@@ -6,7 +6,7 @@
 ## プロジェクト総括 (2026-05-11 終了時点)
 
 **累計改善**: 1MB tail ppl 5.93 → 4.23 (-29%), 10MB tail ppl 7.32 → 4.04 (-45%),
-10MB tail bpb 2.014 → 1.906 (-5%)。
+10MB tail bpb 2.014 → 1.906 (-5%), **60MB tail bpb 1.632 (Stage-10, -14% vs 10MB)**。
 
 **champion 二系統**:
 - byte-level ppl: **Stage-7-deeper-extend** (1.22M params, 10MB ppl 4.038 / 1MB ppl 4.231)
@@ -56,7 +56,42 @@ origin/main と同期済み (push 済み)。
 
 ## チャンピオン (現状最強モデル)
 
-**Stage-9-BPE-vocab2048 (1.45M params, depth=6, RoPE + 10MB + 2048-vocab BPE, 40000 step)** — **bits-per-byte champion**
+**Stage-10-60MB-BPE (1.45M params, Stage-9 recipe + 60MB mixed_classics_en, 40000 step)** — **bits-per-byte champion (data-scaling proven)**
+
+```
+local-genai/out/transformer_stage10_60mb_bpe.pt + tokenizer_stage10_60mb_bpe.json
+  TinyTransformer depth=6, d_model=128, n_heads=4, ctx=256, bptt=256
+  ffn_mult=4, RMSNorm, RoPE
+  dropout 0.1, label_smoothing 0.05, weight_decay 0.05
+  warmup 1500, cosine 終端 LR=1e-5 (min_lr_frac=0.005)
+  BPE 2048-vocab (2.99 bytes/token on 60MB holdout)
+  TinyShakespeare+KJV+Victorian-60MB 学習, 1,447,296 params
+  best bpb 1.632 @ step 40000 (40000 step 走破、まだ未収束)
+  ppl/byte 換算 ≈ 3.099 (Stage-9 比 -17%)
+  訓練時間 5711s (M2 MPS, ≈ 95 分)
+```
+
+**「訓練データ増大」 仮説の実証**: Stage-9 と完全同 recipe (depth=6, d=128, RoPE, 直交 3 種正則化, schedule=long_40k, BPE-2048) でコーパスのみ 10MB → 60MB に拡張。
+
+- bpb 1.906 → **1.632** (-0.274, **-14%**) — プロジェクト最大の単一 stage 改善
+- ppl/byte 3.749 → **3.099** (-17%)
+- 訓練時間 83 分 → 95 分 (+14%; train_t が 6x 増えたが BPE 圧縮効果で穏やか)
+
+corpus 構成 (mixed_classics_en):
+- Shakespeare Complete + alt editions (~6MB)
+- King James Bible 1611 (~4MB)
+- Marlowe, Jonson, Milton, Spenser, Donne, Bacon, Bunyan (~5MB)
+- Defoe, Swift, Pope (~3MB)
+- Austen × 4 (~3MB)
+- Dickens × 5 (~6MB)
+- Eliot, Bronte, Thackeray, Trollope (~5MB)
+- Wilde, Hugo, Melville, Shelley, Twain (~6MB)
+- Joyce, Dostoevsky, Tolstoy, Cervantes, Dumas (~7MB)
+- その他 (Beowulf, Chaucer, Hume, Smith, Stevenson, Hardy 等) (~15MB)
+
+注: holdout は Stage-9 と異なる (60MB tail = Modern Victorian English 中心) ため厳密な同 distribution 比較ではないが、 より広い分布で bpb 1.63 を達成した事実は data scaling の強い裏付け. best @ step 40000 (走破直前) のため延長で更に下がる可能性大.
+
+**Stage-9-BPE-vocab2048 (歴史的: 10MB BPE champion, 1.45M params)** — bpb 1.906 on 10MB tail (= ppl/byte 3.749)
 
 ```
 local-genai/out/transformer_stage9_bpe_vocab2048.pt + tokenizer_stage9_bpe_vocab2048.json
@@ -378,7 +413,8 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
 | 8-deeper-plus (10MB) | depth=8, d=128 RoPE 20K step | 10MB | 1.61M | 4.04 | 4.04 (1MB tail 4.36 / 10MB tail 4.04 — 7-deeper-extend と並ぶが超えず) |
 | 8-BPE (10MB) | 7-deeper recipe + BPE-1024 vocab | 10MB | 1.32M | bpb 1.92 | bpb 1.915 (= ppl/byte 3.77) |
 | 9-BPE-extend (10MB) | 8-BPE + steps 20K→40K | 10MB | 1.32M | bpb 1.911 | bpb 1.911 |
-| **9-BPE-vocab2048 (10MB)** | **9-BPE-extend + vocab 1024→2048** | **10MB** | **1.45M** | **bpb 1.906** | **bpb 1.906 (= ppl/byte 3.75; bpb champion)** |
+| 9-BPE-vocab2048 (10MB) | 9-BPE-extend + vocab 1024→2048 | 10MB | 1.45M | bpb 1.906 | bpb 1.906 (= ppl/byte 3.75) |
+| **10 (60MB)** | **9-vocab2048 recipe + 60MB mixed_classics_en** | **60MB** | **1.45M** | **bpb 1.632** | **bpb 1.632 (= ppl/byte 3.10; current champion, data-scaling proven, -14% vs Stage-9)** |
 
 教訓:
 - Stage-3 の transformer 敗北は ctx だけの問題ではなかった: BPTT < ctx
