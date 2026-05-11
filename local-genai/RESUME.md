@@ -22,7 +22,27 @@ origin/main と同期済み (push 済み)。
 
 ## チャンピオン (現状最強モデル)
 
-**Stage-9-BPE-extend (1.32M params, depth=6, RoPE + 10MB + 1024-vocab BPE, 40000 step)** — **bits-per-byte champion**
+**Stage-9-BPE-vocab2048 (1.45M params, depth=6, RoPE + 10MB + 2048-vocab BPE, 40000 step)** — **bits-per-byte champion**
+
+```
+local-genai/out/transformer_stage9_bpe_vocab2048.pt + tokenizer_stage9_bpe_vocab2048.json
+  TinyTransformer depth=6, d_model=128, n_heads=4, ctx=256, bptt=256
+  ffn_mult=4, RMSNorm, RoPE
+  dropout 0.1, label_smoothing 0.05, weight_decay 0.05
+  warmup 1500, cosine 終端 LR=1e-5 (min_lr_frac=0.005)
+  BPE 2048-vocab (2.86 bytes/token on holdout, +40% 圧縮 vs 1024)
+  TinyShakespeare+KJV-10MB 学習, 1,447,296 params
+  best bpb 1.906 @ step 36000 (40000 step 走破)
+  ppl/byte 換算 ≈ 3.749
+  訓練時間 4995s (M2 MPS, ≈ 83 分; vocab=1024 の 112 分より -26%)
+```
+
+vocab=1024 → 2048 の効果:
+- bpb -0.005 (-0.3%) — 微小だが純粋な改善
+- params +10% — 表現力増加分
+- 訓練時間 -26% (token 数が 4.75M → 3.36M に減るため) — 大きな副次効果
+
+**Stage-9-BPE-extend (1.32M params, depth=6, RoPE + 10MB + 1024-vocab BPE, 40000 step)** — bpb 1.911 (歴史的)
 
 ```
 local-genai/out/transformer_stage9_bpe_extend.pt + tokenizer_stage9_bpe_extend.json
@@ -58,7 +78,8 @@ local-genai/out/transformer_stage8_bpe.pt + tokenizer_stage8_bpe.json
 |---|---:|---|---:|---:|---:|
 | 7-deeper-extend | 1.22M | byte | 2.014 | 4.038 | 193 min |
 | 8-BPE | 1.32M | BPE-1024 | 1.915 | 3.771 | 54.5 min |
-| **9-BPE-extend** | **1.32M** | **BPE-1024** | **1.911** | **3.760** | **112 min** |
+| 9-BPE-extend | 1.32M | BPE-1024 | 1.911 | 3.760 | 112 min |
+| **9-BPE-vocab2048** | **1.45M** | **BPE-2048** | **1.906** | **3.749** | **83 min** |
 
 延長効果は微小 (-0.004 bpb): BPE は token あたり情報量が高く、 byte-level
 のような長 schedule での「終盤微調整」の余地が少ない。 step 32000 で peak
@@ -322,7 +343,8 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
 | 8-wider (10MB) | depth=4, d=192 (width 試行) | 10MB | 1.82M | 4.23 | 4.23 (1MB tail 5.21 / 10MB tail 4.23 — params +50% で 7-deeper に負け) |
 | 8-deeper-plus (10MB) | depth=8, d=128 RoPE 20K step | 10MB | 1.61M | 4.04 | 4.04 (1MB tail 4.36 / 10MB tail 4.04 — 7-deeper-extend と並ぶが超えず) |
 | 8-BPE (10MB) | 7-deeper recipe + BPE-1024 vocab | 10MB | 1.32M | bpb 1.92 | bpb 1.915 (= ppl/byte 3.77) |
-| **9-BPE-extend (10MB)** | **8-BPE + steps 20K→40K** | **10MB** | **1.32M** | **bpb 1.911** | **bpb 1.911 (= ppl/byte 3.76; bpb champion)** |
+| 9-BPE-extend (10MB) | 8-BPE + steps 20K→40K | 10MB | 1.32M | bpb 1.911 | bpb 1.911 |
+| **9-BPE-vocab2048 (10MB)** | **9-BPE-extend + vocab 1024→2048** | **10MB** | **1.45M** | **bpb 1.906** | **bpb 1.906 (= ppl/byte 3.75; bpb champion)** |
 
 教訓:
 - Stage-3 の transformer 敗北は ctx だけの問題ではなかった: BPTT < ctx
@@ -368,12 +390,12 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
      のに depth=8 (1.61M, 81 分) より depth=6 + 延長 (1.22M, 193 分)
      のほうが省 params。
 6. **Stage-9 / Plan-β (BPE 確立後)**
-   - ~~**8-bpe**~~ — 完了 (1.32M, BPE-1024, bpb 1.915)
-   - ~~**9-bpe-extend**~~ — 完了 (1.32M, BPE-1024, 40K step, bpb **1.911**;
-     **bpb champion**、延長効果は微小)
-   - **9-bpe-vocab-2048**: vocab を 1024 → 2048 で更に圧縮 (~4-5 bytes/token)
-   - **chat.py 拡張**: 最終 champion (byte + BPE) で実生成デモ
-   - **8-AIPL-revival**: 全 prior を AIPL .abcl に encode して進化計算へ
+   - ~~8-bpe~~ — 完了 (1.32M, BPE-1024, bpb 1.915)
+   - ~~9-bpe-extend~~ — 完了 (1.32M, BPE-1024, 40K, bpb 1.911)
+   - ~~**9-bpe-vocab2048**~~ — 完了 (1.45M, BPE-2048, 40K, bpb **1.906**; **bpb champion**)
+   - **BPE 改善は飽和傾向**: 8 → 9-extend → 9-vocab2048 で累計 -0.009 bpb のみ
+   - **chat.py 拡張**: 最終 champion (BPE-2048) で実生成デモ
+   - **AIPL-revival**: 全 prior を encode して進化計算へ
 4. **Stage-AIPL-revival**: 全 prior (容量, 正則化 3 種, schedule, RoPE) を
    `.aice` に encode → AIPL evolution で人が見つけた Pareto を AI が更に
    押し下げられるか
@@ -400,7 +422,25 @@ local-genai/.venv/bin/python local-genai/train_stage4.py \
 # 約 7 分 (M2 MPS), best ppl 5.302 @ step 10000 (収束未達)
 ```
 
-## Stage-9-BPE-extend (現 bpb champion, 40K step) を回す手順
+## Stage-9-BPE-vocab2048 (現 bpb champion) を回す手順
+
+```sh
+local-genai/.venv/bin/python local-genai/train_stage8_bpe.py \
+  --corpus 10MB --vocab-size 2048 \
+  --steps 40000 --eval-every 1000 --warmup 1500 \
+  --batch 24 --bptt 256 --ctx 256 \
+  --depth 6 --d-model 128 --n-heads 4 \
+  --lr 2e-3 --dropout 0.1 \
+  --label-smoothing 0.05 --weight-decay 0.05 \
+  --min-lr-frac 0.005 \
+  --pos-encoding rope \
+  --out-name transformer_stage9_bpe_vocab2048.pt \
+  --tokenizer-name tokenizer_stage9_bpe_vocab2048.json
+# 約 83 分 (M2 MPS, 4995s), 1.45M params,
+# best bpb 1.906 @ step 36000 (= ppl/byte 3.75)
+```
+
+## Stage-9-BPE-extend (vocab=1024 版, 40K step) を回す手順
 
 ```sh
 local-genai/.venv/bin/python local-genai/train_stage8_bpe.py \
