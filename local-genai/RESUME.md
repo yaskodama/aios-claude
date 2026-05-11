@@ -3,14 +3,48 @@
 このセッションで構築した「ローカル生成 AI 進化計算」の状態と、
 別端末・後日の再開手順をまとめる。
 
+## プロジェクト総括 (2026-05-11 終了時点)
+
+**累計改善**: 1MB tail ppl 5.93 → 4.23 (-29%), 10MB tail ppl 7.32 → 4.04 (-45%),
+10MB tail bpb 2.014 → 1.906 (-5%)。
+
+**champion 二系統**:
+- byte-level ppl: **Stage-7-deeper-extend** (1.22M params, 10MB ppl 4.038 / 1MB ppl 4.231)
+- bits-per-byte: **Stage-9-BPE-vocab2048** (1.45M params, bpb 1.906 / ppl_byte 3.749)
+
+**6 つの discovery** (累計効果順):
+1. 10MB データ + 容量 ~1M params (Stage-6c, 6d)
+2. 直交 3 種正則化 (dropout 0.1 + ls 0.05 + wd 0.05) — Stage-4d-orth
+3. 訓練 20K→40K step + 深 cosine 減衰 — Stage-7-deeper-extend
+4. depth=4 → 6 — Stage-7-deeper
+5. BPE 1024/2048 vocab トークナイザ — Stage-8/9-BPE
+6. RoPE (rotary positional) — Stage-5-RoPE
+
+**Failed/飽和 (やってはダメと判明)**:
+- width=192 で depth=6 に負け (depth >> width 確定)
+- depth=8 は depth=6 +延長と並ぶだけ (depth 飽和)
+- 1MB scale で容量増は逆効果 (data-bound)
+- AIPL mock provider はランダム sampling で champion 再発見不可
+
+**インフラ**:
+- chat.py で 5 backend (trigram/bigram/charrnn/transformer/BPE) と REPL 対話可
+- fair_compare.py で 1MB / 10MB tail の共通評価ベンチ確立
+- AIPL の予測器・スキーマを v1/v2/v3 まで校正済 (LLM proposer 接続が v4 の課題)
+
+詳細は `NEXT_SESSION.md` 参照。
+
 ## 直近のコミット
 
-- `6fdd0a7` LocalGenAI evolved: AIPL .abcl run + lineage scoring + real Stage-3 training
-- `512943d` LocalGenAIScaledEvolutionJP: v2 .ga.json + AIPL orchestrator
-- `b6d6280` LocalGenAIScaledEvolutionJP.aice — corpus + params 同時進化版
-- `74cec58` local-genai: stage 2 — real CharRNN training with PyTorch
-- `1f53ce6` local-genai: chat.py — interactive REPL for stage-1 n-gram
-- `ee6e952` local-genai: end-to-end 7-stage evolution loop
+- `12ef1c5` aipl-revival v3: coherence violations + interaction bonuses
+- `d4f2675` aipl-revival v2: extend schema with four new axes
+- `2e073eb` aipl-revival v1: calibrate design_estimator with Stage-4..9 priors
+- `23f9ad1` chat.py — add transformer and BPE backends
+- `b5fd026` Stage-9-BPE-vocab2048 — bpb 1.906 (champion)
+- `f7cf721` Stage-9-BPE-extend — bpb 1.911 (40K step)
+- `40d664d` Stage-8-BPE — bpb 1.915 (-5% vs byte-level)
+- `12e0c05` Stage-7-deeper-extend — 1MB tail 4.231 (-7%)
+- `1df74d1` Stage-7-deeper — depth=6 (ppl 4.064)
+- `2711f7f` Stage-6d — all four discoveries combined (ppl 4.191)
 
 origin/main と同期済み (push 済み)。
 
