@@ -77,10 +77,12 @@ def feasibility(g: dict) -> tuple[bool, str]:
     """Can we actually train this locally right now?"""
     if g.get("data_per_param_health") == "below_50_overfit_warning":
         return False, "data/param < 50 (overfit)"
-    if g.get("corpus_size_class") not in ("10KB",):
+    # All corpus tiers are now hash-locked in common.py: 10KB / 100KB / 1MB / 10MB
+    if g.get("corpus_size_class") not in ("10KB", "100KB", "1MB", "10MB"):
         return False, f"corpus {g.get('corpus_size_class')} not locally available"
     if g.get("model_family") not in ("char_rnn", "single_block_transformer",
-                                     "multi_block_transformer"):
+                                     "multi_block_transformer",
+                                     "multi_block_transformer_compact"):
         return False, f"model_family={g.get('model_family')} not implemented locally"
     if g.get("training_paradigm") not in ("maximum_likelihood_sgd",
                                           "count_normalize"):

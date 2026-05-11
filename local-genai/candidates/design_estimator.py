@@ -34,12 +34,34 @@ import hashlib
 
 VOCAB = 256
 
+# Legacy single-axis base ppl (kept for backward compat / fallback).
 BASE_PPL_BY_CLASS = {
     "32K":  9.0,
     "100K": 6.5,
     "1M":   5.2,
     "3M":   4.1,
     "10M":  3.9,
+}
+
+# Calibrated (corpus, param_class) → expected_ppl on that corpus's holdout
+# Fitted from Stage-4 through Stage-9 actual measurements (Apr-May 2026).
+# When the genome's exact (corpus, pcls) pair isn't here, we fall back to
+# BASE_PPL_BY_CLASS keyed only on param_class (legacy behaviour).
+BASE_PPL_BY_CORPUS_AND_CLASS = {
+    # 10KB corpus (tiny_corpus, stage-1 era; mostly overfit small models)
+    ("10KB", "32K"):  16.0,
+    ("10KB", "100K"):  4.5,
+    # 100KB corpus (TinyShakespeare 100KB; stage-2 era)
+    ("100KB", "100K"): 5.7,
+    ("100KB", "1M"):   5.5,
+    # 1MB corpus (TinyShakespeare 1MB; stage-4 era, data-saturated above ~400K)
+    ("1MB", "100K"):   5.5,   # 5-RoPE 165K → 5.12 with full recipe
+    ("1MB", "1M"):     5.4,   # 4d-orth 855K → 5.30; 1.87M overfits at 5.93
+    ("1MB", "3M"):     5.9,   # 1.87M overcapacity at 1MB
+    # 10MB corpus (Shakespeare + KJV; stage-6 era, where capacity finally pays)
+    ("10MB", "100K"):  4.7,   # 6b 165K → 4.725
+    ("10MB", "1M"):    4.2,   # 7-deeper 1.22M → 4.06, extend 4.04
+    ("10MB", "3M"):    4.2,   # plateau — bigger models don't help much more
 }
 
 PARAM_BUDGET_BY_CLASS = {
@@ -121,12 +143,18 @@ def _seed_jitter(g: dict, scale: float) -> float:
 
 def estimate(g: dict) -> dict:
     pcls = g.get("param_class", "1M")
-    base = BASE_PPL_BY_CLASS[pcls]
+    corpus = g.get("corpus_size_class", "1MB")
+    # Prefer the corpus-aware table; fall back to the legacy one-axis lookup.
+    base = BASE_PPL_BY_CORPUS_AND_CLASS.get((corpus, pcls),
+                                              BASE_PPL_BY_CLASS[pcls])
 
     bonus = 0.0
-    if g.get("positional") == "rope":      bonus -= 0.10
-    if g.get("normalization") == "rmsnorm":bonus -= 0.05
-    if g.get("regularization") == "dropout":
+    # RoPE: re-fit from Stage-5-RoPE → Stage-4f-extend gap (~0.08 ppl)
+    if g.get("positional") == "rope":            bonus -= 0.08
+    if g.get("normalization") == "rmsnorm":      bonus -= 0.05
+    # Dropout helps mid/large models, hurts tiny ones — re-fitted to
+    # Stage-4b (855K, dropout) vs Stage-4 (1.87M, dropout) actuals.
+    if g.get("regularization") in ("dropout", "dropout_005", "dropout_010"):
         bonus -= 0.20 if pcls in ("1M", "3M", "10M") else +0.30
 
     tp = g.get("training_paradigm", "maximum_likelihood_sgd")
@@ -136,6 +164,14 @@ def estimate(g: dict) -> dict:
 
     fam = g["model_family"]
     if fam == "self_evolving_compact":    bonus -= 0.05
+
+    # Calibration deltas observed in Stage-4 → Stage-9 (not currently axes
+    # in the schema, but recorded here so future schema extensions can
+    # surface them):
+    #   orthogonal_reg_combo (dropout 0.1 + ls 0.05 + wd 0.05)   ≈ -0.35
+    #   long_schedule (20k steps + min_lr_frac=0.005)            ≈ -0.20
+    #   depth=6 vs depth=4 at 10MB                              ≈ -0.10
+    #   BPE-1024 tokenizer (bits/byte instead of ppl)            ≈ -0.10 bpb
 
     violations = _coherence_violations(g)
     penalty = 1.0 * len(violations)
