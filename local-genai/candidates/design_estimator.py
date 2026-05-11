@@ -165,13 +165,25 @@ def estimate(g: dict) -> dict:
     fam = g["model_family"]
     if fam == "self_evolving_compact":    bonus -= 0.05
 
-    # Calibration deltas observed in Stage-4 → Stage-9 (not currently axes
-    # in the schema, but recorded here so future schema extensions can
-    # surface them):
-    #   orthogonal_reg_combo (dropout 0.1 + ls 0.05 + wd 0.05)   ≈ -0.35
-    #   long_schedule (20k steps + min_lr_frac=0.005)            ≈ -0.20
-    #   depth=6 vs depth=4 at 10MB                              ≈ -0.10
-    #   BPE-1024 tokenizer (bits/byte instead of ppl)            ≈ -0.10 bpb
+    # Calibration deltas observed in Stage-4 → Stage-9 (now surfaced as
+    # new schema axes in revival v2). Bonuses apply only when the genome
+    # specifies the value — older genomes lacking these fields default
+    # to no bonus, keeping backward compatibility.
+    rcombo = g.get("regularization_combo")
+    if rcombo == "orthogonal_3_set":      bonus -= 0.35
+    elif rcombo == "dropout_only":        bonus -= 0.10
+
+    schedule = g.get("schedule_length")
+    if schedule == "long_40k":            bonus -= 0.25
+    elif schedule == "medium_20k":        bonus -= 0.10
+
+    depth_cls = g.get("depth_class")
+    if depth_cls == "medium_4_to_6":      bonus -= 0.10
+    elif depth_cls == "deep_8plus":       bonus -= 0.10  # diminishing returns
+
+    tok = g.get("tokenizer")
+    if tok == "bpe_2048":                 bonus -= 0.12
+    elif tok == "bpe_1024":               bonus -= 0.10
 
     violations = _coherence_violations(g)
     penalty = 1.0 * len(violations)

@@ -1,33 +1,37 @@
 {
   "winner": {
-    "id": "I54",
-    "cell": "model_family=char_rnn|training_paradigm=count_normalize|param_class=2M|corpus_size_class=10KB",
+    "id": "I52",
+    "cell": "model_family=multi_block_transformer|training_paradigm=maximum_likelihood_sgd|param_class=2M|corpus_size_class=10MB",
     "genome_axes": {
-      "model_family": "char_rnn",
-      "positional": "sinusoidal",
-      "normalization": "rmsnorm",
-      "regularization": "none",
+      "model_family": "multi_block_transformer",
+      "positional": "implicit_recurrence",
+      "normalization": "layernorm",
+      "regularization": "dropout_005",
       "inference_optimization": "kv_cache_plus_int8",
-      "training_paradigm": "count_normalize",
-      "self_evolution": "local_llm_proposes_three_mutations",
-      "engine": "stdlib_only",
+      "training_paradigm": "maximum_likelihood_sgd",
+      "self_evolution": "local_llm_writes_full_stage",
+      "engine": "pytorch_mps",
       "param_class": "2M",
-      "corpus_size_class": "10KB",
-      "data_per_param_health": "50_to_100_tight"
+      "corpus_size_class": "10MB",
+      "data_per_param_health": "100_to_200_healthy",
+      "regularization_combo": "dropout_only",
+      "schedule_length": "short_5k",
+      "tokenizer": "byte",
+      "depth_class": "shallow_3"
     },
     "design": {
-      "name": "I54",
-      "model_family": "char_rnn",
+      "name": "I52",
+      "model_family": "multi_block_transformer",
       "param_class": "3M",
-      "positional": "sinusoidal",
-      "normalization": "rmsnorm",
-      "regularization": "none",
+      "positional": "implicit_recurrence",
+      "normalization": "layernorm",
+      "regularization": "dropout",
       "inference_optimization": "kv_cache_plus_int8",
-      "training_paradigm": "count_normalize",
-      "self_evolution": "local_llm_proposes_three_mutations",
-      "engine": "stdlib_only",
-      "corpus_size_class": "10KB",
-      "data_per_param_health": "50_to_100_tight",
+      "training_paradigm": "maximum_likelihood_sgd",
+      "self_evolution": "local_llm_writes_full_stage",
+      "engine": "pytorch_mps",
+      "corpus_size_class": "10MB",
+      "data_per_param_health": "100_to_200_healthy",
       "depth": 4,
       "n_heads": 4,
       "d_model": 192,
@@ -45,13 +49,13 @@
       ]
     },
     "estimate": {
-      "params": 90112,
+      "params": 1820160,
       "param_class": "3M",
       "param_budget": 4000000,
       "over_budget": false,
-      "expected_holdout_ppl": 4.079,
-      "flops_per_token": 573440,
-      "train_time_min_estimate": 0.23,
+      "expected_holdout_ppl": 3.951,
+      "flops_per_token": 4033536,
+      "train_time_min_estimate": 3.19,
       "inference_throughput_factor": 6.0,
       "coherence_violations": []
     },
@@ -61,20 +65,20 @@
         "axes": {
           "ppl_score_class_aware": 3,
           "loss_trajectory_plausibility": 3,
-          "generation_appropriate_size": 2
+          "generation_appropriate_size": 3
         },
-        "total": 8,
+        "total": 9,
         "max": 12
       },
       "efficiency": {
         "reviewer": "Efficiency",
         "axes": {
-          "ppl_per_param": 0,
+          "ppl_per_param": 2,
           "within_param_budget": 3,
           "train_time_under_30min": 3,
           "inference_optimization": 3
         },
-        "total": 9,
+        "total": 11,
         "max": 12
       },
       "reproducibility": {
@@ -91,11 +95,11 @@
         "total": 10,
         "max": 10
       },
-      "normalized_total": 2.4167
+      "normalized_total": 2.6667
     },
     "feasible": true,
     "reason": "feasible"
   },
-  "feasible_count": 4,
+  "feasible_count": 14,
   "total_individuals": 76
 }

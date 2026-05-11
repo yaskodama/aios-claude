@@ -70,6 +70,26 @@
       "50_to_100_tight",
       "100_to_200_healthy",
       "above_200_underfit_room"
+    ],
+    "regularization_combo": [
+      "none",
+      "dropout_only",
+      "orthogonal_3_set"
+    ],
+    "schedule_length": [
+      "short_5k",
+      "medium_20k",
+      "long_40k"
+    ],
+    "tokenizer": [
+      "byte",
+      "bpe_1024",
+      "bpe_2048"
+    ],
+    "depth_class": [
+      "shallow_3",
+      "medium_4_to_6",
+      "deep_8plus"
     ]
   },
   "ordinal_axes": {
@@ -89,7 +109,11 @@
       "50_to_100_tight",
       "100_to_200_healthy",
       "above_200_underfit_room"
-    ]
+    ],
+    "regularization_combo": ["none", "dropout_only", "orthogonal_3_set"],
+    "schedule_length": ["short_5k", "medium_20k", "long_40k"],
+    "tokenizer": ["byte", "bpe_1024", "bpe_2048"],
+    "depth_class": ["shallow_3", "medium_4_to_6", "deep_8plus"]
   },
   "coherence": [
     {"if": {"model_family": "ngram_count"},
@@ -122,7 +146,21 @@
     {"if": {"param_class": "3M"},
      "then_in": {"corpus_size_class": ["1MB", "10MB"]}},
     {"if": {"param_class": "6M"},
-     "then": {"corpus_size_class": "10MB"}}
+     "then": {"corpus_size_class": "10MB"}},
+    {"if": {"model_family": "ngram_count"},
+     "then": {"regularization_combo": "none", "schedule_length": "short_5k",
+              "tokenizer": "byte", "depth_class": "shallow_3"}},
+    {"if": {"model_family": "char_rnn"},
+     "then_in": {"regularization_combo": ["none", "dropout_only"],
+                 "tokenizer": ["byte"],
+                 "depth_class": ["shallow_3"]}},
+    {"if": {"model_family": "single_block_transformer"},
+     "then": {"depth_class": "shallow_3"}},
+    {"if": {"model_family": "multi_block_transformer"},
+     "then_in": {"depth_class": ["medium_4_to_6", "deep_8plus"]}},
+    {"if": {"model_family": "multi_block_transformer_compact"},
+     "then_in": {"depth_class": ["medium_4_to_6", "deep_8plus"],
+                 "tokenizer": ["bpe_1024", "bpe_2048"]}}
   ],
   "open_axes": true
 }
