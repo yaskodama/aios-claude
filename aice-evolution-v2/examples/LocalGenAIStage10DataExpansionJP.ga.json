@@ -1,0 +1,110 @@
+{
+  "name": "LocalGenAIStage10DataExpansionJP",
+  "task": "Stage-9 で確立した recipe (depth=6, d_model=128, RoPE, 直交 3 種正則化, schedule=long_40k, BPE-2048) を seed として、 訓練データの「量」 「多様性」 「再利用戦略」 の 3 新軸を進化計算で探索する. cell は (model_family, training_paradigm, param_class, corpus_size_class, corpus_composition) の 5 軸. champion は bits-per-byte (BPB) で比較し、 Stage-9-BPE-vocab2048 の bpb 1.906 を baseline とする. 終端目標は (multi_block_transformer, maximum_likelihood_sgd, 3M, 100MB or 1GB, mixed_elizabethan) の単一 cell が bpb 1.8 を切ること、 もしくは (multi_block_transformer_compact, distillation_plus_dpo, 1M, 10MB, shakespeare_only) で bpb 1.85 を達成して params/bpb 効率での Pareto 最前線を更新すること.",
+  "schema_ref": "schemas/local_genai_stage10.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "model_family",
+      "training_paradigm",
+      "param_class",
+      "corpus_size_class",
+      "corpus_composition"
+    ],
+    "generations": 80,
+    "seed_count": 24,
+    "open_axes": true,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.45
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.25
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.25
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.05
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "BitsPerByteOnSharedHoldout",
+      "DataCeilingAnalysis",
+      "TokenEfficiencyVsDataScale",
+      "AugmentationVsOverfitTradeoff",
+      "TrainTimeBudget",
+      "ReproducibilityChecklist"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "Quality",
+        "persona": "あなたは言語品質レビュアーです. 候補ジェノムから (corpus_size_class, corpus_composition, param_class, tokenizer) の組合せを確認し、 BPB の期待値が我々の Stage-9 ベースライン (1MB→bpb 2.4, 10MB→bpb 1.91, 100MB→bpb 1.80 予想, 1GB→bpb 1.70 予想) に整合しているかを見ます. 採点は 5 軸 [BPB が世代の expected レンジ内か / data_per_param が健全 (5-50 byte/param) か / corpus_composition が training_task と整合か / data_augmentation が corpus_size に適切か / 訓練終端で peak を打ったか] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Efficiency",
+        "persona": "あなたは効率レビュアーです. data_per_param 比 (5-50 byte/param が data-rich, 50+ で underfit_room, 5 未満は overfit_warning) と train_time_estimate (4 時間以内 = 80K steps × 3M params on M2 MPS) を最重視します. BPE vocab × bytes/token のバランスも見ます (vocab=2048 で bytes/token=2.86 が経験値, vocab=4096 でも 4.0 程度が期待値の上限). 採点は 5 軸 [data_per_param が 5-50 範囲 / params が世代上限内 / train_time<=4hr / vocab × corpus が整合 / inference cost が許容範囲] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Reproducibility",
+        "persona": "あなたは再現性レビュアーです. 採点は 7 軸 [seed 固定 / corpus が SHA-256 ロック / corpus build スクリプト公開 / 外部 API 不使用 / 依存最小 (python+pytorch+numpy+tokenizers) / 単一スクリプトで train+eval+chat / 20 プロンプト × 3 温度のサンプル保存] それぞれ 0-2 点、 計 0-14 点. ローカル Ollama 利用は外部 API ではないので減点しない. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.2,
+    "frontier_coverage": 0.2,
+    "novelty": 0.1,
+    "evolvability": 0.15,
+    "cross_task_generality": 0.15,
+    "implementability": 0.2
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "data_pareto",
+      "param_pareto",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "data_pareto": {},
+      "param_pareto": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}
