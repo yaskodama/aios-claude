@@ -1,37 +1,37 @@
 {
   "winner": {
-    "id": "I52",
-    "cell": "model_family=multi_block_transformer|training_paradigm=maximum_likelihood_sgd|param_class=2M|corpus_size_class=10MB",
+    "id": "I12",
+    "cell": "model_family=char_rnn|training_paradigm=count_normalize|param_class=200K|corpus_size_class=10MB",
     "genome_axes": {
-      "model_family": "multi_block_transformer",
-      "positional": "implicit_recurrence",
+      "model_family": "char_rnn",
+      "positional": "sinusoidal",
       "normalization": "layernorm",
-      "regularization": "dropout_005",
+      "regularization": "none",
       "inference_optimization": "kv_cache_plus_int8",
-      "training_paradigm": "maximum_likelihood_sgd",
-      "self_evolution": "local_llm_writes_full_stage",
-      "engine": "pytorch_mps",
-      "param_class": "2M",
+      "training_paradigm": "count_normalize",
+      "self_evolution": "local_llm_proposes_three_mutations",
+      "engine": "pytorch_cpu",
+      "param_class": "200K",
       "corpus_size_class": "10MB",
-      "data_per_param_health": "100_to_200_healthy",
-      "regularization_combo": "dropout_only",
-      "schedule_length": "short_5k",
-      "tokenizer": "byte",
+      "data_per_param_health": "above_200_underfit_room",
+      "regularization_combo": "none",
+      "schedule_length": "medium_20k",
+      "tokenizer": "bpe_2048",
       "depth_class": "shallow_3"
     },
     "design": {
-      "name": "I52",
-      "model_family": "multi_block_transformer",
-      "param_class": "3M",
-      "positional": "implicit_recurrence",
+      "name": "I12",
+      "model_family": "char_rnn",
+      "param_class": "100K",
+      "positional": "sinusoidal",
       "normalization": "layernorm",
-      "regularization": "dropout",
+      "regularization": "none",
       "inference_optimization": "kv_cache_plus_int8",
-      "training_paradigm": "maximum_likelihood_sgd",
-      "self_evolution": "local_llm_writes_full_stage",
-      "engine": "pytorch_mps",
+      "training_paradigm": "count_normalize",
+      "self_evolution": "local_llm_proposes_three_mutations",
+      "engine": "pytorch_cpu",
       "corpus_size_class": "10MB",
-      "data_per_param_health": "100_to_200_healthy",
+      "data_per_param_health": "above_200_underfit_room",
       "depth": 4,
       "n_heads": 4,
       "d_model": 192,
@@ -49,13 +49,13 @@
       ]
     },
     "estimate": {
-      "params": 1820160,
-      "param_class": "3M",
-      "param_budget": 4000000,
+      "params": 90112,
+      "param_class": "100K",
+      "param_budget": 200000,
       "over_budget": false,
-      "expected_holdout_ppl": 3.951,
-      "flops_per_token": 4033536,
-      "train_time_min_estimate": 3.19,
+      "expected_holdout_ppl": 4.709,
+      "flops_per_token": 573440,
+      "train_time_min_estimate": 0.56,
       "inference_throughput_factor": 6.0,
       "coherence_violations": []
     },
@@ -63,22 +63,22 @@
       "quality": {
         "reviewer": "Quality",
         "axes": {
-          "ppl_score_class_aware": 3,
+          "ppl_score_class_aware": 5,
           "loss_trajectory_plausibility": 3,
           "generation_appropriate_size": 3
         },
-        "total": 9,
+        "total": 11,
         "max": 12
       },
       "efficiency": {
         "reviewer": "Efficiency",
         "axes": {
-          "ppl_per_param": 2,
+          "ppl_per_param": 0,
           "within_param_budget": 3,
           "train_time_under_30min": 3,
           "inference_optimization": 3
         },
-        "total": 11,
+        "total": 9,
         "max": 12
       },
       "reproducibility": {
@@ -100,6 +100,6 @@
     "feasible": true,
     "reason": "feasible"
   },
-  "feasible_count": 14,
+  "feasible_count": 18,
   "total_individuals": 76
 }

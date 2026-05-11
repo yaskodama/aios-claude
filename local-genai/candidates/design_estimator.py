@@ -115,13 +115,22 @@ def _params(g: dict) -> int:
 def _coherence_violations(g: dict) -> list[str]:
     v = []
     fam = g["model_family"]
-    if fam in ("single_block_transformer", "multi_block_transformer",
-               "distilled_compact", "preference_tuned_compact",
-               "self_evolving_compact"):
+    is_transformer = fam in (
+        "single_block_transformer", "multi_block_transformer",
+        "multi_block_transformer_compact",
+        "distilled_compact", "preference_tuned_compact",
+        "self_evolving_compact",
+    )
+    if is_transformer:
         if g.get("normalization", "none") == "none":
             v.append("transformer_without_normalization")
-        if g.get("positional", "none") == "none":
+        pos = g.get("positional", "none")
+        if pos == "none":
             v.append("transformer_without_positional")
+        # v3: implicit_recurrence is an RNN idiom; transformers must use
+        # an explicit positional encoding (learned/rope/sinusoidal).
+        if pos == "implicit_recurrence":
+            v.append("transformer_with_implicit_recurrence_pos")
     if fam == "multi_block_transformer" and g.get("regularization") != "dropout":
         v.append("deep_transformer_without_dropout")
     if g.get("training_paradigm") == "distillation" and fam not in (
@@ -131,6 +140,16 @@ def _coherence_violations(g: dict) -> list[str]:
         v.append("dpo_paradigm_mismatch")
     if g.get("training_paradigm") == "self_proposed_mutation" and fam != "self_evolving_compact":
         v.append("self_evolve_paradigm_mismatch")
+    # v3: depth_class should match family.
+    depth_cls = g.get("depth_class")
+    if depth_cls == "shallow_3" and fam in (
+        "multi_block_transformer", "multi_block_transformer_compact"
+    ):
+        v.append("multi_block_with_shallow_depth_class")
+    if depth_cls in ("medium_4_to_6", "deep_8plus") and fam in (
+        "ngram_count", "char_rnn", "single_block_transformer"
+    ):
+        v.append("non_multi_block_with_deep_depth_class")
     return v
 
 
@@ -184,6 +203,28 @@ def estimate(g: dict) -> dict:
     tok = g.get("tokenizer")
     if tok == "bpe_2048":                 bonus -= 0.12
     elif tok == "bpe_1024":               bonus -= 0.10
+
+    # v3 interaction bonuses — these combinations were how we actually
+    # got below ppl 4.1 in practice. Without them, the AIPL search
+    # treated each axis as independent and could not see why the joint
+    # configuration matters more than the sum of its parts.
+    corpus = g.get("corpus_size_class", "1MB")
+    pos = g.get("positional", "none")
+
+    # RoPE + 10MB unlocks the data ceiling (Stage-6c → 6d delta).
+    if pos == "rope" and corpus == "10MB":
+        bonus -= 0.10
+    # Orthogonal regularization × long schedule × 10MB is the recipe
+    # that produced Stage-7-deeper-extend (-0.31 ppl on the 1MB tail).
+    if rcombo == "orthogonal_3_set" and schedule == "long_40k" and corpus == "10MB":
+        bonus -= 0.20
+    # BPE tokenizer is only useful with enough data and enough capacity.
+    if tok in ("bpe_1024", "bpe_2048") and corpus == "10MB" and pcls in ("1M", "3M", "10M"):
+        bonus -= 0.10
+    # Medium depth on 10MB is where the depth gradient pays off
+    # (Stage-7-deeper vs Stage-6d).
+    if depth_cls == "medium_4_to_6" and corpus == "10MB":
+        bonus -= 0.10
 
     violations = _coherence_violations(g)
     penalty = 1.0 * len(violations)
