@@ -1,0 +1,97 @@
+// LocalGenAIStage10DataExpansionJP — Stage-10 進化計算仕様 (.aice).
+//
+// Stage-9 終了時点で 1.45M params (BPE-2048 + RoPE + depth=6, 10MB 学習)
+// が bpb 1.906 / ppl_byte 3.749 で頭打ちになった. 残された伸び代は
+// 「訓練データの増大」 — corpus 容量と多様性を増やすことで、 容量
+// 1M-2M params のモデルが本来持つはずの表現力を引き出す.
+//
+// 本 .aice は Stage-9 までで確立した 6 つの discovery を seed の prior
+// とし、 (corpus_size, corpus_composition, data_augmentation_strategy)
+// を新たに進化軸として加えて MAP-Elites で探索する.
+//
+// 設計の前提:
+//   - Stage-9 champion (Stage-9-BPE-vocab2048) を seed genome の 1 つに
+//     する. 他 seed は容量 / depth / vocab を一段ずつ動かした近傍.
+//   - corpus_size_class に "100MB" と "1GB" を追加し、 10MB で頭打ち
+//     した data ceiling を破る軸とする.
+//   - corpus_composition で「分布の広さ」 を制御する. 単一作家 ↔ 同時代
+//     混合 ↔ 近代英語混合 ↔ 多言語混合 で、 generalization vs
+//     specialization のトレードオフを定量化する.
+//   - data_augmentation_strategy で「同じデータをどう見せるか」 を
+//     制御する. naive_multi_epoch / shuffled_blocks /
+//     curriculum_short_to_long / synthetic_paraphrase の 4 戦略.
+
+aice LocalGenAIStage10DataExpansionJP {
+  dialect = "aice_evolution_v2";
+
+  task = "Stage-9 で確立した recipe (depth=6, d_model=128, RoPE, 直交 3 種正則化, schedule=long_40k, BPE-2048) を seed として、 訓練データの「量」 「多様性」 「再利用戦略」 の 3 新軸を進化計算で探索する. cell は (model_family, training_paradigm, param_class, corpus_size_class, corpus_composition) の 5 軸. champion は bits-per-byte (BPB) で比較し、 Stage-9-BPE-vocab2048 の bpb 1.906 を baseline とする. 終端目標は (multi_block_transformer, maximum_likelihood_sgd, 3M, 100MB or 1GB, mixed_elizabethan) の単一 cell が bpb 1.8 を切ること、 もしくは (multi_block_transformer_compact, distillation_plus_dpo, 1M, 10MB, shakespeare_only) で bpb 1.85 を達成して params/bpb 効率での Pareto 最前線を更新すること.";
+
+  gene_schema = "schemas/local_genai_stage10.schema.json";
+
+  evaluation_tasks {
+    task BitsPerByteOnSharedHoldout {
+      spec = "全候補を共通 holdout (10MB tail) で再評価. bits-per-byte (BPB) が唯一の cross-tokenizer fair 指標. Stage-9 champion baseline = 1.906. 1.85 切りで Pareto 改善、 1.80 切りで 'data scaling 効いた' とみなす. 期待 BPB レンジは (10MB,1M=1.90-1.95), (100MB,1M=1.80-1.90), (100MB,3M=1.75-1.85), (1GB,3M=1.65-1.80), (1GB,10M=1.55-1.70). data_per_param < 5 byte/param の極端な overcapacity は別途 reviewer が減点.";
+    }
+    task DataCeilingAnalysis {
+      spec = "corpus_size_class × param_class マトリクスで bpb の改善曲線を追跡. 10MB → 100MB で bpb -0.05 以上、 100MB → 1GB で bpb -0.05 以上の改善が観測されることを要求. 改善が頭打ちのセルは 'data-saturated' と判定し、 次世代から corpus を更に増やしても無意味と reviewer が指摘する.";
+    }
+    task TokenEfficiencyVsDataScale {
+      spec = "BPE vocab × corpus_size の組合せが bpb と訓練時間に与える効果. vocab=2048 は 10MB では bytes/token=2.86 だったが、 100MB / 1GB では word 単位の reuse が増え bytes/token=3-4 になることを期待. vocab=4096 / 8192 は corpus が大きいほうが有利になる. vocab=byte (256) との比較で最大の伸び代がどこかを示す.";
+    }
+    task AugmentationVsOverfitTradeoff {
+      spec = "data_augmentation_strategy 軸. naive_multi_epoch は corpus 小なら必須だが大きいと overfit を悪化させる. shuffled_blocks は語彙分布を保ちつつ局所順序を壊す, curriculum_short_to_long は短い文から徐々に長くする, synthetic_paraphrase は LLM で言い換え生成する. 各戦略の (corpus_size, model_size) ごとの bpb 改善幅を測る.";
+    }
+    task TrainTimeBudget {
+      spec = "M2 MPS で 4 時間以内に train loop が終わる. 100MB corpus + 3M params + 40K step で 約 200-240 分が上限. 1GB corpus は steps を 80K に増やしつつ batch 並列で吸収する設計を要求. 越える候補は失格.";
+    }
+    task ReproducibilityChecklist {
+      spec = "seed 固定 / corpus が SHA-256 ロック / corpus が公知ソース (PG, Wikipedia 等) / 外部 API 不使用 / 依存最小 (python+pytorch+numpy+tokenizers) / 単一スクリプトで train+eval+chat / 生成サンプル 20 プロンプト保存. 7 項目 0-2 点で計 0-14 点.";
+    }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "model_family, training_paradigm, param_class, corpus_size_class, corpus_composition";
+    generations = 80;
+    seed_count  = 24;
+    open_axes   = true;
+    rng_seed    = 42;
+  }
+
+  // Stage-9 で発見した champion 領域を seed の核とする.
+  // mock provider は seed を直接読まないが、 LLM proposer (gemma2:2b 等)
+  // を将来接続したときに「人間が見つけた Pareto」 を起点として use する.
+  prior_seeds = "
+    multi_block_transformer | maximum_likelihood_sgd | 1M  | 10MB  | shakespeare_plus_kjv | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_2048 | medium_4_to_6
+    multi_block_transformer | maximum_likelihood_sgd | 1M  | 100MB | mixed_elizabethan    | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_2048 | medium_4_to_6
+    multi_block_transformer | maximum_likelihood_sgd | 3M  | 100MB | mixed_elizabethan    | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_4096 | medium_4_to_6
+    multi_block_transformer | maximum_likelihood_sgd | 3M  | 1GB   | mixed_classics_en    | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_4096 | deep_8plus
+  ";
+
+  meta_fitness {
+    trend_alignment       = 0.20;
+    frontier_coverage     = 0.20;
+    novelty               = 0.10;
+    evolvability          = 0.15;
+    cross_task_generality = 0.15;
+    implementability      = 0.20;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["data_pareto", "param_pareto", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer Quality {
+      persona = "あなたは言語品質レビュアーです. 候補ジェノムから (corpus_size_class, corpus_composition, param_class, tokenizer) の組合せを確認し、 BPB の期待値が我々の Stage-9 ベースライン (1MB→bpb 2.4, 10MB→bpb 1.91, 100MB→bpb 1.80 予想, 1GB→bpb 1.70 予想) に整合しているかを見ます. 採点は 5 軸 [BPB が世代の expected レンジ内か / data_per_param が健全 (5-50 byte/param) か / corpus_composition が training_task と整合か / data_augmentation が corpus_size に適切か / 訓練終端で peak を打ったか] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Efficiency {
+      persona = "あなたは効率レビュアーです. data_per_param 比 (5-50 byte/param が data-rich, 50+ で underfit_room, 5 未満は overfit_warning) と train_time_estimate (4 時間以内 = 80K steps × 3M params on M2 MPS) を最重視します. BPE vocab × bytes/token のバランスも見ます (vocab=2048 で bytes/token=2.86 が経験値, vocab=4096 でも 4.0 程度が期待値の上限). 採点は 5 軸 [data_per_param が 5-50 範囲 / params が世代上限内 / train_time<=4hr / vocab × corpus が整合 / inference cost が許容範囲] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Reproducibility {
+      persona = "あなたは再現性レビュアーです. 採点は 7 軸 [seed 固定 / corpus が SHA-256 ロック / corpus build スクリプト公開 / 外部 API 不使用 / 依存最小 (python+pytorch+numpy+tokenizers) / 単一スクリプトで train+eval+chat / 20 プロンプト × 3 温度のサンプル保存] それぞれ 0-2 点、 計 0-14 点. ローカル Ollama 利用は外部 API ではないので減点しない. 最後に最良候補番号を 1 行で返します.";
+    }
+  }
+}

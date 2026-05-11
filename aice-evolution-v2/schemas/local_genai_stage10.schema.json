@@ -1,0 +1,194 @@
+{
+  "name": "local_genai_stage10",
+  "based_on": "local_genai_scaled",
+  "notes": "Stage-10 schema. Extends local_genai_scaled with three new data-axis genes (corpus_size_class enlarged, corpus_composition added, data_augmentation_strategy added) and a wider tokenizer axis. Keeps backward compatibility with all axes used by AIPL v1-v3.",
+  "axes": {
+    "model_family": [
+      "ngram_count",
+      "char_rnn",
+      "single_block_transformer",
+      "multi_block_transformer",
+      "multi_block_transformer_compact",
+      "self_evolving_compact"
+    ],
+    "positional": [
+      "none",
+      "implicit_recurrence",
+      "learned_absolute",
+      "rope",
+      "sinusoidal"
+    ],
+    "normalization": [
+      "none",
+      "layernorm",
+      "rmsnorm"
+    ],
+    "regularization": [
+      "none",
+      "dropout_005",
+      "dropout_010"
+    ],
+    "regularization_combo": [
+      "none",
+      "dropout_only",
+      "orthogonal_3_set"
+    ],
+    "schedule_length": [
+      "short_5k",
+      "medium_20k",
+      "long_40k",
+      "very_long_80k"
+    ],
+    "tokenizer": [
+      "byte",
+      "bpe_1024",
+      "bpe_2048",
+      "bpe_4096",
+      "bpe_8192"
+    ],
+    "depth_class": [
+      "shallow_3",
+      "medium_4_to_6",
+      "deep_8plus"
+    ],
+    "inference_optimization": [
+      "none",
+      "kv_cache",
+      "kv_cache_plus_int8"
+    ],
+    "training_paradigm": [
+      "count_normalize",
+      "maximum_likelihood_sgd",
+      "distillation",
+      "distillation_plus_dpo",
+      "self_proposed_mutation"
+    ],
+    "self_evolution": [
+      "none",
+      "local_llm_proposes_three_mutations",
+      "local_llm_writes_full_stage",
+      "local_llm_critiques_then_proposes"
+    ],
+    "engine": [
+      "stdlib_only",
+      "pytorch_cpu",
+      "pytorch_cpu_or_mps",
+      "pytorch_mps"
+    ],
+    "param_class": [
+      "32K",
+      "200K",
+      "500K",
+      "2M",
+      "3M",
+      "6M",
+      "10M",
+      "20M"
+    ],
+    "corpus_size_class": [
+      "10KB",
+      "100KB",
+      "500KB",
+      "1MB",
+      "10MB",
+      "100MB",
+      "1GB"
+    ],
+    "corpus_composition": [
+      "shakespeare_only",
+      "shakespeare_plus_kjv",
+      "mixed_elizabethan",
+      "mixed_classics_en",
+      "mixed_modern_en",
+      "multilingual_en_jp"
+    ],
+    "data_augmentation_strategy": [
+      "naive_multi_epoch",
+      "shuffled_blocks",
+      "curriculum_short_to_long",
+      "synthetic_paraphrase"
+    ],
+    "data_per_param_health": [
+      "below_5_severe_overfit",
+      "5_to_50_data_rich",
+      "50_to_200_balanced",
+      "above_200_underfit_room"
+    ]
+  },
+  "ordinal_axes": {
+    "param_class": ["32K", "200K", "500K", "2M", "3M", "6M", "10M", "20M"],
+    "corpus_size_class": ["10KB", "100KB", "500KB", "1MB", "10MB", "100MB", "1GB"],
+    "regularization_combo": ["none", "dropout_only", "orthogonal_3_set"],
+    "schedule_length": ["short_5k", "medium_20k", "long_40k", "very_long_80k"],
+    "tokenizer": ["byte", "bpe_1024", "bpe_2048", "bpe_4096", "bpe_8192"],
+    "depth_class": ["shallow_3", "medium_4_to_6", "deep_8plus"],
+    "inference_optimization": ["none", "kv_cache", "kv_cache_plus_int8"],
+    "data_per_param_health": [
+      "below_5_severe_overfit",
+      "5_to_50_data_rich",
+      "50_to_200_balanced",
+      "above_200_underfit_room"
+    ]
+  },
+  "coherence": [
+    {"if": {"model_family": "ngram_count"},
+     "then": {"positional": "none", "normalization": "none",
+              "regularization": "none", "regularization_combo": "none",
+              "schedule_length": "short_5k", "tokenizer": "byte",
+              "depth_class": "shallow_3", "inference_optimization": "none",
+              "training_paradigm": "count_normalize",
+              "self_evolution": "none", "engine": "stdlib_only",
+              "param_class": "32K", "data_augmentation_strategy": "naive_multi_epoch"}},
+    {"if": {"model_family": "char_rnn"},
+     "then": {"positional": "implicit_recurrence", "normalization": "none",
+              "training_paradigm": "maximum_likelihood_sgd",
+              "tokenizer": "byte", "depth_class": "shallow_3"},
+     "then_in": {"regularization_combo": ["none", "dropout_only"]}},
+    {"if": {"model_family": "single_block_transformer"},
+     "then": {"depth_class": "shallow_3"},
+     "then_in": {"positional": ["learned_absolute", "rope", "sinusoidal"],
+                 "normalization": ["layernorm", "rmsnorm"]}},
+    {"if": {"model_family": "multi_block_transformer"},
+     "then_in": {"positional": ["learned_absolute", "rope", "sinusoidal"],
+                 "normalization": ["layernorm", "rmsnorm"],
+                 "depth_class": ["medium_4_to_6", "deep_8plus"]}},
+    {"if": {"model_family": "multi_block_transformer_compact"},
+     "then_in": {"training_paradigm": ["distillation", "distillation_plus_dpo"],
+                 "tokenizer": ["bpe_1024", "bpe_2048", "bpe_4096", "bpe_8192"],
+                 "depth_class": ["medium_4_to_6", "deep_8plus"]}},
+    {"if": {"training_paradigm": "self_proposed_mutation"},
+     "then": {"model_family": "self_evolving_compact"},
+     "then_not": {"self_evolution": "none"}},
+    {"if": {"param_class": "32K"},
+     "then_in": {"corpus_size_class": ["10KB", "100KB"]}},
+    {"if": {"param_class": "200K"},
+     "then_in": {"corpus_size_class": ["10KB", "100KB", "500KB", "1MB"]}},
+    {"if": {"param_class": "2M"},
+     "then_in": {"corpus_size_class": ["500KB", "1MB", "10MB", "100MB"]}},
+    {"if": {"param_class": "3M"},
+     "then_in": {"corpus_size_class": ["1MB", "10MB", "100MB", "1GB"]}},
+    {"if": {"param_class": "6M"},
+     "then_in": {"corpus_size_class": ["10MB", "100MB", "1GB"]}},
+    {"if": {"param_class": "10M"},
+     "then_in": {"corpus_size_class": ["100MB", "1GB"]}},
+    {"if": {"param_class": "20M"},
+     "then": {"corpus_size_class": "1GB"}},
+    {"if": {"corpus_composition": "shakespeare_only"},
+     "then_in": {"corpus_size_class": ["10KB", "100KB", "500KB", "1MB"]}},
+    {"if": {"corpus_composition": "shakespeare_plus_kjv"},
+     "then_in": {"corpus_size_class": ["1MB", "10MB"]}},
+    {"if": {"corpus_composition": "mixed_elizabethan"},
+     "then_in": {"corpus_size_class": ["10MB", "100MB"]}},
+    {"if": {"corpus_composition": "mixed_classics_en"},
+     "then_in": {"corpus_size_class": ["100MB", "1GB"]}},
+    {"if": {"corpus_composition": "mixed_modern_en"},
+     "then_in": {"corpus_size_class": ["100MB", "1GB"]}},
+    {"if": {"corpus_composition": "multilingual_en_jp"},
+     "then_in": {"corpus_size_class": ["1GB"]}},
+    {"if": {"data_augmentation_strategy": "synthetic_paraphrase"},
+     "then_not": {"self_evolution": "none"}},
+    {"if": {"data_augmentation_strategy": "curriculum_short_to_long"},
+     "then_in": {"schedule_length": ["medium_20k", "long_40k", "very_long_80k"]}}
+  ],
+  "open_axes": true
+}
