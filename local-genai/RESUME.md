@@ -56,7 +56,27 @@ origin/main と同期済み (push 済み)。
 
 ## チャンピオン (現状最強モデル)
 
-**Stage-10-60MB-BPE (1.45M params, Stage-9 recipe + 60MB mixed_classics_en, 40000 step)** — **bits-per-byte champion (data-scaling proven)**
+**Stage-11-1B-tokens (1.45M params, Stage-10 recipe + 160K steps ≈ 983M tokens)** — **bits-per-byte champion**
+
+```
+local-genai/out/transformer_stage11_1b_tokens_bpe.pt + tokenizer_stage11_1b_tokens_bpe.json
+  TinyTransformer depth=6, d_model=128, n_heads=4, ctx=256, bptt=256
+  ffn_mult=4, RMSNorm, RoPE
+  dropout 0.1, label_smoothing 0.05, weight_decay 0.05
+  warmup 1500, cosine 終端 LR=1e-5 (min_lr_frac=0.005)
+  BPE 2048-vocab on 60MB mixed_classics_en corpus
+  steps=160000 → 160000 × 24 × 256 = 983,040,000 tokens processed (≈ 1 B)
+  best bpb 1.5856 @ step 152000 (= ppl/byte 3.001)
+  訓練時間 25309s (M2 MPS, ≈ 7.0 時間)
+```
+
+**1B トークン処理の効果**: Stage-10 (40K step / 246M tokens) → Stage-11 (160K step / 983M tokens)
+で bpb 1.632 → **1.586** (-0.046, -2.8%)。 同コーパス・同 architecture を 4x 多く回した
+だけ。 直交 3 種正則化が overfit を抑制し、 50 epoch 相当の繰り返しでも下降を継続した。
+
+best @ step 152000 (走破直前) → 8K step の余裕で plateau に到達。 完全収束。
+
+**Stage-10-60MB-BPE (歴史的: 40K step 40 epoch 版, 1.45M params)** — bpb 1.632 on 60MB tail
 
 ```
 local-genai/out/transformer_stage10_60mb_bpe.pt + tokenizer_stage10_60mb_bpe.json
@@ -414,7 +434,8 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
 | 8-BPE (10MB) | 7-deeper recipe + BPE-1024 vocab | 10MB | 1.32M | bpb 1.92 | bpb 1.915 (= ppl/byte 3.77) |
 | 9-BPE-extend (10MB) | 8-BPE + steps 20K→40K | 10MB | 1.32M | bpb 1.911 | bpb 1.911 |
 | 9-BPE-vocab2048 (10MB) | 9-BPE-extend + vocab 1024→2048 | 10MB | 1.45M | bpb 1.906 | bpb 1.906 (= ppl/byte 3.75) |
-| **10 (60MB)** | **9-vocab2048 recipe + 60MB mixed_classics_en** | **60MB** | **1.45M** | **bpb 1.632** | **bpb 1.632 (= ppl/byte 3.10; current champion, data-scaling proven, -14% vs Stage-9)** |
+| 10 (60MB) | 9-vocab2048 recipe + 60MB mixed_classics_en | 60MB | 1.45M | bpb 1.632 | bpb 1.632 (= ppl/byte 3.10) |
+| **11 (60MB, 1B tokens)** | **Stage-10 recipe + 160K steps ≈ 983M tokens** | **60MB** | **1.45M** | **bpb 1.586** | **bpb 1.586 (= ppl/byte 3.00; current champion, 1B-token training)** |
 
 教訓:
 - Stage-3 の transformer 敗北は ctx だけの問題ではなかった: BPTT < ctx
