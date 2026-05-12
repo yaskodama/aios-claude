@@ -56,7 +56,38 @@ origin/main と同期済み (push 済み)。
 
 ## チャンピオン (現状最強モデル)
 
-**Stage-11-1B-tokens (1.45M params, Stage-10 recipe + 160K steps ≈ 983M tokens)** — **bits-per-byte champion**
+**Stage-12-multilingual (1.71M params, 99MB BR+US English + 日本語, MeCab+BPE-4096, 160K step ≈ 983M tokens)** — **第一の多言語 champion**
+
+```
+local-genai/out/transformer_stage12_multi_bpe4k.pt + tokenizer_stage12_multi_bpe4k.json
+  TinyTransformer depth=6, d_model=128, n_heads=4, ctx=256, bptt=256
+  ffn_mult=4, RMSNorm, RoPE
+  dropout 0.1, label_smoothing 0.05, weight_decay 0.05
+  warmup 1500, cosine 終端 LR=1e-5 (min_lr_frac=0.005)
+  BPE 4096-vocab + 日本語 MeCab 分かち書き前処理 (fugashi+unidic-lite)
+  3.16 bytes/token on holdout
+  TinyShakespeare+Victorian+US+JP-99MB interleaved 学習, 1,709,440 params
+  best bpb 1.667 @ step 152000 (= ppl/byte 3.176)
+  訓練時間 44578s (M2 MPS, 12.4 時間)
+```
+
+**多言語 corpus (interleaved)**:
+- 英米 PG: 80 作品 (Shakespeare + KJV + Marlowe + Jonson + Milton + Spenser + Donne + Austen + Dickens + Eliot + Bronte + Hardy + Twain + Melville + Hawthorne + Whitman + Thoreau + Emerson + Poe + James + Cooper + Stowe + Crane + London + Wharton 等)
+- 日本語 Aozora: 14 作品 (夏目漱石 × 5 + 芥川 × 4 + 太宰 × 3 + 宮沢賢治 × 3 等)
+- **interleaved 配置で train/holdout の言語バランスを確保**
+
+**MeCab 分かち書き効果**:
+- 日本語を fugashi+unidic-lite で形態素分割 → BPE が word-like 単位を学習
+- 例: `吾輩は猫である` → `吾輩 は 猫 で ある`
+- BPE-4096 vocab で英語と日本語を統一的に扱える
+
+**Stage-11 (60MB 英語のみ, bpb 1.586) との比較**:
+- bpb 1.667 (Stage-12) vs 1.586 (Stage-11) — Stage-12 は ~5% 上昇
+- **タスクの難化**: 多言語 + より広い分布 + BPE-4096 (より細かい予測)
+- ppl/byte 換算は 3.18 vs 3.00 (-6%)
+- Japanese は corpus 比 1% のため undertrained だが基本動作確認
+
+**Stage-11-1B-tokens (1.45M params, 60MB 英語のみ)** — bpb 1.586 / ppl/byte 3.001 (歴史的 monolingual champion)
 
 ```
 local-genai/out/transformer_stage11_1b_tokens_bpe.pt + tokenizer_stage11_1b_tokens_bpe.json
@@ -435,7 +466,8 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
 | 9-BPE-extend (10MB) | 8-BPE + steps 20K→40K | 10MB | 1.32M | bpb 1.911 | bpb 1.911 |
 | 9-BPE-vocab2048 (10MB) | 9-BPE-extend + vocab 1024→2048 | 10MB | 1.45M | bpb 1.906 | bpb 1.906 (= ppl/byte 3.75) |
 | 10 (60MB) | 9-vocab2048 recipe + 60MB mixed_classics_en | 60MB | 1.45M | bpb 1.632 | bpb 1.632 (= ppl/byte 3.10) |
-| **11 (60MB, 1B tokens)** | **Stage-10 recipe + 160K steps ≈ 983M tokens** | **60MB** | **1.45M** | **bpb 1.586** | **bpb 1.586 (= ppl/byte 3.00; current champion, 1B-token training)** |
+| 11 (60MB, 1B tokens) | Stage-10 recipe + 160K steps ≈ 983M tokens | 60MB | 1.45M | bpb 1.586 | bpb 1.586 (= ppl/byte 3.00) |
+| **12 (99MB multi)** | **+ US + 日本語 (MeCab) + BPE-4096 + interleaved** | **99MB** | **1.71M** | **bpb 1.667** | **bpb 1.667 (= ppl/byte 3.18; 多言語 champion, JP 動作確認)** |
 
 教訓:
 - Stage-3 の transformer 敗北は ctx だけの問題ではなかった: BPTT < ctx

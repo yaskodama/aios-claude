@@ -78,7 +78,7 @@ def encode_corpus(tok: Tokenizer, raw: bytes) -> list[int]:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", default="10MB",
-                   choices=["10KB", "100KB", "1MB", "10MB", "60MB"])
+                   choices=["10KB", "100KB", "1MB", "10MB", "60MB", "100MB_multi"])
     p.add_argument("--vocab-size", type=int, default=1024)
     p.add_argument("--device", default="mps", choices=["cpu", "mps"])
     p.add_argument("--d-model", type=int, default=128)

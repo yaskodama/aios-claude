@@ -29,6 +29,10 @@ CORPORA = {
         HERE / "corpus" / "tinyshake_60MB.txt",
         "48808768d4617016cc3f3b139c13fc30cc05c8003f414e6b2117f8e8ca2edd3c",
     ),
+    "100MB_multi": (
+        HERE / "corpus" / "tinyshake_100MB_multi.txt",
+        "51e9c3d5d5d420ef7518e47eb16f62b72a679a4ca1c0f909effc1ae10166d7cb",
+    ),
 }
 
 CORPUS_PATH = CORPORA["10KB"][0]

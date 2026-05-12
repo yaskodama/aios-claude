@@ -46,25 +46,33 @@ SEED = 7
 # Same prompt list as samples_stage7_deeper_extend.md, so the two files
 # can be diffed side-by-side to see the byte-vs-BPE quality jump.
 PROMPTS = [
-    "Please explain the use of artificial intelligence in education.",
-    "What is the meaning of life?",
-    "Describe how a transformer neural network works.",
-    "Write a short poem about autumn rain.",
+    # British English (Shakespeare-style)
     "To be, or not to be,",
     "All the world's a stage,",
-    "If music be the food of love,",
-    "What light through yonder window breaks?",
-    "In the beginning",
-    "And it came to pass",
-    "Blessed are the meek,",
-    "The Lord is my shepherd;",
-    "Love",
-    "Hark!",
     "ROMEO. ",
-    "HAMLET. To-day",
-    "ENTER three Witches.",
-    "let x = 1 + 2",
-    "こんにちは",
+    # American English
+    "Call me Ishmael.",
+    "It was the best of times,",
+    "Four score and seven years ago",
+    # KJV style
+    "In the beginning",
+    "Blessed are the meek,",
+    # Modern English questions
+    "Please explain the use of artificial intelligence in education.",
+    "Describe how a transformer neural network works.",
+    "Write a short poem about autumn rain.",
+    # 日本語 (note: model was trained on MeCab-segmented Japanese, so
+    # we feed prompts pre-segmented with spaces for best continuation)
+    "吾輩 は 猫 で ある 。",
+    "メロス は 激怒 し た 。",
+    "国境 の 長い トンネル を 抜ける と",
+    "むかし むかし ある ところ に",
+    "私 は 日本 から 来 ました 。",
+    # 短い (短くてもセグメント済み)
+    "桜 の 花",
+    "雨 が 降る 。",
+    # Cross-lingual mix
+    "Hello, world! こんにちは 世界 !",
     "1, 2, 3, 4,",
 ]
 
