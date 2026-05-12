@@ -18,6 +18,7 @@ Output: local-genai/samples/samples_stage9_bpe_vocab2048.md
 """
 
 from __future__ import annotations
+import argparse
 import sys
 from pathlib import Path
 
@@ -35,9 +36,8 @@ try:
 except ImportError as e:
     sys.exit(f"need tokenizers package: pip install tokenizers ({e})")
 
-CHECKPOINT = HERE / "out" / "transformer_stage9_bpe_vocab2048.pt"
-TOKENIZER = HERE / "out" / "tokenizer_stage9_bpe_vocab2048.json"
-OUT_PATH = HERE / "samples" / "samples_stage9_bpe_vocab2048.md"
+DEFAULT_CHECKPOINT = HERE / "out" / "transformer_stage9_bpe_vocab2048.pt"
+DEFAULT_TOKENIZER = HERE / "out" / "tokenizer_stage9_bpe_vocab2048.json"
 
 MAX_CHARS = 320
 TEMPERATURES = (0.6, 0.85, 1.05)
@@ -100,20 +100,32 @@ def generate_bpe(model: TinyTransformer, tok: Tokenizer, vocab_size: int,
 
 
 def main():
-    if not CHECKPOINT.exists():
-        sys.exit(f"checkpoint not found: {CHECKPOINT}")
-    if not TOKENIZER.exists():
-        sys.exit(f"tokenizer not found: {TOKENIZER}")
+    p = argparse.ArgumentParser()
+    p.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    p.add_argument("--tokenizer", type=Path, default=DEFAULT_TOKENIZER)
+    p.add_argument("--out", type=Path, default=None,
+                   help="output Markdown path (default derived from checkpoint stem)")
+    args = p.parse_args()
 
-    print(f"loading {CHECKPOINT.name} + {TOKENIZER.name} ...")
-    ckpt = torch.load(CHECKPOINT, weights_only=False, map_location="cpu")
+    checkpoint = args.checkpoint
+    tokenizer_path = args.tokenizer
+    out_path = args.out or (HERE / "samples" /
+                             f"samples_{checkpoint.stem.replace('transformer_', '')}.md")
+
+    if not checkpoint.exists():
+        sys.exit(f"checkpoint not found: {checkpoint}")
+    if not tokenizer_path.exists():
+        sys.exit(f"tokenizer not found: {tokenizer_path}")
+
+    print(f"loading {checkpoint.name} + {tokenizer_path.name} ...")
+    ckpt = torch.load(checkpoint, weights_only=False, map_location="cpu")
     cfg = ckpt["config"]
     vocab_size = cfg["vocab_size"]
     print(f"  config: depth={cfg['depth']}, d_model={cfg['d_model']}, "
           f"vocab={vocab_size}, pos={cfg.get('pos_encoding')}")
     print(f"  params: {ckpt['params']:,}  bpb: {ckpt['holdout_bpb']:.4f}")
 
-    tok = Tokenizer.from_file(str(TOKENIZER))
+    tok = Tokenizer.from_file(str(tokenizer_path))
     tok.decoder = decoders.ByteLevel()
 
     device = "mps" if torch.backends.mps.is_available() else "cpu"
@@ -129,14 +141,15 @@ def main():
     model.embed = nn.Embedding(vocab_size, cfg["d_model"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    name_for_header = checkpoint.stem.replace("transformer_", "")
     lines: list[str] = []
-    lines.append(f"# Sample generations — Stage-9-BPE-vocab2048\n")
-    lines.append(f"Checkpoint: `{CHECKPOINT.name}` "
+    lines.append(f"# Sample generations — {name_for_header}\n")
+    lines.append(f"Checkpoint: `{checkpoint.name}` "
                  f"({ckpt['params']:,} params, bpb "
-                 f"{ckpt['holdout_bpb']:.4f} on 10MB tail, "
+                 f"{ckpt['holdout_bpb']:.4f}, "
                  f"≈ ppl/byte {2**ckpt['holdout_bpb']:.3f})\n")
-    lines.append(f"Tokenizer: `{TOKENIZER.name}` "
+    lines.append(f"Tokenizer: `{tokenizer_path.name}` "
                  f"(vocab {vocab_size}, "
                  f"≈ {cfg.get('bytes_per_token_holdout', 2.86):.2f} bytes/token)\n")
     lines.append(
@@ -162,9 +175,9 @@ def main():
             lines.append(prompt + cont + "\n")
             lines.append("```\n")
 
-    OUT_PATH.write_text("".join(lines), encoding="utf-8")
+    out_path.write_text("".join(lines), encoding="utf-8")
     print()
-    print(f"wrote {OUT_PATH}")
+    print(f"wrote {out_path}")
 
 
 if __name__ == "__main__":
