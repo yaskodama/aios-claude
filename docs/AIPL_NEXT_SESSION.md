@@ -8,19 +8,25 @@ Stage-13-jp-heavy was the last champion at bpb 1.494).
 
 ```
 docs/AIPL_NEXT_SESSION.md と docs/AIPL_Runtime_Feature_Matrix.md を
-読み込んで現状を把握して下さい。
+読み込んで現状を把握して下さい。さらに docs/AIPL_Design_and_Implementation.pdf
+と docs/AICE_Meta_Research.pdf に研究論文が二本あります。
 
-AIPL は今、7 ランタイム + 7 codegen ターゲットの言語プロジェクト
-です:
-  ランタイム: Python (annotated) / Python (inferred) /
-              OCaml / JS-OCaml(server) / JS-Browser /
-              JS-Node(server) / C (abcl2c → runtime variants)
+AIPL は今、7 ランタイム + 8 codegen ターゲット + WebSocket 全実装統合
++ 研究論文二本の言語プロジェクトです:
+  ランタイム: Python (注釈) / Python (推論) / OCaml /
+              JS-OCaml(server) / JS-Browser / JS-Node(server) /
+              C (aipl2c → runtime variants)
   codegen   : C+pthread / C+SDL2 / Xinu / Python / Pony /
               Erlang / Go / Prolog
+  WebSocket : 全 7 runtime/codegen で動作確認済
+  論文      : 設計と実装 (13p, HM推論中心) + Meta Research (9p, GA駆動)
 
-最新 commit: 9f4fb15 (gitignore cleanup)
-直近作業: WebSocket 統合完了 (全 7 runtime), abcl2c → aipl2c rename,
-         ABCL/c+ → AIPL 全置換, self-host 37/37 smoke pass を確認。
+最新 commit: a39d75a (Meta Research 論文追加)
+直近作業: 二本の研究論文 (AIPL_Design_and_Implementation.pdf,
+         AICE_Meta_Research.pdf) を執筆・push。前者は HM 型推論を
+         中心に再構成し ai_call × now/future/send の例を追加、
+         後者は AICE Meta Pipeline (.aice → .ga.json → AIPL →
+         実行) を提案。
 
 次の候補:
   (a) JVM 系 (Kotlin / Scala / Java) codegen
@@ -30,6 +36,9 @@ AIPL は今、7 ランタイム + 7 codegen ターゲットの言語プロジェ
   (e) 既存ターゲット最適化 (C codegen の become/select/now サポート)
   (f) aipl-self-host を C/Pony/Erlang などにも展開
   (g) /api/typecheck と /ws を OCaml gateway にも統一仕様で整備
+  (h) Meta Research 論文の Phase 4 lowerer (LLM 自動 .aice→.ga.json)
+      の完全自動化
+  (i) 論文を学会投稿向けに (英語化, abstract 整理, 図の高解像度化)
 
 推奨と理由を一言で教えて下さい。
 ```
@@ -65,11 +74,16 @@ AIPL は今、7 ランタイム + 7 codegen ターゲットの言語プロジェ
 
 ### Key documents
 
-- **`docs/AIPL_Runtime_Feature_Matrix.{md,tex,pdf}`** — 11-page side-by-side
-  comparison: 35+ feature rows × 7 runtimes; sample-count and
-  per-sample-feature tables; concurrency-model section; latest at PDF
-  92.9 KB.
-- `docs/AIPL_Type_Soundness_Report.{tex,pdf}` — older soundness analysis.
+- **`docs/AIPL_Design_and_Implementation.{tex,pdf}`** — research paper,
+  13 pages, 434 KB.  HM-inference-centric design and implementation
+  exposition; ai_call × past/now/future patterns included.
+- **`docs/AICE_Meta_Research.{tex,pdf}`** — research paper, 9 pages,
+  335 KB.  AICE Meta Pipeline (.aice → .ga.json → AIPL → run) for
+  GA-driven LLM problem solving; companion paper to the design one.
+- **`docs/AIPL_Runtime_Feature_Matrix.{md,tex,pdf}`** — 11-page
+  side-by-side comparison: 35+ feature rows × 7 runtimes; sample-count
+  and per-sample-feature tables; concurrency-model section.
+- `docs/AIPL_Type_Soundness_Report.{tex,pdf}` — older soundness analysis (Phase 15).
 - `aipl-self-host/` — AIPL written in AIPL (9 levels, A → C-3, 37/37 smoke pass).
 - `AIPL_OVERVIEW.md` — bird's-eye index.
 - `USER_MANUAL.md` — language tour.
@@ -82,6 +96,12 @@ AIPL は今、7 ランタイム + 7 codegen ターゲットの言語プロジェ
 Commits this session (most recent first; date 2026-05-13):
 
 ```
+a39d75a  docs: add Meta Research paper — AICE/AIPL × GA for LLM problem solving
+44a5b5c  docs: AIPL report — ai_call × past/now/future examples in §3.3
+afc0c97  docs: AIPL report — change float→var in §3.2.1 Hello example
+6accd3f  docs: refocus AIPL report on Hindley-Milner inference
+73ec62b  docs: add AIPL design & implementation report (10p)
+387d48a  docs: add AIPL_NEXT_SESSION.md — restart note for next session
 9f4fb15  gitignore: stop tracking tinyshake_100MB_multi.txt (95 MB)
 966dbce  gitignore: stop tracking tinyshake_60MB.txt (57 MB)
 1993ce7  Rename abcl2c → aipl2c; replace ABCL/c+ text with AIPL
@@ -132,6 +152,13 @@ adeb0b6  AIPL: add node-aipl-server — seventh runtime, Node HTTP server
    already gitignored; this session also added `tinyshake_60MB.txt`
    (57 MB) and `tinyshake_100MB_multi.txt` (95 MB) — both regenerable
    from `build_*.py`.  No history rewrites.
+7. **二本の研究論文.**  実装側を `AIPL_Design_and_Implementation.pdf`
+   (13p, HM 推論を中核に再構成,ai\_call × past/now/future 例追加),
+   研究戦略側を `AICE_Meta_Research.pdf` (9p, AICE Meta Pipeline で
+   `.aice → .ga.json → AIPL → run` の四段で生成 AI 問題解決を進化
+   計算駆動,Phase 9/17 を自動予測した自己改善ループの実証) で
+   執筆.両方とも xelatex + 日本語フォントでビルドし PDF を docs/
+   に commit.
 
 ---
 
@@ -283,4 +310,5 @@ abclcp-project/
 
 ---
 
-*Generated 2026-05-13.  Up-to-date through commit `9f4fb15`.*
+*Generated 2026-05-13 (revised post-papers).  Up-to-date through
+commit `a39d75a` (`docs: add Meta Research paper`).*
