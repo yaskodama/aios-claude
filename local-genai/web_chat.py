@@ -6,6 +6,10 @@ Run:
 
 By default loads Stage-13-jp-heavy (the current absolute champion).
 A dropdown lets you switch to any of the on-disk BPE champions.
+
+Uses gr.ChatInterface (gradio's high-level chat component) so the
+message-state plumbing is handled by gradio. Multi-turn history,
+clear button, retry, and undo come for free.
 """
 
 from __future__ import annotations
@@ -48,6 +52,7 @@ CHECKPOINTS = {
 }
 DEFAULT_NAME = next(iter(CHECKPOINTS))
 
+# Cache loaded models per dropdown name so switching is fast.
 _CACHE: dict[str, tuple] = {}
 
 
@@ -84,7 +89,7 @@ def _generate(model, tok, vocab_size, prompt, max_chars, temperature, seed,
     g = torch.Generator(device=device).manual_seed(seed)
     enc = tok.encode(prompt if prompt else ". ")
     ids = list(enc.ids)
-    new_ids = []
+    new_ids: list[int] = []
     max_tokens = max(8, int(max_chars / max(0.5, bytes_per_tok)) + 64)
     for _ in range(max_tokens):
         ctx_in = ids[-model.ctx:]
@@ -101,11 +106,61 @@ def _generate(model, tok, vocab_size, prompt, max_chars, temperature, seed,
     return tok.decode(new_ids)
 
 
-def _build_prompt_with_history(history, user_input, ctx_bytes):
-    parts: list[str] = []
-    for u, r in history:
-        parts.append(u + r)
-    parts.append(user_input)
+def _content_to_text(content) -> str:
+    """ChatInterface content can be a plain string, a list of parts
+    (multimodal), or a dict. Normalize to a single string."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        # List of parts — concatenate the str-typed ones, drop file objects.
+        parts: list[str] = []
+        for p in content:
+            if isinstance(p, str):
+                parts.append(p)
+            elif isinstance(p, dict):
+                # gradio FileMessage / image — skip
+                if "text" in p:
+                    parts.append(str(p["text"]))
+        return " ".join(parts)
+    if isinstance(content, dict):
+        if "text" in content:
+            return str(content["text"])
+    return str(content)
+
+
+def _extract_history_text(history) -> list[tuple[str, str]]:
+    """ChatInterface passes us history in messages format:
+        [{"role": "user", "content": "..." | [parts]},
+         {"role": "assistant", "content": "..." | [parts]},
+         ...]
+    Convert to list of (user, assistant) string pairs."""
+    pairs: list[tuple[str, str]] = []
+    last_user: str | None = None
+    for item in history or []:
+        if isinstance(item, dict):
+            role = item.get("role", "")
+            content = _content_to_text(item.get("content"))
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            # Defensive: handle the older tuples format too.
+            pairs.append((_content_to_text(item[0]),
+                          _content_to_text(item[1])))
+            continue
+        else:
+            continue
+        if not content:
+            continue
+        if role == "user":
+            last_user = content
+        elif role == "assistant" and last_user is not None:
+            pairs.append((last_user, content))
+            last_user = None
+    return pairs
+
+
+def _build_prompt_with_history(history_pairs, user_input, ctx_bytes):
+    parts = [u + r for u, r in history_pairs] + [user_input]
     joined = "".join(parts)
     enc = joined.encode("utf-8", errors="ignore")
     if len(enc) <= ctx_bytes:
@@ -113,39 +168,32 @@ def _build_prompt_with_history(history, user_input, ctx_bytes):
     return enc[-ctx_bytes:].decode("utf-8", errors="ignore")
 
 
-def chat(message, history, model_name, temperature, max_chars, seed,
-         multi_turn):
+def respond(message: str, history, model_name: str, temperature: float,
+            max_chars: int, seed: int, multi_turn: bool) -> str:
+    """ChatInterface callback — return the assistant's reply as plain str."""
     loaded = _load(model_name)
     if loaded is None:
-        return [(message, f"[error] checkpoint not found for {model_name}")]
+        return f"[error] checkpoint not found for {model_name}"
     model, tok, vocab_size, device, bytes_per_tok, _ = loaded
 
-    # gradio gives us history as list of dicts (messages format)
-    msg_history: list[tuple[str, str]] = []
-    if history:
-        i = 0
-        while i + 1 < len(history):
-            u = history[i].get("content") if isinstance(history[i], dict) else history[i][0]
-            r = history[i + 1].get("content") if isinstance(history[i + 1], dict) else history[i][1]
-            if u and r:
-                msg_history.append((u, r))
-            i += 2
+    pairs = _extract_history_text(history)
 
     if multi_turn:
-        full_prompt = _build_prompt_with_history(msg_history, message,
-                                                   model.ctx)
+        full_prompt = _build_prompt_with_history(pairs, message, model.ctx)
     else:
         full_prompt = message
 
-    reply = _generate(model, tok, vocab_size, full_prompt,
-                      max_chars=int(max_chars),
-                      temperature=float(temperature),
-                      seed=int(seed) + len(msg_history),
-                      device=device, bytes_per_tok=bytes_per_tok)
+    reply = _generate(
+        model, tok, vocab_size, full_prompt,
+        max_chars=int(max_chars),
+        temperature=float(temperature),
+        seed=int(seed) + len(pairs),
+        device=device, bytes_per_tok=bytes_per_tok,
+    )
     return reply.lstrip()
 
 
-def model_info(model_name):
+def model_info(model_name: str) -> str:
     loaded = _load(model_name)
     if loaded is None:
         return f"checkpoint not found for {model_name}"
@@ -174,50 +222,44 @@ with gr.Blocks(title="local-genai chat") as demo:
         "feed text and it continues. Japanese prompts work best when MeCab-"
         "segmented (`桜 の 花` instead of `桜の花`)."
     )
+
     with gr.Row():
         with gr.Column(scale=2):
-            chatbot = gr.Chatbot(height=480, label="conversation")
-            msg = gr.Textbox(label="your prompt",
-                             placeholder="To be, or not to be,  or  桜 の 花",
-                             lines=2)
-            with gr.Row():
-                send = gr.Button("send", variant="primary")
-                clear = gr.Button("clear")
-        with gr.Column(scale=1):
-            model_dd = gr.Dropdown(list(CHECKPOINTS.keys()), value=DEFAULT_NAME,
-                                    label="model")
-            info = gr.Markdown()
+            # Additional inputs that flow into respond() alongside (message, history).
+            model_dd = gr.Dropdown(list(CHECKPOINTS.keys()),
+                                    value=DEFAULT_NAME, label="model")
             temp = gr.Slider(0.3, 1.4, value=0.85, step=0.05,
                               label="temperature")
             max_chars = gr.Slider(40, 600, value=200, step=20,
                                    label="max characters")
             seed = gr.Number(value=7, precision=0, label="seed")
             multi = gr.Checkbox(value=True, label="multi-turn (keep history)")
+        with gr.Column(scale=1):
+            info = gr.Markdown()
 
-    def on_send(user, history, name, t, m, s, mu):
-        history = history or []
-        reply = chat(user, history, name, t, m, s, mu)
-        history = history + [
-            {"role": "user", "content": user},
-            {"role": "assistant", "content": reply},
-        ]
-        return history, ""
-
-    def on_clear():
-        return [], ""
+    chat_ui = gr.ChatInterface(
+        fn=respond,
+        additional_inputs=[model_dd, temp, max_chars, seed, multi],
+        examples=[
+            ["To be, or not to be,"],
+            ["Call me Ishmael."],
+            ["In the beginning"],
+            ["桜 の 花"],
+            ["メロス は 激怒 し た 。"],
+            ["国境 の 長い トンネル を 抜ける と"],
+        ],
+    )
 
     def on_model_change(name):
-        return model_info(name), []
+        return model_info(name)
 
-    send.click(on_send, [msg, chatbot, model_dd, temp, max_chars, seed, multi],
-                [chatbot, msg])
-    msg.submit(on_send, [msg, chatbot, model_dd, temp, max_chars, seed, multi],
-                [chatbot, msg])
-    clear.click(on_clear, None, [chatbot, msg])
-    model_dd.change(on_model_change, [model_dd], [info, chatbot])
+    model_dd.change(on_model_change, [model_dd], [info])
     demo.load(model_info, [model_dd], [info])
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1", server_port=7860,
+    # Let gradio pick a free port (7860 default, but it'll fall back to
+    # 7861, 7862, ... if the default is taken — e.g. by an earlier
+    # launch you forgot to close).
+    demo.launch(server_name="127.0.0.1",
                 inbrowser=True, share=False)
