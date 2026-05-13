@@ -42,6 +42,29 @@ Python (annotated); only the **static type-checker** layer differs
 
 ---
 
+## Sample programs
+
+Number of `.abcl` sample programs reachable by each runtime
+(core directory + AI integration + remote-actor demos):
+
+| Category               | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C  |
+|------------------------|-----:|-----:|------:|-----:|-----:|-----:|---:|
+| core samples           |  33  |  33  |  57   |  57  |   5  |   5  | 57 |
+| AI integration samples |  11  |  11  |   8   |   8  |   0  |   0  |  8 |
+| remote-actor samples   |   8  |   8  |   1   |   1  |   0  |   0  |  1 |
+| **total**              | **52** | **52** | **66** | **66** | **5** | **5** | **66** |
+
+Cross-cutting / not tied to a specific runtime:
+- `aipl-self-host/`: 48 AIPL-in-AIPL self-host programs
+- `docker/cross/samples/`: 4 cross-language interop samples
+
+The C runtime processes the same `.abcl` files as OCaml via
+`abcl2c`; of the 66 reachable samples, 48 currently pass the
+`abcl2c` smoke test (the remaining 9 in `abclc/` have pre-existing
+type ambiguities surfaced by our hard-fail policy).
+
+---
+
 ## Core language
 
 | #   | Feature                                             | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C    |

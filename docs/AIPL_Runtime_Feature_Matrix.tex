@@ -1,0 +1,343 @@
+% !TEX program = xelatex
+% AIPL Runtime Feature Matrix — 7 implementations compared
+
+\documentclass[10pt,a4paper,landscape]{article}
+
+\usepackage[a4paper,landscape,margin=15mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.85]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!60!black,
+  pdftitle={AIPL Runtime Feature Matrix},
+  pdfauthor={Yasushi Kodama}
+}
+
+% Status cells — colored backgrounds for readability
+\newcommand{\Yes}{\textcolor{green!50!black}{\textbf{\checkmark}}}
+\newcommand{\No}{\textcolor{red!70!black}{$\times$}}
+\newcommand{\Part}{\textcolor{orange!80!black}{$\triangle$}}
+\newcommand{\NA}{\textcolor{gray}{--}}
+
+% Column types for tight matrix
+\newcolumntype{C}{>{\centering\arraybackslash}p{0.9cm}}
+\newcolumntype{F}{>{\raggedright\arraybackslash}p{6.5cm}}
+\newcolumntype{N}{>{\centering\arraybackslash}p{0.6cm}}
+
+\title{\textbf{AIPL Runtime Feature Matrix} \\
+  {\large 7 implementations compared}}
+\author{Yasushi Kodama}
+\date{2026-05-13}
+
+\begin{document}
+\maketitle
+
+\section*{Overview}
+
+AIPL (Actor-based Intelligent Parallel Language, formerly ABCL/c+)
+has grown into a \textbf{seven-runtime project}.  This document
+provides a side-by-side comparison of every language and
+infrastructure feature across all implementations, grounded in
+source surveys.
+
+\paragraph{Legend.}
+\Yes\ = full support, \Part\ = partial, \No\ = not supported,
+\NA\ = not applicable.
+
+\paragraph{The seven runtimes.}
+
+\begin{tabularx}{\linewidth}{l X}
+  \toprule
+  \textbf{Short name} & \textbf{Source} \\
+  \midrule
+  Python (annotated)        & \texttt{src/python-aipl/} \\
+  Python (inferred)         & \texttt{src/python-aipl-inferred/} \\
+  OCaml                     & \texttt{src/*.ml}, \texttt{\_build/.../repl\_thread.exe} \\
+  JS-OCaml (server)         & \texttt{src/app.js}, \texttt{console\_server.js}, \texttt{ide.js} + OCaml \texttt{web\_gateway} \\
+  JS-Browser (serverless)   & \texttt{src/browser-abcl/} \\
+  JS-Node (server)          & \texttt{src/node-aipl-server/} (Node HTTP server wrapping browser-abcl) \\
+  C (abcl2c)                & \texttt{src/abcl2c.ml} codegen + \texttt{src/abcl\_gui\_runtime.c} \\
+  \bottomrule
+\end{tabularx}
+
+\paragraph{Column abbreviations in matrices below.}
+\textbf{Py-A}~=~Python annotated, \textbf{Py-I}~=~Python inferred,
+\textbf{OCaml}, \textbf{JS-O}~=~JS via OCaml backend,
+\textbf{JS-B}~=~JS in browser, \textbf{JS-N}~=~JS in Node server,
+\textbf{C}~=~abcl2c codegen.
+
+\paragraph{Inheritance relationships.}
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{JS-OCaml} is a thin HTTP client over the OCaml
+    backend, so its feature set inherits OCaml's (plus the new
+    \texttt{/api/typecheck} endpoint).
+  \item \textbf{JS-Node} wraps the same browser-abcl parser /
+    type-checker / interpreter inside a Node.js HTTP server.
+    Runtime feature set therefore mirrors JS-Browser.
+  \item \textbf{Python (inferred)} imports parser, interpreter, AI,
+    remote, and dashboard from \texttt{../python-aipl/}.  All
+    \emph{runtime} features match Python (annotated); only the
+    \emph{static type-checker} layer differs (full
+    Hindley-Milner instead of Phase 11+ annotation-driven).
+\end{itemize}
+
+\clearpage
+
+\section*{Sample programs}
+
+Number of \texttt{.abcl} sample programs reachable by each runtime
+(core directory + AI integration + remote-actor demos):
+
+\begin{tabularx}{\linewidth}{l C C C C C C C}
+  \toprule
+  & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  core samples           & 33   & 33   & 57   & 57   & 5    & 5    & 57   \\
+  AI integration samples & 11   & 11   & 8    & 8    & 0    & 0    & 8    \\
+  remote-actor samples   & 8    & 8    & 1    & 1    & 0    & 0    & 1    \\
+  \midrule
+  \textbf{total}         & \textbf{52} & \textbf{52} & \textbf{66} & \textbf{66} & \textbf{5} & \textbf{5} & \textbf{66} \\
+  \bottomrule
+\end{tabularx}
+
+\smallskip
+
+\noindent
+Cross-cutting / not tied to a specific runtime:
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \texttt{aipl-self-host/}: 48 AIPL-in-AIPL self-host programs
+  \item \texttt{docker/cross/samples/}: 4 cross-language interop samples
+\end{itemize}
+
+Note that the C runtime processes the same \texttt{.abcl} files as
+OCaml via \texttt{abcl2c}; of the 66 reachable samples, 48 currently
+pass the \texttt{abcl2c} smoke test (the remaining 9 in \texttt{abclc/}
+have pre-existing type ambiguities surfaced by our hard-fail policy).
+
+\clearpage
+
+\section*{Core language}
+
+\begin{longtable}{F C C C C C C C}
+  \toprule
+  \textbf{Feature} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  method injection (\texttt{add\_method}/\texttt{remove\_method}) & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  \texttt{now} synchronous send                                   & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
+  \texttt{future} async send                                      & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
+  \texttt{await} future block                                     & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
+  \texttt{send} fire-and-forget                                   & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
+  \texttt{become} actor class swap                                & \Yes & \Yes & \Yes & \Yes & \No  & \No  & \No  \\
+  \texttt{select} selective receive                               & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No  \\
+  top-level functions                                             & \Yes & \Yes & \Part & \Part & \No  & \No  & \Yes \\
+  signatures / overloads                                          & \No  & \No  & \Yes & \Yes & \No  & \No  & \No  \\
+  dynamic compile (\texttt{compile()})                            & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  worker pool / \texttt{DynamicWorkerPool}                        & \Yes & \Yes & \No & \No & \Part & \Part & \No \\
+  \bottomrule
+\end{longtable}
+
+\section*{Type system}
+
+\begin{longtable}{F C C C C C C C}
+  \toprule
+  \textbf{Feature} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  type inference                  & \Part trace & \Yes HM & \Yes HM & \Yes HM & \Yes flow & \Yes flow & \Yes HM+spec \\
+  type annotations                & \Yes        & \Part ignored & \No & \No & \No & \No & \No \\
+  records \texttt{\{a:int, b:str\}} & \Yes  & \Yes & \Part type only & \No & \No & \No & \Part type only \\
+  tuples \texttt{(1, "a")}          & \Yes  & \Yes & \No  & \No  & \No  & \No  & \No  \\
+  arrays (typed, multi-dim)         & \Yes  & \Yes & \Yes & \Yes & \Part & \Part & \Part \\
+  generics on functions             & \No   & \Yes Forall & \Part Forall & \Part & \No & \No & \No \\
+  \bottomrule
+\end{longtable}
+
+\section*{Phase 11+ advanced features}
+
+Python (inferred) runs HM only, so the annotation-driven Phase 11+
+static checks that Python (annotated) performs are not re-implemented.
+Programs still execute at runtime via the shared interpreter, but
+the static guarantees from Phase 12 / 14 / 15 / 16 are lost.
+Phase 13 (channels) and Phase 17 (\texttt{scope}) are runtime features,
+so they remain available.
+
+\begin{longtable}{F C C C C C C C}
+  \toprule
+  \textbf{Feature} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  channels (CSP-style) — Phase 13          & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  linear types / use-after-move — Phase 14 & \Yes & \No  & \No & \No & \No & \No & \No \\
+  owned / pub fields — Phase 15            & \Yes & \No  & \No & \No & \No & \No & \No \\
+  effects \texttt{!\{fs,ai,net,mut\}} — Phase 12 & \Yes & \No  & \No & \No & \No & \No & \No \\
+  structured concurrency \texttt{scope} — Phase 17 & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  transient cast at any-boundary — Phase 16 & \Yes & \No  & \No & \No & \No & \No & \No \\
+  \bottomrule
+\end{longtable}
+
+\clearpage
+
+\section*{Networking, AI, infrastructure}
+
+\begin{longtable}{F C C C C C C C}
+  \toprule
+  \textbf{Feature} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  remote actors (HTTP)                          & \Yes & \Yes & \Part no WS & \Part & \No & \Part srv only & \Yes via OCaml \\
+  WebSocket                                     & \No & \No & \No & \No & \No & \No & \No \\
+  AI integration (\texttt{ai\_call})            & \Yes stream/img & \Yes & \Yes & \Yes & \Yes mock & \Yes mock & \Yes \\
+  AI governance (budget/concurrent/fallback)    & \Yes & \Yes & \Yes & \Yes & \No & \No & \Yes \\
+  HMAC-signed remote send                       & \Yes & \Yes & \No & \No & \No & \No & \Yes \\
+  persistent actor state                        & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  live dashboard (SSE)                          & \Yes & \Yes & \Part polling & \Part & \No & \No & \Yes \\
+  \texttt{/api/typecheck} JSON endpoint         & \No & \No & \Yes & \Yes & \No & \Yes & \NA \\
+  \texttt{/api/run} JSON endpoint               & \No & \No & \No & \No & \No & \Yes & \NA \\
+  \bottomrule
+\end{longtable}
+
+\section*{C-version-specific codegen targets}
+
+\begin{tabularx}{\linewidth}{X C}
+  \toprule
+  \textbf{Target} & \textbf{C} \\
+  \midrule
+  C + pthread standalone binary              & \Yes \\
+  C + SDL2 GUI binary (1178-line runtime)    & \Yes \\
+  Xinu embedded-OS target (\texttt{--xinu})  & \Yes \\
+  Python target (\texttt{--python})          & \Yes \\
+  \bottomrule
+\end{tabularx}
+
+\clearpage
+
+\section*{Key observations}
+
+\subsection*{Python (annotated) is the most feature-complete runtime}
+
+Of the 30 surveyed features, Python (annotated) ticks roughly 28.
+It owns the full Phase 11--17 stack (channels, linear types, owned
+fields, effects, structured concurrency, transient casts), method
+injection, dynamic compile, persistent actor state, and full AI
+integration (including streaming and images).
+
+\subsection*{Python (inferred) is Python's HM-typed twin}
+
+Runtime features match Python (annotated) exactly because the
+interpreter is shared.  The trade is on the static side: the Phase
+11+ annotation-driven checks are replaced with a Hindley-Milner
+inference pass.  Inferred types cross-verified against OCaml: on
+shared samples (\texttt{Hello.abcl}, \texttt{counter.abcl}) the two
+runtimes produce identical type schemes.
+
+\subsection*{OCaml is the canonical core}
+
+Implements roughly 15 of the surveyed features.  Phase 11+ exist
+only as \texttt{.abcl} design-document samples, not implemented.
+Solid \texttt{become} / \texttt{select} / HM inference; remote is
+HTTP only (no HMAC, no WebSocket).
+
+\subsection*{JS-OCaml $\approx$ OCaml}
+
+Thin HTTP client over the OCaml backend, so features inherit.  The
+only differentiator is the \texttt{/api/typecheck} endpoint added
+in commit \texttt{5227f87}.
+
+\subsection*{JS-Browser is the minimal implementation}
+
+Around 8 of the 30 features.  Basic actor model plus our
+newly-added flow-sensitive type inference.  No \texttt{become}, no
+channels, no remote.  AI integration exists but is mock-only.
+
+\subsection*{JS-Node (Node-server, newest)}
+
+Wraps the browser-abcl parser, type-checker, and interpreter
+inside a Node.js HTTP server.  Exposes \texttt{/api/typecheck} (the
+same JSON shape as OCaml's endpoint) and \texttt{/api/run}
+(executes and returns stdout) — the only runtime with the latter.
+Runtime feature set mirrors browser-abcl; the value-add is having
+both the type-checker and the interpreter reachable over HTTP
+without bringing up either OCaml or a browser.
+
+\subsection*{C version --- surprisingly strong on infrastructure}
+
+About 17 of 30.  \texttt{become} and \texttt{select} are not
+implemented (codegen emits \texttt{/* unsupported */}), but it
+inherits OCaml's HMAC, SSE, AI governance, and adds \textbf{three
+additional codegen targets} (SDL2, Xinu, Python).  Fields,
+parameters, and locals are specialized to native C types.
+
+\section*{Method injection --- a Python-family exclusive}
+
+Both Python variants use mutable method dispatch tables that can
+be mutated at runtime via \texttt{add\_method} /
+\texttt{remove\_method}.  Other runtimes substitute \texttt{become}
+(whole-class swap) as the closest equivalent.  \texttt{JS-Browser}
+and \texttt{JS-Node} lack even \texttt{become} (pure actor
+execution).
+
+\section*{Type inference cross-verification}
+
+For shared samples (\texttt{abclc/Hello.abcl},
+\texttt{abclc/counter.abcl}), the three HM-based runtimes
+(\textbf{OCaml}, \textbf{Python-inferred}, \textbf{C}) produce
+identical inferred types:
+
+\begin{verbatim}
+Hello:   count : float
+         init  : (int) -> unit
+         greet : () -> unit
+         inc   : () -> unit
+
+Counter: count : float
+         inc   : () -> unit
+         dec   : (float) -> unit    <- monomorphized via call site
+\end{verbatim}
+
+The flow-sensitive variants (\textbf{JS-Browser},
+\textbf{JS-Node}) reach the same answers on shared samples within
+the limits of their algorithm — field types match, but method
+signature schemes are not produced the same way.
+
+\section*{Phase 11+ implementation gap}
+
+The full Phase 11--17 stack is implemented only in Python
+(annotated).  This represents AIPL's language-evolution frontier;
+Python (annotated) serves as the research runtime.  Python
+(inferred) keeps the runtime side but trades the static checks for
+HM-style polymorphic inference --- a different research axis
+(declarative typing vs. annotated capabilities).
+
+\bigskip
+\hrule
+\smallskip
+
+\noindent\small
+Generated 2026-05-13.  Includes \texttt{python-aipl-inferred}
+(commit \texttt{270f291}) and \texttt{node-aipl-server} (commit
+\texttt{adeb0b6}).  For source pointers, run \texttt{grep} against
+the files listed in each runtime's source column.
+
+\end{document}
