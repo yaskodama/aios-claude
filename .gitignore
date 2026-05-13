@@ -68,4 +68,7 @@ local-genai/.cache/
 
 # Stage-13 jp-heavy corpus (108MB > GitHub 100MB limit; regenerate via build_500mb_corpus.py)
 local-genai/corpus/tinyshake_120MB_jp_heavy.txt
+# Stage-10/11 60MB English corpus (57MB; over GitHub's 50MB warning threshold;
+# regenerate via build_100mb_corpus.py)
+local-genai/corpus/tinyshake_60MB.txt
 src/node-aipl-server/node_modules/
