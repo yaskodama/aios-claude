@@ -42,7 +42,7 @@
  (libraries abcllib tsdl threads unix))
 
 (executable
- (name abcl2c)
- (modules abcl2c)
+ (name aipl2c)
+ (modules aipl2c)
  (flags (:standard -w -a))
  (libraries abcllib))

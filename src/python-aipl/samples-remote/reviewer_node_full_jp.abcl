@@ -1,5 +1,5 @@
 // レビュアー専用ノード (review + brief 両対応)。
-// OCaml ABCL/c+ ランタイムから `now remote("host:9100","reviewer").review(...)` で
+// OCaml AIPL ランタイムから `now remote("host:9100","reviewer").review(...)` で
 // 呼び出されることを想定。
 //
 // Docker で起動する例:

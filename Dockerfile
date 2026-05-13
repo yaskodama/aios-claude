@@ -1,5 +1,5 @@
-# Lightweight Python container for the ABCL/c+ runtime.
-# Builds the Python ABCL/c+ interpreter + every AI provider SDK we
+# Lightweight Python container for the AIPL runtime.
+# Builds the Python AIPL interpreter + every AI provider SDK we
 # integrate with.  No Gemini / Anthropic / OpenAI key is baked in;
 # pass them at run time via -e or --env-file.
 

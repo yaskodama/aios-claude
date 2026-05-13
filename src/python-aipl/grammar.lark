@@ -1,4 +1,4 @@
-// Lark grammar for ABCL/c+ (medium-scope Python implementation).
+// Lark grammar for AIPL (medium-scope Python implementation).
 // Mirrors src/parser.mly: classes with var/float fields and methods,
 // actor-style send/become, and the usual control-flow constructs.
 

@@ -3,7 +3,7 @@
   "_use": "Open the project root in VS Code; the .vscode/abcl.tmLanguage.json grammar is used by the 'Custom Language' extension if installed, or by the bundled grammar loader.",
   "id": "abcl",
   "extensions": [".abcl"],
-  "aliases": ["ABCL/c+", "abcl"],
+  "aliases": ["AIPL", "abcl"],
   "configuration": "./abcl.language-configuration.json",
   "grammar": "./abcl.tmLanguage.json"
 }

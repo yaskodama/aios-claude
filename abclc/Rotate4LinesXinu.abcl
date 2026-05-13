@@ -1,5 +1,5 @@
 // Rotate4LinesXinu.abcl
-// Xinu 上で 4 本の線分を回転させる ABCL/c+ プログラム + Start/Stop ボタン。
+// Xinu 上で 4 本の線分を回転させる AIPL プログラム + Start/Stop ボタン。
 // 各 Spinner は Xinu thread (アクター) として動き、tick で角度更新。
 // Controller はボタン押下を受けて全 spinner に start/stop を broadcast。
 

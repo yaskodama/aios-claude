@@ -1,6 +1,6 @@
 # AIPL ユーザーズマニュアル
 
-**AIPL** (Actor-based Intelligent Parallel Language; 旧称 ABCL/c+) は、
+**AIPL** (Actor-based Intelligent Parallel Language; 旧称 AIPL) は、
 東京工業大学・米澤明憲研究室で設計された並行オブジェクト指向言語 ABCL/1 を、
 現代的なシンタックスとマルチランタイム（OCaml ネイティブ／ブラウザ JS／C）で
 再実装した言語です。本マニュアルは言語仕様の概要と、付属サンプルの解説をまとめます。

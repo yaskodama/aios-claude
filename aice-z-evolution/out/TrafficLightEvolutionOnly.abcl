@@ -1,10 +1,10 @@
 // Generated from aice-z-evolution/examples/TrafficLightEvolutionOnly.aice
-// Runtime: OCaml ABCL/c+ (src/repl_thread.ml / abclrepl_thread).
+// Runtime: OCaml AIPL (src/repl_thread.ml / abclrepl_thread).
 // Scope: evolutionary search only. Formal checks are intentionally external.
 
 class TrafficLightEvolutionOnly {
-  var task = "Evolve a traffic-light tick program for the OCaml ABCL/c+ runtime. Preserve Red -> Yellow -> Green -> Red behavior. Formal verification is external; this run only performs evolutionary generation, selection, crossover, and archive logging.";
-  var generator_persona = "You generate short executable OCaml ABCL/c+ candidate programs. Use class, var fields, method declarations, if statements, send, new, and print. Do not use Z, formal proof text, or pseudocode. Return the candidate program plus one short IMPROVES line.";
+  var task = "Evolve a traffic-light tick program for the OCaml AIPL runtime. Preserve Red -> Yellow -> Green -> Red behavior. Formal verification is external; this run only performs evolutionary generation, selection, crossover, and archive logging.";
+  var generator_persona = "You generate short executable OCaml AIPL candidate programs. Use class, var fields, method declarations, if statements, send, new, and print. Do not use Z, formal proof text, or pseudocode. Return the candidate program plus one short IMPROVES line.";
   var selector_persona = "You are an evolutionary-programming selector. Compare three candidates by correctness, executability, readability, type safety, and extensibility. Return exactly one character: 1, 2, or 3.";
   var weights = "correctness=0.35, executability=0.25, readability=0.15, type_safety=0.15, extensibility=0.10";
 
@@ -18,7 +18,7 @@ class TrafficLightEvolutionOnly {
 
     print("================== GEN 1 : ProceduralBaseline ==================");
     var g1_base = "Generation 1 ProceduralBaseline. Seed genome: target_language=ABCL, paradigm=procedural, state_representation=integer, transition_style=increment_and_wrap, encapsulation=none, executable_demo=minimal. Focus axes: correctness, executability. ";
-    var g1_c1 = ai_call_with_system(generator_persona, task + "\n\n" + g1_base + "Variant brevity: smallest correct ABCL/c+ traffic-light tick demo.");
+    var g1_c1 = ai_call_with_system(generator_persona, task + "\n\n" + g1_base + "Variant brevity: smallest correct AIPL traffic-light tick demo.");
     var g1_c2 = ai_call_with_system(generator_persona, task + "\n\n" + g1_base + "Variant comments: clear identifiers and short comments.");
     var g1_c3 = ai_call_with_system(generator_persona, task + "\n\n" + g1_base + "Variant named_consts: prefer named state constants over magic literals.");
     print("--- ProceduralBaseline candidate 1 [brevity] ---");

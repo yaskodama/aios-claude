@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Smoke test for the AIPL → Go codegen.
 #
-# For each sample: abcl2c --go -> go run -> capture output.
+# For each sample: aipl2c --go -> go run -> capture output.
 set -u
 cd "$(dirname "$0")/.."
 
-ABCL2C=./_build/default/src/abcl2c.exe
+ABCL2C=./_build/default/src/aipl2c.exe
 if [ ! -x "$ABCL2C" ]; then
   echo "[FATAL] $ABCL2C missing; run dune build"; exit 1
 fi
@@ -33,7 +33,7 @@ check_good() {
   local dir="$TMPROOT/$name"
   mkdir -p "$dir"
   if ! "$ABCL2C" "abclc/$f" -o "$dir/main.go" --go > /dev/null 2>&1; then
-    fail=$((fail + 1)); printf '  FAIL  %s  (abcl2c)\n' "$f"; return
+    fail=$((fail + 1)); printf '  FAIL  %s  (aipl2c)\n' "$f"; return
   fi
   local out
   out=$(cd "$dir" && go run main.go 2>&1 | head -5)

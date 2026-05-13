@@ -1,6 +1,6 @@
 // Remote-actor client.
 //
-// Sends three fire-and-forget messages to whichever ABCL/c+ runtime
+// Sends three fire-and-forget messages to whichever AIPL runtime
 // is listening on localhost:8080 — the matching server can be either
 // the Python server.abcl in this directory or an OCaml runtime that
 // has called web_listen(8080) and web_expose("/mailbox", ...).

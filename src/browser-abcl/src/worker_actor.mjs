@@ -1,4 +1,4 @@
-// Worker-side runner: one ABCL/c+ actor per Web Worker thread.
+// Worker-side runner: one AIPL actor per Web Worker thread.
 //
 // Receives from main:
 //   { kind: "init",     name, className, methods, fields, initArgs }

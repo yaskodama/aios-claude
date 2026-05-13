@@ -1,4 +1,4 @@
-// Drone Return-Route Support Simulator — ABCL/c+ (JavaScript version)
+// Drone Return-Route Support Simulator — AIPL (JavaScript version)
 // Adaptation of Taga et al. (2016) "Multi-agent Approach for Return Route
 // Support System Simulation" where the smartphones of stranded commuters are
 // replaced by a swarm of disaster-relief drones flying toward a safe zone.
@@ -121,7 +121,7 @@ class Drone {
   }
 }
 
-// Sequential spawner — ABCL/c+ has no loop syntax, so each Drone is created
+// Sequential spawner — AIPL has no loop syntax, so each Drone is created
 // inside a self-recursive spawn_next() method. Using `new Drone(...)` inside
 // a print() expression lets the interpreter auto-generate unique actor names
 // (drone1, drone2, ...).

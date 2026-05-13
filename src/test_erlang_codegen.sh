@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Smoke test for the AIPL → Erlang codegen.
 #
-# For each sample: abcl2c --erlang -> erlc -> erl -s aipl_out main.
+# For each sample: aipl2c --erlang -> erlc -> erl -s aipl_out main.
 # Captures the output and PASSes if non-empty.
 set -u
 cd "$(dirname "$0")/.."
 
-ABCL2C=./_build/default/src/abcl2c.exe
+ABCL2C=./_build/default/src/aipl2c.exe
 if [ ! -x "$ABCL2C" ]; then
   echo "[FATAL] $ABCL2C missing; run dune build"; exit 1
 fi
@@ -37,7 +37,7 @@ check_good() {
   local dir="$TMPROOT/$name"
   mkdir -p "$dir"
   if ! "$ABCL2C" "abclc/$f" -o "$dir/aipl_out.erl" --erlang > /dev/null 2>&1; then
-    fail=$((fail + 1)); printf '  FAIL  %s  (abcl2c)\n' "$f"; return
+    fail=$((fail + 1)); printf '  FAIL  %s  (aipl2c)\n' "$f"; return
   fi
   if ! (cd "$dir" && erlc aipl_out.erl > erlc.log 2>&1); then
     fail=$((fail + 1)); printf '  FAIL  %s  (erlc)\n' "$f"

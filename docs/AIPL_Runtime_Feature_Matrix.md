@@ -16,7 +16,7 @@ The seven runtimes:
 | JS-OCaml (server)      | `src/app.js` / `console_server.js` / `ide.js` (browser JS) + `src/web_gateway.ml` (OCaml HTTP server) |
 | JS-Browser (serverless)| `src/browser-abcl/`                        |
 | **JS-Node (server)**   | `src/node-aipl-server/` (Node.js HTTP server hosting the browser-abcl runtime) |
-| C (abcl2c)             | `src/abcl2c.ml` codegen + `src/abcl_gui_runtime.c` |
+| C (aipl2c)             | `src/aipl2c.ml` codegen + `src/abcl_gui_runtime.c` |
 
 Column abbreviations in tables below: **Py-A**, **Py-I**, **OCaml**,
 **JS-O** (OCaml-backed), **JS-B** (browser-only), **JS-N** (Node-server), **C**.
@@ -59,8 +59,8 @@ Cross-cutting / not tied to a specific runtime:
 - `docker/cross/samples/`: 4 cross-language interop samples
 
 The C runtime processes the same `.abcl` files as OCaml via
-`abcl2c`; of the 66 reachable samples, 48 currently pass the
-`abcl2c` smoke test (the remaining 9 in `abclc/` have pre-existing
+`aipl2c`; of the 66 reachable samples, 48 currently pass the
+`aipl2c` smoke test (the remaining 9 in `abclc/` have pre-existing
 type ambiguities surfaced by our hard-fail policy).
 
 ### What each sample exercises
@@ -71,14 +71,14 @@ the "Target" column lists the runtime(s) and codegen targets that
 actually execute the sample.
 
 Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
-**OCaml** = OCaml REPL (`abclc`); **C** = `abcl2c` → C + pthread;
-**SDL2** = `abcl2c` → C + SDL2 GUI binary;
-**Xinu** = `abcl2c --xinu` → Xinu-flavoured C;
-**Py-gen** = `abcl2c --python` → stand-alone Python file;
-**Pony** = `abcl2c --pony` → Pony actor source;
-**Erlang** = `abcl2c --erlang` → Erlang `.erl` module;
-**Go** = `abcl2c --go` → Go `main.go` source;
-**Prolog** = `abcl2c --prolog` → SWI-Prolog `.pl` (threads + msg queues);
+**OCaml** = OCaml REPL (`abclc`); **C** = `aipl2c` → C + pthread;
+**SDL2** = `aipl2c` → C + SDL2 GUI binary;
+**Xinu** = `aipl2c --xinu` → Xinu-flavoured C;
+**Py-gen** = `aipl2c --python` → stand-alone Python file;
+**Pony** = `aipl2c --pony` → Pony actor source;
+**Erlang** = `aipl2c --erlang` → Erlang `.erl` module;
+**Go** = `aipl2c --go` → Go `main.go` source;
+**Prolog** = `aipl2c --prolog` → SWI-Prolog `.pl` (threads + msg queues);
 **JS-B** = browser-abcl; **JS-N** = node-aipl-server.
 
 | Feature category | Sample(s) | Where | What it checks | Target |
@@ -109,13 +109,13 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `Reviewer.abcl`, `Fanout.abcl`, `PriorityFanout.abcl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing | Py, OCaml |
 | **Remote actors** | `client / server / coordinator / solver / verifier / reviewer_node*`, `RemoteCalcClient/Server` | py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples | HTTP cross-machine sends; HMAC-signed coordination | Py, OCaml |
 | **Web / dashboard** | `web_calc.abcl`, `SiteGen.abcl` | abclc + py-aipl/samples | embedded HTTP gateway; static-site generator | Py (SiteGen), OCaml (web_calc) |
-| **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via abcl2c | SDL2 (via abcl2c) |
-| **Python codegen target** | `BoundedBufferPy`, `Philosophers5Py`, `Rotate4LinesPy` | abclc | `abcl2c --python` emits stand-alone Python | Py-gen |
-| **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `abcl2c --xinu` emits Xinu-flavoured C | Xinu |
-| **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `abcl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
-| **Erlang codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — `sender` not tracked) | abclc | `abcl2c --erlang` emits a single `.erl` module; `class` → spawn + receive loop; fields → loop args with versioned variables on assign; methods → `receive` clauses | Erlang |
-| **Go codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `abcl2c --go` emits a single Go `main.go`; `class` → struct + goroutine `run()`; each method → typed message struct + `Method()` helper that pushes to a buffered `chan any` mailbox; dispatch via type switch in `run()` | Go |
-| **Prolog codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `abcl2c --prolog` emits a single SWI-Prolog `.pl` file using `library(thread)`; `class` → `c_loop(Fields)` thread with `thread_get_message` + `Msg = m(Args) -> body ; ...` dispatch; expressions are hoisted into prolog goals (`X is A + B`, `format(atom(S), "~w~w", [A,B])`) | Prolog |
+| **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via aipl2c | SDL2 (via aipl2c) |
+| **Python codegen target** | `BoundedBufferPy`, `Philosophers5Py`, `Rotate4LinesPy` | abclc | `aipl2c --python` emits stand-alone Python | Py-gen |
+| **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `aipl2c --xinu` emits Xinu-flavoured C | Xinu |
+| **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `aipl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
+| **Erlang codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — `sender` not tracked) | abclc | `aipl2c --erlang` emits a single `.erl` module; `class` → spawn + receive loop; fields → loop args with versioned variables on assign; methods → `receive` clauses | Erlang |
+| **Go codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `aipl2c --go` emits a single Go `main.go`; `class` → struct + goroutine `run()`; each method → typed message struct + `Method()` helper that pushes to a buffered `chan any` mailbox; dispatch via type switch in `run()` | Go |
+| **Prolog codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `aipl2c --prolog` emits a single SWI-Prolog `.pl` file using `library(thread)`; `class` → `c_loop(Fields)` thread with `thread_get_message` + `Msg = m(Args) -> body ; ...` dispatch; expressions are hoisted into prolog goals (`X is A + B`, `format(atom(S), "~w~w", [A,B])`) | Prolog |
 | **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 

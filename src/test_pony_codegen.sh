@@ -2,7 +2,7 @@
 # Smoke test for the AIPL → Pony codegen.
 #
 # For each sample, runs:
-#   1. abcl2c --pony <sample> → <name>.pony
+#   1. aipl2c --pony <sample> → <name>.pony
 #   2. ponyc on a tmp directory containing the .pony file (renamed main.pony)
 #   3. executes the resulting binary
 # Records PASS / FAIL per phase.  Some samples are expected to FAIL the
@@ -12,7 +12,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-ABCL2C=./_build/default/src/abcl2c.exe
+ABCL2C=./_build/default/src/aipl2c.exe
 if [ ! -x "$ABCL2C" ]; then
   echo "[FATAL] $ABCL2C missing; run dune build"; exit 1
 fi
@@ -45,7 +45,7 @@ check_good() {
   local dir="$TMPROOT/$name"
   mkdir -p "$dir"
   if ! "$ABCL2C" "abclc/$f" -o "$dir/main.pony" --pony > /dev/null 2>&1; then
-    fail=$((fail + 1)); printf '  FAIL  %s  (abcl2c)\n' "$f"; return
+    fail=$((fail + 1)); printf '  FAIL  %s  (aipl2c)\n' "$f"; return
   fi
   if ! (cd "$dir" && ponyc --output . > ponyc.log 2>&1); then
     fail=$((fail + 1)); printf '  FAIL  %s  (ponyc)\n' "$f"

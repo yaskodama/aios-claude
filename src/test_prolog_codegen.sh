@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Smoke test for the AIPL → Prolog (SWI) codegen.
-# Each sample: abcl2c --prolog -> swipl -g main -t halt
+# Each sample: aipl2c --prolog -> swipl -g main -t halt
 set -u
 cd "$(dirname "$0")/.."
 
-ABCL2C=./_build/default/src/abcl2c.exe
+ABCL2C=./_build/default/src/aipl2c.exe
 if [ ! -x "$ABCL2C" ]; then
   echo "[FATAL] $ABCL2C missing; run dune build"; exit 1
 fi
@@ -26,7 +26,7 @@ check_good() {
   local name="${f%.abcl}"
   local pl="$TMPROOT/$name.pl"
   if ! "$ABCL2C" "abclc/$f" -o "$pl" --prolog > /dev/null 2>&1; then
-    fail=$((fail + 1)); printf '  FAIL  %s  (abcl2c)\n' "$f"; return
+    fail=$((fail + 1)); printf '  FAIL  %s  (aipl2c)\n' "$f"; return
   fi
   # swipl prints warnings to stderr; we capture stdout for the actual output
   local out

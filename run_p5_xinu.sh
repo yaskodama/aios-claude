@@ -6,8 +6,8 @@ cd "$(dirname "$0")"
 XINU=/Users/kodamay/projects/xinu-raz/xinu
 COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-
 
-dune build src/abcl2c.exe
-./_build/default/src/abcl2c.exe abclc/Philosophers5Xinu.abcl \
+dune build src/aipl2c.exe
+./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.abcl \
     -o /tmp/p5_xinu.c --xinu --max-msgs 0
 cp /tmp/p5_xinu.c "$XINU/apps/abcl_program.c"
 

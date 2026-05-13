@@ -1,6 +1,6 @@
 # AIPL Builtin Reference (Python runtime)
 
-**AIPL** = Actor-based Intelligent Parallel Language (formerly ABCL/c+).
+**AIPL** = Actor-based Intelligent Parallel Language (formerly AIPL).
 
 Every builtin available to `.abcl` programs running on the Python
 runtime (`src/python-aipl/`).  All are total: filesystem and AI

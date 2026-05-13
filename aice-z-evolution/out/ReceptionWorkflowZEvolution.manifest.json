@@ -45,7 +45,7 @@
         "repair": "logical_consensus",
         "style": "defensive",
         "generation": "1",
-        "mutation": "M1_TargetLanguagePolicy: set target_language to ABCL. Use OCaml ABCL/c+ as the default target. The meta file may still select any or another concrete target language explicitly."
+        "mutation": "M1_TargetLanguagePolicy: set target_language to ABCL. Use OCaml AIPL as the default target. The meta file may still select any or another concrete target language explicitly."
       },
       "score": 0.8783333333333333,
       "findings": []

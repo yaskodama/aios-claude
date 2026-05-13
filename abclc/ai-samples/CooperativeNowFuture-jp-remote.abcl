@@ -1,7 +1,7 @@
 // 3 役 AI 協調 (now/future/await) — reviewer は別マシン (Docker) で動く版。
 //
 // ローカル: Planner, Solver
-// リモート: Reviewer  (Python ABCL/c+ Docker container, port 9100)
+// リモート: Reviewer  (Python AIPL Docker container, port 9100)
 //
 // 起動:
 //   bash /tmp/coop_remote_jp.sh

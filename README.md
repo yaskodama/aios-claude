@@ -1,6 +1,6 @@
 # aios-claude — AIPL as an AI-OS scripting layer
 
-**AIPL** (Actor-based Intelligent Parallel Language; formerly ABCL/c+)
+**AIPL** (Actor-based Intelligent Parallel Language; formerly AIPL)
 is a small actor language descended from
 the [ABCL/1](https://en.wikipedia.org/wiki/Actor-Based_Concurrent_Language)
 family. See [USER_MANUAL.md](USER_MANUAL.md) for the language reference.  This project ships three wire-compatible runtimes for it
@@ -26,7 +26,7 @@ coordination.
 
 | Runtime | Source | Best for |
 |---|---|---|
-| OCaml AIPL | `src/*.ml`, `_build/.../repl_thread.exe` | the canonical interpreter; SDL/Xinu/Python codegen via `abcl2c`; minimal native binary |
+| OCaml AIPL | `src/*.ml`, `_build/.../repl_thread.exe` | the canonical interpreter; SDL/Xinu/Python codegen via `aipl2c`; minimal native binary |
 | Browser AIPL | `src/browser-abcl/` | WebGL canvas demos in any browser |
 | Python AIPL | `src/python-aipl/` | the AI-OS surface — every AI provider, every governance knob, distributed mode |
 
@@ -129,7 +129,7 @@ make smoke-dynamic   # also opens the JS demos in headless Chrome
 Latest run:
 
 ```
-ABCL  : 52/52   (OCaml REPL + abcl2c + cc/SDL2)
+ABCL  : 52/52   (OCaml REPL + aipl2c + cc/SDL2)
 JS    : syntax 7/7 + parse 4/4
 Python: 7/7
 Dist  : 8/8     (3-node distributed mock)

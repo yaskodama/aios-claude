@@ -1,6 +1,6 @@
 #!/bin/sh
 # PingPong.abcl を Xinu (arm-qemu) 上で動かす一連の手順。
-#  1. abcl2c に --xinu を付けて C を生成
+#  1. aipl2c に --xinu を付けて C を生成
 #  2. Xinu の apps/abcl_pingpong.c に配置
 #  3. Xinu kernel をビルド (arm-none-eabi-gcc)
 #  4. QEMU で起動し、シリアル出力を表示
@@ -11,8 +11,8 @@ XINU=/Users/kodamay/projects/xinu-raz/xinu
 COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-
 
 # 1. translator
-dune build src/abcl2c.exe
-./_build/default/src/abcl2c.exe abclc/PingPong.abcl \
+dune build src/aipl2c.exe
+./_build/default/src/aipl2c.exe abclc/PingPong.abcl \
     -o /tmp/pp_xinu.c --xinu --max-msgs 12
 
 # 2. place into Xinu apps

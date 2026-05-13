@@ -11,7 +11,7 @@ set -u
 cd "$(dirname "$0")"
 
 REPL=../_build/default/src/repl_thread.exe
-ABCL2C=../_build/default/src/abcl2c.exe
+ABCL2C=../_build/default/src/aipl2c.exe
 RUNTIME_C=../src/abcl_gui_runtime.c
 TIMEOUT=${TIMEOUT:-5}
 LOGDIR=_smoke_logs
@@ -28,8 +28,8 @@ fi
 pass=0; fail=0; total=0
 declare -a FAILS
 
-# Gui/Py/Xinu variants are designed to be cross-compiled via abcl2c,
-# not executed in the REPL.  Route them through abcl2c instead.
+# Gui/Py/Xinu variants are designed to be cross-compiled via aipl2c,
+# not executed in the REPL.  Route them through aipl2c instead.
 classify() {
   case "$1" in
     *Gui.abcl)  echo gui  ;;
@@ -62,7 +62,7 @@ run_repl() {
   grep -q '\[Compiled\]' "$log"
 }
 
-run_abcl2c() {
+run_aipl2c() {
   local abcl="$1"
   local mode="$2"
   local name="${abcl%.abcl}"
@@ -96,18 +96,18 @@ run_one() {
       fail=$((fail+1)); FAILS+=("$abcl"); printf '  FAIL  %s  (repl)\n' "$abcl"
     fi
   else
-    if run_abcl2c "$abcl" "$kind"; then
+    if run_aipl2c "$abcl" "$kind"; then
       if [ "$kind" = "gui" ] && [ "$SDL2_OK" = "1" ]; then
         if build_c_gui "$abcl"; then
-          pass=$((pass+1)); printf '  PASS  %s  (abcl2c --gui + cc/SDL2)\n' "$abcl"
+          pass=$((pass+1)); printf '  PASS  %s  (aipl2c --gui + cc/SDL2)\n' "$abcl"
         else
           fail=$((fail+1)); FAILS+=("$abcl"); printf '  FAIL  %s  (cc/SDL2)\n' "$abcl"
         fi
       else
-        pass=$((pass+1)); printf '  PASS  %s  (abcl2c --%s)\n' "$abcl" "$kind"
+        pass=$((pass+1)); printf '  PASS  %s  (aipl2c --%s)\n' "$abcl" "$kind"
       fi
     else
-      fail=$((fail+1)); FAILS+=("$abcl"); printf '  FAIL  %s  (abcl2c --%s)\n' "$abcl" "$kind"
+      fail=$((fail+1)); FAILS+=("$abcl"); printf '  FAIL  %s  (aipl2c --%s)\n' "$abcl" "$kind"
     fi
   fi
 }

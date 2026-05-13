@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run every smoke test in the project and report a single summary.
 #
-#   1. abclc/_smoke_test.sh   -> OCaml REPL + abcl2c (+ cc/SDL2 for Gui variants)
+#   1. abclc/_smoke_test.sh   -> OCaml REPL + aipl2c (+ cc/SDL2 for Gui variants)
 #   2. src/browser-abcl/_smoke_test.sh [--dynamic]
 #                             -> JS syntax + parser
 #                                (and headless Chrome run when --dynamic)
@@ -22,7 +22,7 @@ DYNAMIC_FLAG=""
 if [ "${1:-}" = "--dynamic" ]; then DYNAMIC_FLAG="--dynamic"; fi
 
 # Make sure the OCaml binaries exist.
-if [ ! -x _build/default/src/repl_thread.exe ] || [ ! -x _build/default/src/abcl2c.exe ]; then
+if [ ! -x _build/default/src/repl_thread.exe ] || [ ! -x _build/default/src/aipl2c.exe ]; then
   echo "[build] dune build"
   dune build || { echo "[FATAL] dune build failed"; exit 1; }
 fi

@@ -1,7 +1,7 @@
-(* abcl2c.ml — AIPL ソースを C に変換 *)
+(* aipl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: abcl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog] [--no-typecheck]";
+  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog] [--no-typecheck]";
   exit 1
 
 let () =
@@ -60,7 +60,7 @@ let () =
   close_in ic;
   if not !no_typecheck then begin
     if not (Typecheck.run prog) then begin
-      Printf.eprintf "[abcl2c] type errors in %s — aborting C generation\n" input;
+      Printf.eprintf "[aipl2c] type errors in %s — aborting C generation\n" input;
       Printf.eprintf "         (use --no-typecheck to bypass)\n";
       exit 3
     end

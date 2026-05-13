@@ -1,4 +1,4 @@
-// TrafficLightParadigmEvolutionJP_Auto.aice から自動変換した AIPL(ABCL/c+) プログラム。
+// TrafficLightParadigmEvolutionJP_Auto.aice から自動変換した AIPL(AIPL) プログラム。
 // 入力 dialect: aice_evolution_v1
 // 形式チェックは外部工程。このプログラムは進化計算、3候補生成、3レビュー、選択、アーカイブ出力を行う。
 

@@ -1,5 +1,5 @@
 // Generated from aice-z-evolution/examples/TrafficLightParadigmEvolution.aice
-// Runtime: OCaml ABCL/c+.
+// Runtime: OCaml AIPL.
 // Topology: Assembler -> BASIC -> fork { C -> Java OOP, Functional -> Functional OOP } -> Parallel OOP.
 
 class TrafficLightParadigmEvolution {
@@ -181,7 +181,7 @@ class TrafficLightParadigmEvolution {
     print("genome: paradigm=ParallelOOP, target_language=ABCL, state_representation=symbolic_state_owned_by_actor, transition_style=actor_method_uses_pure_next_cases, control_abstraction=asynchronous_send_messages, data_abstraction=TrafficLight_actor_class, encapsulation=single_state_owner_actor, type_safety=guarded_symbolic_state, concurrency_model=actor_messages, executable_demo=controller_sends_four_ticks");
     print("mutations: M6_Join_to_ParallelOOP, M10_Add_State_Owner, M9_Add_Demo");
     print("crossover: C3_JavaOOP_FunctionalOOP_to_ParallelOOP, Java OOP contributes state owner/interface; Functional OOP contributes symbolic pure transition; child uses ABCL actor messages");
-    var p_base = task + "\n\nParent JavaOOPWinner:\n" + JavaOOPWinner + "\n\nParent FunctionalOOPWinner:\n" + FunctionalOOPWinner + "\n\nGeneration Parallel OOP. Target ABCL/c+. Use actors/classes, new, send, method tick, single state owner, four tick demo.";
+    var p_base = task + "\n\nParent JavaOOPWinner:\n" + JavaOOPWinner + "\n\nParent FunctionalOOPWinner:\n" + FunctionalOOPWinner + "\n\nGeneration Parallel OOP. Target AIPL. Use actors/classes, new, send, method tick, single state owner, four tick demo.";
     var p1 = ai_call_with_system(generator_persona, p_base + "\nCandidate 1 style=single_TrafficLight_actor.");
     var p2 = ai_call_with_system(generator_persona, p_base + "\nCandidate 2 style=controller_sends_ticks.");
     var p3 = ai_call_with_system(generator_persona, p_base + "\nCandidate 3 style=parallel_tick_requests_with_ordered_state_owner.");

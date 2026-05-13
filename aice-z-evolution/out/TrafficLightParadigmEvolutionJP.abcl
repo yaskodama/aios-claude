@@ -1,4 +1,4 @@
-// TrafficLightParadigmEvolutionJP.aice から生成した AIPL(ABCL/c+) プログラム。
+// TrafficLightParadigmEvolutionJP.aice から生成した AIPL(AIPL) プログラム。
 // 経路: Assembler -> BASIC -> fork { C -> Java OOP, Functional -> Functional OOP } -> Parallel OOP
 // 形式検査は別工程。このプログラムは進化計算、3候補生成、3レビュー、選択、アーカイブ出力を行う。
 

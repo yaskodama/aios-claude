@@ -1,4 +1,4 @@
-// First AI sample on the OCaml ABCL/c+ runtime.
+// First AI sample on the OCaml AIPL runtime.
 // Requires GEMINI_API_KEY in the environment when launching the REPL.
 class Greeter {
   method ask(question) {

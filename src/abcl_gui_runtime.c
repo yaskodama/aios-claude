@@ -1,6 +1,6 @@
 /*
  * abcl_gui_runtime.c
- * ABCL/c+ → C 翻訳器が呼び出す GUI ビルトイン群 (SDL2)
+ * AIPL → C 翻訳器が呼び出す GUI ビルトイン群 (SDL2)
  *
  * 翻訳器が出す .c は value_t / enqueue / abcl_shutdown / global_shutdown を
  * extern 公開しているので、ここで参照できる。
@@ -844,7 +844,7 @@ value_t gui_run(int n, value_t* a) {
     abcl_shutdown();
     return v_nil();
   }
-  g_win = SDL_CreateWindow("ABCL/c+ Rotate4Lines",
+  g_win = SDL_CreateWindow("AIPL Rotate4Lines",
                            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                            g_win_w, g_win_h, SDL_WINDOW_SHOWN);
   if (!g_win) {

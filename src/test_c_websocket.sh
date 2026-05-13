@@ -7,7 +7,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-ABCL2C=./_build/default/src/abcl2c.exe
+ABCL2C=./_build/default/src/aipl2c.exe
 WS_RT=./src/abcl_ws_runtime.c
 
 if [ ! -x "$ABCL2C" ]; then echo "[FATAL] $ABCL2C missing; dune build"; exit 1; fi
@@ -42,7 +42,7 @@ send h.run();
 EOF
 
 if ! "$ABCL2C" "$TMPROOT/ws_smoke.abcl" -o "$TMPROOT/ws_smoke.c" --max-msgs 4 > /dev/null 2>&1; then
-  fail=$((fail + 1)); printf '  FAIL  abcl2c\n'
+  fail=$((fail + 1)); printf '  FAIL  aipl2c\n'
 else
   if cc -O2 -Wall -pthread \
         -I"$LWS_INC" -I"$OS_INC" \

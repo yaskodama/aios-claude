@@ -45,7 +45,7 @@
         "repair": "logical_consensus",
         "style": "defensive",
         "generation": "1",
-        "mutation": "M1_Target_OCaml_ABCL: set target_language to ABCL. Use the OCaml ABCL/c+ runtime as the executable target."
+        "mutation": "M1_Target_OCaml_ABCL: set target_language to ABCL. Use the OCaml AIPL runtime as the executable target."
       },
       "score": 0.865,
       "findings": []

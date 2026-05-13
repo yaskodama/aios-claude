@@ -4,7 +4,7 @@ Phase 1〜7 + 9 まで動く状態です。多タスク横断で「次世代言�
 Phase 9 の `open_axes=true` ではスキーマ自体が探索中に成長します。
 
 > **言語名について**: 本プロジェクトのアクター並列言語は **AIPL**
-> (Actor-based Intelligent Parallel Language; 旧称 ABCL/c+) と呼びます。
+> (Actor-based Intelligent Parallel Language; 旧称 AIPL) と呼びます。
 > 実装内部のモジュール名 (`aipl_*.py`)・ファイル拡張子
 > (`.abcl`)・環境変数 (`ABCL_AI_PROVIDER`) は後方互換のため維持。
 

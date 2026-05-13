@@ -50,7 +50,7 @@
 
 \section*{Overview}
 
-AIPL (Actor-based Intelligent Parallel Language, formerly ABCL/c+)
+AIPL (Actor-based Intelligent Parallel Language, formerly AIPL)
 has grown into a \textbf{seven-runtime project}.  This document
 provides a side-by-side comparison of every language and
 infrastructure feature across all implementations, grounded in
@@ -72,7 +72,7 @@ source surveys.
   JS-OCaml (server)         & \texttt{src/app.js}, \texttt{console\_server.js}, \texttt{ide.js} + OCaml \texttt{web\_gateway} \\
   JS-Browser (serverless)   & \texttt{src/browser-abcl/} \\
   JS-Node (server)          & \texttt{src/node-aipl-server/} (Node HTTP server wrapping browser-abcl) \\
-  C (abcl2c)                & \texttt{src/abcl2c.ml} codegen + \texttt{src/abcl\_gui\_runtime.c} \\
+  C (aipl2c)                & \texttt{src/aipl2c.ml} codegen + \texttt{src/abcl\_gui\_runtime.c} \\
   \bottomrule
 \end{tabularx}
 
@@ -80,7 +80,7 @@ source surveys.
 \textbf{Py-A}~=~Python annotated, \textbf{Py-I}~=~Python inferred,
 \textbf{OCaml}, \textbf{JS-O}~=~JS via OCaml backend,
 \textbf{JS-B}~=~JS in browser, \textbf{JS-N}~=~JS in Node server,
-\textbf{C}~=~abcl2c codegen.
+\textbf{C}~=~aipl2c codegen.
 
 \paragraph{Inheritance relationships.}
 
@@ -127,8 +127,8 @@ Cross-cutting / not tied to a specific runtime:
 \end{itemize}
 
 Note that the C runtime processes the same \texttt{.abcl} files as
-OCaml via \texttt{abcl2c}; of the 66 reachable samples, 48 currently
-pass the \texttt{abcl2c} smoke test (the remaining 9 in \texttt{abclc/}
+OCaml via \texttt{aipl2c}; of the 66 reachable samples, 48 currently
+pass the \texttt{aipl2c} smoke test (the remaining 9 in \texttt{abclc/}
 have pre-existing type ambiguities surfaced by our hard-fail policy).
 
 \subsection*{What each sample exercises}
@@ -143,14 +143,14 @@ execute the sample.
 \noindent\small
 Target abbreviations: \textbf{Py}~=~python-aipl /
 python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
-\textbf{C}~=~\texttt{abcl2c}~$\to$~C+pthread;
-\textbf{SDL2}~=~\texttt{abcl2c}~$\to$~C+SDL2 GUI binary;
-\textbf{Xinu}~=~\texttt{abcl2c~--xinu}~$\to$~Xinu-flavoured C;
-\textbf{Py-gen}~=~\texttt{abcl2c~--python}~$\to$~stand-alone Python;
-\textbf{Pony}~=~\texttt{abcl2c~--pony}~$\to$~Pony actor source;
-\textbf{Erlang}~=~\texttt{abcl2c~--erlang}~$\to$~Erlang module;
-\textbf{Go}~=~\texttt{abcl2c~--go}~$\to$~Go source;
-\textbf{Prolog}~=~\texttt{abcl2c~--prolog}~$\to$~SWI-Prolog \texttt{.pl};
+\textbf{C}~=~\texttt{aipl2c}~$\to$~C+pthread;
+\textbf{SDL2}~=~\texttt{aipl2c}~$\to$~C+SDL2 GUI binary;
+\textbf{Xinu}~=~\texttt{aipl2c~--xinu}~$\to$~Xinu-flavoured C;
+\textbf{Py-gen}~=~\texttt{aipl2c~--python}~$\to$~stand-alone Python;
+\textbf{Pony}~=~\texttt{aipl2c~--pony}~$\to$~Pony actor source;
+\textbf{Erlang}~=~\texttt{aipl2c~--erlang}~$\to$~Erlang module;
+\textbf{Go}~=~\texttt{aipl2c~--go}~$\to$~Go source;
+\textbf{Prolog}~=~\texttt{aipl2c~--prolog}~$\to$~SWI-Prolog \texttt{.pl};
 \textbf{JS-B}~=~browser-abcl; \textbf{JS-N}~=~node-aipl-server.
 \normalsize
 
@@ -186,13 +186,13 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   AI cooperative pattern & \texttt{CooperativeNowFuture\{,-jp,-jp-remote\}}, \texttt{CooperativeSolve\{,-jp,Remote,Remote-jp\}}, \texttt{Reviewer}, \texttt{Fanout}, \texttt{PriorityFanout} & py-aipl/samples-ai + abclc/ai-samples & Planner$\to$Solver$\to$Reviewer; fan-out aggregator; priority routing & Py, OCaml \\
   Remote actors & \texttt{client}, \texttt{server}, \texttt{coordinator}, \texttt{solver}, \texttt{verifier}, \texttt{reviewer\_node*}, \texttt{RemoteCalcClient}/\texttt{Server} & py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples & HTTP cross-machine sends; HMAC-signed coordination & Py, OCaml \\
   Web / dashboard & \texttt{web\_calc}, \texttt{SiteGen} & abclc + py-aipl/samples & embedded HTTP gateway; static-site generator & Py (SiteGen), OCaml (web\_calc) \\
-  GUI / SDL2 & \texttt{Rotate\{One,Three,Four\}Lines\{,Gui\}}, \texttt{MultiLineSpin}, \texttt{Philosophers5Gui}, \texttt{BoundedBufferGui}, \texttt{DisasterReturnGui}, \texttt{LineDrawer}, \texttt{window} & abclc & SDL2-backed GUI codegen via abcl2c & SDL2 (via abcl2c) \\
-  Python codegen target & \texttt{BoundedBufferPy}, \texttt{Philosophers5Py}, \texttt{Rotate4LinesPy} & abclc & \texttt{abcl2c --python} emits stand-alone Python & Py-gen \\
-  Xinu (embedded OS) target & \texttt{BoundedBufferXinu}, \texttt{Philosophers5Xinu}, \texttt{Rotate4LinesXinu} & abclc & \texttt{abcl2c --xinu} emits Xinu-flavoured C & Xinu \\
-  Pony codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --pony} emits Pony source; \texttt{class} $\to$ \texttt{actor}, methods $\to$ \texttt{be}; two-step \texttt{\_aipl\_init} decouples construction from init body & Pony \\
-  Erlang codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --erlang} emits an \texttt{.erl} module; \texttt{class} $\to$ \texttt{spawn} + \texttt{receive} loop; fields $\to$ loop args with versioned variables on assign & Erlang \\
-  Go codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --go} emits a single \texttt{main.go}; \texttt{class} $\to$ struct + goroutine; methods $\to$ typed message structs + helper methods + type-switch dispatch & Go \\
-  Prolog codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --prolog} emits a single SWI-Prolog \texttt{.pl} using \texttt{library(thread)}; \texttt{class} $\to$ \texttt{c\_loop(Fields)} thread + \texttt{thread\_get\_message} + \texttt{Msg = m(Args) -> body} dispatch; expressions hoisted to goals (\texttt{X is A + B}, \texttt{format(atom(S), ...)}) & Prolog \\
+  GUI / SDL2 & \texttt{Rotate\{One,Three,Four\}Lines\{,Gui\}}, \texttt{MultiLineSpin}, \texttt{Philosophers5Gui}, \texttt{BoundedBufferGui}, \texttt{DisasterReturnGui}, \texttt{LineDrawer}, \texttt{window} & abclc & SDL2-backed GUI codegen via aipl2c & SDL2 (via aipl2c) \\
+  Python codegen target & \texttt{BoundedBufferPy}, \texttt{Philosophers5Py}, \texttt{Rotate4LinesPy} & abclc & \texttt{aipl2c --python} emits stand-alone Python & Py-gen \\
+  Xinu (embedded OS) target & \texttt{BoundedBufferXinu}, \texttt{Philosophers5Xinu}, \texttt{Rotate4LinesXinu} & abclc & \texttt{aipl2c --xinu} emits Xinu-flavoured C & Xinu \\
+  Pony codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --pony} emits Pony source; \texttt{class} $\to$ \texttt{actor}, methods $\to$ \texttt{be}; two-step \texttt{\_aipl\_init} decouples construction from init body & Pony \\
+  Erlang codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --erlang} emits an \texttt{.erl} module; \texttt{class} $\to$ \texttt{spawn} + \texttt{receive} loop; fields $\to$ loop args with versioned variables on assign & Erlang \\
+  Go codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --go} emits a single \texttt{main.go}; \texttt{class} $\to$ struct + goroutine; methods $\to$ typed message structs + helper methods + type-switch dispatch & Go \\
+  Prolog codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --prolog} emits a single SWI-Prolog \texttt{.pl} using \texttt{library(thread)}; \texttt{class} $\to$ \texttt{c\_loop(Fields)} thread + \texttt{thread\_get\_message} + \texttt{Msg = m(Args) -> body} dispatch; expressions hoisted to goals (\texttt{X is A + B}, \texttt{format(atom(S), ...)}) & Prolog \\
   Drone / simulation & \texttt{drone\_simulator} & browser-abcl & obstacle-aware drone swarm with comm + view range & JS-B, JS-N \\
   Trace / minimal repros & \texttt{H}, \texttt{P}, \texttt{T*}, \texttt{LD*}, \texttt{MS}, \texttt{AA}, \texttt{PP}, \texttt{PH}, \texttt{line*}, \texttt{Philosophers5\_\{debug,trace\}} & abclc & reduced repro cases used during runtime / TLA+ / Spin model-checking & OCaml \\
   \bottomrule

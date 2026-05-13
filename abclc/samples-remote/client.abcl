@@ -1,4 +1,4 @@
-// OCaml client targeting a remote ABCL/c+ runtime.
+// OCaml client targeting a remote AIPL runtime.
 //
 // Same wire format on both sides — works against:
 //   - the Python server (samples-remote/server.abcl, port 8080), or
