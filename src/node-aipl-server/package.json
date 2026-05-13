@@ -1,0 +1,11 @@
+{
+  "name": "node-aipl-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js HTTP server hosting the AIPL parser, type checker, and interpreter (reuses browser-abcl runtime).",
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke": "bash _smoke_test.sh"
+  }
+}
