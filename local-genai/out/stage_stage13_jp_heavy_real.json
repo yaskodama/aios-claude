@@ -1,0 +1,22 @@
+{
+  "name": "Stage8_BPE_Transformer",
+  "params": 1709440,
+  "vocab_size": 4096,
+  "bytes_per_token_avg_holdout": 3.3120351673674446,
+  "best_bpb": 1.4940579620901016,
+  "best_ppl_byte_equiv": 2.816801620103227,
+  "best_ppl_token": 30.87511301724289,
+  "best_step": 160000,
+  "train_time_sec": 37909.62,
+  "config": {
+    "d_model": 128,
+    "depth": 6,
+    "steps": 160000,
+    "corpus": "120MB_jp_heavy",
+    "dropout": 0.1,
+    "label_smoothing": 0.05,
+    "weight_decay": 0.05,
+    "min_lr_frac": 0.005,
+    "pos_encoding": "rope"
+  }
+}

@@ -65,3 +65,6 @@ src/python-aipl/out_site/
 
 # local-genai PG corpus build cache (regenerable)
 local-genai/.cache/
+
+# Stage-13 jp-heavy corpus (108MB > GitHub 100MB limit; regenerate via build_500mb_corpus.py)
+local-genai/corpus/tinyshake_120MB_jp_heavy.txt

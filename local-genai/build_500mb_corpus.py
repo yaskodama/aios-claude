@@ -21,6 +21,7 @@ is plain Japanese text.
 
 from __future__ import annotations
 import hashlib
+import random
 import re
 import sys
 import urllib.request
@@ -30,12 +31,14 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 CACHE_DIR = HERE / ".cache"
-# Stage-12 first iteration: targeted 500MB, settled at ~98MB after PG
-# fetch failures + Aozora source 404s. The 98MB result is still the
-# first multilingual corpus (English + Japanese) in this project and
-# ~60% larger than the Stage-11 60MB corpus.
-CORPUS_OUT = HERE / "corpus" / "tinyshake_100MB_multi.txt"
+# Stage-13-jp-heavy: same source list as Stage-12 but the Aozora pieces
+# get repeated AOZORA_REPEAT times during corpus assembly so the
+# Japanese ratio reaches ~20% (vs 1.16% in Stage-12). This boosts
+# Japanese exposure for both BPE training and model training without
+# needing fresh Aozora URLs.
+CORPUS_OUT = HERE / "corpus" / "tinyshake_120MB_jp_heavy.txt"
 TARGET_BYTES = 500_000_000
+AOZORA_REPEAT = 5
 
 # (source_kind, source_id, label, url)
 #   source_kind ∈ {"pg", "aozora_html"}
@@ -508,31 +511,21 @@ def main():
     # piles up at the end of the corpus and the tokenizer/model can't
     # generalize across the language boundary.
     pg_pieces = [p for (kind, _, _, _), p in zip(SOURCES, pieces) if kind == "pg"]
-    aozora_pieces = [p for (kind, _, _, _), p in zip(SOURCES, pieces) if kind == "aozora_html"]
+    aozora_pieces_unique = [p for (kind, _, _, _), p in zip(SOURCES, pieces) if kind == "aozora_html"]
     # Drop empties (failed fetches were skipped earlier, but be defensive).
     pg_pieces = [p for p in pg_pieces if p]
-    aozora_pieces = [p for p in aozora_pieces if p]
-    # Round-robin: every Nth slot is a Japanese piece, where
-    # N ≈ len(pg)/len(aozora). With ~80 PG and ~20 Aozora, that gives a
-    # 4:1 English:Japanese local mix throughout the corpus.
-    interleaved: list[bytes] = []
-    pg_idx = aoz_idx = 0
-    if aozora_pieces:
-        stride = max(1, len(pg_pieces) // len(aozora_pieces))
-    else:
-        stride = 10 ** 9
-    counter = 0
-    while pg_idx < len(pg_pieces) or aoz_idx < len(aozora_pieces):
-        if counter % (stride + 1) == stride and aoz_idx < len(aozora_pieces):
-            interleaved.append(aozora_pieces[aoz_idx])
-            aoz_idx += 1
-        elif pg_idx < len(pg_pieces):
-            interleaved.append(pg_pieces[pg_idx])
-            pg_idx += 1
-        elif aoz_idx < len(aozora_pieces):
-            interleaved.append(aozora_pieces[aoz_idx])
-            aoz_idx += 1
-        counter += 1
+    aozora_pieces_unique = [p for p in aozora_pieces_unique if p]
+    # Repeat the unique Japanese pieces so the final corpus has a higher
+    # Japanese ratio (Stage-13-jp-heavy goal).
+    aozora_pieces = aozora_pieces_unique * AOZORA_REPEAT
+    print(f"  aozora pieces: {len(aozora_pieces_unique)} unique × {AOZORA_REPEAT}"
+          f" repetitions = {len(aozora_pieces)} interleaved entries")
+    # Randomised interleave: gather all pieces and shuffle them with a
+    # fixed seed. This gives a uniform Japanese-vs-English distribution
+    # across the whole corpus, so any truncation point (and the 5%
+    # tail used as the holdout) preserves the language mix.
+    interleaved: list[bytes] = pg_pieces + aozora_pieces
+    random.Random(42).shuffle(interleaved)
 
     combined = sep.join(interleaved)
     final = combined[:TARGET_BYTES] if len(combined) >= TARGET_BYTES else combined

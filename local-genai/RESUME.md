@@ -56,7 +56,30 @@ origin/main と同期済み (push 済み)。
 
 ## チャンピオン (現状最強モデル)
 
-**Stage-12-multilingual (1.71M params, 99MB BR+US English + 日本語, MeCab+BPE-4096, 160K step ≈ 983M tokens)** — **第一の多言語 champion**
+**Stage-13-jp-heavy (1.71M params, 113MB BR+US English + 日本語 ×5 repeat, MeCab+BPE-4096, 160K step ≈ 983M tokens)** — **絶対 bpb champion (多言語タスクで monolingual を超えた)**
+
+```
+local-genai/out/transformer_stage13_jp_heavy.pt + tokenizer_stage13_jp_heavy.json
+  TinyTransformer depth=6, d_model=128, n_heads=4, ctx=256, bptt=256
+  ffn_mult=4, RMSNorm, RoPE
+  dropout 0.1, label_smoothing 0.05, weight_decay 0.05
+  warmup 1500, cosine 終端 LR=1e-5 (min_lr_frac=0.005)
+  BPE 4096-vocab + 日本語 MeCab 分かち書き
+  113MB Shakespeare+Victorian+US+JP (Aozora ×5 repeat, ~15% JP bytes) 学習
+  best bpb 1.494 @ step 160000 (= ppl/byte 2.817) — 走破直前、 未収束
+  訓練時間 37910s (M2 MPS, 10.5 時間)
+```
+
+**「日本語比率上げ」 の効果**: 全く同じ recipe で Stage-12 (1% JP) → Stage-13 (15% JP) → bpb 1.667 → 1.494 (**-10%**)、 ppl/byte 3.18 → **2.82**。 多言語タスクであるにも関わらず monolingual champion Stage-11 (bpb 1.586) を **0.09 bpb 上回る**。
+
+実装ポイント:
+- build_500mb_corpus.py に AOZORA_REPEAT=5 を導入 (Aozora ピース 15 個を 5 回繰り返し配置 = 75 個)
+- ランダムシャッフル (seed=42) で interleave → train/holdout の言語バランス確保
+- holdout も日本語 ~1.5% で評価が JP fluency を反映
+
+best @ step 160000 (走破直前) は未収束 → さらに延長で伸びる余地あり。
+
+**Stage-12-multilingual (1.71M params, 99MB BR+US English + 日本語 ×1, MeCab+BPE-4096, 160K step)** — 第一の多言語実装, bpb 1.667 (歴史的)
 
 ```
 local-genai/out/transformer_stage12_multi_bpe4k.pt + tokenizer_stage12_multi_bpe4k.json
@@ -467,7 +490,8 @@ cd aice-evolution-v2 && /opt/homebrew/bin/python3.13 -m src.cli \
 | 9-BPE-vocab2048 (10MB) | 9-BPE-extend + vocab 1024→2048 | 10MB | 1.45M | bpb 1.906 | bpb 1.906 (= ppl/byte 3.75) |
 | 10 (60MB) | 9-vocab2048 recipe + 60MB mixed_classics_en | 60MB | 1.45M | bpb 1.632 | bpb 1.632 (= ppl/byte 3.10) |
 | 11 (60MB, 1B tokens) | Stage-10 recipe + 160K steps ≈ 983M tokens | 60MB | 1.45M | bpb 1.586 | bpb 1.586 (= ppl/byte 3.00) |
-| **12 (99MB multi)** | **+ US + 日本語 (MeCab) + BPE-4096 + interleaved** | **99MB** | **1.71M** | **bpb 1.667** | **bpb 1.667 (= ppl/byte 3.18; 多言語 champion, JP 動作確認)** |
+| 12 (99MB multi) | + US + 日本語 (MeCab) + BPE-4096 | 99MB | 1.71M | bpb 1.667 | bpb 1.667 (= ppl/byte 3.18) |
+| **13 (113MB jp-heavy)** | **Stage-12 + Aozora ×5 repeat (15% JP)** | **113MB** | **1.71M** | **bpb 1.494** | **bpb 1.494 (= ppl/byte 2.82; 絶対 champion, 多言語タスク中)** |
 
 教訓:
 - Stage-3 の transformer 敗北は ctx だけの問題ではなかった: BPTT < ctx
