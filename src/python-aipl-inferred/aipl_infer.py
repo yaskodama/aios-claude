@@ -400,6 +400,12 @@ def make_prelude() -> dict[str, list[Scheme]]:
     add_mono("wait", TFun([T_INT], T_UNIT))
     add_mono("wait", TFun([T_FLOAT], T_UNIT))
 
+    # Future / await — async send returning a future handle that
+    # await(f) blocks on.  Both are runtime-defined; treat as
+    # polymorphic identity-ish for the type checker.
+    a = TVar()
+    add_poly("await", [a.id], TFun([a], a))
+
     # AI builtins (mirror OCaml prelude).  Each ai_call_* accepts an
     # optional leading provider id (int 1..3 = gemini/anthropic/openai)
     # or omits it for env-driven auto-select.

@@ -185,6 +185,9 @@ abort.
 | 28  | WebSocket                                     | ❌                          | ❌                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
 | 29  | AI integration (`ai_call`)                    | ✅ (stream, image)          | ✅                   | ✅            | ✅            | ✅ mock only | ✅ mock only                  | ✅       |
 | 29a | `ai_call([provider,] prompt)` — int 1/2/3 = gemini/anthropic/openai (default: gemini auto) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (via OCaml) |
+| 29b | `now actor.m(...)` + `ai_call(...)` inside method  → reply gets blocking reply | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no `reply()` in C runtime) |
+| 29c | `future actor.m(...)` + `await(f)` + `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no future slot in C runtime) |
+| 29d | `send` + callback pattern (`send a.ask(rcv); ...; send rcv.got(reply)`) with `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | 30  | AI governance (budget / concurrent / fallback)| ✅                          | ✅                   | ✅            | ✅            | ❌           | ❌                            | ✅       |
 | 31  | HMAC-signed remote send                       | ✅                          | ✅                   | ❌            | ❌            | ❌           | ❌                            | ✅       |
 | 32  | persistent actor state                        | ✅ (`ABCL_NODE_STATE_FILE`) | ✅                   | ❌            | ❌            | ❌           | ❌                            | ❌       |

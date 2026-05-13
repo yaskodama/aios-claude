@@ -529,7 +529,16 @@ let call_gemini ?(provider_override : provider option = None)
   (match sem with Some s -> Sem.acquire s | None -> ());
   let result_or_exn =
     try
-      let p = match provider_override with
+      (* Mirror Python: ABCL_AI_PROVIDER=mock wins even over an
+         explicit provider arg, so smoke tests run without API keys. *)
+      let forced_env =
+        match Sys.getenv_opt "ABCL_AI_PROVIDER" with
+        | Some s -> String.lowercase_ascii (String.trim s)
+        | None -> ""
+      in
+      let p =
+        if forced_env = "mock" then Mock
+        else match provider_override with
         | Some p -> p
         | None -> select_provider ()
       in
@@ -560,7 +569,14 @@ let call_gemini ?(provider_override : provider option = None)
   match result_or_exn with
   | Error e -> raise e
   | Ok (text, in_t, out_t) ->
-      let actual_p = match provider_override with
+      let actual_p =
+        let forced_env =
+          match Sys.getenv_opt "ABCL_AI_PROVIDER" with
+          | Some s -> String.lowercase_ascii (String.trim s)
+          | None -> ""
+        in
+        if forced_env = "mock" then Mock
+        else match provider_override with
         | Some p -> p
         | None -> select_provider ()
       in

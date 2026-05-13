@@ -461,12 +461,25 @@ let rec process_command line =
              with exn ->
                Printf.printf "[Top-level VarDecl %s error] %s\n%!" name (Printexc.to_string exn)))
       | Send (tgt, mname, args) -> (
+        (* Globals like `send a.ask(rcv)` must evaluate args in the
+           top-level env BEFORE delivery — otherwise the receiver
+           actor sees raw `Var "rcv"` and errors with
+           "unbound variable: rcv".  Match the actor-side Send
+           semantics in eval_thread.ml. *)
         pending_global_sends := (fun () ->
-          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt) (mk_stmt (CallStmt (mname, args)))
+          let arg_vals = List.map (Eval_thread.eval_expr top_actor) args in
+          let arg_exprs = List.map (fun v ->
+            mk_expr (Eval_thread.expr_of_value v)) arg_vals in
+          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt)
+            (mk_stmt (CallStmt (mname, arg_exprs)))
           ) :: !pending_global_sends)
       | UnsafeSend (tgt, mname, args) -> (
         pending_global_sends := (fun () ->
-          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt) (mk_stmt (CallStmt (mname, args)))
+          let arg_vals = List.map (Eval_thread.eval_expr top_actor) args in
+          let arg_exprs = List.map (fun v ->
+            mk_expr (Eval_thread.expr_of_value v)) arg_vals in
+          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt)
+            (mk_stmt (CallStmt (mname, arg_exprs)))
           ) :: !pending_global_sends)
       | CallStmt (fname, args) -> (
           (* Top-level call (for prims like web_listen / web_expose / print) *)

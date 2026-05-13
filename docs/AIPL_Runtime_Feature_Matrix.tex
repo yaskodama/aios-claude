@@ -291,6 +291,9 @@ the program does not abort.
   WebSocket                                     & \No & \No & \No & \No & \No & \No & \No \\
   AI integration (\texttt{ai\_call})            & \Yes stream/img & \Yes & \Yes & \Yes & \Yes mock & \Yes mock & \Yes \\
   \quad provider arg (\texttt{ai\_call([1|2|3,] prompt)}) — 1=gemini, 2=anthropic, 3=openai & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes (via OCaml) \\
+  \quad \texttt{now actor.m(...)} + \texttt{ai\_call} inside method (blocking) & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
+  \quad \texttt{future actor.m(...)} + \texttt{await(f)} + \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
+  \quad \texttt{send}\,+\,callback pattern with \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   AI governance (budget/concurrent/fallback)    & \Yes & \Yes & \Yes & \Yes & \No & \No & \Yes \\
   HMAC-signed remote send                       & \Yes & \Yes & \No & \No & \No & \No & \Yes \\
   persistent actor state                        & \Yes & \Yes & \No & \No & \No & \No & \No \\
