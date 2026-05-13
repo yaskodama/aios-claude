@@ -7,7 +7,7 @@ class Buffer {
   var capacity = 20;
   var count    = 0;
 
-  method init(cap) {
+  method init(cap: int) {
     capacity = cap;
     count    = 0;
   }
@@ -37,10 +37,10 @@ class Producer {
   var idx     = 0;
   var state   = 0;
   var counter = 0;
-  var buffer  = 0;
+  var buffer  = "";
   var running = 0;
 
-  method init(i, buf) {
+  method init(i: int, buf) {
     idx     = i;
     buffer  = buf;
     state   = 0;
@@ -95,10 +95,10 @@ class Consumer {
   var idx     = 0;
   var state   = 0;
   var counter = 0;
-  var buffer  = 0;
+  var buffer  = "";
   var running = 0;
 
-  method init(i, buf) {
+  method init(i: int, buf) {
     idx     = i;
     buffer  = buf;
     state   = 0;
@@ -150,7 +150,7 @@ class Consumer {
 
 class Controller {
   var buf = 0;
-  var p0 = 0; var p1 = 0; var p2 = 0;
+  var p0 = ""; var p1 = ""; var p2 = "";
   var c0 = 0; var c1 = 0; var c2 = 0;
 
   method init() {

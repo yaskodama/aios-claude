@@ -23,9 +23,19 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token ARROW /* -> */
 %token EOF NEW
 %token VAR EQ NEQ DOT BECOME FUNCTION RETURN
-%left PLUS MINUS
-%left TIMES DIV
-%left DOT LBRACK
+/* Precedence and associativity, lowest to highest.
+   Aim: keep the grammar at exactly one shift/reduce conflict —
+   the canonical "dangling else" (IF ... stmt vs IF ... stmt ELSE stmt).
+   Everything else is disambiguated here. */
+%nonassoc IFX             /* below ELSE so `if (e) stmt` reduces only
+                             when no ELSE follows */
+%nonassoc ELSE
+%left EQ NEQ              /* equality:   a == b == c parses ((a==b)==c) */
+%left LT GT LE GE         /* relational: a < b < c   parses ((a<b)<c) */
+%left PLUS MINUS          /* additive */
+%left TIMES DIV           /* multiplicative */
+%left DOT LBRACK          /* postfix access — tightest */
+%nonassoc UAWAIT          /* `await expr` binds the entire expr to its right */
 %start program
 %type <Ast.program> program
 %type <Ast.send_target> send_target
@@ -59,8 +69,6 @@ decl:
       { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, None))))) }
   | VAR ID dim_list ASSIGN expr SEMICOLON
       { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, Some $5))))) }
-  | VAR ID ASSIGN NEW ID LPAREN args RPAREN SEMICOLON
-    { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 4 (New ($5, $7))))) }
   | ID ASSIGN expr SEMICOLON               { Global (mk_stmt1 1 (Assign ($1, $3))) }
   | SEND send_target DOT ID LPAREN args RPAREN SEMICOLON               { Global (mk_stmt1 1 (Send ($2, $4, $6))) }
   | UNSAFESEND send_target DOT ID LPAREN args RPAREN SEMICOLON         { Global (mk_stmt1 1 (UnsafeSend ($2, $4, $6))) }
@@ -89,11 +97,6 @@ method_decl:
     { let (names, tys) = List.split $4 in
       { mname = $2; params = names; param_types = tys; ret_ty = $6;
         body = mk_stmt1 2 (Seq $8) } }
-
-param_list:
-  |    { [] }
-  | ID { [$1] }
-  | ID COMMA param_list { $1::$3 }
 
 annot_param:
   | ID                          { ($1, None) }
@@ -149,13 +152,12 @@ stmt_list:
 stmt:
   | ID ASSIGN expr SEMICOLON { mk_stmt1 1 (Assign ($1, $3)) }
   | CALL ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (CallStmt ($2, $4)) }
-  | CALL ID LPAREN RPAREN SEMICOLON { mk_stmt1 2 (CallStmt ($2, [])) }
   | SEND SELF DOT ID LPAREN args RPAREN SEMICOLON { mk_stmt1 4 (Send(LocalTarget "self", $4, $6)) }
   | SEND SENDER DOT ID LPAREN args RPAREN SEMICOLON { mk_stmt1 4 (Send (LocalTarget "sender", $4, $6)) }
   | SEND send_target DOT ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (Send ($2, $4, $6)) }
   | UNSAFESEND send_target DOT ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (UnsafeSend ($2, $4, $6)) }
-  | IF LPAREN expr RPAREN stmt { mk_stmt1 2 (If($3, $5, mk_stmt1 5 (Seq([])))) }
-  | IF LPAREN expr RPAREN stmt ELSE stmt { mk_stmt1 3 (If($3, $5, $7)) }
+  | IF LPAREN expr RPAREN stmt           %prec IFX { mk_stmt1 2 (If($3, $5, mk_stmt1 5 (Seq([])))) }
+  | IF LPAREN expr RPAREN stmt ELSE stmt           { mk_stmt1 3 (If($3, $5, $7)) }
   | WHILE expr DO stmt { mk_stmt1 2 (While ($2, $4)) }
   | LBRACE stmt_list RBRACE { mk_stmt1 2 (Seq $2) }
   | VAR ID ASSIGN expr SEMICOLON { mk_stmt1 2 (VarDecl($2, $4)) }
@@ -165,17 +167,11 @@ stmt:
       { mk_stmt1 2 (VarDecl($2, mk_expr1 3 (ArraySized($3, None)))) }
   | VAR ID dim_list ASSIGN expr SEMICOLON
       { mk_stmt1 2 (VarDecl($2, mk_expr1 3 (ArraySized($3, Some $5)))) }
-  | VAR ID ASSIGN NEW ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (VarDecl($2, mk_expr1 4 (New($5,$7)))) }
   | ID LPAREN args RPAREN SEMICOLON { mk_stmt1 1 (CallStmt ($1, $3)) }
-  | BECOME ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, $4)) } 
-  | BECOME ID LPAREN RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, [])) }
+  | BECOME ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, $4)) }
   | SELECT LBRACE select_cases select_timeout_opt RBRACE { mk_stmt1 3 (Select($3, $4)) }
   | RETURN expr SEMICOLON                              { mk_stmt1 1 (Return (Some $2)) }
   | RETURN SEMICOLON                                   { mk_stmt1 1 (Return None) }
-
-select_cases:
-    select_cases select_case { $1 @ [$2] }
-  | /* empty */              { [] }
 
 select_cases:
     select_cases select_case { $1 @ [$2] }
@@ -207,10 +203,6 @@ args:
   /* empty */    { [] }
   | arg_list     { $1 }
 
-inits:
-  | ID ASSIGN expr { [(mk_stmt1 1 (VarDecl($1, $3)))] }
-  | ID ASSIGN expr COMMA inits { (mk_stmt1 1 (VarDecl($1, $3))) :: $5 }
-
 expr:
   | FLOATLIT { mk_expr1 1 (Float $1) }
   | STRINGLIT { mk_expr1 1 (String $1) }
@@ -237,7 +229,7 @@ expr:
   | expr LBRACK INTLIT RBRACK                     { mk_expr1 2 (IndexExpr ($1, $3)) }
   | NOW send_target DOT ID LPAREN args RPAREN     { mk_expr1 1 (Now ($2, $4, $6)) }
   | FUTURE send_target DOT ID LPAREN args RPAREN  { mk_expr1 1 (Future ($2, $4, $6)) }
-  | AWAIT expr                                    { mk_expr1 1 (Await $2) }
+  | AWAIT expr %prec UAWAIT                       { mk_expr1 1 (Await $2) }
 
 record_fields:
   | ID COLON expr                       { [($1, $3)] }

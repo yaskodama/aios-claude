@@ -5,7 +5,7 @@
 
 class Spinner {
   var idx     = 0;
-  var angle   = 0;
+  var angle   = 0.;
   var speed   = 5;
   var cx      = 0;
   var cy      = 0;
@@ -13,7 +13,7 @@ class Spinner {
   var running = 1;
   var rr = 200; var gg = 220; var bb = 255;
 
-  method init(i, sp, mx, my, r, g, b) {
+  method init(i: int, sp: float, mx: float, my: float, r: int, g: int, b: int) {
     idx = i;
     speed = sp;
     cx = mx;
@@ -46,7 +46,7 @@ class Spinner {
 }
 
 class Controller {
-  var s1 = 0; var s2 = 0; var s3 = 0; var s4 = 0;
+  var s1 = ""; var s2 = ""; var s3 = ""; var s4 = "";
 
   method init() {
     // 正方形の 4 角

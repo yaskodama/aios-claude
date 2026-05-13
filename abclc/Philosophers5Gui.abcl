@@ -10,7 +10,7 @@ class Fork {
   var held   = 0;
   var holder = 0;
 
-  method init(i) {
+  method init(i: int) {
     idx = i;
     held = 0;
     gui_set_fork_free(idx);
@@ -50,7 +50,7 @@ class Philosopher {
   var right_fork = 0;
   var running   = 0;
 
-  method init(i, li, ri, lf, rf) {
+  method init(i: int, li: int, ri: int, lf, rf) {
     idx       = i;
     left_idx  = li;
     right_idx = ri;
@@ -123,7 +123,7 @@ class Philosopher {
 }
 
 class Controller {
-  var p0 = 0; var p1 = 0; var p2 = 0; var p3 = 0; var p4 = 0;
+  var p0 = ""; var p1 = ""; var p2 = ""; var p3 = ""; var p4 = "";
   var f0 = 0; var f1 = 0; var f2 = 0; var f3 = 0; var f4 = 0;
 
   method init() {

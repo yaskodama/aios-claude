@@ -16,7 +16,7 @@ class Spinner {
   var bb = 255;
 
   // i:インデックス, sp:角速度, mx,my:中心座標, r,g,b:線の色
-  method init(i, sp, mx, my, r, g, b) {
+  method init(i: int, sp: float, mx: float, my: float, r: int, g: int, b: int) {
     idx   = i;
     speed = sp;
     cx    = mx;
@@ -44,10 +44,10 @@ class Spinner {
 }
 
 class Controller {
-  var s1 = 0;
-  var s2 = 0;
-  var s3 = 0;
-  var s4 = 0;
+  var s1 = "";
+  var s2 = "";
+  var s3 = "";
+  var s4 = "";
 
   method init() {
     // 正方形の 4 角 (120,110)(360,110)(120,290)(360,290)。
