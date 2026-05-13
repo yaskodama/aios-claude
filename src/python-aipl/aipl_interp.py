@@ -1251,6 +1251,41 @@ def _b_web_listen(args, frame, interp):
     return None
 
 
+# ---- WebSocket builtins -----------------------------------------------
+
+def _b_ws_listen(args, frame, interp):
+    """ws_listen(port: int) → port — start a WebSocket server."""
+    from aipl_websocket import ws_listen
+    if not args:
+        raise ValueError("ws_listen(port): missing port argument")
+    return ws_listen(int(args[0]))
+
+
+def _b_ws_send(args, frame, interp):
+    """ws_send(sid: string, message: string [, port: int]) → int — push
+    `message` to every WS client on `sid`.  Returns recipient count."""
+    from aipl_websocket import ws_send
+    if len(args) < 2:
+        raise ValueError("ws_send(sid, message[, port])")
+    port = int(args[2]) if len(args) >= 3 else None
+    return ws_send(_to_str(args[0]), _to_str(args[1]), port=port)
+
+
+def _b_ws_close(args, frame, interp):
+    """ws_close(port: int) — shut down a listener."""
+    from aipl_websocket import ws_close
+    if not args:
+        raise ValueError("ws_close(port)")
+    ws_close(int(args[0]))
+    return None
+
+
+def _b_ws_status(args, frame, interp):
+    """ws_status() → dict — diagnostic snapshot of all listeners."""
+    from aipl_websocket import ws_status
+    return ws_status()
+
+
 def _b_web_expose(args, frame, interp):
     """web_expose(name, actor) — register `actor` under `name` so any
     remote `POST /api/json/send` with that to-field is delivered to its
@@ -2556,6 +2591,11 @@ _BUILTINS = {
     "remote_future":                 _b_remote_future,
     "serve_forever":                 _b_serve_forever,
     "register_with":                 _b_register_with,
+    # WebSocket (Phase 3 of WS rollout)
+    "ws_listen":                     _b_ws_listen,
+    "ws_send":                       _b_ws_send,
+    "ws_close":                      _b_ws_close,
+    "ws_status":                     _b_ws_status,
     # Per-node persistent state
     "save_state":                    _b_save_state,
     # Introspection

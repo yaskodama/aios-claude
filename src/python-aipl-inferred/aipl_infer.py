@@ -426,6 +426,13 @@ def make_prelude() -> dict[str, list[Scheme]]:
     add_mono("web_listen", TFun([T_FLOAT], T_UNIT))
     add_mono("web_expose", TFun([T_STRING, T_STRING], T_UNIT))
 
+    # WebSocket (Phase 3 of WS rollout)
+    add_mono("ws_listen", TFun([T_INT], T_INT))
+    add_mono("ws_send",   TFun([T_STRING, T_STRING], T_INT))
+    add_mono("ws_send",   TFun([T_STRING, T_STRING, T_INT], T_INT))
+    add_mono("ws_close",  TFun([T_INT], T_UNIT))
+    add_mono("ws_status", TFun([], T_ANY))
+
     add_mono("spawn", TFun([T_STRING, T_STRING], T_UNIT))
 
     # typeof : forall a. a -> string
