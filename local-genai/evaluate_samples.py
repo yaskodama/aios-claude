@@ -86,6 +86,13 @@ def parse_samples(path: Path) -> list[dict]:
     return out
 
 
+CODE_MARKERS = (
+    "let ", "var ", "const ", "function", "def ", "class ",
+    "import ", "from ", "return ", "SELECT ", "INSERT ", "UPDATE ",
+    "DELETE ", "{\n", "{ \"", "():",
+)
+
+
 def is_japanese_prompt(prompt: str) -> bool:
     """A prompt is Japanese if >20% of its chars are CJK."""
     if not prompt:
@@ -93,6 +100,11 @@ def is_japanese_prompt(prompt: str) -> bool:
     cjk = sum(1 for c in prompt
               if ("぀" <= c <= "ヿ") or ("一" <= c <= "鿿"))
     return cjk / len(prompt) > 0.2
+
+
+def is_code_prompt(prompt: str) -> bool:
+    """Heuristic: prompt looks like code if it contains a code marker."""
+    return any(m in prompt for m in CODE_MARKERS)
 
 
 def _safe_div(a: float, b: float) -> float:
@@ -154,11 +166,40 @@ def score_english(gen: str) -> dict[str, float]:
     }
 
 
+def score_code(gen: str) -> dict[str, float]:
+    """Score code-shaped prompts on bracket balance and syntax density."""
+    if not gen:
+        return {"code_bracket_balance": 0.0, "code_syntax_density": 0.0,
+                "code_purity": 0.0}
+    open_b = sum(gen.count(c) for c in "({[")
+    close_b = sum(gen.count(c) for c in ")}]")
+    # 1.0 if matched, decays linearly with imbalance
+    if open_b + close_b == 0:
+        code_bracket_balance = 0.0
+    else:
+        code_bracket_balance = 1.0 - abs(open_b - close_b) / (open_b + close_b)
+    # syntax density: count of code-related chars
+    code_chars = sum(gen.count(c) for c in "=();,{}[]<>+-*/!&|.\"'")
+    code_syntax_density = min(1.0, code_chars / max(1, len(gen)) * 5)
+    # code purity: should be mostly ASCII
+    ascii_chars = sum(1 for c in gen if c.isascii())
+    code_purity = ascii_chars / len(gen)
+    return {
+        "code_bracket_balance": round(code_bracket_balance, 3),
+        "code_syntax_density": round(code_syntax_density, 3),
+        "code_purity": round(code_purity, 3),
+    }
+
+
 def evaluate_file(path: Path) -> dict:
     samples = parse_samples(path)
     rows = []
     for s in samples:
-        if is_japanese_prompt(s["prompt"]):
+        if is_code_prompt(s["prompt"]):
+            scores = score_code(s["generation"])
+            fluency = sum(scores.values()) / 3
+            lang = "code"
+        elif is_japanese_prompt(s["prompt"]):
             scores = score_japanese(s["generation"])
             fluency = sum(scores.values()) / 3
             lang = "ja"
@@ -189,6 +230,7 @@ def evaluate_file(path: Path) -> dict:
 
     overall_ja = [r for r in rows if r["language"] == "ja"]
     overall_en = [r for r in rows if r["language"] == "en"]
+    overall_code = [r for r in rows if r["language"] == "code"]
 
     def _mean(rows):
         if not rows:
@@ -200,9 +242,11 @@ def evaluate_file(path: Path) -> dict:
         "n_samples": len(rows),
         "n_ja": len(overall_ja),
         "n_en": len(overall_en),
+        "n_code": len(overall_code),
         "mean_fluency_overall": _mean(rows),
         "mean_fluency_ja": _mean(overall_ja),
         "mean_fluency_en": _mean(overall_en),
+        "mean_fluency_code": _mean(overall_code),
         "by_temp_lang": summary,
         "rows": rows,
     }
@@ -211,14 +255,16 @@ def evaluate_file(path: Path) -> dict:
 def render_summary(results: list[dict]) -> str:
     lines = []
     lines.append("# Sample fluency evaluation\n")
-    lines.append("| checkpoint | n total | n ja | n en | "
-                 "fluency_ja | fluency_en | fluency_overall |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|")
+    lines.append("| checkpoint | n total | n ja | n en | n code | "
+                 "fluency_ja | fluency_en | fluency_code | fluency_overall |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for r in results:
         name = Path(r["file"]).stem.replace("samples_", "")
         lines.append(
             f"| `{name}` | {r['n_samples']} | {r['n_ja']} | {r['n_en']} | "
+            f"{r.get('n_code', 0)} | "
             f"{r['mean_fluency_ja']} | {r['mean_fluency_en']} | "
+            f"{r.get('mean_fluency_code', 0.0)} | "
             f"{r['mean_fluency_overall']} |"
         )
     lines.append("")
