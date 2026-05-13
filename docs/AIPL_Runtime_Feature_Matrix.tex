@@ -150,6 +150,7 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
 \textbf{Pony}~=~\texttt{abcl2c~--pony}~$\to$~Pony actor source;
 \textbf{Erlang}~=~\texttt{abcl2c~--erlang}~$\to$~Erlang module;
 \textbf{Go}~=~\texttt{abcl2c~--go}~$\to$~Go source;
+\textbf{Prolog}~=~\texttt{abcl2c~--prolog}~$\to$~SWI-Prolog \texttt{.pl};
 \textbf{JS-B}~=~browser-abcl; \textbf{JS-N}~=~node-aipl-server.
 \normalsize
 
@@ -191,6 +192,7 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   Pony codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --pony} emits Pony source; \texttt{class} $\to$ \texttt{actor}, methods $\to$ \texttt{be}; two-step \texttt{\_aipl\_init} decouples construction from init body & Pony \\
   Erlang codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --erlang} emits an \texttt{.erl} module; \texttt{class} $\to$ \texttt{spawn} + \texttt{receive} loop; fields $\to$ loop args with versioned variables on assign & Erlang \\
   Go codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --go} emits a single \texttt{main.go}; \texttt{class} $\to$ struct + goroutine; methods $\to$ typed message structs + helper methods + type-switch dispatch & Go \\
+  Prolog codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --prolog} emits a single SWI-Prolog \texttt{.pl} using \texttt{library(thread)}; \texttt{class} $\to$ \texttt{c\_loop(Fields)} thread + \texttt{thread\_get\_message} + \texttt{Msg = m(Args) -> body} dispatch; expressions hoisted to goals (\texttt{X is A + B}, \texttt{format(atom(S), ...)}) & Prolog \\
   Drone / simulation & \texttt{drone\_simulator} & browser-abcl & obstacle-aware drone swarm with comm + view range & JS-B, JS-N \\
   Trace / minimal repros & \texttt{H}, \texttt{P}, \texttt{T*}, \texttt{LD*}, \texttt{MS}, \texttt{AA}, \texttt{PP}, \texttt{PH}, \texttt{line*}, \texttt{Philosophers5\_\{debug,trace\}} & abclc & reduced repro cases used during runtime / TLA+ / Spin model-checking & OCaml \\
   \bottomrule
@@ -324,6 +326,7 @@ I/O in one actor stalls the whole runtime.
   C $\to$ Pony codegen      & \textbf{M:N lightweight} (runtime-scheduled) & Pony actor (work-stealing) & implicit in generated \texttt{actor} \\
   C $\to$ Erlang codegen    & \textbf{M:N lightweight} (BEAM) & BEAM process (\texttt{spawn(fun()->...end)}) & \texttt{c\_translator.ml:\textasciitilde 2413} \\
   C $\to$ Go codegen        & \textbf{M:N lightweight} (Go runtime) & goroutine (\texttt{go c.run()}) & \texttt{c\_translator.ml:\textasciitilde 2728} \\
+  C $\to$ Prolog codegen    & \textbf{1:1 OS thread} & SWI thread (\texttt{thread\_create/3}) & \texttt{c\_translator.ml:\textasciitilde 3060} \\
   \bottomrule
 \end{longtable}
 
@@ -331,7 +334,7 @@ I/O in one actor stalls the whole runtime.
 
 \begin{itemize}[leftmargin=*,itemsep=0pt]
   \item \textbf{1:1 OS thread / process} (Python, OCaml, C, C-SDL2,
-    Xinu, C$\to$Python): each actor is a kernel-scheduled thread.
+    Xinu, C$\to$Python, C$\to$Prolog): each actor is a kernel-scheduled thread.
     Simple mental model; blocking I/O in one actor doesn't stall
     others.  Scales to $\sim$100--1000 actors before kernel
     overhead dominates.
@@ -381,6 +384,7 @@ file:
   \textbf{Pony target (\texttt{--pony})} — \texttt{class}$\to$\texttt{actor}, methods$\to$\texttt{be}, two-step \texttt{\_aipl\_init} & \Yes \\
   \textbf{Erlang target (\texttt{--erlang})} — \texttt{class}$\to$\texttt{spawn}+\texttt{receive} loop, fields$\to$versioned loop args & \Yes \\
   \textbf{Go target (\texttt{--go})} — \texttt{class}$\to$struct+goroutine, methods$\to$typed message structs + type-switch dispatch & \Yes \\
+  \textbf{Prolog target (\texttt{--prolog})} — \texttt{class}$\to$SWI thread + receive loop, expressions hoisted to goals (\texttt{is/2}, \texttt{format(atom(...))}) & \Yes \\
   \bottomrule
 \end{tabularx}
 

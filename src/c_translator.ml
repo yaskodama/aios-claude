@@ -2806,3 +2806,298 @@ let gen_program_go (p : program) : string =
     emit "\ttime.Sleep(200 * time.Millisecond)\n";
   emit "}\n";
   Buffer.contents buf
+
+(* ==================================================================== *)
+(*               Prolog codegen (AIPL -> SWI-Prolog source)             *)
+(* ==================================================================== *)
+(* AIPL アクター → SWI-Prolog thread + message queue:                  *)
+(*   class C       -> c_loop(F1, F2, ...) :-                            *)
+(*                      thread_get_message(Msg),                         *)
+(*                      ( Msg = m(...) -> body ; ... ).                  *)
+(*   new C(args)   -> thread_create(c_loop(InitFields), Tid, []),       *)
+(*                    thread_send_message(Tid, init(args)).              *)
+(*   send obj.m(a) -> thread_send_message(Obj, m(A)).                   *)
+(*   print(x)      -> format("~w~n", [X])                                *)
+(*                                                                       *)
+(* 重要な構造差: Prolog の式は副作用ベース。算術は `X is A + B`、       *)
+(* 文字列連結は `format(atom(X), "~w~w", [A, B])` のように              *)
+(* "ゴール列 + 結果変数" として展開する必要がある                      *)
+
+(* Prolog 変数: 大文字始まり; アトム: 小文字始まり *)
+let prolog_var (n : string) : string =
+  if n = "" then "V_"
+  else
+    let first = Char.uppercase_ascii n.[0] in
+    let rest = String.sub n 1 (String.length n - 1) in
+    String.make 1 first ^ rest
+
+let prolog_atom (n : string) : string =
+  String.map (fun c ->
+    if c >= 'A' && c <= 'Z' then Char.lowercase_ascii c else c) n
+
+let pl_loop_name (cls : string) = (prolog_atom cls) ^ "_loop"
+let pl_new_name (cls : string) = "new_" ^ (prolog_atom cls)
+
+(* 評価環境: ローカル変数の現バインディング、新変数発行カウンタ *)
+type pl_env = {
+  mutable pl_bindings : (string * string) list;
+  mutable pl_counter : int;
+  pl_cname : string;
+}
+
+let pl_lookup (env : pl_env) (x : string) : string =
+  match List.assoc_opt x env.pl_bindings with
+  | Some v -> v
+  | None -> prolog_var x
+
+let pl_fresh (env : pl_env) (base : string) : string =
+  env.pl_counter <- env.pl_counter + 1;
+  Printf.sprintf "%s%d" (prolog_var base) env.pl_counter
+
+(* === 式生成 === *)
+(* 返値: (式の評価に必要なゴール列, 最終結果を保持する Prolog 項) *)
+let rec gen_expr_pl ~(env:pl_env) (e : expr) : string list * string * Types.ty =
+  match e.desc with
+  | Int n -> ([], string_of_int n, Types.TInt)
+  | Float f -> ([], Printf.sprintf "%f" f, Types.TFloat)
+  | String s -> ([], Printf.sprintf "\"%s\"" (String.escaped s), Types.TString)
+  | Var x ->
+      if x = "self" then ([], "Self", Types.TActor (env.pl_cname, []))
+      else if x = "sender" then ([], "_Sender /* unsupported */",
+                                  Types.TAny)
+      else ([], pl_lookup env x, Types.TAny)
+  | Binop (op, a, b) ->
+      let (ga, va, ta) = gen_expr_pl ~env a in
+      let (gb, vb, tb) = gen_expr_pl ~env b in
+      let ra = Types.repr ta in
+      let rb = Types.repr tb in
+      (match op, ra, rb with
+       | "+", Types.TString, _ | "+", _, Types.TString ->
+           let tmp = pl_fresh env "S" in
+           let goal = Printf.sprintf "format(atom(%s), \"~w~w\", [%s, %s])"
+                        tmp va vb in
+           (ga @ gb @ [goal], tmp, Types.TString)
+       | ("+"|"-"|"*"|"/"), _, _ ->
+           let tmp = pl_fresh env "T" in
+           (* Prolog の `is/2` は数値式専用; / は浮動除算 *)
+           let goal = Printf.sprintf "%s is %s %s %s" tmp va op vb in
+           (ga @ gb @ [goal], tmp, Types.TAny)
+       | "==", _, _ -> (ga @ gb, Printf.sprintf "(%s =:= %s)" va vb, Types.TBool)
+       | "!=", _, _ -> (ga @ gb, Printf.sprintf "(%s =\\= %s)" va vb, Types.TBool)
+       | ("<"|">"|"<="|">="), _, _ ->
+           let pl_op = match op with
+             | "<="  -> "=<"
+             | ">="  -> ">="
+             | _ -> op in
+           (ga @ gb, Printf.sprintf "(%s %s %s)" va pl_op vb, Types.TBool)
+       | _ ->
+           let tmp = pl_fresh env "T" in
+           let goal = Printf.sprintf "%s = %s" tmp va in
+           (ga @ gb @ [goal], tmp, Types.TAny))
+  | Call ("print", [arg]) ->
+      (* 式位置の print は副作用のみ; 値は dummy *)
+      let (g, v, _) = gen_expr_pl ~env arg in
+      let goal = Printf.sprintf "format(\"~w~n\", [%s])" v in
+      (g @ [goal], "0", Types.TUnit)
+  | Call (f, args) ->
+      let goals_args = List.map (gen_expr_pl ~env) args in
+      let all_g = List.concat_map (fun (g, _, _) -> g) goals_args in
+      let vs = List.map (fun (_, v, _) -> v) goals_args in
+      let tmp = pl_fresh env "R" in
+      (* call: 普通の Prolog 述語として呼ぶ; 最後の引数を結果として束縛 *)
+      let args_str = String.concat ", " vs in
+      let goal =
+        if vs = []
+        then Printf.sprintf "%s(%s)" (prolog_atom f) tmp
+        else Printf.sprintf "%s(%s, %s)" (prolog_atom f) args_str tmp
+      in
+      (all_g @ [goal], tmp, Types.TAny)
+  | New (cls, args) ->
+      (* thread_create + thread_send_message *)
+      let goals_args = List.map (gen_expr_pl ~env) args in
+      let all_g = List.concat_map (fun (g, _, _) -> g) goals_args in
+      let vs = List.map (fun (_, v, _) -> v) goals_args in
+      let tid = pl_fresh env "Tid" in
+      let new_goal =
+        if vs = []
+        then Printf.sprintf "%s(%s)" (pl_new_name cls) tid
+        else Printf.sprintf "%s(%s, %s)" (pl_new_name cls)
+               (String.concat ", " vs) tid
+      in
+      (all_g @ [new_goal], tid, Types.TActor (cls, []))
+  | Expr e -> gen_expr_pl ~env e
+  | Array _ -> ([], "[]", Types.TAny)
+
+(* === 文 → ゴール列 === *)
+let rec gen_stmts_pl ~env (stmts : stmt list) : string list =
+  List.concat_map (gen_stmt_pl ~env) stmts
+
+and gen_stmt_pl ~env (s : stmt) : string list =
+  match s.sdesc with
+  | Seq ss -> gen_stmts_pl ~env ss
+  | VarDecl (x, e) ->
+      let (g, v, _) = gen_expr_pl ~env e in
+      let var = prolog_var x in
+      env.pl_bindings <- (x, var) :: env.pl_bindings;
+      g @ [Printf.sprintf "%s = %s" var v]
+  | Assign (x, e) ->
+      let (g, v, _) = gen_expr_pl ~env e in
+      let var = pl_fresh env x in
+      env.pl_bindings <- (x, var) :: env.pl_bindings;
+      g @ [Printf.sprintf "%s = %s" var v]
+  | CallStmt ("print", [arg]) ->
+      let (g, v, _) = gen_expr_pl ~env arg in
+      g @ [Printf.sprintf "format(\"~w~n\", [%s])" v]
+  | CallStmt (f, args) ->
+      let goals_args = List.map (gen_expr_pl ~env) args in
+      let all_g = List.concat_map (fun (g, _, _) -> g) goals_args in
+      let vs = List.map (fun (_, v, _) -> v) goals_args in
+      all_g @ [Printf.sprintf "%s(%s)" (prolog_atom f) (String.concat ", " vs)]
+  | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+      let rid = match tgt with
+        | RemoteTarget _ -> "_RemoteUnsupported"
+        | LocalTarget t when t = "self" -> "Self"
+        | LocalTarget t when t = "sender" -> "_SenderUnsupported"
+        | LocalTarget t -> pl_lookup env t
+      in
+      let goals_args = List.map (gen_expr_pl ~env) args in
+      let all_g = List.concat_map (fun (g, _, _) -> g) goals_args in
+      let vs = List.map (fun (_, v, _) -> v) goals_args in
+      let payload =
+        if vs = [] then prolog_atom meth
+        else Printf.sprintf "%s(%s)" (prolog_atom meth) (String.concat ", " vs)
+      in
+      all_g @ [Printf.sprintf "thread_send_message(%s, %s)" rid payload]
+  | If (e, s1, s2) ->
+      let (g, v, _) = gen_expr_pl ~env e in
+      let g1 = gen_stmt_pl ~env s1 in
+      let g2 = gen_stmt_pl ~env s2 in
+      let then_body = if g1 = [] then ["true"] else g1 in
+      let else_body = if g2 = [] then ["true"] else g2 in
+      g @ [Printf.sprintf "( %s -> ( %s ) ; ( %s ) )" v
+             (String.concat ", " then_body)
+             (String.concat ", " else_body)]
+  | While _ -> ["% while unsupported in Prolog codegen"]
+  | Become _ -> ["% become unsupported"]
+  | Select _ -> ["% select unsupported"]
+
+(* === クラス生成 === *)
+let gen_class_pl (c : class_decl) : unit =
+  let fields = fields_of c in
+  let loop_fn = pl_loop_name c.cname in
+  let new_fn  = pl_new_name c.cname in
+  let init_md = List.find_opt (fun (m : method_decl) -> m.mname = "init")
+                              c.methods in
+
+  let field_vars = List.map prolog_var fields in
+  let loop_call_no_fields = fields = [] in
+  let params_str = String.concat ", " field_vars in
+  let loop_head =
+    if loop_call_no_fields then loop_fn
+    else Printf.sprintf "%s(%s)" loop_fn params_str
+  in
+
+  emitf "%% --- class %s ---\n" c.cname;
+  emitf "%s :-\n" loop_head;
+  (* thread_self をループ毎に取得 (再帰のたびに呼ばれるが定数なので安全) *)
+  emit  "    thread_self(Self), _ = Self,\n";
+  emit  "    thread_get_message(Msg),\n";
+  emit  "    (   Msg = stop -> true\n";
+
+  (* init を含むすべての method を receive 句として出す *)
+  List.iter (fun (md : method_decl) ->
+    let env = { pl_bindings =
+                  ("self", "Self") ::
+                  List.map2 (fun f v -> (f, v)) fields field_vars
+                  @ List.mapi (fun _ p -> (p, prolog_var p)) md.params;
+                pl_counter = 0;
+                pl_cname = c.cname }
+    in
+    let pattern =
+      if md.params = [] then prolog_atom md.mname
+      else Printf.sprintf "%s(%s)" (prolog_atom md.mname)
+             (String.concat ", " (List.map prolog_var md.params))
+    in
+    emitf "    ;   Msg = %s ->\n" pattern;
+    let body = gen_stmt_pl ~env md.body in
+    List.iter (fun l -> emitf "            %s,\n" l) body;
+    let updated = List.map (fun f -> pl_lookup env f) fields in
+    if loop_call_no_fields then
+      emitf "            %s\n" loop_fn
+    else
+      emitf "            %s(%s)\n" loop_fn (String.concat ", " updated)
+  ) c.methods;
+
+  emitf "    ;   true -> %s\n" loop_head;
+  emit  "    ).\n\n";
+
+  (* コンストラクタ *)
+  let init_params = match init_md with
+    | Some md -> md.params
+    | None -> []
+  in
+  let init_param_vars = List.map prolog_var init_params in
+  let new_decl_params = init_param_vars @ ["Tid"] in
+  emitf "%s(%s) :-\n" new_fn (String.concat ", " new_decl_params);
+
+  let env = { pl_bindings =
+                List.mapi (fun _ p -> (p, prolog_var p)) init_params;
+              pl_counter = 0;
+              pl_cname = c.cname }
+  in
+  let field_init_goals = ref [] in
+  List.iter (fun (s : stmt) ->
+    match s.sdesc with
+    | VarDecl (name, e) ->
+        let (g, v, _) = gen_expr_pl ~env e in
+        let var = prolog_var name in
+        env.pl_bindings <- (name, var) :: env.pl_bindings;
+        field_init_goals := !field_init_goals @ g @
+          [Printf.sprintf "%s = %s" var v]
+    | _ -> ()
+  ) c.fields;
+  List.iter (fun g -> emitf "    %s,\n" g) !field_init_goals;
+
+  let initial_fields = List.map (fun f -> pl_lookup env f) fields in
+  let loop_init_call =
+    if loop_call_no_fields then loop_fn
+    else Printf.sprintf "%s(%s)" loop_fn (String.concat ", " initial_fields)
+  in
+  emitf "    thread_create(%s, Tid, []),\n" loop_init_call;
+  (* init body は init() メッセージで loop に流す *)
+  (match init_md with
+   | Some _ when init_param_vars <> [] ->
+       emitf "    thread_send_message(Tid, init(%s)).\n\n"
+         (String.concat ", " init_param_vars)
+   | Some _ ->
+       emit "    thread_send_message(Tid, init).\n\n"
+   | None ->
+       emit "    true.\n\n")
+
+let gen_program_prolog (p : program) : string =
+  Buffer.clear buf;
+  emit "% Generated by abcl2c --prolog\n";
+  emit "% AIPL actor model -> SWI-Prolog threads + message queues.\n";
+  emit "% Note: now/future/await/become/select/sender unsupported.\n";
+  emit ":- use_module(library(thread)).\n\n";
+
+  List.iter gen_class_pl (classes_of p);
+
+  emit ":- initialization(main).\n\n";
+  emit "main :-\n";
+  let env = { pl_bindings = []; pl_counter = 0; pl_cname = "" } in
+  let goals = ref [] in
+  List.iter (fun (s : stmt) ->
+    let gs = gen_stmt_pl ~env s in
+    (* `var x = new C(args)` の場合、init を起こす送信は new_c が処理する *)
+    goals := !goals @ gs
+  ) (globals_of p);
+
+  if !goals = [] then emit "    halt.\n"
+  else begin
+    List.iter (fun g -> emitf "    %s,\n" g) !goals;
+    emit "    sleep(0.3),\n";
+    emit "    halt.\n"
+  end;
+
+  Buffer.contents buf

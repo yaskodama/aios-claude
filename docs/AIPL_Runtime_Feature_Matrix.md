@@ -78,6 +78,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 **Pony** = `abcl2c --pony` → Pony actor source;
 **Erlang** = `abcl2c --erlang` → Erlang `.erl` module;
 **Go** = `abcl2c --go` → Go `main.go` source;
+**Prolog** = `abcl2c --prolog` → SWI-Prolog `.pl` (threads + msg queues);
 **JS-B** = browser-abcl; **JS-N** = node-aipl-server.
 
 | Feature category | Sample(s) | Where | What it checks | Target |
@@ -114,6 +115,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `abcl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
 | **Erlang codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — `sender` not tracked) | abclc | `abcl2c --erlang` emits a single `.erl` module; `class` → spawn + receive loop; fields → loop args with versioned variables on assign; methods → `receive` clauses | Erlang |
 | **Go codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `abcl2c --go` emits a single Go `main.go`; `class` → struct + goroutine `run()`; each method → typed message struct + `Method()` helper that pushes to a buffered `chan any` mailbox; dispatch via type switch in `run()` | Go |
+| **Prolog codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `abcl2c --prolog` emits a single SWI-Prolog `.pl` file using `library(thread)`; `class` → `c_loop(Fields)` thread with `thread_get_message` + `Msg = m(Args) -> body ; ...` dispatch; expressions are hoisted into prolog goals (`X is A + B`, `format(atom(S), "~w~w", [A,B])`) | Prolog |
 | **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 
@@ -212,13 +214,15 @@ actor stalls the whole runtime.
 | C → Pony codegen         | **M:N lightweight (runtime-scheduled)** | Pony actor (work-stealing)   | implicit in generated `actor` |
 | C → Erlang codegen       | **M:N lightweight (BEAM)**     | BEAM process (`spawn(fun()->...end)`)| `c_translator.ml:~2413` |
 | C → Go codegen           | **M:N lightweight (Go runtime)** | goroutine (`go c.run()`)           | `c_translator.ml:~2728` |
+| C → Prolog codegen       | **1:1 OS thread**              | SWI thread (`thread_create/3`)        | `c_translator.ml:~3060` |
 
 ### Three concurrency tiers
 
 - **1:1 OS thread / process** (Python, OCaml, C, C-SDL2, Xinu,
-  C→Python): each actor is a kernel-scheduled thread.  Simple
-  mental model; blocking I/O in one actor doesn't stall others.
-  Scales to ~100–1000 actors before kernel overhead dominates.
+  C→Python, C→Prolog): each actor is a kernel-scheduled thread.
+  Simple mental model; blocking I/O in one actor doesn't stall
+  others.  Scales to ~100–1000 actors before kernel overhead
+  dominates.
 - **M:N lightweight** (Pony, Erlang, Go): actors are scheduled
   by the language runtime onto a small pool of OS threads.
   Scales to ~10⁵–10⁷ actors.  Blocking syscalls in one actor
@@ -257,6 +261,7 @@ program text.  The same `.abcl` file:
 | 40  | **Pony target (`--pony`)** — `class` → `actor`, methods → `be`, two-step `_aipl_init` | ✅   |
 | 41  | **Erlang target (`--erlang`)** — `class` → spawn+receive loop, fields → loop args (versioned vars) | ✅   |
 | 42  | **Go target (`--go`)** — `class` → struct + goroutine, methods → typed message structs + type-switch dispatch | ✅   |
+| 43  | **Prolog target (`--prolog`)** — `class` → SWI thread + receive loop, methods → `Msg = m(...)` patterns, expressions hoisted to goals (`is/2`, `format(atom(...))`) | ✅   |
 
 ---
 
