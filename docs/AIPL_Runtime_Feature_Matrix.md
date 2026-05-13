@@ -75,6 +75,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 **SDL2** = `abcl2c` → C + SDL2 GUI binary;
 **Xinu** = `abcl2c --xinu` → Xinu-flavoured C;
 **Py-gen** = `abcl2c --python` → stand-alone Python file;
+**Pony** = `abcl2c --pony` → Pony actor source;
 **JS-B** = browser-abcl; **JS-N** = node-aipl-server.
 
 | Feature category | Sample(s) | Where | What it checks | Target |
@@ -108,6 +109,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via abcl2c | SDL2 (via abcl2c) |
 | **Python codegen target** | `BoundedBufferPy`, `Philosophers5Py`, `Rotate4LinesPy` | abclc | `abcl2c --python` emits stand-alone Python | Py-gen |
 | **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `abcl2c --xinu` emits Xinu-flavoured C | Xinu |
+| **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `abcl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
 | **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 
@@ -191,6 +193,7 @@ abort.
 | 37  | C + SDL2 GUI binary (1178-line runtime)         | ✅   |
 | 38  | Xinu embedded-OS target (`--xinu`)              | ✅   |
 | 39  | Python target (`--python`)                      | ✅   |
+| 40  | **Pony target (`--pony`)** — `class` → `actor`, methods → `be`, two-step `_aipl_init` | ✅   |
 
 ---
 

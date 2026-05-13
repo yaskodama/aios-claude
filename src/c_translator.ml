@@ -1875,3 +1875,309 @@ let gen_program_python ?(max_messages = 12) (p : program) : string =
   emit "if __name__ == '__main__':\n";
   emit "    main()\n";
   Buffer.contents buf
+
+(* ==================================================================== *)
+(*                  Pony codegen (AIPL -> Pony source)                  *)
+(* ==================================================================== *)
+(* AIPL のアクター・モデルは Pony のアクターに直接マップできる:        *)
+(*   AIPL  class C { method m(x) { ... } }                              *)
+(*   Pony  actor C { be m(x: T) => ... }                                *)
+(* 重要な制限 (現バージョン):                                            *)
+(*   - now / future / await は未対応 (Pony Promise を別途使う必要あり) *)
+(*   - become / select は未対応 (codegen が ;; コメントを残す)         *)
+(*   - records / tuples / arrays は未対応 (literals は無視)             *)
+(* 推論結果を使って、フィールド・パラメータ・ローカルに Pony 型を      *)
+(* 付ける。文字列連結は ".string()" で自動コア辞                        *)
+
+(* AIPL ty -> Pony 型 *)
+let pony_type_of_ty (t : Types.ty) : string =
+  match Types.repr t with
+  | Types.TInt    -> "I64"
+  | Types.TFloat  -> "F64"
+  | Types.TString -> "String"
+  | Types.TBool   -> "Bool"
+  | Types.TActor (cls, _) when cls <> "" -> cls ^ " tag"
+  | Types.TActor _ -> "Env tag"  (* sender unknown -> fallback *)
+  | _ -> "String"  (* TAny / TVar など fallback *)
+
+(* AIPL ty に応じて Pony 式の文字列化を返す。string なら no-op *)
+let pony_to_string (t : Types.ty) (expr : string) : string =
+  match Types.repr t with
+  | Types.TString -> expr
+  | _ -> Printf.sprintf "%s.string()" expr
+
+let pony_default_for (t : Types.ty) : string =
+  match Types.repr t with
+  | Types.TInt | Types.TBool -> "0"
+  | Types.TFloat -> "0.0"
+  | Types.TString -> "\"\""
+  | _ -> "\"\""
+
+(* Pony ID 衝突回避 — Pony の予約語を避ける *)
+let pony_mangle (n : string) : string =
+  match n with
+  | "actor"|"be"|"fun"|"new"|"if"|"then"|"else"|"end"|"while"|"do"
+  | "for"|"in"|"return"|"recover"|"object"|"interface"|"trait"
+  | "primitive"|"struct"|"class"|"type"|"use"|"var"|"let"|"true"|"false"
+  | "iso"|"trn"|"ref"|"val"|"box"|"tag"|"None"|"this" ->
+      "_" ^ n
+  | _ -> n
+
+(* Pony 式の生成: (式文字列, 型) を返す *)
+let rec gen_expr_pony ~ctx (e : expr) : string * Types.ty =
+  match e.desc with
+  | Int n      -> (Printf.sprintf "I64(%d)" n, Types.TInt)
+  | Float f    -> (Printf.sprintf "F64(%f)" f, Types.TFloat)
+  | String s   -> (Printf.sprintf "\"%s\"" (String.escaped s), Types.TString)
+  | Var x ->
+      if x = "self" then ("this", Types.TActor (ctx.cname, []))
+      else if x = "sender" then ("this", Types.TActor ("", []))
+      else if List.mem x ctx.params then begin
+        match List.assoc_opt x ctx.param_types with
+        | Some t -> (pony_mangle x, t)
+        | None -> (pony_mangle x, Types.TAny)
+      end
+      else if List.mem x ctx.locals then begin
+        match List.assoc_opt x ctx.local_types with
+        | Some t -> (pony_mangle x, t)
+        | None -> (pony_mangle x, Types.TAny)
+      end
+      else if List.mem x ctx.fields then begin
+        match List.assoc_opt x ctx.field_types with
+        | Some t -> (pony_mangle x, t)
+        | None -> (pony_mangle x, Types.TAny)
+      end
+      else
+        (* グローバル actor 変数 *)
+        (pony_mangle x, Types.TActor ("", []))
+  | Binop (op, a, b) ->
+      let (sa, ta) = gen_expr_pony ~ctx a in
+      let (sb, tb) = gen_expr_pony ~ctx b in
+      let ra = Types.repr ta in
+      let rb = Types.repr tb in
+      (match op, ra, rb with
+       | "+", Types.TString, _ ->
+           (Printf.sprintf "(%s + %s)" sa (pony_to_string tb sb), Types.TString)
+       | "+", _, Types.TString ->
+           (Printf.sprintf "(%s + %s)" (pony_to_string ta sa) sb, Types.TString)
+       | ("+"|"-"|"*"|"/"), Types.TInt, Types.TInt ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TInt)
+       | ("+"|"-"|"*"|"/"), (Types.TInt|Types.TFloat), (Types.TInt|Types.TFloat) ->
+           let af = if ra = Types.TInt then Printf.sprintf "%s.f64()" sa else sa in
+           let bf = if rb = Types.TInt then Printf.sprintf "%s.f64()" sb else sb in
+           (Printf.sprintf "(%s %s %s)" af op bf, Types.TFloat)
+       | ("<"|">"|"<="|">="|"=="|"!="), _, _ ->
+           let pony_op = if op = "!=" then "!=" else op in
+           (Printf.sprintf "(%s %s %s)" sa pony_op sb, Types.TBool)
+       | _ ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TAny))
+  | Call ("print", [arg]) ->
+      let (s, t) = gen_expr_pony ~ctx arg in
+      (Printf.sprintf "(_env.out.print(%s) ; None)" (pony_to_string t s),
+       Types.TUnit)
+  | Call (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_pony ~ctx a in s) args in
+      (Printf.sprintf "%s(%s)" (pony_mangle f) (String.concat ", " parts),
+       Types.TAny)
+  | New (cls, _args) ->
+      (* Pony constructor takes only `env`.  Init args go through a
+         separate `_aipl_init` behaviour, which the caller emits after
+         the construction in two-step VarDecl handling. *)
+      let env_ref = if ctx.cname = "" then "env" else "_env" in
+      (Printf.sprintf "%s(%s)" cls env_ref, Types.TActor (cls, []))
+  | Expr e -> gen_expr_pony ~ctx e
+  | Array _ -> ("\"<array>\"", Types.TString)
+
+(* tgt -> (recipient_expr, is_supported)
+   AIPL の `sender` は Pony で追跡されないので、send 文をコメントアウト
+   するための signal を返す。 *)
+let target_id_pony ~ctx tgt : (string * bool) =
+  match tgt with
+  | RemoteTarget _ -> ("/* remote */", false)
+  | LocalTarget t ->
+      if t = "self" then ("this", true)
+      else if t = "sender" then ("/* sender */", false)
+      else (pony_mangle t, true)
+  [@@warning "-27"]
+
+let rec gen_stmt_pony ~ctx ~indent (s : stmt) =
+  let ind = String.make indent ' ' in
+  match s.sdesc with
+  | Seq ss -> List.iter (gen_stmt_pony ~ctx ~indent) ss
+  | VarDecl (x, e) ->
+      let (e_c, t) = gen_expr_pony ~ctx e in
+      ctx.locals <- x :: ctx.locals;
+      ctx.local_types <- (x, t) :: ctx.local_types;
+      let pty = pony_type_of_ty t in
+      emitf "%slet %s: %s = %s\n" ind (pony_mangle x) pty e_c
+  | Assign (x, e) ->
+      let (e_c, t) = gen_expr_pony ~ctx e in
+      (* Pony は厳格な型: 左辺型に合わせて変換を入れる *)
+      let lhs_ty =
+        if List.mem x ctx.fields then List.assoc_opt x ctx.field_types
+        else if List.mem x ctx.params then List.assoc_opt x ctx.param_types
+        else if List.mem x ctx.locals then List.assoc_opt x ctx.local_types
+        else None
+      in
+      let coerced =
+        match lhs_ty with
+        | Some lt when Types.repr lt = Types.TFloat
+                    && Types.repr t = Types.TInt ->
+            Printf.sprintf "%s.f64()" e_c
+        | Some lt when Types.repr lt = Types.TInt
+                    && Types.repr t = Types.TFloat ->
+            Printf.sprintf "%s.i64()" e_c
+        | _ -> e_c
+      in
+      emitf "%s%s = %s\n" ind (pony_mangle x) coerced
+  | CallStmt ("print", [arg]) ->
+      let (s, t) = gen_expr_pony ~ctx arg in
+      emitf "%s_env.out.print(%s)\n" ind (pony_to_string t s)
+  | CallStmt (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_pony ~ctx a in s) args in
+      emitf "%s%s(%s)\n" ind (pony_mangle f) (String.concat ", " parts)
+  | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+      let (rid, ok) = target_id_pony ~ctx tgt in
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_pony ~ctx a in s) args in
+      if ok then
+        emitf "%s%s.%s(%s)\n" ind rid (pony_mangle meth)
+          (String.concat ", " parts)
+      else
+        emitf "%s// send to %s unsupported in Pony codegen: %s.%s(%s)\n"
+          ind rid rid (pony_mangle meth) (String.concat ", " parts)
+  | If (e, s1, s2) ->
+      let (ec, _) = gen_expr_pony ~ctx e in
+      emitf "%sif %s then\n" ind ec;
+      gen_stmt_pony ~ctx ~indent:(indent + 2) s1;
+      emitf "%selse\n" ind;
+      gen_stmt_pony ~ctx ~indent:(indent + 2) s2;
+      emitf "%send\n" ind
+  | While (e, body) ->
+      let (ec, _) = gen_expr_pony ~ctx e in
+      emitf "%swhile %s do\n" ind ec;
+      gen_stmt_pony ~ctx ~indent:(indent + 2) body;
+      emitf "%send\n" ind
+  | Become _ -> emitf "%s// become unsupported in Pony codegen\n" ind
+  | Select _ -> emitf "%s// select unsupported in Pony codegen\n" ind
+
+let gen_method_pony ~cname ~fields (md : method_decl) =
+  let ctx = make_ctx ~cname ~fields ~params:md.params ~mname:md.mname in
+  (* AIPL の `init` は behaviour `_aipl_init` に分離する。Main 側で
+     全アクター構築後に明示的に呼ぶ — Pony の strict な構築モデルで
+     クロス参照型のグローバルにも対応できる *)
+  let pony_name =
+    if md.mname = "init" then "_aipl_init"
+    else pony_mangle md.mname
+  in
+  let params_str =
+    if md.params = [] then ""
+    else
+      String.concat ", "
+        (List.map (fun p ->
+           let pty = match List.assoc_opt p ctx.param_types with
+             | Some t -> pony_type_of_ty t
+             | None -> "String"
+           in
+           Printf.sprintf "%s: %s" (pony_mangle p) pty
+         ) md.params)
+  in
+  emitf "  be %s(%s) =>\n" pony_name params_str;
+  let body_start = Buffer.length buf in
+  gen_stmt_pony ~ctx ~indent:4 md.body;
+  if Buffer.length buf = body_start then
+    emit "    None\n"
+
+(* Constructor: env だけ受け取って _env を初期化する。
+   init body は別の _aipl_init behaviour に分離するため、ここでは呼ばない *)
+let gen_constructor_pony ~cname:_ =
+  emit "  new create(env: Env) =>\n";
+  emit "    _env = env\n"
+
+let gen_class_pony (c : class_decl) =
+  let fields = fields_of c in
+  emitf "actor %s\n" c.cname;
+  emit  "  let _env: Env\n";
+  List.iter (fun s ->
+    match s.sdesc with
+    | VarDecl (name, e) ->
+        let init_ctx = make_ctx ~cname:c.cname ~fields ~params:[] ~mname:"" in
+        let (e_c, t) = gen_expr_pony ~ctx:init_ctx e in
+        let pty = pony_type_of_ty t in
+        emitf "  var %s: %s = %s\n" (pony_mangle name) pty e_c
+    | _ -> ()
+  ) c.fields;
+  emit  "\n";
+  gen_constructor_pony ~cname:c.cname;
+  (* Init が存在しないクラスでも `_aipl_init` 呼び出しを許容するため
+     default の no-op を追加 *)
+  let has_init = List.exists (fun (m : method_decl) -> m.mname = "init")
+                             c.methods in
+  if not has_init then begin
+    emit "\n";
+    emit "  be _aipl_init() =>\n";
+    emit "    None\n"
+  end;
+  List.iter (fun md -> emit "\n"; gen_method_pony ~cname:c.cname ~fields md)
+            c.methods;
+  emit "\n"
+
+let gen_program_pony (p : program) : string =
+  Buffer.clear buf;
+  emit "// Generated by abcl2c --pony\n";
+  emit "// AIPL actor model -> Pony actor model.\n";
+  emit "// Note: now/future/await/become/select are unsupported in this\n";
+  emit "// codegen path; the OCaml/Python runtimes are richer.\n\n";
+  let classes = classes_of p in
+  let globals = globals_of p in
+  List.iter gen_class_pony classes;
+  (* Main actor で global statements を実行 *)
+  emit "actor Main\n";
+  emit "  new create(env: Env) =>\n";
+  let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
+  let any_emitted = ref false in
+  List.iter (fun s ->
+    match s.sdesc with
+    | VarDecl (x, e) ->
+        let (e_c, t) = gen_expr_pony ~ctx:g_ctx e in
+        let pty = pony_type_of_ty t in
+        g_ctx.locals <- x :: g_ctx.locals;
+        g_ctx.local_types <- (x, t) :: g_ctx.local_types;
+        emitf "    let %s: %s = %s\n" (pony_mangle x) pty e_c;
+        (* `var x = new Cls(args)` の args は init に流す *)
+        (match e.desc with
+         | New (_cls, init_args) when init_args <> [] ->
+             let parts = List.map (fun a ->
+               let (s, _) = gen_expr_pony ~ctx:g_ctx a in s) init_args in
+             emitf "    %s._aipl_init(%s)\n"
+               (pony_mangle x) (String.concat ", " parts)
+         | New (_cls, _) ->
+             emitf "    %s._aipl_init()\n" (pony_mangle x)
+         | _ -> ());
+        any_emitted := true
+    | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+        let (rid, ok) = target_id_pony ~ctx:g_ctx tgt in
+        let parts = List.map (fun a ->
+          let (s, _) = gen_expr_pony ~ctx:g_ctx a in s) args in
+        if ok then
+          emitf "    %s.%s(%s)\n" rid (pony_mangle meth)
+            (String.concat ", " parts)
+        else
+          emitf "    // send to %s unsupported in Pony codegen: %s.%s(%s)\n"
+            rid rid (pony_mangle meth) (String.concat ", " parts);
+        any_emitted := true
+    | CallStmt ("print", [arg]) ->
+        let (s, t) = gen_expr_pony ~ctx:g_ctx arg in
+        emitf "    env.out.print(%s)\n" (pony_to_string t s);
+        any_emitted := true
+    | CallStmt (f, args) ->
+        let parts = List.map (fun a ->
+          let (s, _) = gen_expr_pony ~ctx:g_ctx a in s) args in
+        emitf "    %s(%s)\n" (pony_mangle f) (String.concat ", " parts);
+        any_emitted := true
+    | _ -> ()
+  ) globals;
+  if not !any_emitted then emit "    None\n";
+  Buffer.contents buf
