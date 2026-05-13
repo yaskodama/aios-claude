@@ -176,9 +176,10 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   Phase 15 owned fields & \texttt{Owned}, \texttt{Owned\_violations}, \texttt{Phase15\_Owned} & py-aipl + abclc & \texttt{pub} field visibility, intentional violations & Py (static), OCaml (sample) \\
   Phase 16 transient cast & \texttt{Transient}, \texttt{Transient\_violation} & py-aipl/samples & runtime type cast at any-boundary & Py \\
   Phase 17 structured conc. & \texttt{Phase17\_StructuredConc} & py-aipl/samples & \texttt{scope \{ future ... \}} auto-joining & Py \\
+  Session types / protocol traces & \texttt{SessionTyped} & py-aipl/samples-ai & runtime-checked typed session protocols (arg + reply types); order-only protocol traces; AIOS service registry & Py \\
   AI integration (mock + real) & \texttt{AIActor}, \texttt{AIChain}, \texttt{AIChainReal}, \texttt{AIHello}, \texttt{MultiProvider} & py-aipl + samples-ai + abclc/ai-samples & LLM-backed actors; multi-provider; chained pipeline & Py, OCaml \\
   AI governance & \texttt{Budgeted} & py-aipl/samples-ai + abclc/ai-samples & token budget, concurrency cap, fallback chain & Py, OCaml \\
-  AI cooperative pattern & \texttt{CooperativeNowFuture\{,-jp,-jp-remote\}}, \texttt{CooperativeSolve\{,-jp,Remote,Remote-jp\}}, \texttt{SessionTyped}, \texttt{Reviewer}, \texttt{Fanout}, \texttt{PriorityFanout} & py-aipl/samples-ai + abclc/ai-samples & Planner$\to$Solver$\to$Reviewer; fan-out aggregator; priority routing & Py, OCaml \\
+  AI cooperative pattern & \texttt{CooperativeNowFuture\{,-jp,-jp-remote\}}, \texttt{CooperativeSolve\{,-jp,Remote,Remote-jp\}}, \texttt{Reviewer}, \texttt{Fanout}, \texttt{PriorityFanout} & py-aipl/samples-ai + abclc/ai-samples & Planner$\to$Solver$\to$Reviewer; fan-out aggregator; priority routing & Py, OCaml \\
   Remote actors & \texttt{client}, \texttt{server}, \texttt{coordinator}, \texttt{solver}, \texttt{verifier}, \texttt{reviewer\_node*}, \texttt{RemoteCalcClient}/\texttt{Server} & py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples & HTTP cross-machine sends; HMAC-signed coordination & Py, OCaml \\
   Web / dashboard & \texttt{web\_calc}, \texttt{SiteGen} & abclc + py-aipl/samples & embedded HTTP gateway; static-site generator & Py (SiteGen), OCaml (web\_calc) \\
   GUI / SDL2 & \texttt{Rotate\{One,Three,Four\}Lines\{,Gui\}}, \texttt{MultiLineSpin}, \texttt{Philosophers5Gui}, \texttt{BoundedBufferGui}, \texttt{DisasterReturnGui}, \texttt{LineDrawer}, \texttt{window} & abclc & SDL2-backed GUI codegen via abcl2c & SDL2 (via abcl2c) \\
@@ -236,8 +237,19 @@ Python (inferred) runs HM only, so the annotation-driven Phase 11+
 static checks that Python (annotated) performs are not re-implemented.
 Programs still execute at runtime via the shared interpreter, but
 the static guarantees from Phase 12 / 14 / 15 / 16 are lost.
-Phase 13 (channels) and Phase 17 (\texttt{scope}) are runtime features,
-so they remain available.
+Phase 13 (channels), Phase 17 (\texttt{scope}), and the session-type /
+protocol-trace / AIOS-registry families are runtime features, so
+they remain available in Py-I.
+
+\smallskip
+
+\noindent
+\textbf{Session types} here are \emph{runtime-checked} and explicitly
+separate from HM inference: they observe values flowing over the
+wire at runtime and validate them against a declared protocol spec
+(\texttt{"actor.method(arg\_t1, ...) ! ret\_type -> ..."}).
+Violations are recorded into \texttt{session\_events()} and counted;
+the program does not abort.
 
 \begin{longtable}{F C C C C C C C}
   \toprule
@@ -251,6 +263,9 @@ so they remain available.
   effects \texttt{!\{fs,ai,net,mut\}} — Phase 12 & \Yes & \No  & \No & \No & \No & \No & \No \\
   structured concurrency \texttt{scope} — Phase 17 & \Yes & \Yes & \No & \No & \No & \No & \No \\
   transient cast at any-boundary — Phase 16 & \Yes & \No  & \No & \No & \No & \No & \No \\
+  \textbf{session types} (runtime-checked typed protocols) & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  protocol traces (order-only)             & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  AIOS service registry (alias-resolved send) & \Yes & \Yes & \No & \No & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 

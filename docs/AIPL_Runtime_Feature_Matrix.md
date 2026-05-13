@@ -99,9 +99,10 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Phase 15 owned fields** | `Owned.abcl`, `Owned_violations.abcl`, `Phase15_Owned.abcl` | py-aipl + abclc | `pub` field visibility, intentional violations | Py (static), OCaml (sample) |
 | **Phase 16 transient cast** | `Transient.abcl`, `Transient_violation.abcl` | py-aipl/samples | runtime type cast at any-boundary | Py |
 | **Phase 17 structured concurrency** | `Phase17_StructuredConc.abcl` | py-aipl/samples | `scope { future ... }` auto-joining | Py |
+| **Session types / protocol traces** | `SessionTyped.abcl` | py-aipl/samples-ai | runtime-checked typed session protocols (arg + reply types); order-only protocol traces; AIOS service registry | Py |
 | **AI integration (mock + real)** | `AIActor`, `AIChain`, `AIChainReal`, `AIHello`, `MultiProvider` | py-aipl/samples + samples-ai + abclc/ai-samples | LLM-backed actors; multi-provider; chained pipeline | Py, OCaml |
 | **AI governance** | `Budgeted.abcl` | py-aipl/samples-ai + abclc/ai-samples | token budget, concurrency cap, fallback chain | Py, OCaml |
-| **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `SessionTyped.abcl`, `Reviewer.abcl`, `Fanout.abcl`, `PriorityFanout.abcl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing | Py, OCaml |
+| **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `Reviewer.abcl`, `Fanout.abcl`, `PriorityFanout.abcl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing | Py, OCaml |
 | **Remote actors** | `client / server / coordinator / solver / verifier / reviewer_node*`, `RemoteCalcClient/Server` | py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples | HTTP cross-machine sends; HMAC-signed coordination | Py, OCaml |
 | **Web / dashboard** | `web_calc.abcl`, `SiteGen.abcl` | abclc + py-aipl/samples | embedded HTTP gateway; static-site generator | Py (SiteGen), OCaml (web_calc) |
 | **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via abcl2c | SDL2 (via abcl2c) |
@@ -145,8 +146,16 @@ The Python (inferred) variant runs HM only; the annotation-driven
 Phase 11+ static checks that Python (annotated) performs are **not**
 re-implemented.  Programs still execute at runtime via the inherited
 interpreter, but the static guarantees from Phase 12 / 14 / 15 / 16
-are lost.  Phase 13 (channels) and Phase 17 (structured concurrency)
-are runtime features, so they remain available.
+are lost.  Phase 13 (channels), Phase 17 (structured concurrency),
+and the session-type / protocol-trace / AIOS-registry families are
+runtime features, so they remain available in Py-I.
+
+Session types here are **runtime-checked** and explicitly *separate
+from* HM inference: they observe values flowing over the wire at
+runtime and validate them against a declared protocol spec
+(`"actor.method(arg_t1, ...) ! ret_type -> ..."`).  Violations are
+recorded in `session_events()` and counted; the program does not
+abort.
 
 | #   | Feature                                    | Py-A | Py-I       | OCaml | JS-O | JS-B | JS-N | C    |
 | --- | ------------------------------------------ | :--: | :--------: | :---: | :--: | :--: | :--: | :--: |
@@ -156,29 +165,32 @@ are runtime features, so they remain available.
 | 21  | effects `!{fs,ai,net,mut}` — Phase 12      |  ✅  |  ❌ static  |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
 | 22  | structured concurrency `scope` — Phase 17  |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
 | 23  | transient cast at any-boundary — Phase 16  |  ✅  |  ❌ static  |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
+| 24  | **session types** (runtime-checked typed protocols) |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
+| 25  | protocol traces (order-only)               |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
+| 26  | AIOS service registry (alias-resolved send) |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
 
 ## Networking / AI / infrastructure
 
 | #   | Feature                                       | Py-A                       | Py-I                | OCaml         | JS-O          | JS-B         | JS-N                          | C        |
 | --- | --------------------------------------------- | :------------------------: | :-----------------: | :-----------: | :-----------: | :----------: | :---------------------------: | :------: |
-| 24  | remote actors (HTTP)                          | ✅                          | ✅                   | 🟡 no WS      | 🟡            | ❌           | 🟡 server itself, no client   | ✅ (via OCaml) |
-| 25  | WebSocket                                     | ❌                          | ❌                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
-| 26  | AI integration (`ai_call`)                    | ✅ (stream, image)          | ✅                   | ✅            | ✅            | ✅ mock only | ✅ mock only                  | ✅       |
-| 27  | AI governance (budget / concurrent / fallback)| ✅                          | ✅                   | ✅            | ✅            | ❌           | ❌                            | ✅       |
-| 28  | HMAC-signed remote send                       | ✅                          | ✅                   | ❌            | ❌            | ❌           | ❌                            | ✅       |
-| 29  | persistent actor state                        | ✅ (`ABCL_NODE_STATE_FILE`) | ✅                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
-| 30  | live dashboard (SSE)                          | ✅                          | ✅                   | 🟡 polling    | 🟡            | ❌           | ❌                            | ✅       |
-| 31  | `/api/typecheck` JSON endpoint                | ❌                          | ❌                   | ✅            | ✅            | ❌           | ✅                            | N/A      |
-| 32  | `/api/run` JSON endpoint                      | ❌                          | ❌                   | ❌            | ❌            | ❌           | ✅                            | N/A      |
+| 27  | remote actors (HTTP)                          | ✅                          | ✅                   | 🟡 no WS      | 🟡            | ❌           | 🟡 server itself, no client   | ✅ (via OCaml) |
+| 28  | WebSocket                                     | ❌                          | ❌                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
+| 29  | AI integration (`ai_call`)                    | ✅ (stream, image)          | ✅                   | ✅            | ✅            | ✅ mock only | ✅ mock only                  | ✅       |
+| 30  | AI governance (budget / concurrent / fallback)| ✅                          | ✅                   | ✅            | ✅            | ❌           | ❌                            | ✅       |
+| 31  | HMAC-signed remote send                       | ✅                          | ✅                   | ❌            | ❌            | ❌           | ❌                            | ✅       |
+| 32  | persistent actor state                        | ✅ (`ABCL_NODE_STATE_FILE`) | ✅                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
+| 33  | live dashboard (SSE)                          | ✅                          | ✅                   | 🟡 polling    | 🟡            | ❌           | ❌                            | ✅       |
+| 34  | `/api/typecheck` JSON endpoint                | ❌                          | ❌                   | ✅            | ✅            | ❌           | ✅                            | N/A      |
+| 35  | `/api/run` JSON endpoint                      | ❌                          | ❌                   | ❌            | ❌            | ❌           | ✅                            | N/A      |
 
 ## C-version-specific codegen targets
 
 | #   | Target                                          | C    |
 | --- | ----------------------------------------------- | :--: |
-| 33  | C + pthread standalone binary                   | ✅   |
-| 34  | C + SDL2 GUI binary (1178-line runtime)         | ✅   |
-| 35  | Xinu embedded-OS target (`--xinu`)              | ✅   |
-| 36  | Python target (`--python`)                      | ✅   |
+| 36  | C + pthread standalone binary                   | ✅   |
+| 37  | C + SDL2 GUI binary (1178-line runtime)         | ✅   |
+| 38  | Xinu embedded-OS target (`--xinu`)              | ✅   |
+| 39  | Python target (`--python`)                      | ✅   |
 
 ---
 
