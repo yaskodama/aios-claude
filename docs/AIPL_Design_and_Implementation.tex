@@ -245,7 +245,7 @@ AIPL の \code{.abcl} ソースには通常,型注釈を一切書かない:
 
 \begin{lstlisting}
 class Hello {
-  float count = 0.;        // 注釈なし — 推論で float に
+  var count = 0.;          // 注釈なし — 0. リテラルから float に推論
   method init(n) {         // n も注釈なし
     count = n;             // count : float なので n : float に
     print("hi " + n);
