@@ -63,6 +63,45 @@ The C runtime processes the same `.abcl` files as OCaml via
 `abcl2c` smoke test (the remaining 9 in `abclc/` have pre-existing
 type ambiguities surfaced by our hard-fail policy).
 
+### What each sample exercises
+
+Samples are grouped by the language or infrastructure feature they
+demonstrate. The "Where" column points to the directory; multiple
+runtimes share these.
+
+| Feature category | Sample(s) | Where | What it checks |
+|---|---|---|---|
+| **Basic actor model** | `Hello`, `Counter`, `PingPong` | py-aipl + abclc | actor creation, `send`, field state, `self`-send |
+| **now / future / await** | `NowFuture`, `CooperativeNowFuture`, `NowFutureDemo` | py-aipl/samples + samples-ai + abclc/ai-samples | three message-passing forms in one program |
+| **Bounded mailboxes / select** | `BoundedBuffer`, `bounded_buffer{,_visual}` | py-aipl + abclc + browser-abcl | producer/consumer, selective receive, visualisation |
+| **Dining philosophers** | `Philosophers`, `philosophers{-1,-2}`, `Philosophers5{,_debug,_trace,Gui,Py,Xinu}` | py-aipl + abclc + browser-abcl | fork as actor, deadlock-free serialisation, SDL/Python/Xinu codegen variants |
+| **`become` (class swap)** | `become.abcl`, `bbecome.abcl` | abclc | runtime actor-class replacement |
+| **`select` / selective receive** | `Channels.abcl`, `Channels2.abcl` | py-aipl/samples | typed channels, worker-pool with request/result |
+| **Method injection** | `MethodPatch.abcl` | py-aipl/samples | `add_method` / `remove_method` runtime patching |
+| **Dynamic compile** | `Dynamic.abcl`, `DynamicWorkerPool.abcl` | py-aipl/samples | `compile()` builtin → runtime class generation; worker pool driven by it |
+| **Top-level functions** | `Functions.abcl`, `Signatures.abcl` | py-aipl/samples | user functions, multiple overload signatures, typeof |
+| **Records** | `Records.abcl` | py-aipl/samples | `{a:int, b:string}` literal, dot-field access, structural typeof |
+| **Tuples** | `Tuples.abcl` | py-aipl/samples | positional, immutable, mixed slot types, nesting |
+| **Arrays** | `Arrays.abcl`, `MultiDimArrays.abcl` | py-aipl/samples | static-sized, multi-dim, dynamic sizes |
+| **Gradual type checker** | `Typecheck.abcl`, `Typecheck11{b,c,de}.abcl` | py-aipl/samples | Phase 11 → 11e progression: literals, call-site validation, unions/generics, narrowing, length-tagged arrays |
+| **Phase 11 typed counter** | `Phase11_TypedCounter.abcl` | abclc | typed annotations / generics / typeof narrowing |
+| **Phase 12 effects** | `Effects.abcl`, `Phase12_EffectsLog.abcl` | py-aipl + abclc | capability-based `!{fs,ai,net,mut}` system |
+| **Phase 13 channels** | `Phase13_Channels.abcl` | abclc | CSP channels (design doc + runtime in Py) |
+| **Phase 14 linear types** | `Linear.abcl`, `Linear2.abcl`, `Phase14_Linear.abcl` | py-aipl + abclc | use-after-move, DB transaction with linear handle |
+| **Phase 15 owned fields** | `Owned.abcl`, `Owned_violations.abcl`, `Phase15_Owned.abcl` | py-aipl + abclc | `pub` field visibility, intentional violations |
+| **Phase 16 transient cast** | `Transient.abcl`, `Transient_violation.abcl` | py-aipl/samples | runtime type cast at any-boundary |
+| **Phase 17 structured concurrency** | `Phase17_StructuredConc.abcl` | py-aipl/samples | `scope { future ... }` auto-joining |
+| **AI integration (mock + real)** | `AIActor`, `AIChain`, `AIChainReal`, `AIHello`, `MultiProvider` | py-aipl/samples + samples-ai + abclc/ai-samples | LLM-backed actors; multi-provider; chained pipeline |
+| **AI governance** | `Budgeted.abcl` | py-aipl/samples-ai + abclc/ai-samples | token budget, concurrency cap, fallback chain |
+| **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `SessionTyped.abcl`, `Reviewer.abcl`, `Fanout.abcl`, `PriorityFanout.abcl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing |
+| **Remote actors** | `client / server / coordinator / solver / verifier / reviewer_node*`, `RemoteCalcClient/Server` | py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples | HTTP cross-machine sends; HMAC-signed coordination |
+| **Web / dashboard** | `web_calc.abcl`, `SiteGen.abcl` | abclc + py-aipl/samples | embedded HTTP gateway; static-site generator |
+| **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via abcl2c |
+| **Python codegen target** | `BoundedBufferPy`, `Philosophers5Py`, `Rotate4LinesPy` | abclc | `abcl2c --python` emits stand-alone Python |
+| **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `abcl2c --xinu` emits Xinu-flavoured C |
+| **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range |
+| **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking |
+
 ---
 
 ## Core language
