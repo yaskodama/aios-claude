@@ -148,6 +148,7 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
 \textbf{Xinu}~=~\texttt{abcl2c~--xinu}~$\to$~Xinu-flavoured C;
 \textbf{Py-gen}~=~\texttt{abcl2c~--python}~$\to$~stand-alone Python;
 \textbf{Pony}~=~\texttt{abcl2c~--pony}~$\to$~Pony actor source;
+\textbf{Erlang}~=~\texttt{abcl2c~--erlang}~$\to$~Erlang module;
 \textbf{JS-B}~=~browser-abcl; \textbf{JS-N}~=~node-aipl-server.
 \normalsize
 
@@ -187,6 +188,7 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   Python codegen target & \texttt{BoundedBufferPy}, \texttt{Philosophers5Py}, \texttt{Rotate4LinesPy} & abclc & \texttt{abcl2c --python} emits stand-alone Python & Py-gen \\
   Xinu (embedded OS) target & \texttt{BoundedBufferXinu}, \texttt{Philosophers5Xinu}, \texttt{Rotate4LinesXinu} & abclc & \texttt{abcl2c --xinu} emits Xinu-flavoured C & Xinu \\
   Pony codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --pony} emits Pony source; \texttt{class} $\to$ \texttt{actor}, methods $\to$ \texttt{be}; two-step \texttt{\_aipl\_init} decouples construction from init body & Pony \\
+  Erlang codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{abcl2c --erlang} emits an \texttt{.erl} module; \texttt{class} $\to$ \texttt{spawn} + \texttt{receive} loop; fields $\to$ loop args with versioned variables on assign & Erlang \\
   Drone / simulation & \texttt{drone\_simulator} & browser-abcl & obstacle-aware drone swarm with comm + view range & JS-B, JS-N \\
   Trace / minimal repros & \texttt{H}, \texttt{P}, \texttt{T*}, \texttt{LD*}, \texttt{MS}, \texttt{AA}, \texttt{PP}, \texttt{PH}, \texttt{line*}, \texttt{Philosophers5\_\{debug,trace\}} & abclc & reduced repro cases used during runtime / TLA+ / Spin model-checking & OCaml \\
   \bottomrule
@@ -304,6 +306,7 @@ the program does not abort.
   Xinu embedded-OS target (\texttt{--xinu})  & \Yes \\
   Python target (\texttt{--python})          & \Yes \\
   \textbf{Pony target (\texttt{--pony})} — \texttt{class}$\to$\texttt{actor}, methods$\to$\texttt{be}, two-step \texttt{\_aipl\_init} & \Yes \\
+  \textbf{Erlang target (\texttt{--erlang})} — \texttt{class}$\to$\texttt{spawn}+\texttt{receive} loop, fields$\to$versioned loop args & \Yes \\
   \bottomrule
 \end{tabularx}
 

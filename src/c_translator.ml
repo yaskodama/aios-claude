@@ -2181,3 +2181,290 @@ let gen_program_pony (p : program) : string =
   ) globals;
   if not !any_emitted then emit "    None\n";
   Buffer.contents buf
+
+(* ==================================================================== *)
+(*               Erlang codegen (AIPL -> Erlang source)                 *)
+(* ==================================================================== *)
+(* AIPL のアクターは Erlang のプロセス + receive で表現する:           *)
+(*   - クラス C   -> モジュール内ループ関数 c_loop(F1, F2, ...)        *)
+(*   - メソッド  -> receive 句 {method, A1, ...}                       *)
+(*   - フィールド-> ループ引数 (immutable; 代入は新版変数 + 末尾呼出)  *)
+(*   - new C(args)-> spawn(fun() -> ... c_loop(InitFields) end)        *)
+(*   - send pid.m(...) -> pid ! {m, ...}                                *)
+(* 制限:                                                                 *)
+(*   - now/future/await: 未対応 (gen_server 化が必要)                   *)
+(*   - become/select   : 未対応                                          *)
+(*   - sender 追跡: 未対応                                                *)
+
+let erl_keywords = [
+  "after"; "and"; "andalso"; "band"; "begin"; "bnot"; "bor"; "bsl"; "bsr";
+  "bxor"; "case"; "catch"; "cond"; "div"; "end"; "fun"; "if"; "let"; "not";
+  "of"; "or"; "orelse"; "receive"; "rem"; "try"; "when"; "xor"
+]
+
+(* 変数名: 最初を大文字、衝突回避でアンダースコア *)
+let erl_var (n : string) : string =
+  if n = "" then "V_"
+  else
+    let first = Char.uppercase_ascii n.[0] in
+    let rest = String.sub n 1 (String.length n - 1) in
+    let s = String.make 1 first ^ rest in
+    if List.mem n erl_keywords then "V_" ^ s else s
+
+(* atom 名: 全部小文字、シングルクオートで囲む安全な版 *)
+let erl_atom (n : string) : string =
+  String.map (fun c ->
+    if (c >= 'A' && c <= 'Z') then Char.lowercase_ascii c
+    else c) n
+
+(* class C -> モジュール内のループ関数名 c_loop *)
+let erl_loop_name (cls : string) = (erl_atom cls) ^ "_loop"
+let erl_new_name  (cls : string) = "new_" ^ (erl_atom cls)
+
+(* === Erlang 式生成 === *)
+(* 状態: 現在の局所変数名マップ (ローカル + フィールド + 引数) *)
+type erl_env = {
+  mutable bindings : (string * string) list;  (* aipl name -> current erlang var *)
+  mutable counter  : int;
+  cname            : string;  (* enclosing class, "" for top-level *)
+}
+
+let erl_lookup (env : erl_env) (x : string) : string =
+  match List.assoc_opt x env.bindings with
+  | Some v -> v
+  | None -> erl_var x  (* fallback — assume initial var name *)
+
+let erl_fresh (env : erl_env) (base : string) : string =
+  env.counter <- env.counter + 1;
+  Printf.sprintf "%s%d" (erl_var base) env.counter
+
+let rec gen_expr_erl ~(env:erl_env) (e : expr) : string * Types.ty =
+  match e.desc with
+  | Int n      -> (Printf.sprintf "%d" n, Types.TInt)
+  | Float f    -> (Printf.sprintf "%f" f, Types.TFloat)
+  | String s   -> (Printf.sprintf "\"%s\"" (String.escaped s), Types.TString)
+  | Var x ->
+      if x = "self" then ("self()", Types.TActor (env.cname, []))
+      else if x = "sender" then ("self()  /* sender unsupported */",
+                                  Types.TActor ("", []))
+      else (erl_lookup env x, Types.TAny)
+  | Binop (op, a, b) ->
+      let (sa, ta) = gen_expr_erl ~env a in
+      let (sb, tb) = gen_expr_erl ~env b in
+      let ra = Types.repr ta in
+      let rb = Types.repr tb in
+      (match op, ra, rb with
+       | "+", Types.TString, _
+       | "+", _, Types.TString ->
+           (* Erlang の文字列は list、++ で連結。term を文字列化 io_lib *)
+           let to_s s t = match Types.repr t with
+             | Types.TString -> s
+             | _ -> Printf.sprintf "lists:flatten(io_lib:format(\"~p\", [%s]))" s
+           in
+           (Printf.sprintf "(%s ++ %s)" (to_s sa ta) (to_s sb tb), Types.TString)
+       | ("+"|"-"|"*"|"/"), _, _ ->
+           let real_op = if op = "/" then "/" else op in
+           (Printf.sprintf "(%s %s %s)" sa real_op sb, Types.TAny)
+       | "==", _, _ -> (Printf.sprintf "(%s =:= %s)" sa sb, Types.TBool)
+       | "!=", _, _ -> (Printf.sprintf "(%s =/= %s)" sa sb, Types.TBool)
+       | _ ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TAny))
+  | Call ("print", [arg]) ->
+      let (s, t) = gen_expr_erl ~env arg in
+      let fmt = match Types.repr t with
+        | Types.TString -> "\"~s~n\""
+        | _ -> "\"~p~n\""
+      in
+      (Printf.sprintf "(io:format(%s, [%s]))" fmt s, Types.TUnit)
+  | Call (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_erl ~env a in s) args in
+      (Printf.sprintf "%s(%s)" (erl_atom f) (String.concat ", " parts),
+       Types.TAny)
+  | New (cls, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_erl ~env a in s) args in
+      (Printf.sprintf "%s(%s)" (erl_new_name cls)
+         (String.concat ", " parts),
+       Types.TActor (cls, []))
+  | Expr e -> gen_expr_erl ~env e
+  | Array _ -> ("[]", Types.TAny)
+
+(* === Erlang 文生成 === *)
+(* Stmt は文字列を返す (";" で区切られる Erlang 句として組み立てる) *)
+let rec gen_stmts_erl ~env ~ind (stmts : stmt list) : string list =
+  List.concat_map (fun s -> gen_stmt_erl ~env ~ind s) stmts
+
+and gen_stmt_erl ~env ~ind (s : stmt) : string list =
+  let ind_s = String.make ind ' ' in
+  match s.sdesc with
+  | Seq ss -> gen_stmts_erl ~env ~ind ss
+  | VarDecl (x, e) ->
+      let (e_c, _) = gen_expr_erl ~env e in
+      let var = erl_var x in
+      env.bindings <- (x, var) :: env.bindings;
+      [Printf.sprintf "%s%s = %s" ind_s var e_c]
+  | Assign (x, e) ->
+      let (e_c, _) = gen_expr_erl ~env e in
+      let var = erl_fresh env x in
+      env.bindings <- (x, var) :: env.bindings;
+      [Printf.sprintf "%s%s = %s" ind_s var e_c]
+  | CallStmt ("print", [arg]) ->
+      let (s, t) = gen_expr_erl ~env arg in
+      let fmt = match Types.repr t with
+        | Types.TString -> "\"~s~n\""
+        | _ -> "\"~p~n\""
+      in
+      [Printf.sprintf "%sio:format(%s, [%s])" ind_s fmt s]
+  | CallStmt (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_erl ~env a in s) args in
+      [Printf.sprintf "%s%s(%s)" ind_s (erl_atom f) (String.concat ", " parts)]
+  | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+      let rid = match tgt with
+        | RemoteTarget _ -> "self()  /* remote unsupported */"
+        | LocalTarget t when t = "self" -> "self()"
+        | LocalTarget t when t = "sender" -> "self()  /* sender unsupported */"
+        | LocalTarget t -> erl_lookup env t
+      in
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_erl ~env a in s) args in
+      let payload =
+        if parts = [] then Printf.sprintf "{%s}" (erl_atom meth)
+        else Printf.sprintf "{%s, %s}" (erl_atom meth)
+               (String.concat ", " parts)
+      in
+      [Printf.sprintf "%s%s ! %s" ind_s rid payload]
+  | If (e, s1, s2) ->
+      let (ec, _) = gen_expr_erl ~env e in
+      (* Erlang の case 文で表現 *)
+      let inner1 = gen_stmt_erl ~env ~ind:(ind + 4) s1 in
+      let inner2 = gen_stmt_erl ~env ~ind:(ind + 4) s2 in
+      let inner1_s = if inner1 = [] then [ind_s ^ "    ok"] else inner1 in
+      let inner2_s = if inner2 = [] then [ind_s ^ "    ok"] else inner2 in
+      [Printf.sprintf "%scase %s of" ind_s ec]
+      @ [Printf.sprintf "%s    true ->" ind_s]
+      @ List.map (fun l -> l) inner1_s
+      @ [Printf.sprintf "%s  ; false ->" ind_s]
+      @ List.map (fun l -> l) inner2_s
+      @ [Printf.sprintf "%send" ind_s]
+  | While _ ->
+      [Printf.sprintf "%s%% while unsupported (would require recursion)" ind_s]
+  | Become _ -> [Printf.sprintf "%s%% become unsupported" ind_s]
+  | Select _ -> [Printf.sprintf "%s%% select unsupported" ind_s]
+
+(* === クラス: ループ関数 + コンストラクタを出す === *)
+let gen_class_erl (c : class_decl) : unit =
+  let fields = fields_of c in
+  let loop_fn = erl_loop_name c.cname in
+  let new_fn  = erl_new_name c.cname in
+  let init_md = List.find_opt (fun (m : method_decl) -> m.mname = "init")
+                              c.methods in
+  let other_methods = List.filter (fun (m : method_decl) -> m.mname <> "init")
+                                  c.methods in
+
+  (* ループ関数: state は (Field1, Field2, ...) 形式 *)
+  let field_vars = List.map erl_var fields in
+  let params_str = String.concat ", " field_vars in
+  emitf "%% --- class %s ---\n" c.cname;
+  emitf "%s(%s) ->\n" loop_fn params_str;
+  emit  "    receive\n";
+  let _first = ref true in
+  List.iter (fun (md : method_decl) ->
+    let env = { bindings =
+                  List.map2 (fun f v -> (f, v)) fields field_vars
+                  @ List.mapi (fun _ p -> (p, erl_var p)) md.params;
+                counter = 0;
+                cname = c.cname }
+    in
+    let msg_payload =
+      if md.params = [] then Printf.sprintf "{%s}" (erl_atom md.mname)
+      else Printf.sprintf "{%s, %s}" (erl_atom md.mname)
+             (String.concat ", " (List.map erl_var md.params))
+    in
+    if !_first then _first := false
+    else emit "      ;\n";
+    emitf "        %s ->\n" msg_payload;
+    let lines = gen_stmt_erl ~env ~ind:12 md.body in
+    List.iter (fun l -> emit l; emit ",\n") lines;
+    (* tail call: loop with updated field values *)
+    let updated_fields =
+      List.map (fun f -> erl_lookup env f) fields
+    in
+    emitf "            %s(%s)\n" loop_fn
+      (String.concat ", " updated_fields)
+  ) other_methods;
+  if other_methods = [] then begin
+    (* methods が無い場合の dummy clause *)
+    emit  "        stop -> ok\n"
+  end else begin
+    emit  "      ;\n";
+    emit  "        stop -> ok\n"
+  end;
+  emit "    end.\n\n";
+
+  (* コンストラクタ: 各フィールドの初期化 + init body + ループ突入 *)
+  let init_params = match init_md with
+    | Some md -> md.params
+    | None -> []
+  in
+  let init_params_erl = List.map erl_var init_params in
+  emitf "%s(%s) ->\n" new_fn (String.concat ", " init_params_erl);
+  emit  "    spawn(fun() ->\n";
+  (* フィールド初期化 *)
+  let env = { bindings = List.mapi (fun _ p -> (p, erl_var p)) init_params;
+              counter = 0;
+              cname = c.cname }
+  in
+  List.iter (fun (s : stmt) ->
+    match s.sdesc with
+    | VarDecl (name, e) ->
+        let (e_c, _) = gen_expr_erl ~env e in
+        let v = erl_var name in
+        env.bindings <- (name, v) :: env.bindings;
+        emitf "        %s = %s,\n" v e_c
+    | _ -> ()
+  ) c.fields;
+  (* init body 実行 *)
+  (match init_md with
+   | Some md ->
+       let lines = gen_stmt_erl ~env ~ind:8 md.body in
+       List.iter (fun l -> emit l; emit ",\n") lines
+   | None -> ());
+  (* ループ突入 *)
+  let final_fields = List.map (fun f -> erl_lookup env f) fields in
+  emitf "        %s(%s)\n" loop_fn
+    (String.concat ", " final_fields);
+  emit  "    end).\n\n"
+
+(* === main: トップレベルのグローバル文 === *)
+let gen_program_erlang (p : program) : string =
+  Buffer.clear buf;
+  emit "%% Generated by abcl2c --erlang\n";
+  emit "%% AIPL actor model -> Erlang spawn + receive.\n";
+  emit "%% Note: now/future/await/become/select/sender are unsupported.\n";
+  emit "-module(aipl_out).\n";
+  emit "-export([main/0]).\n\n";
+
+  List.iter gen_class_erl (classes_of p);
+
+  emit "main() ->\n";
+  let env = { bindings = []; counter = 0; cname = "" } in
+  let globals = globals_of p in
+  let lines = ref [] in
+  List.iter (fun (s : stmt) ->
+    let ls = gen_stmt_erl ~env ~ind:4 s in
+    lines := !lines @ ls
+  ) globals;
+  if !lines = [] then emit "    ok.\n"
+  else begin
+    let n = List.length !lines in
+    List.iteri (fun i l ->
+      emit l;
+      if i = n - 1 then emit ",\n"
+      else emit ",\n"
+    ) !lines;
+    emit "    timer:sleep(200),\n";
+    emit "    ok.\n"
+  end;
+  Buffer.contents buf

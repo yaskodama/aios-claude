@@ -1,7 +1,7 @@
 (* abcl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: abcl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony] [--no-typecheck]";
+  prerr_endline "usage: abcl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang] [--no-typecheck]";
   exit 1
 
 let () =
@@ -11,6 +11,7 @@ let () =
   let xinu = ref false in
   let py = ref false in
   let pony = ref false in
+  let erl = ref false in
   let no_typecheck = ref false in
   let dump_types = ref false in
   let args = Array.to_list Sys.argv |> List.tl in
@@ -21,6 +22,7 @@ let () =
     | "--xinu" :: rest -> xinu := true; loop rest
     | "--python" :: rest -> py := true; loop rest
     | "--pony" :: rest -> pony := true; loop rest
+    | "--erlang" :: rest -> erl := true; loop rest
     | "--no-typecheck" :: rest -> no_typecheck := true; loop rest
     | "--dump-types" :: rest -> dump_types := true; loop rest
     | "-h" :: _ | "--help" :: _ -> usage ()
@@ -32,6 +34,7 @@ let () =
   let default_ext =
     if !py then ".py"
     else if !pony then ".pony"
+    else if !erl then ".erl"
     else ".c"
   in
   let output =
@@ -74,6 +77,7 @@ let () =
   end;
   let c_code =
     if !pony      then C_translator.gen_program_pony                       prog
+    else if !erl  then C_translator.gen_program_erlang                     prog
     else if !py   then C_translator.gen_program_python ~max_messages:!max_msgs prog
     else if !xinu then C_translator.gen_program_xinu   ~max_messages:!max_msgs prog
     else               C_translator.gen_program        ~max_messages:!max_msgs prog
