@@ -77,6 +77,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 **Py-gen** = `abcl2c --python` → stand-alone Python file;
 **Pony** = `abcl2c --pony` → Pony actor source;
 **Erlang** = `abcl2c --erlang` → Erlang `.erl` module;
+**Go** = `abcl2c --go` → Go `main.go` source;
 **JS-B** = browser-abcl; **JS-N** = node-aipl-server.
 
 | Feature category | Sample(s) | Where | What it checks | Target |
@@ -112,6 +113,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `abcl2c --xinu` emits Xinu-flavoured C | Xinu |
 | **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `abcl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
 | **Erlang codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — `sender` not tracked) | abclc | `abcl2c --erlang` emits a single `.erl` module; `class` → spawn + receive loop; fields → loop args with versioned variables on assign; methods → `receive` clauses | Erlang |
+| **Go codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `abcl2c --go` emits a single Go `main.go`; `class` → struct + goroutine `run()`; each method → typed message struct + `Method()` helper that pushes to a buffered `chan any` mailbox; dispatch via type switch in `run()` | Go |
 | **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 
@@ -197,6 +199,7 @@ abort.
 | 39  | Python target (`--python`)                      | ✅   |
 | 40  | **Pony target (`--pony`)** — `class` → `actor`, methods → `be`, two-step `_aipl_init` | ✅   |
 | 41  | **Erlang target (`--erlang`)** — `class` → spawn+receive loop, fields → loop args (versioned vars) | ✅   |
+| 42  | **Go target (`--go`)** — `class` → struct + goroutine, methods → typed message structs + type-switch dispatch | ✅   |
 
 ---
 

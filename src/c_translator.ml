@@ -2468,3 +2468,341 @@ let gen_program_erlang (p : program) : string =
     emit "    ok.\n"
   end;
   Buffer.contents buf
+
+(* ==================================================================== *)
+(*                  Go codegen (AIPL -> Go source)                       *)
+(* ==================================================================== *)
+(* AIPL アクター → Go の goroutine + channel ベースのアクターに変換:    *)
+(*   class C     -> type C struct { mailbox chan any; ...fields... }    *)
+(*   method m    -> type cMsgM struct { args... } + (c *C) M(args) func *)
+(*   send obj.m  -> obj.M(args)                                          *)
+(*   new C(args) -> NewC() + obj.Init(args) の二段階                    *)
+(*   print(x)    -> fmt.Println(...)                                    *)
+(* 制限: now/future/await/become/select/sender 未対応                   *)
+
+let go_type_of_ty (t : Types.ty) : string =
+  match Types.repr t with
+  | Types.TInt    -> "int64"
+  | Types.TFloat  -> "float64"
+  | Types.TString -> "string"
+  | Types.TBool   -> "bool"
+  | Types.TActor (cls, _) when cls <> "" -> "*" ^ cls
+  | _ -> "any"
+
+(* Go の予約語と衝突する場合のマングリング *)
+let go_keywords = [
+  "break"; "case"; "chan"; "const"; "continue"; "default"; "defer"; "else";
+  "fallthrough"; "for"; "func"; "go"; "goto"; "if"; "import"; "interface";
+  "map"; "package"; "range"; "return"; "select"; "struct"; "switch"; "type";
+  "var"
+]
+
+let go_id (n : string) : string =
+  if List.mem n go_keywords then "v_" ^ n else n
+
+(* メソッド名 → Go の Capitalized 名 (送信ヘルパ用) *)
+let go_method_helper (m : string) : string =
+  if m = "" then "M"
+  else String.make 1 (Char.uppercase_ascii m.[0])
+       ^ String.sub m 1 (String.length m - 1)
+
+(* メッセージ構造体名: cMsgInit, cMsgGreet, ... *)
+let go_msg_struct (cname : string) (mname : string) : string =
+  cname ^ "Msg" ^ (go_method_helper mname)
+
+(* Go 式生成 *)
+let rec gen_expr_go ~(ctx:ctx) (e : expr) : string * Types.ty =
+  match e.desc with
+  | Int n      -> (Printf.sprintf "int64(%d)" n, Types.TInt)
+  | Float f    -> (Printf.sprintf "%f" f, Types.TFloat)
+  | String s   -> (Printf.sprintf "\"%s\"" (String.escaped s), Types.TString)
+  | Var x ->
+      if x = "self" then ("c", Types.TActor (ctx.cname, []))
+      else if x = "sender" then ("nil /* sender */", Types.TAny)
+      else if List.mem x ctx.params then begin
+        match List.assoc_opt x ctx.param_types with
+        | Some t -> (go_id x, t)
+        | None -> (go_id x, Types.TAny)
+      end
+      else if List.mem x ctx.locals then begin
+        match List.assoc_opt x ctx.local_types with
+        | Some t -> (go_id x, t)
+        | None -> (go_id x, Types.TAny)
+      end
+      else if List.mem x ctx.fields then begin
+        match List.assoc_opt x ctx.field_types with
+        | Some t -> ("c." ^ go_id x, t)
+        | None -> ("c." ^ go_id x, Types.TAny)
+      end
+      else
+        (go_id x, Types.TActor ("", []))
+  | Binop (op, a, b) ->
+      let (sa, ta) = gen_expr_go ~ctx a in
+      let (sb, tb) = gen_expr_go ~ctx b in
+      let ra = Types.repr ta in
+      let rb = Types.repr tb in
+      let to_str s t = match Types.repr t with
+        | Types.TString -> s
+        | _ -> Printf.sprintf "fmt.Sprint(%s)" s
+      in
+      (match op, ra, rb with
+       | "+", Types.TString, _ | "+", _, Types.TString ->
+           (Printf.sprintf "(%s + %s)" (to_str sa ta) (to_str sb tb),
+            Types.TString)
+       | ("+"|"-"|"*"|"/"), Types.TInt, Types.TInt ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TInt)
+       | ("+"|"-"|"*"|"/"), (Types.TInt|Types.TFloat), (Types.TInt|Types.TFloat) ->
+           let af = if ra = Types.TInt then Printf.sprintf "float64(%s)" sa else sa in
+           let bf = if rb = Types.TInt then Printf.sprintf "float64(%s)" sb else sb in
+           (Printf.sprintf "(%s %s %s)" af op bf, Types.TFloat)
+       | ("=="|"!="|"<"|"<="|">"|">="), _, _ ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TBool)
+       | _ ->
+           (Printf.sprintf "(%s %s %s)" sa op sb, Types.TAny))
+  | Call ("print", [arg]) ->
+      let (s, _) = gen_expr_go ~ctx arg in
+      (Printf.sprintf "(fmt.Println(%s))" s, Types.TUnit)
+  | Call (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_go ~ctx a in s) args in
+      (Printf.sprintf "%s(%s)" (go_id f) (String.concat ", " parts),
+       Types.TAny)
+  | New (cls, _args) ->
+      (* Go では二段階: ctor (引数なし) -> Init(...) *)
+      (Printf.sprintf "New%s()" cls, Types.TActor (cls, []))
+  | Expr e -> gen_expr_go ~ctx e
+  | Array _ -> ("nil", Types.TAny)
+
+(* 文 *)
+let rec gen_stmt_go ~(ctx:ctx) ~indent (s : stmt) =
+  let ind = String.make indent ' ' in
+  match s.sdesc with
+  | Seq ss -> List.iter (gen_stmt_go ~ctx ~indent) ss
+  | VarDecl (x, e) ->
+      let (e_c, t) = gen_expr_go ~ctx e in
+      ctx.locals <- x :: ctx.locals;
+      ctx.local_types <- (x, t) :: ctx.local_types;
+      emitf "%s%s := %s\n" ind (go_id x) e_c;
+      emitf "%s_ = %s\n" ind (go_id x)
+  | Assign (x, e) ->
+      let (e_c, t) = gen_expr_go ~ctx e in
+      let lhs =
+        if List.mem x ctx.fields then "c." ^ go_id x
+        else go_id x
+      in
+      (* Pony 同様、左辺が float で右辺 int なら float64 にキャスト *)
+      let lhs_ty =
+        if List.mem x ctx.fields then List.assoc_opt x ctx.field_types
+        else if List.mem x ctx.params then List.assoc_opt x ctx.param_types
+        else if List.mem x ctx.locals then List.assoc_opt x ctx.local_types
+        else None
+      in
+      let coerced =
+        match lhs_ty with
+        | Some lt when Types.repr lt = Types.TFloat
+                    && Types.repr t = Types.TInt ->
+            Printf.sprintf "float64(%s)" e_c
+        | _ -> e_c
+      in
+      emitf "%s%s = %s\n" ind lhs coerced
+  | CallStmt ("print", [arg]) ->
+      let (s, _) = gen_expr_go ~ctx arg in
+      emitf "%sfmt.Println(%s)\n" ind s
+  | CallStmt (f, args) ->
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_go ~ctx a in s) args in
+      emitf "%s%s(%s)\n" ind (go_id f) (String.concat ", " parts)
+  | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+      let rid = match tgt with
+        | RemoteTarget _ -> "nil /* remote */"
+        | LocalTarget t when t = "self" -> "c"
+        | LocalTarget t when t = "sender" -> "nil /* sender */"
+        | LocalTarget t -> go_id t
+      in
+      let parts = List.map (fun a ->
+        let (s, _) = gen_expr_go ~ctx a in s) args in
+      if rid = "nil /* remote */" || rid = "nil /* sender */" then
+        emitf "%s// send to %s unsupported: .%s(%s)\n"
+          ind rid (go_method_helper meth) (String.concat ", " parts)
+      else
+        emitf "%s%s.%s(%s)\n" ind rid (go_method_helper meth)
+          (String.concat ", " parts)
+  | If (e, s1, s2) ->
+      let (ec, _) = gen_expr_go ~ctx e in
+      emitf "%sif %s {\n" ind ec;
+      gen_stmt_go ~ctx ~indent:(indent + 4) s1;
+      emitf "%s} else {\n" ind;
+      gen_stmt_go ~ctx ~indent:(indent + 4) s2;
+      emitf "%s}\n" ind
+  | While (e, body) ->
+      let (ec, _) = gen_expr_go ~ctx e in
+      emitf "%sfor %s {\n" ind ec;
+      gen_stmt_go ~ctx ~indent:(indent + 4) body;
+      emitf "%s}\n" ind
+  | Become _ -> emitf "%s// become unsupported\n" ind
+  | Select _ -> emitf "%s// select unsupported\n" ind
+
+(* メッセージ構造体定義: type cMsgM struct { ...args... } *)
+let gen_msg_struct_go (cname : string) (md : method_decl) =
+  let ctx = make_ctx ~cname ~fields:[] ~params:md.params ~mname:md.mname in
+  let mname = if md.mname = "init" then "_aipl_init" else md.mname in
+  let struct_name = go_msg_struct cname mname in
+  emitf "type %s struct {\n" struct_name;
+  List.iter (fun p ->
+    let pty = match List.assoc_opt p ctx.param_types with
+      | Some t -> go_type_of_ty t
+      | None -> "any"
+    in
+    emitf "\t%s %s\n" (go_id p) pty
+  ) md.params;
+  emit  "}\n\n"
+
+(* run loop の case 句生成 *)
+let gen_method_dispatch_go (cname : string) ~fields (md : method_decl) =
+  let mname = if md.mname = "init" then "_aipl_init" else md.mname in
+  let struct_name = go_msg_struct cname mname in
+  let ctx = make_ctx ~cname ~fields ~params:md.params ~mname:md.mname in
+  emitf "\t\tcase %s:\n" struct_name;
+  (* unused 警告回避 *)
+  emit  "\t\t\t_ = m\n";
+  List.iter (fun p ->
+    emitf "\t\t\t%s := m.%s\n" (go_id p) (go_id p);
+    emitf "\t\t\t_ = %s\n" (go_id p)
+  ) md.params;
+  gen_stmt_go ~ctx ~indent:12 md.body
+
+(* 送信ヘルパ: func (c *C) Method(args) { c.mailbox <- cMsgMethod{...} } *)
+let gen_send_helper_go (cname : string) (md : method_decl) =
+  let ctx = make_ctx ~cname ~fields:[] ~params:md.params ~mname:md.mname in
+  let mname_pony = if md.mname = "init" then "_aipl_init" else md.mname in
+  let struct_name = go_msg_struct cname mname_pony in
+  let helper_name = go_method_helper (if md.mname = "init" then "Init" else md.mname) in
+  let params_decl = String.concat ", " (List.map (fun p ->
+    let pty = match List.assoc_opt p ctx.param_types with
+      | Some t -> go_type_of_ty t
+      | None -> "any"
+    in
+    Printf.sprintf "%s %s" (go_id p) pty
+  ) md.params) in
+  let field_init = String.concat ", " (List.map (fun p ->
+    Printf.sprintf "%s: %s" (go_id p) (go_id p)
+  ) md.params) in
+  emitf "func (c *%s) %s(%s) {\n" cname helper_name params_decl;
+  emitf "\tc.mailbox <- %s{%s}\n" struct_name field_init;
+  emit  "}\n\n"
+
+let gen_class_go (c : class_decl) =
+  let fields = fields_of c in
+  emitf "// === class %s ===\n" c.cname;
+  (* struct *)
+  emitf "type %s struct {\n" c.cname;
+  emit  "\tmailbox chan any\n";
+  List.iter (fun fname ->
+    let fty = match Types.lookup_field_type c.cname fname with
+      | Some t -> go_type_of_ty t
+      | None -> "any"
+    in
+    emitf "\t%s %s\n" (go_id fname) fty
+  ) fields;
+  emit  "}\n\n";
+  (* メッセージ構造体 *)
+  List.iter (gen_msg_struct_go c.cname) c.methods;
+  let has_init = List.exists (fun (m : method_decl) -> m.mname = "init")
+                             c.methods in
+  if not has_init then begin
+    (* デフォルト no-op init *)
+    emitf "type %s struct {}\n\n" (go_msg_struct c.cname "_aipl_init")
+  end;
+  (* ctor *)
+  emitf "func New%s() *%s {\n" c.cname c.cname;
+  emitf "\tc := &%s{mailbox: make(chan any, 64)}\n" c.cname;
+  (* field 初期化 *)
+  let init_ctx = make_ctx ~cname:c.cname ~fields ~params:[] ~mname:"" in
+  List.iter (fun s ->
+    match s.sdesc with
+    | VarDecl (name, e) ->
+        let (e_c, _) = gen_expr_go ~ctx:init_ctx e in
+        emitf "\tc.%s = %s\n" (go_id name) e_c
+    | _ -> ()
+  ) c.fields;
+  emit  "\tgo c.run()\n";
+  emit  "\treturn c\n";
+  emit  "}\n\n";
+  (* run loop *)
+  emitf "func (c *%s) run() {\n" c.cname;
+  emit  "\tfor raw := range c.mailbox {\n";
+  emit  "\t\tswitch m := raw.(type) {\n";
+  List.iter (gen_method_dispatch_go c.cname ~fields) c.methods;
+  if not has_init then begin
+    emitf "\t\tcase %s:\n" (go_msg_struct c.cname "_aipl_init");
+    emit  "\t\t\t_ = m\n"
+  end;
+  emit  "\t\t}\n";
+  emit  "\t}\n";
+  emit  "}\n\n";
+  (* 送信ヘルパ *)
+  List.iter (gen_send_helper_go c.cname) c.methods;
+  if not has_init then begin
+    emitf "func (c *%s) Init() {\n" c.cname;
+    emitf "\tc.mailbox <- %s{}\n" (go_msg_struct c.cname "_aipl_init");
+    emit  "}\n\n"
+  end
+
+let gen_program_go (p : program) : string =
+  Buffer.clear buf;
+  emit "// Generated by abcl2c --go\n";
+  emit "// AIPL actor model -> Go goroutines + channels.\n";
+  emit "// Note: now/future/await/become/select/sender are unsupported.\n";
+  emit "package main\n\n";
+  emit "import (\n";
+  emit "\t\"fmt\"\n";
+  emit "\t\"time\"\n";
+  emit ")\n\n";
+  emit "var _ = fmt.Sprint\n";
+  emit "var _ = time.Millisecond\n\n";
+
+  List.iter gen_class_go (classes_of p);
+
+  emit "func main() {\n";
+  let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
+  let any_emitted = ref false in
+  List.iter (fun s ->
+    match s.sdesc with
+    | VarDecl (x, e) ->
+        let (e_c, t) = gen_expr_go ~ctx:g_ctx e in
+        g_ctx.locals <- x :: g_ctx.locals;
+        g_ctx.local_types <- (x, t) :: g_ctx.local_types;
+        emitf "\t%s := %s\n" (go_id x) e_c;
+        emitf "\t_ = %s\n" (go_id x);
+        (* `var x = new C(args)` の args は Init() に流す *)
+        (match e.desc with
+         | New (_cls, init_args) ->
+             let parts = List.map (fun a ->
+               let (s, _) = gen_expr_go ~ctx:g_ctx a in s) init_args in
+             if parts = [] then
+               emitf "\t%s.Init()\n" (go_id x)
+             else
+               emitf "\t%s.Init(%s)\n" (go_id x)
+                 (String.concat ", " parts)
+         | _ -> ());
+        any_emitted := true
+    | Send (tgt, meth, args) | UnsafeSend (tgt, meth, args) ->
+        let rid = match tgt with
+          | RemoteTarget _ -> "nil /* remote */"
+          | LocalTarget t -> go_id t
+        in
+        let parts = List.map (fun a ->
+          let (s, _) = gen_expr_go ~ctx:g_ctx a in s) args in
+        emitf "\t%s.%s(%s)\n" rid (go_method_helper meth)
+          (String.concat ", " parts);
+        any_emitted := true
+    | CallStmt ("print", [arg]) ->
+        let (s, _) = gen_expr_go ~ctx:g_ctx arg in
+        emitf "\tfmt.Println(%s)\n" s;
+        any_emitted := true
+    | _ -> ()
+  ) (globals_of p);
+  if !any_emitted then
+    emit "\ttime.Sleep(200 * time.Millisecond)\n";
+  emit "}\n";
+  Buffer.contents buf
