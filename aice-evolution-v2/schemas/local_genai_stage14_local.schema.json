@@ -1,0 +1,185 @@
+{
+  "name": "local_genai_stage14_local",
+  "based_on": "local_genai_stage10",
+  "notes": "Stage-14 local-only schema. Drops the hardware_class dimension (always implicitly local_m2_mps) and the very-large param/corpus/token tiers from the cloud variant. Keeps jp_ratio, token_budget, ctx_class, batch_class as the practical evolution axes. Adds memory-feasibility coherence rules so the search never proposes configurations that exceed M2 16GB unified memory.",
+  "axes": {
+    "model_family": [
+      "char_rnn",
+      "single_block_transformer",
+      "multi_block_transformer",
+      "multi_block_transformer_compact"
+    ],
+    "positional": [
+      "implicit_recurrence",
+      "learned_absolute",
+      "rope",
+      "sinusoidal"
+    ],
+    "normalization": [
+      "none",
+      "layernorm",
+      "rmsnorm"
+    ],
+    "regularization_combo": [
+      "none",
+      "dropout_only",
+      "orthogonal_3_set"
+    ],
+    "schedule_length": [
+      "medium_20k",
+      "long_40k",
+      "very_long_80k",
+      "very_long_160k",
+      "epic_320k"
+    ],
+    "tokenizer": [
+      "byte",
+      "bpe_2048",
+      "bpe_4096",
+      "bpe_8192"
+    ],
+    "depth_class": [
+      "shallow_3",
+      "medium_4_to_6",
+      "deep_8plus"
+    ],
+    "d_model": [
+      "d_64",
+      "d_96",
+      "d_128",
+      "d_192"
+    ],
+    "ctx_class": [
+      "ctx_128",
+      "ctx_256",
+      "ctx_512"
+    ],
+    "batch_class": [
+      "batch_16",
+      "batch_24",
+      "batch_32",
+      "batch_48"
+    ],
+    "param_class": [
+      "200K",
+      "500K",
+      "2M",
+      "3M",
+      "6M"
+    ],
+    "corpus_size_class": [
+      "10MB",
+      "60MB",
+      "113MB",
+      "200MB",
+      "300MB",
+      "500MB"
+    ],
+    "corpus_composition": [
+      "mixed_classics_en",
+      "bilingual_en_jp",
+      "bilingual_en_jp_jp_heavy"
+    ],
+    "jp_ratio": [
+      "jp_ratio_0",
+      "jp_ratio_5",
+      "jp_ratio_15",
+      "jp_ratio_30",
+      "jp_ratio_50"
+    ],
+    "token_budget": [
+      "300M_tokens",
+      "1B_tokens",
+      "2B_tokens",
+      "3B_tokens"
+    ],
+    "training_paradigm": [
+      "maximum_likelihood_sgd"
+    ],
+    "data_augmentation_strategy": [
+      "naive_multi_epoch",
+      "shuffled_blocks",
+      "curriculum_short_to_long",
+      "language_oversample"
+    ],
+    "regularization": [
+      "none",
+      "dropout_005",
+      "dropout_010"
+    ],
+    "inference_optimization": [
+      "none",
+      "kv_cache",
+      "kv_cache_plus_int8"
+    ],
+    "self_evolution": [
+      "none",
+      "local_llm_proposes_three_mutations"
+    ],
+    "engine": [
+      "pytorch_mps"
+    ],
+    "data_per_param_health": [
+      "below_5_severe_overfit",
+      "5_to_50_data_rich",
+      "50_to_200_balanced",
+      "above_200_underfit_room"
+    ]
+  },
+  "ordinal_axes": {
+    "param_class": ["200K", "500K", "2M", "3M", "6M"],
+    "corpus_size_class": ["10MB", "60MB", "113MB", "200MB", "300MB", "500MB"],
+    "jp_ratio": ["jp_ratio_0", "jp_ratio_5", "jp_ratio_15", "jp_ratio_30", "jp_ratio_50"],
+    "token_budget": ["300M_tokens", "1B_tokens", "2B_tokens", "3B_tokens"],
+    "schedule_length": ["medium_20k", "long_40k", "very_long_80k", "very_long_160k", "epic_320k"],
+    "tokenizer": ["byte", "bpe_2048", "bpe_4096", "bpe_8192"],
+    "depth_class": ["shallow_3", "medium_4_to_6", "deep_8plus"],
+    "d_model": ["d_64", "d_96", "d_128", "d_192"],
+    "ctx_class": ["ctx_128", "ctx_256", "ctx_512"],
+    "batch_class": ["batch_16", "batch_24", "batch_32", "batch_48"],
+    "regularization_combo": ["none", "dropout_only", "orthogonal_3_set"],
+    "regularization": ["none", "dropout_005", "dropout_010"],
+    "inference_optimization": ["none", "kv_cache", "kv_cache_plus_int8"]
+  },
+  "coherence": [
+    {"if": {"model_family": "char_rnn"},
+     "then": {"positional": "implicit_recurrence", "normalization": "none",
+              "training_paradigm": "maximum_likelihood_sgd",
+              "tokenizer": "byte", "depth_class": "shallow_3"},
+     "then_in": {"regularization_combo": ["none", "dropout_only"]}},
+    {"if": {"model_family": "multi_block_transformer"},
+     "then_in": {"positional": ["learned_absolute", "rope", "sinusoidal"],
+                 "normalization": ["layernorm", "rmsnorm"],
+                 "depth_class": ["medium_4_to_6", "deep_8plus"]}},
+    {"if": {"jp_ratio": "jp_ratio_30"},
+     "then_in": {"tokenizer": ["bpe_4096", "bpe_8192"]}},
+    {"if": {"jp_ratio": "jp_ratio_50"},
+     "then_in": {"tokenizer": ["bpe_8192"]}},
+    {"if": {"corpus_size_class": "500MB"},
+     "then_in": {"token_budget": ["2B_tokens", "3B_tokens"]}},
+    {"if": {"corpus_size_class": "10MB"},
+     "then_in": {"token_budget": ["300M_tokens", "1B_tokens"]}},
+    {"if": {"token_budget": "3B_tokens"},
+     "then_in": {"corpus_size_class": ["300MB", "500MB"],
+                 "schedule_length": ["very_long_160k", "epic_320k"]}},
+    {"if": {"ctx_class": "ctx_512"},
+     "then_in": {"batch_class": ["batch_16", "batch_24"],
+                 "d_model": ["d_64", "d_96", "d_128"]}},
+    {"if": {"ctx_class": "ctx_128"},
+     "then_in": {"batch_class": ["batch_24", "batch_32", "batch_48"]}},
+    {"if": {"d_model": "d_192"},
+     "then_in": {"ctx_class": ["ctx_128", "ctx_256"],
+                 "batch_class": ["batch_16", "batch_24"],
+                 "param_class": ["2M", "3M", "6M"]}},
+    {"if": {"d_model": "d_64"},
+     "then_in": {"param_class": ["200K", "500K"]}},
+    {"if": {"d_model": "d_96"},
+     "then_in": {"param_class": ["200K", "500K", "2M"]}},
+    {"if": {"d_model": "d_128"},
+     "then_in": {"param_class": ["500K", "2M", "3M"]}},
+    {"if": {"data_augmentation_strategy": "language_oversample"},
+     "then_in": {"corpus_composition": ["bilingual_en_jp", "bilingual_en_jp_jp_heavy"],
+                 "jp_ratio": ["jp_ratio_15", "jp_ratio_30", "jp_ratio_50"]}}
+  ],
+  "open_axes": true
+}

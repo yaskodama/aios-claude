@@ -1,0 +1,91 @@
+// LocalGenAIStage14LocalOnlyJP — M2 MPS 単体で完結する版.
+//
+// 設計制約 (cloud 不可、 M2 MPS 1 台のみ):
+//   - メモリ予算 ~12-16GB (Apple Silicon 統合メモリ)
+//   - 推奨 train time 上限: 24-48 時間/run
+//   - corpus 上限: 500MB (network + disk + cache の現実値)
+//   - 訓練トークン上限: ~3B (24h × 12K steps/h × 6144 tokens = 1B)
+//
+// Stage-14-cloud (LocalGenAIStage14GigaCorpusJP.aice) は 1GB / 10B
+// トークン / cloud_h100 を狙うが、 本仕様はそれを断念し、 「同じ M2 MPS
+// で Stage-13 (bpb 1.494) を超える」 ことを目標にする.
+//
+// 主要な進化軸:
+//   - corpus_size_class : 113MB → 300MB / 500MB
+//   - token_budget      : 1B → 2B / 3B
+//   - jp_ratio          : 15% → 30% / 50% (Stage-13 で 15% が劇的改善)
+//   - ctx_class         : 256 → 512 (M2 MPS で memory 限界に近い)
+//   - data_augmentation : 言語サブセット oversample で JP fluency 強化
+
+aice LocalGenAIStage14LocalOnlyJP {
+  dialect = "aice_evolution_v2";
+
+  task = "Stage-13 (113MB, 15% JP, ~1B tokens) で bpb 1.494 を達成. 本仕様は M2 MPS 1 台のみで完結する制約のもとで、 (corpus_size_class, token_budget, jp_ratio, ctx_class, batch_class) の 5 軸を進化計算で探索する. cell は (model_family, corpus_size_class, token_budget, jp_ratio, ctx_class) の 5 軸. champion は bits-per-byte (BPB) で比較し、 Stage-13 baseline = 1.494. 終端目標は (multi_block_transformer, 300MB, 2B_tokens, jp_ratio_30, ctx_512) の単一 cell が bpb 1.40 を切ること、 もしくは (multi_block_transformer, 500MB, 3B_tokens, jp_ratio_30, ctx_256) で bpb 1.35 を達成することのいずれか.";
+
+  gene_schema = "schemas/local_genai_stage14_local.schema.json";
+
+  evaluation_tasks {
+    task BitsPerByteOnSharedHoldout {
+      spec = "全候補を共通 holdout (500MB tail) で再評価. BPB が唯一の cross-tokenizer fair 指標. Stage-13 baseline = 1.494. 期待 BPB レンジ (M2 MPS で実現可能な範囲): (113MB,1B=1.49-1.51), (300MB,2B=1.40-1.48), (500MB,3B=1.35-1.43). data-saturated を超えるには corpus × tokens の両方を伸ばす必要あり.";
+    }
+    task JapaneseFluencyBenchmark {
+      spec = "20 個の日本語プロンプト (MeCab 分かち書き済) で生成し、 (a) ASCII へのリーク率、 (b) 文末記号妥当性、 (c) 漢字-平仮名比率、 を 0-3 点で採点. Stage-13 baseline = 9/9. jp_ratio_30 の場合 9/9 を温度 1.0 でも保てること.";
+    }
+    task TrainTimeUnder48h {
+      spec = "M2 MPS で 48 時間以内に train loop が終わる. Stage-13 (160K step) で約 10.5 時間 → 1M step (~3B tokens) で 65 時間程度なので、 batch を 24 → 32, bptt を 256 → 512 等で並列性を上げて時間を圧縮する設計が必要. ctx_class=512 は memory pressure に注意.";
+    }
+    task MemoryUnder12GB {
+      spec = "M2 統合メモリは 16GB のため、 訓練中の peak memory ≤ 12GB を要求 (chrome / IDE 等の同時実行に耐える). d_model × depth × ctx × batch が memory に効く. (d=128, depth=6, ctx=256, batch=24) で約 4GB. (d=128, depth=6, ctx=512, batch=24) で約 8GB. (d=192, depth=6, ctx=512, batch=32) で >12GB 失格.";
+    }
+    task DataDownloadFeasibility {
+      spec = "corpus は PG + Aozora から HTTP fetch で取得可能であること. 500MB 越えは PG mirror の rate-limit / 個別ソースの 404 リスクで脱落する可能性. build スクリプトが exponential backoff で再試行し、 80% 以上の sources fetch 成功で完了とみなす.";
+    }
+    task ReproducibilityChecklist {
+      spec = "seed 固定 / corpus が SHA-256 ロック / build スクリプト + 訓練スクリプト公開 / 依存最小 (pytorch+tokenizers+fugashi+unidic-lite) / 単一マシン (M2 MPS) で再現可能 / 20 プロンプト × 3 温度 サンプル保存 / 日本語 fluency check スクリプト. 7 項目 0-2 点で計 0-14 点.";
+    }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "model_family, corpus_size_class, token_budget, jp_ratio, ctx_class";
+    generations = 60;
+    seed_count  = 20;
+    open_axes   = true;
+    rng_seed    = 42;
+  }
+
+  prior_seeds = "
+    multi_block_transformer | 113MB | 1B_tokens | jp_ratio_15 | ctx_256 | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_4096 | medium_4_to_6 | d_model_128 | depth_6 | batch_24 | naive_multi_epoch
+    multi_block_transformer | 200MB | 2B_tokens | jp_ratio_30 | ctx_256 | rope | rmsnorm | orthogonal_3_set | very_long_80k | bpe_4096 | medium_4_to_6 | d_model_128 | depth_6 | batch_24 | language_oversample
+    multi_block_transformer | 300MB | 2B_tokens | jp_ratio_30 | ctx_512 | rope | rmsnorm | orthogonal_3_set | very_long_80k | bpe_4096 | medium_4_to_6 | d_model_128 | depth_6 | batch_16 | language_oversample
+    multi_block_transformer | 500MB | 3B_tokens | jp_ratio_30 | ctx_256 | rope | rmsnorm | orthogonal_3_set | very_long_160k | bpe_8192 | medium_4_to_6 | d_model_128 | depth_6 | batch_32 | language_oversample
+  ";
+
+  meta_fitness {
+    trend_alignment       = 0.20;
+    frontier_coverage     = 0.15;
+    novelty               = 0.10;
+    evolvability          = 0.15;
+    cross_task_generality = 0.15;
+    implementability      = 0.15;
+    multilingual_quality  = 0.10;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["bpb_pareto", "jp_fluency_pareto", "memory_efficient", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer Quality {
+      persona = "あなたは言語品質レビュアーです. 候補ジェノムから (corpus_size_class, jp_ratio, token_budget, ctx_class) を確認し、 BPB の期待値が Stage-13 baseline (113MB×1B×15%JP=1.494) を踏まえて整合しているかを見ます. 期待 BPB レンジ: (113MB,1B=1.49-1.51), (200MB,1B-2B=1.42-1.48), (300MB,2B=1.38-1.45), (500MB,3B=1.32-1.40). 採点は 5 軸 [BPB が レンジ内か / 日本語 fluency / 英語 fluency / 言語混入率 / model_size と corpus の整合 (5-50 byte/param が data_rich)] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Efficiency {
+      persona = "あなたは効率レビュアーです. M2 MPS 単体での 48 時間予算と 12GB memory 上限を最重視します. peak memory ≈ (d_model^2 × depth × ctx × batch × 4 bytes × 5) で見積もり、 12GB 越えは即失格. train_time ≈ params × tokens / (M2 throughput ≈ 10M tokens/sec for d=128 model). 採点は 5 軸 [memory ≤ 12GB / train_time ≤ 48h / data efficiency / vocab × corpus 整合 / inference cost] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Reproducibility {
+      persona = "あなたは再現性レビュアーです. 採点は 7 軸 [seed 固定 / corpus が SHA-256 ロック / build スクリプト reliability (80%+ source fetch 成功) / 依存最小 (pytorch+tokenizers+fugashi) / 単一スクリプト train+eval+chat / 20 プロンプト × 3 温度 サンプル / 日本語 fluency check スクリプト] それぞれ 0-2 点、 計 0-14 点. M2 MPS のみで完結することを評価する (cloud 依存は減点対象). 最後に最良候補番号を 1 行で返します.";
+    }
+  }
+}
