@@ -189,6 +189,63 @@ abort.
 | 34  | `/api/typecheck` JSON endpoint                | ❌                          | ❌                   | ✅            | ✅            | ❌           | ✅                            | N/A      |
 | 35  | `/api/run` JSON endpoint                      | ❌                          | ❌                   | ❌            | ❌            | ❌           | ✅                            | N/A      |
 
+## Actor concurrency model
+
+Every AIPL implementation runs each actor as a separate concurrent
+unit, but the kind of unit differs by 3-4 orders of magnitude in
+weight.  This affects how many actors a program can usefully
+spawn, how messages interleave, and whether blocking I/O in one
+actor stalls the whole runtime.
+
+| Runtime / codegen target | Model                          | Per-actor unit                       | Source pointer |
+|---|---|---|---|
+| Python (annotated)       | **1:1 OS thread**              | `threading.Thread(daemon=True)`      | `aipl_runtime.py:92` |
+| Python (inferred)        | **1:1 OS thread**              | (inherits from python-aipl)          | (re-uses interp) |
+| OCaml                    | **1:1 OS thread**              | `Thread.create`                      | `eval_thread.ml:~1168` |
+| JS-OCaml (server)        | **1:1 OS thread**              | (= OCaml backend threads)            | (= OCaml) |
+| JS-Browser (browser-abcl)| **cooperative event loop**     | `setTimeout`-driven mailbox drain    | `runtime.js:~233` |
+| JS-Node (node-aipl-server)| **cooperative event loop**    | (= browser-abcl runtime)             | `server.mjs` re-export |
+| C (default)              | **1:1 OS thread**              | `pthread_create`                     | `c_translator.ml:~721,790` |
+| C + SDL2                 | **1:1 OS thread**              | `pthread_create`                     | (same as default C) |
+| C + Xinu                 | **1:1 OS process** (kernel-level) | Xinu `create()` + `ready()`       | `c_translator.ml:~1077` |
+| C → Python codegen       | **1:1 OS thread**              | `threading.Thread` (`o._spawn()`)    | `c_translator.ml:~1847` |
+| C → Pony codegen         | **M:N lightweight (runtime-scheduled)** | Pony actor (work-stealing)   | implicit in generated `actor` |
+| C → Erlang codegen       | **M:N lightweight (BEAM)**     | BEAM process (`spawn(fun()->...end)`)| `c_translator.ml:~2413` |
+| C → Go codegen           | **M:N lightweight (Go runtime)** | goroutine (`go c.run()`)           | `c_translator.ml:~2728` |
+
+### Three concurrency tiers
+
+- **1:1 OS thread / process** (Python, OCaml, C, C-SDL2, Xinu,
+  C→Python): each actor is a kernel-scheduled thread.  Simple
+  mental model; blocking I/O in one actor doesn't stall others.
+  Scales to ~100–1000 actors before kernel overhead dominates.
+- **M:N lightweight** (Pony, Erlang, Go): actors are scheduled
+  by the language runtime onto a small pool of OS threads.
+  Scales to ~10⁵–10⁷ actors.  Blocking syscalls in one actor
+  may stall its scheduler unless the runtime intercepts them
+  (Erlang's BEAM intercepts; Go's runtime intercepts via
+  `netpoll`; Pony's runtime requires non-blocking idioms).
+- **Cooperative event loop** (browser-abcl, node-aipl-server):
+  single OS thread; mailboxes are drained turn-by-turn through
+  `setTimeout(0)` re-entry into the event loop.  No real
+  parallelism, but message-level interleaving is preserved.
+  A long synchronous computation in one actor *will* stall all
+  others — by design, since this is the only concurrency model
+  the browser DOM allows.
+
+### Cross-cutting implication
+
+The AIPL programming model (`send` / `now` / `future` / `await`)
+is preserved across all three tiers — the choice of target
+picks a point on the cost/scale curve without changing the
+program text.  The same `.abcl` file:
+- runs ~1000 actors fine on Python / OCaml / C (OS-thread tier);
+- scales to millions of actors on Erlang / Go / Pony codegen;
+- runs in a browser sandbox via JS-Browser at the cost of
+  single-threaded execution.
+
+---
+
 ## C-version-specific codegen targets
 
 | #   | Target                                          | C    |

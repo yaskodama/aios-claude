@@ -297,6 +297,77 @@ the program does not abort.
   \bottomrule
 \end{longtable}
 
+\section*{Actor concurrency model}
+
+Every AIPL implementation runs each actor as a separate
+concurrent unit, but the kind of unit differs by 3--4 orders of
+magnitude in weight.  This affects how many actors a program can
+usefully spawn, how messages interleave, and whether blocking
+I/O in one actor stalls the whole runtime.
+
+\begin{longtable}{p{4.0cm} p{4.0cm} p{6.0cm} p{4.0cm}}
+  \toprule
+  \textbf{Runtime / codegen target} & \textbf{Model} & \textbf{Per-actor unit} & \textbf{Source pointer} \\
+  \midrule
+  \endhead
+
+  Python (annotated)        & \textbf{1:1 OS thread} & \texttt{threading.Thread(daemon=True)} & \texttt{aipl\_runtime.py:92} \\
+  Python (inferred)         & \textbf{1:1 OS thread} & (inherits from python-aipl) & (re-uses interp) \\
+  OCaml                     & \textbf{1:1 OS thread} & \texttt{Thread.create} & \texttt{eval\_thread.ml:\textasciitilde 1168} \\
+  JS-OCaml (server)         & \textbf{1:1 OS thread} & (= OCaml backend threads) & (= OCaml) \\
+  JS-Browser (browser-abcl) & \textbf{cooperative event loop} & \texttt{setTimeout}-driven mailbox drain & \texttt{runtime.js:\textasciitilde 233} \\
+  JS-Node (node-aipl-server)& \textbf{cooperative event loop} & (= browser-abcl runtime) & re-export \\
+  C (default)               & \textbf{1:1 OS thread} & \texttt{pthread\_create} & \texttt{c\_translator.ml:\textasciitilde 721,790} \\
+  C + SDL2                  & \textbf{1:1 OS thread} & \texttt{pthread\_create} & (same as default C) \\
+  C + Xinu                  & \textbf{1:1 OS process} (kernel-level) & Xinu \texttt{create()} + \texttt{ready()} & \texttt{c\_translator.ml:\textasciitilde 1077} \\
+  C $\to$ Python codegen    & \textbf{1:1 OS thread} & \texttt{threading.Thread} (\texttt{o.\_spawn()}) & \texttt{c\_translator.ml:\textasciitilde 1847} \\
+  C $\to$ Pony codegen      & \textbf{M:N lightweight} (runtime-scheduled) & Pony actor (work-stealing) & implicit in generated \texttt{actor} \\
+  C $\to$ Erlang codegen    & \textbf{M:N lightweight} (BEAM) & BEAM process (\texttt{spawn(fun()->...end)}) & \texttt{c\_translator.ml:\textasciitilde 2413} \\
+  C $\to$ Go codegen        & \textbf{M:N lightweight} (Go runtime) & goroutine (\texttt{go c.run()}) & \texttt{c\_translator.ml:\textasciitilde 2728} \\
+  \bottomrule
+\end{longtable}
+
+\subsection*{Three concurrency tiers}
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{1:1 OS thread / process} (Python, OCaml, C, C-SDL2,
+    Xinu, C$\to$Python): each actor is a kernel-scheduled thread.
+    Simple mental model; blocking I/O in one actor doesn't stall
+    others.  Scales to $\sim$100--1000 actors before kernel
+    overhead dominates.
+  \item \textbf{M:N lightweight} (Pony, Erlang, Go): actors are
+    scheduled by the language runtime onto a small pool of OS
+    threads.  Scales to $\sim 10^{5}$--$10^{7}$ actors.
+    Blocking syscalls in one actor may stall its scheduler unless
+    the runtime intercepts them (Erlang's BEAM intercepts; Go's
+    runtime intercepts via \texttt{netpoll}; Pony's runtime
+    requires non-blocking idioms).
+  \item \textbf{Cooperative event loop} (browser-abcl,
+    node-aipl-server): single OS thread; mailboxes are drained
+    turn-by-turn through \texttt{setTimeout(0)} re-entry into the
+    event loop.  No real parallelism, but message-level
+    interleaving is preserved.  A long synchronous computation in
+    one actor \emph{will} stall all others --- by design, since
+    this is the only concurrency model the browser DOM allows.
+\end{itemize}
+
+\subsection*{Cross-cutting implication}
+
+The AIPL programming model (\texttt{send} / \texttt{now} /
+\texttt{future} / \texttt{await}) is preserved across all three
+tiers --- the choice of target picks a point on the cost/scale
+curve without changing the program text.  The same \texttt{.abcl}
+file:
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item runs $\sim$1000 actors fine on Python / OCaml / C
+    (OS-thread tier);
+  \item scales to millions of actors on Erlang / Go / Pony codegen;
+  \item runs in a browser sandbox via JS-Browser at the cost of
+    single-threaded execution.
+\end{itemize}
+
+\clearpage
+
 \section*{C-version-specific codegen targets}
 
 \begin{tabularx}{\linewidth}{X C}
