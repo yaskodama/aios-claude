@@ -1120,10 +1120,49 @@ export class Runtime {
   // offline in any environment. To use a real provider, override this
   // method on a Runtime instance (the Node runner in run_cooperative.mjs
   // does this with execSync + curl).
-  _aiCall(prompt, system = null) {
+  //
+  // `provider` is an optional integer (1=gemini, 2=anthropic/claude,
+  // 3=openai) or a canonical lowercase string.  null / undefined / 0
+  // means "auto-select".  Mirrors python-aipl/aipl_ai.py:_resolve_provider.
+  _aiCall(prompt, system = null, provider = null) {
     const sysTag = system ? ` sys=(${String(system).slice(0, 12)}...)` : "";
     const head = String(prompt ?? "").slice(0, 60);
-    return `[mock] reply${sysTag} for: ${head}`;
+    const provTag = provider ? ` provider=${this._resolveProvider(provider)}` : "";
+    return `[mock${provTag}] reply${sysTag} for: ${head}`;
+  }
+
+  // Map AIPL-side provider id (int 1..3 / string) to canonical name.
+  _resolveProvider(p) {
+    if (p == null || p === 0) return null;
+    if (typeof p === "number" || /^[0-9]+$/.test(String(p))) {
+      const n = Number(p);
+      if (n === 1) return "gemini";
+      if (n === 2) return "anthropic";
+      if (n === 3) return "openai";
+      return null;
+    }
+    const s = String(p).trim().toLowerCase();
+    if (s === "auto" || s === "") return null;
+    if (s === "claude" || s === "claudecode" || s === "claude-code") return "anthropic";
+    if (s === "gpt" || s === "chatgpt") return "openai";
+    if (s === "gemini" || s === "anthropic" || s === "openai" || s === "mock") return s;
+    return null;
+  }
+
+  // Split an args array into (provider | null, rest).  If the first
+  // arg looks like a provider id (int 1..3 or a known provider
+  // string), strip it.  Mirrors python-aipl:_split_provider.
+  _splitProvider(args) {
+    if (!args || args.length === 0) return { provider: null, rest: args };
+    const a0 = args[0];
+    if (typeof a0 === "number" && [0, 1, 2, 3].includes(a0)) {
+      return { provider: a0 === 0 ? null : a0, rest: args.slice(1) };
+    }
+    if (typeof a0 === "string" && args.length >= 2) {
+      const resolved = this._resolveProvider(a0);
+      if (resolved !== null) return { provider: a0, rest: args.slice(1) };
+    }
+    return { provider: null, rest: args };
   }
 
   evalTarget(target, env) {
@@ -1211,8 +1250,16 @@ export class Runtime {
           case "floor": return Math.floor(args[0]);
           case "rand":  return Math.floor(Math.random() * (Number(args[0]) || 1));
           case "randf": return Math.random() * (Number(args[0]) || 1);
-          case "ai_call":             return this._aiCall(args[0]);
-          case "ai_call_with_system": return this._aiCall(args[1], args[0]);
+          case "ai_call": {
+            // ai_call([provider,] prompt) — provider optional.
+            const sp = this._splitProvider(args);
+            return this._aiCall(sp.rest[0], null, sp.provider);
+          }
+          case "ai_call_with_system": {
+            // ai_call_with_system([provider,] system, prompt)
+            const sp = this._splitProvider(args);
+            return this._aiCall(sp.rest[1], sp.rest[0], sp.provider);
+          }
           case "prod_speed":          return this._prodSpeed;
           case "cons_speed":          return this._consSpeed;
           default: {

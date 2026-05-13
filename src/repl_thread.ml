@@ -894,17 +894,24 @@ let () =
       VUnit
   | _ -> failwith "spawn(class, name): arity 2 expected (string,string)");
 
-  (* AI integration: synchronous Gemini call.
-     ai_call(prompt) and ai_call_with_system(system, prompt) both
-     block the current actor thread until Gemini returns. *)
+  (* AI integration: synchronous LLM call.  Each blocks the calling
+     actor until the provider responds.  Provider can be passed as
+     an optional leading int (1=gemini, 2=anthropic/Claude, 3=openai);
+     omitting it falls back to env-driven auto-select (default Gemini
+     when GEMINI_API_KEY is set).  Mirrors python-aipl/aipl_ai.py. *)
   add_prim "ai_call" (function
   | [VString prompt] -> VString (Ai.call_gemini prompt)
-  | _ -> failwith "ai_call(prompt): arity 1 expected (string)");
+  | [VInt pid; VString prompt] ->
+      VString (Ai.call_gemini ~provider_override:(Ai.provider_of_int pid) prompt)
+  | _ -> failwith "ai_call([provider:int,] prompt:string)");
 
   add_prim "ai_call_with_system" (function
   | [VString sys; VString prompt] ->
       VString (Ai.call_gemini ~system:(Some sys) prompt)
-  | _ -> failwith "ai_call_with_system(system, prompt): arity 2 expected (string,string)");
+  | [VInt pid; VString sys; VString prompt] ->
+      VString (Ai.call_gemini ~provider_override:(Ai.provider_of_int pid)
+                              ~system:(Some sys) prompt)
+  | _ -> failwith "ai_call_with_system([provider:int,] system:string, prompt:string)");
 
   (* AI-OS governance read-outs: live counters + budget remainder. *)
   add_prim "ai_usage" (function
@@ -922,12 +929,20 @@ let () =
   add_prim "ai_call_retry" (function
   | [VInt n; VString prompt] ->
       VString (Ai.call_with_retry ~max_attempts:n prompt)
-  | _ -> failwith "ai_call_retry(max_attempts, prompt): arity 2 expected (int, string)");
+  | [VInt pid; VInt n; VString prompt] ->
+      VString (Ai.call_with_retry
+                 ~provider_override:(Ai.provider_of_int pid)
+                 ~max_attempts:n prompt)
+  | _ -> failwith "ai_call_retry([provider:int,] max_attempts:int, prompt:string)");
 
   add_prim "ai_call_retry_with_system" (function
   | [VInt n; VString sys; VString prompt] ->
       VString (Ai.call_with_retry ~system:(Some sys) ~max_attempts:n prompt)
-  | _ -> failwith "ai_call_retry_with_system(max_attempts, system, prompt): arity 3 expected (int,string,string)");
+  | [VInt pid; VInt n; VString sys; VString prompt] ->
+      VString (Ai.call_with_retry
+                 ~provider_override:(Ai.provider_of_int pid)
+                 ~system:(Some sys) ~max_attempts:n prompt)
+  | _ -> failwith "ai_call_retry_with_system([provider:int,] max_attempts:int, system:string, prompt:string)");
 						    
   let repl_thr = Thread.create (fun () -> repl_thread_fun ()) () in
 

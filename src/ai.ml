@@ -510,14 +510,29 @@ let default_for_provider p = function
        | OpenAI    -> default_openai_model
        | Mock      -> "mock")
 
-let call_gemini ?(system : string option = None) ?(model : string = "")
+(* AIPL-side provider id (int 1..3) -> canonical provider type.
+   Used by the `ai_call(provider, prompt)` builtin family.  0 / None
+   means "auto-select" (use the env var / API-key heuristic).
+   Mirrors python-aipl/aipl_ai.py:_resolve_provider. *)
+let provider_of_int (n : int) : provider option =
+  match n with
+  | 1 -> Some Gemini
+  | 2 -> Some Anthropic
+  | 3 -> Some OpenAI
+  | _ -> None
+
+let call_gemini ?(provider_override : provider option = None)
+                ?(system : string option = None) ?(model : string = "")
                 ?(max_tokens : int = default_max_tokens) (prompt : string) : string =
   check_budget ();
   let sem = get_concurrency_sem () in
   (match sem with Some s -> Sem.acquire s | None -> ());
   let result_or_exn =
     try
-      let p = select_provider () in
+      let p = match provider_override with
+        | Some p -> p
+        | None -> select_provider ()
+      in
       let primary = default_for_provider p (Some model) in
       let chain = primary :: List.filter (fun m -> m <> primary) (fallback_models ()) in
       let rec try_chain ms last_err =
@@ -545,13 +560,18 @@ let call_gemini ?(system : string option = None) ?(model : string = "")
   match result_or_exn with
   | Error e -> raise e
   | Ok (text, in_t, out_t) ->
-      let model_used = default_for_provider (select_provider ()) (Some model) in
+      let actual_p = match provider_override with
+        | Some p -> p
+        | None -> select_provider ()
+      in
+      let model_used = default_for_provider actual_p (Some model) in
       record_usage ~model:model_used in_t out_t;
       text
 
 (* Same-model retry (different from fallback chain which switches
    models).  Used by the ai_call_retry primitive. *)
-let call_with_retry ?(system : string option = None) ?(model : string = "")
+let call_with_retry ?(provider_override : provider option = None)
+                    ?(system : string option = None) ?(model : string = "")
                     ?(max_tokens : int = default_max_tokens)
                     ~(max_attempts : int) (prompt : string) : string =
   let last_err = ref None in
@@ -560,7 +580,7 @@ let call_with_retry ?(system : string option = None) ?(model : string = "")
   let i = ref 0 in
   while !result = None && !i < n do
     (try
-      result := Some (call_gemini ~system ~model ~max_tokens prompt)
+      result := Some (call_gemini ~provider_override ~system ~model ~max_tokens prompt)
     with e ->
       last_err := Some e;
       let retryable = is_retryable (Printexc.to_string e) in

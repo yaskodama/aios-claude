@@ -400,14 +400,20 @@ def make_prelude() -> dict[str, list[Scheme]]:
     add_mono("wait", TFun([T_INT], T_UNIT))
     add_mono("wait", TFun([T_FLOAT], T_UNIT))
 
-    # AI builtins (mirror OCaml prelude)
+    # AI builtins (mirror OCaml prelude).  Each ai_call_* accepts an
+    # optional leading provider id (int 1..3 = gemini/anthropic/openai)
+    # or omits it for env-driven auto-select.
     add_mono("ai_call",                       TFun([T_STRING], T_STRING))
+    add_mono("ai_call",                       TFun([T_INT, T_STRING], T_STRING))
     add_mono("ai_call_with_system",           TFun([T_STRING, T_STRING], T_STRING))
+    add_mono("ai_call_with_system",           TFun([T_INT, T_STRING, T_STRING], T_STRING))
     add_mono("ai_usage",                      TFun([], T_STRING))
     add_mono("ai_remaining",                  TFun([], T_INT))
     add_mono("ai_cost",                       TFun([], T_FLOAT))
     add_mono("ai_call_retry",                 TFun([T_INT, T_STRING], T_STRING))
+    add_mono("ai_call_retry",                 TFun([T_INT, T_INT, T_STRING], T_STRING))
     add_mono("ai_call_retry_with_system",     TFun([T_INT, T_STRING, T_STRING], T_STRING))
+    add_mono("ai_call_retry_with_system",     TFun([T_INT, T_INT, T_STRING, T_STRING], T_STRING))
 
     # Web gateway
     add_mono("web_listen", TFun([T_INT], T_UNIT))
