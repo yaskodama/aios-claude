@@ -358,8 +358,12 @@ HM 推論と独立した\textbf{実行時動的検査}として位置付ける�
 推論版にも自然に組込まれる.
 
 \subsection{LLM 統合}
+\label{sec:llm}
 
-\code{ai\_call} の API:
+\subsubsection{\code{ai\_call} API}
+
+\code{ai\_call} は同期的に LLM プロバイダを呼び出して文字列を返す
+プリミティブである:
 
 \begin{lstlisting}
 var r1 = ai_call("prompt");                // env 自動選択 (default: Gemini)
@@ -379,6 +383,118 @@ var r6 = ai_call_retry(3, "prompt");       // 自動リトライ
   \item テスト用 mock プロバイダ (\code{ABCL\_AI\_PROVIDER=mock} で
     API 鍵不要,オフライン smoke 用).
 \end{itemize}
+
+\subsubsection{3 種の送信形式から LLM を呼ぶ}
+
+\code{ai\_call} 自体は同期的だが,\textbf{アクターのメソッド本体から呼ぶ}
+ことで,アクター言語の三送信形式 (past/now/future) すべてに自然に
+組み込める.以下では「LLM を実際に呼ぶ \code{Asker} アクター」を共通
+基盤として,それを past / now / future の三形式で駆動する例を示す.
+
+\paragraph{共通の Asker アクター.}
+どの形式でも,LLM 呼び出し自体は同じアクターメソッドに閉じる:
+
+\begin{lstlisting}
+class Asker {
+  method ask(q) {
+    var r = ai_call(2, q);    // 2 = Anthropic (Claude)
+    reply(r);                 // 同期送信に応答 (now / future が拾う)
+  }
+}
+\end{lstlisting}
+
+ここでメソッド内の \code{reply(r)} は,呼び出し側が \code{now} または
+\code{future} で呼んだ場合の返答スロットへ値を渡す.\code{send} で
+呼ばれた場合 \code{reply} は捨てられる (fire-and-forget の意味論).
+
+\paragraph{(1) \code{now} — 同期送信: ブロックして LLM 応答を待つ.}
+
+\begin{lstlisting}
+var a = new Asker();
+var answer = now a.ask("In 5 words, why is the sky blue?");
+print(answer);    // → "Rayleigh scatters short blue wavelengths."
+\end{lstlisting}
+
+呼び出し側のアクター (あるいは最上位) が \code{now} で発射すると,
+\code{Asker.ask} の本体が走り終えて \code{reply(r)} に到達するまで
+ブロックする.内部的にはランタイムが reply スロットを発行し,
+\code{Asker} スレッドが \code{reply} を呼んだ時点でその slot を
+fulfill して待機側を起こす.外部から見ると,\code{ai\_call} と
+\code{now} の合成は通常の同期関数呼び出しと同じ意味論で振る舞う.
+
+\paragraph{(2) \code{future} + \code{await} — 非同期発射 + 後で値取得.}
+
+\begin{lstlisting}
+var a = new Asker();
+var f = future a.ask("Summarise quicksort in one sentence.");
+// ... ここで f の到着を待たず別の仕事をする ...
+do_other_work();
+var answer = await(f);
+print(answer);
+\end{lstlisting}
+
+\code{future} は \code{Asker.ask} の終了を待たずに\textbf{ハンドル}
+\code{f} を即座に返す.呼び出し側はその間に他の計算 (例えば別の
+\code{ai\_call} の並列発射) を進められる.\code{await(f)} で値を
+要求した時点で reply スロットが未到着なら,そこで初めてブロック
+する.AI コールを並列実行して結果を後で合流する典型的なパターンに
+対応:
+
+\begin{lstlisting}
+var a = new Asker();
+var f1 = future a.ask("Translate hello to French.");
+var f2 = future a.ask("Translate hello to German.");
+var f3 = future a.ask("Translate hello to Japanese.");
+print(await(f1));        // 三本の AI コールが並列に走る
+print(await(f2));        // (ランタイムが同時実行上限内で多重化)
+print(await(f3));
+\end{lstlisting}
+
+\paragraph{(3) \code{send} (past type) + callback — 完全非同期.}
+
+\code{send} は fire-and-forget で reply を持たないため,結果は
+\textbf{コールバック先のアクター}を引数で渡して受け取らせる:
+
+\begin{lstlisting}
+class Asker {
+  method ask(q, callback) {
+    var r = ai_call(2, q);
+    send callback.got(r);    // コールバック先へ非同期で結果を流す
+  }
+}
+class Printer {
+  method got(r) { print("[got] " + r); }
+}
+var a = new Asker();
+var p = new Printer();
+send a.ask("Why is the sea salty?", p);    // ここでは値は待たない
+\end{lstlisting}
+
+このパターンは典型的なメッセージ・パッシングのスタイルである.LLM
+応答を受け取るアクターが固有の責務 (例えば応答の検証・記録・
+さらなる派生呼び出し) を持つ場合に向いている.
+
+\paragraph{形式選択の指針.}
+三送信形式の使い分けは,アクター言語一般の指針と同じで,
+LLM 呼び出しに固有の話ではない:
+
+\begin{tabularx}{\linewidth}{l X}
+  \toprule
+  \textbf{形式} & \textbf{選択基準} \\
+  \midrule
+  \code{now}    & 値が直後に必要で,並列化の余地がない.制御フローが線形で読みやすい. \\
+  \code{future} & 複数 LLM コールを並列発射し,後で合流したい.遅延応答に対するスループット重視. \\
+  \code{send}   & 応答の処理が別アクターの責務として独立.ストリーミング処理やイベント駆動的なパイプライン. \\
+  \bottomrule
+\end{tabularx}
+
+\paragraph{実装間の保持.}
+重要なのは,この三形式 × LLM の組合せが全 7 ランタイム実装
+(Py-A,Py-I,OCaml,JS-O,JS-B,JS-N,C のうち AI 統合があるもの) で
+\textbf{同じ表面構文・同じ意味論}で動作する点である (\S\ref{sec:eval}
+の評価表 6.4 参照).プログラマは \code{ai\_call} の周囲に AIPL
+標準のアクター送受信を組合せるだけで,LLM 連携アプリケーションを
+ランタイム非依存に書ける.
 
 \subsection{3 並行モデルの統一}
 
