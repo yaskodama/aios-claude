@@ -77,6 +77,43 @@ parse_pass=$(echo "$parse_out" | grep -c '^  PASS' || true)
 parse_fail=$(echo "$parse_out" | grep -c '^  FAIL' || true)
 rm -f "$parse_runner"
 
+# ---- Phase 2.5: typecheck.js (flow-sensitive type inference) ----
+echo "[Phase 2.5] typecheck.js on .abcl samples"
+tc_runner=$(mktemp /tmp/abcl_tc.XXXXXX.mjs)
+cat > "$tc_runner" <<'NODE'
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const baseDir = process.argv[2];
+const files = process.argv.slice(3);
+const ast = await import(resolve(baseDir, 'src/ast.js'));
+const tc = await import(resolve(baseDir, 'src/typecheck.js'));
+const require = createRequire(import.meta.url);
+const parser = require(resolve(baseDir, 'src/parser/parser.js')).parser;
+parser.yy = ast;
+
+let fail = 0;
+for (const f of files) {
+  try {
+    const src = readFileSync(resolve(baseDir, f), 'utf8');
+    const tree = parser.parse(src);
+    tc.runTypeCheck(tree);
+    process.stdout.write(`  PASS  ${f}\n`);
+  } catch (e) {
+    process.stdout.write(`  FAIL  ${f}\n        ${String(e.message || e).split('\n')[0]}\n`);
+    fail++;
+  }
+}
+process.exit(fail === 0 ? 0 : 1);
+NODE
+tc_pass=0; tc_fail=0
+tc_out=$(node "$tc_runner" "$(pwd)" "${abcl_files[@]}" 2>&1)
+echo "$tc_out"
+tc_pass=$(echo "$tc_out" | grep -c '^  PASS' || true)
+tc_fail=$(echo "$tc_out" | grep -c '^  FAIL' || true)
+rm -f "$tc_runner"
+
 # ---- Phase 3: dynamic puppeteer-core run ----
 dyn_pass=0; dyn_fail=0; dyn_skip=0
 if [ "$DYNAMIC" = "1" ]; then
@@ -118,16 +155,17 @@ fi
 # ---- Summary ----
 echo
 echo "==== JS smoke summary ===="
-printf '  syntax: pass=%d fail=%d\n' "$js_pass" "$js_fail"
-printf '  parse : pass=%d fail=%d\n' "$parse_pass" "$parse_fail"
+printf '  syntax  : pass=%d fail=%d\n' "$js_pass" "$js_fail"
+printf '  parse   : pass=%d fail=%d\n' "$parse_pass" "$parse_fail"
+printf '  typeck  : pass=%d fail=%d\n' "$tc_pass" "$tc_fail"
 if [ "$DYNAMIC" = "1" ]; then
   if [ "$dyn_skip" = "1" ]; then
     echo "  dynamic: SKIPPED"
   else
     grep -cE '^  PASS|^  FAIL' /dev/null >/dev/null # noop
-    printf '  dynamic: pass=%d fail=%d\n' "$dyn_pass" "$dyn_fail"
+    printf '  dynamic : pass=%d fail=%d\n' "$dyn_pass" "$dyn_fail"
   fi
 fi
 
-total_fail=$((js_fail + parse_fail + dyn_fail))
+total_fail=$((js_fail + parse_fail + tc_fail + dyn_fail))
 exit $total_fail

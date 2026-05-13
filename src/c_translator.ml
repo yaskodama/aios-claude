@@ -2,12 +2,89 @@
 
 open Ast
 
+(* ====================================================== *)
+(* 型推論結果を C 型へマッピングするヘルパ                *)
+(* (Infer.check_program が事前に動いている前提)            *)
+(* ====================================================== *)
+
+(* AIPL ty → C 型表現
+   - 確定型 (TInt/TFloat/TString/TActor) は具体的な C 型に
+   - 不定 (TVar/TAny/TUnit) は value_t (汎用箱) に fallback           *)
+let c_type_of_ty (t : Types.ty) : string =
+  match Types.repr t with
+  | Types.TInt    -> "long"
+  | Types.TFloat  -> "double"
+  | Types.TString -> "const char*"
+  | Types.TActor _ -> "int"  (* object id *)
+  | Types.TBool   -> "long"  (* C does not have bool primitive in this runtime; use long 0/1 *)
+  | Types.TUnit | Types.TAny | Types.TVar _ | Types.TFun _
+  | Types.TArray _ | Types.TRecord _ -> "value_t"
+
+(* AIPL ty が「具体的に特殊化できる」かどうか *)
+let is_concrete (t : Types.ty) : bool =
+  match Types.repr t with
+  | Types.TInt | Types.TFloat | Types.TString | Types.TActor _ | Types.TBool -> true
+  | _ -> false
+
+(* 任意の C 式を value_t に箱詰めする C 式を返す *)
+let box_to_value (t : Types.ty) (c_expr : string) : string =
+  match Types.repr t with
+  | Types.TInt    -> Printf.sprintf "mk_int((long)(%s))" c_expr
+  | Types.TFloat  -> Printf.sprintf "mk_float((double)(%s))" c_expr
+  | Types.TString -> Printf.sprintf "mk_str(%s)" c_expr
+  | Types.TActor _ -> Printf.sprintf "mk_obj((int)(%s))" c_expr
+  | Types.TBool   -> Printf.sprintf "mk_int((long)(%s))" c_expr
+  | _ -> c_expr  (* 既に value_t と仮定 *)
+
+(* value_t の C 式から typed C 値を取り出す *)
+let unbox_from_value (t : Types.ty) (v_expr : string) : string =
+  match Types.repr t with
+  | Types.TInt    -> Printf.sprintf "((%s).tag == V_INT ? (%s).i : (long)((%s).f))" v_expr v_expr v_expr
+  | Types.TFloat  -> Printf.sprintf "((%s).tag == V_FLOAT ? (%s).f : (double)((%s).i))" v_expr v_expr v_expr
+  | Types.TString -> Printf.sprintf "((%s).s ? (%s).s : \"\")" v_expr v_expr
+  | Types.TActor _ -> Printf.sprintf "((%s).obj_id)" v_expr
+  | Types.TBool   -> Printf.sprintf "((%s).tag == V_INT ? (%s).i : 0L)" v_expr v_expr
+  | _ -> v_expr
+
+(* ローカル var / param のスコープ別型情報を 1 つにまとめる             *)
 type ctx = {
   cname  : string;
   fields : string list;
   params : string list;
   mutable locals : string list;
+  (* 推論された型 (Stage 3) *)
+  field_types  : (string * Types.ty) list;     (* class fields *)
+  param_types  : (string * Types.ty) list;     (* method params *)
+  mutable local_types : (string * Types.ty) list;
+  mname : string;                              (* enclosing method name; "" for globals/init *)
 }
+
+let lookup_var_type (ctx : ctx) (name : string) : Types.ty option =
+  match List.assoc_opt name ctx.local_types with
+  | Some t -> Some t
+  | None ->
+    match List.assoc_opt name ctx.param_types with
+    | Some t -> Some t
+    | None -> List.assoc_opt name ctx.field_types
+
+let make_ctx ~cname ~fields ~params ~mname : ctx =
+  let field_types =
+    if cname = "" then []
+    else Types.class_field_list cname
+  in
+  let param_types =
+    if cname = "" || mname = "" then []
+    else match Types.lookup_method_scheme cname mname with
+      | Some (Types.Forall (_, t)) ->
+        (match Types.repr t with
+         | Types.TFun (pts, _) ->
+           (try List.combine params (List.map Types.repr pts)
+            with Invalid_argument _ -> [])
+         | _ -> [])
+      | None -> []
+  in
+  { cname; fields; params; locals = [];
+    field_types; param_types; local_types = []; mname }
 
 let buf = Buffer.create 8192
 let emit s = Buffer.add_string buf s
@@ -86,47 +163,107 @@ let collect_externs (p : program) : string list =
   in
   List.rev acc
 
-(* ---------- 式 ---------- *)
-let rec gen_expr ~ctx (e : expr) : string =
+(* ---------- 式 (型推論版) ---------- *)
+(* gen_expr_typed: 推論された型 ty を C 式と共に返す。
+   - 具体型のときはネイティブ C 値 (long/double/const char*/int) を生成
+   - 不定のときは value_t を生成、戻り値は TAny
+   呼び出し側は box_to_value で必要なら値箱詰めする *)
+let rec gen_expr_typed ~ctx (e : expr) : string * Types.ty =
   match e.desc with
-  | Int n      -> Printf.sprintf "mk_int(%dL)" n
-  | Float f    -> Printf.sprintf "mk_float(%f)" f
-  | String s   -> Printf.sprintf "mk_str(\"%s\")" (String.escaped s)
+  | Int n      -> (Printf.sprintf "%dL" n, Types.TInt)
+  | Float f    -> (Printf.sprintf "%f" f, Types.TFloat)
+  | String s   -> (Printf.sprintf "\"%s\"" (String.escaped s), Types.TString)
   | Var x ->
-      if x = "self"   then "mk_obj(self_id)"
-      else if x = "sender" then "mk_obj(sender_id)"
-      else if List.mem x ctx.params then Printf.sprintf "p_%s" x
-      else if List.mem x ctx.locals then Printf.sprintf "l_%s" x
-      else if List.mem x ctx.fields then
-        Printf.sprintf "objects[self_id].fields[F_%s_%s]" ctx.cname x
+      if x = "self"   then ("self_id", Types.TActor (ctx.cname, []))
+      else if x = "sender" then ("sender_id", Types.TActor ("", []))
+      else if List.mem x ctx.params then begin
+        match List.assoc_opt x ctx.param_types with
+        | Some t when is_concrete t -> (Printf.sprintf "p_%s" x, Types.repr t)
+        | Some t -> (Printf.sprintf "p_%s" x, Types.repr t)
+        | None -> (Printf.sprintf "p_%s" x, Types.TAny)
+      end
+      else if List.mem x ctx.locals then begin
+        match List.assoc_opt x ctx.local_types with
+        | Some t -> (Printf.sprintf "l_%s" x, Types.repr t)
+        | None -> (Printf.sprintf "l_%s" x, Types.TAny)
+      end
+      else if List.mem x ctx.fields then begin
+        let loc = Printf.sprintf "objects[self_id].fields[F_%s_%s]" ctx.cname x in
+        match List.assoc_opt x ctx.field_types with
+        | Some t when is_concrete t -> (unbox_from_value t loc, Types.repr t)
+        | _ -> (loc, Types.TAny)
+      end
       else
-        Printf.sprintf "mk_obj(g_%s)" x
+        (* グローバル actor 変数 *)
+        (Printf.sprintf "g_%s" x, Types.TActor ("", []))
   | Binop (op, a, b) ->
-      Printf.sprintf "v_binop(\"%s\", %s, %s)" op (gen_expr ~ctx a) (gen_expr ~ctx b)
+      let (sa, ta) = gen_expr_typed ~ctx a in
+      let (sb, tb) = gen_expr_typed ~ctx b in
+      let ra = Types.repr ta in
+      let rb = Types.repr tb in
+      (match op, ra, rb with
+       (* 文字列連結はランタイム v_binop に任せる (連結結果のメモリ管理)。
+          v_binop は value_t を返すので .s で typed const char* を取り出す *)
+       | "+", Types.TString, _ | "+", _, Types.TString ->
+         let va = box_to_value ta sa in
+         let vb = box_to_value tb sb in
+         (Printf.sprintf "((v_binop(\"+\", %s, %s)).s)" va vb, Types.TString)
+       (* int-int 算術 — native *)
+       | ("+"|"-"|"*"|"/"), Types.TInt, Types.TInt ->
+         (Printf.sprintf "((%s) %s (%s))" sa op sb, Types.TInt)
+       (* float が混じる算術 — native double *)
+       | ("+"|"-"|"*"|"/"), (Types.TInt|Types.TFloat), (Types.TInt|Types.TFloat) ->
+         let af = if ra = Types.TInt then Printf.sprintf "(double)(%s)" sa else sa in
+         let bf = if rb = Types.TInt then Printf.sprintf "(double)(%s)" sb else sb in
+         (Printf.sprintf "((%s) %s (%s))" af op bf, Types.TFloat)
+       (* 比較演算 — 同型なら native *)
+       | ("=="|"!="|"<"|"<="|">"|">="), Types.TInt, Types.TInt ->
+         (Printf.sprintf "((long)((%s) %s (%s)))" sa op sb, Types.TInt)
+       | ("=="|"!="|"<"|"<="|">"|">="), (Types.TInt|Types.TFloat), (Types.TInt|Types.TFloat) ->
+         let af = if ra = Types.TInt then Printf.sprintf "(double)(%s)" sa else sa in
+         let bf = if rb = Types.TInt then Printf.sprintf "(double)(%s)" sb else sb in
+         (Printf.sprintf "((long)((%s) %s (%s)))" af op bf, Types.TInt)
+       | _ ->
+         (* 不定型は ランタイム v_binop に fallback *)
+         let va = box_to_value ta sa in
+         let vb = box_to_value tb sb in
+         (Printf.sprintf "v_binop(\"%s\", %s, %s)" op va vb, Types.TAny))
   | Call ("print", [arg]) ->
-      Printf.sprintf "(v_print(%s), mk_int(0L))" (gen_expr ~ctx arg)
+      let (sa, ta) = gen_expr_typed ~ctx arg in
+      let va = box_to_value ta sa in
+      (Printf.sprintf "(v_print(%s), mk_int(0L))" va, Types.TInt)
   | Call (f, args) ->
       let n = List.length args in
       let argstr =
         if n = 0 then "NULL"
         else
-          "(value_t[]){"
-          ^ String.concat ", " (List.map (gen_expr ~ctx) args)
-          ^ "}"
+          let parts = List.map (fun a ->
+            let (s, t) = gen_expr_typed ~ctx a in
+            box_to_value t s
+          ) args in
+          "(value_t[]){" ^ String.concat ", " parts ^ "}"
       in
-      Printf.sprintf "%s(%d, %s)" (mangle f) n argstr
+      (Printf.sprintf "%s(%d, %s)" (mangle f) n argstr, Types.TAny)
   | New (cls, args) ->
       let n = List.length args in
       let argstr =
         if n = 0 then "NULL"
         else
-          "(value_t[]){"
-          ^ String.concat ", " (List.map (gen_expr ~ctx) args)
-          ^ "}"
+          let parts = List.map (fun a ->
+            let (s, t) = gen_expr_typed ~ctx a in
+            box_to_value t s
+          ) args in
+          "(value_t[]){" ^ String.concat ", " parts ^ "}"
       in
-      Printf.sprintf "mk_obj(create_obj(CLASS_%s, %d, %s))" cls n argstr
-  | Expr e   -> gen_expr ~ctx e
-  | Array _  -> "mk_int(0L)"
+      (Printf.sprintf "create_obj(CLASS_%s, %d, %s)" cls n argstr,
+       Types.TActor (cls, []))
+  | Expr e   -> gen_expr_typed ~ctx e
+  | Array _  -> ("0L", Types.TInt)  (* placeholder: arrays not supported *)
+
+(* legacy ラッパ: 旧呼び出し箇所のために value_t 文字列を返す *)
+and gen_expr ~ctx (e : expr) : string =
+  let (s, t) = gen_expr_typed ~ctx e in
+  box_to_value t s
 
 (* send target -> 受信 object id を表すC式 *)
 let target_id ~ctx tgt =
@@ -148,18 +285,47 @@ let rec gen_stmt ~ctx ?(indent = 2) (s : stmt) =
   match s.sdesc with
   | Seq ss -> List.iter (gen_stmt ~ctx ~indent) ss
   | VarDecl (x, e) ->
-      let e_c = gen_expr ~ctx e in
+      let (e_c, t) = gen_expr_typed ~ctx e in
       ctx.locals <- x :: ctx.locals;
-      emitf "%svalue_t l_%s = %s;\n" ind x e_c
+      if is_concrete t then begin
+        ctx.local_types <- (x, t) :: ctx.local_types;
+        emitf "%s%s l_%s = %s;\n" ind (c_type_of_ty t) x e_c
+      end else begin
+        ctx.local_types <- (x, Types.TAny) :: ctx.local_types;
+        emitf "%svalue_t l_%s = %s;\n" ind x (box_to_value t e_c)
+      end
   | Assign (x, e) ->
-      let e_c = gen_expr ~ctx e in
-      if List.mem x ctx.fields then
-        emitf "%sobjects[self_id].fields[F_%s_%s] = %s;\n" ind ctx.cname x e_c
-      else if List.mem x ctx.params then
-        emitf "%sp_%s = %s;\n" ind x e_c
-      else if List.mem x ctx.locals then
-        emitf "%sl_%s = %s;\n" ind x e_c
-      else
+      let (e_c, t) = gen_expr_typed ~ctx e in
+      if List.mem x ctx.fields then begin
+        (* フィールドは universal storage (value_t) なので box する。
+           ただし読み出し側 (Var) は unbox 済みでアクセスする *)
+        emitf "%sobjects[self_id].fields[F_%s_%s] = %s;\n"
+          ind ctx.cname x (box_to_value t e_c)
+      end else if List.mem x ctx.params then begin
+        (* param が typed なら typed 代入、そうでなければ value_t *)
+        match List.assoc_opt x ctx.param_types with
+        | Some pt when is_concrete pt ->
+          (* 推論された param 型に合わせる *)
+          let coerced =
+            if Types.repr t = Types.repr pt then e_c
+            else if is_concrete t then unbox_from_value pt (box_to_value t e_c)
+            else unbox_from_value pt e_c
+          in
+          emitf "%sp_%s = %s;\n" ind x coerced
+        | _ ->
+          emitf "%sp_%s = %s;\n" ind x (box_to_value t e_c)
+      end else if List.mem x ctx.locals then begin
+        match List.assoc_opt x ctx.local_types with
+        | Some lt when is_concrete lt ->
+          let coerced =
+            if Types.repr t = Types.repr lt then e_c
+            else if is_concrete t then unbox_from_value lt (box_to_value t e_c)
+            else unbox_from_value lt e_c
+          in
+          emitf "%sl_%s = %s;\n" ind x coerced
+        | _ ->
+          emitf "%sl_%s = %s;\n" ind x (box_to_value t e_c)
+      end else
         emitf "%s/* unknown var %s */\n" ind x
   | CallStmt ("print", [arg]) ->
       emitf "%sv_print(%s);\n" ind (gen_expr ~ctx arg)
@@ -199,13 +365,27 @@ let rec gen_stmt ~ctx ?(indent = 2) (s : stmt) =
 
 (* ---------- メソッド ---------- *)
 let gen_method ~cname ~fields (md : method_decl) =
-  let ctx = { cname; fields; params = md.params; locals = [] } in
+  let ctx = make_ctx ~cname ~fields ~params:md.params ~mname:md.mname in
   emitf "static void %s_%s(int self_id, int sender_id, value_t* args, int n_args) {\n"
     cname md.mname;
   emit "  (void)args; (void)n_args; (void)sender_id;\n";
+  (* パラメータの推論型が具体型なら unbox、不定なら value_t のまま *)
   List.iteri
     (fun i p ->
-      emitf "  value_t p_%s = (n_args > %d) ? args[%d] : mk_int(0L);\n" p i i)
+      match List.assoc_opt p ctx.param_types with
+      | Some t when is_concrete t ->
+        let c_ty = c_type_of_ty t in
+        let default = match Types.repr t with
+          | Types.TInt | Types.TBool -> "0L"
+          | Types.TFloat -> "0.0"
+          | Types.TString -> "\"\""
+          | Types.TActor _ -> "-1"
+          | _ -> "0"
+        in
+        emitf "  %s p_%s = (n_args > %d) ? %s : (%s)(%s);\n"
+          c_ty p i (unbox_from_value t (Printf.sprintf "args[%d]" i)) c_ty default
+      | _ ->
+        emitf "  value_t p_%s = (n_args > %d) ? args[%d] : mk_int(0L);\n" p i i)
     md.params;
   gen_stmt ~ctx md.body;
   emit "}\n\n"
@@ -220,7 +400,7 @@ let gen_class (c : class_decl) =
   (* フィールド初期化関数 *)
   emitf "static void init_fields_%s(int self_id) {\n" c.cname;
   emit "  (void)self_id;\n";
-  let init_ctx = { cname = c.cname; fields; params = []; locals = [] } in
+  let init_ctx = make_ctx ~cname:c.cname ~fields ~params:[] ~mname:"" in
   List.iter (fun s ->
     match s.sdesc with
     | VarDecl (name, e) ->
@@ -233,13 +413,13 @@ let gen_class (c : class_decl) =
   emitf "static void dispatch_%s(int self_id, int sender_id, const char* method, value_t* args, int n_args) {\n"
     c.cname;
   List.iter
-    (fun md ->
+    (fun (md : method_decl) ->
       emitf
         "  if (strcmp(method, \"%s\") == 0) { %s_%s(self_id, sender_id, args, n_args); return; }\n"
         md.mname c.cname md.mname)
     c.methods;
   (* init が定義されていなければ、自動 init は無視 *)
-  let has_init = List.exists (fun md -> md.mname = "init") c.methods in
+  let has_init = List.exists (fun (md : method_decl) -> md.mname = "init") c.methods in
   if not has_init then
     emit "  if (strcmp(method, \"init\") == 0) return; /* default no-op init */\n";
   emitf "  fprintf(stderr, \"unknown method %%s on %s\\n\", method);\n" c.cname;
@@ -583,7 +763,7 @@ let gen_program ?(max_messages = 12) (p : program) : string =
 
   (* main : 全 global を alloc → 全 actor を spawn → 全 join *)
   emit "int main(void) {\n";
-  let g_ctx = { cname = ""; fields = []; params = []; locals = [] } in
+  let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
   emit "  /* phase 1: 全 global VarDecl を alloc (スレッド未起動) */\n";
   List.iter
     (fun s ->
@@ -940,7 +1120,7 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  print_mu   = semcreate(1);\n";
   emit "  objects_mu = semcreate(1);\n";
   emit "  kprintf(\"\\r\\n[abcl] starting...\\r\\n\");\n";
-  let g_ctx = { cname = ""; fields = []; params = []; locals = [] } in
+  let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
   emit "  /* phase 1: alloc all globals */\n";
   List.iter
     (fun s ->
@@ -1588,7 +1768,7 @@ let gen_class_py (c : class_decl) =
   emitf "class %s(_Actor):\n" c.cname;
   (* _init_fields *)
   emit "    def _init_fields(self):\n";
-  (let init_ctx = { cname = c.cname; fields; params = []; locals = [] } in
+  (let init_ctx = make_ctx ~cname:c.cname ~fields ~params:[] ~mname:"" in
    let any = ref false in
    List.iter (fun s ->
      match s.sdesc with
@@ -1601,7 +1781,7 @@ let gen_class_py (c : class_decl) =
   emit "\n";
   (* methods *)
   List.iter (fun (md : method_decl) ->
-    let ctx = { cname = c.cname; fields; params = md.params; locals = [] } in
+    let ctx = make_ctx ~cname:c.cname ~fields ~params:md.params ~mname:md.mname in
     emitf "    def m_%s(self, sender_id, args):\n" md.mname;
     List.iteri (fun i p ->
       emitf "        p_%s = args[%d] if len(args) > %d else 0\n" p i i
@@ -1653,7 +1833,7 @@ let gen_program_python ?(max_messages = 12) (p : program) : string =
   if global_names_l <> [] then
     emitf "    global %s\n"
       (String.concat ", " (List.map (fun x -> "g_" ^ x) global_names_l));
-  let g_ctx = { cname = ""; fields = []; params = []; locals = [] } in
+  let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
   emit "    # phase 1: alloc all globals (no thread yet)\n";
   List.iter (fun s ->
     match s.sdesc with

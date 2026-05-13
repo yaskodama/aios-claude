@@ -50,12 +50,25 @@ let unify_try (loc : Location.t) (t1 : ty) (t2 : ty) : bool =
   | Types.Type_error _ -> false
 
 (* loc 付きオーバーロード解決 *)
+(* グラデュアル fallback として登録済みビルトイン名のセット。
+   未登録名は「未知ビルトイン (any-typed) 」と見なし、警告のみ出して通す *)
+let warned_unknown : (string, unit) Hashtbl.t = Hashtbl.create 32
+
 let pick_overload (loc:Location.t) (name:string) (env:tenv) (arg_tys:ty list) : ty =
   let schemes =
     match Hashtbl.find_opt env name with
     | Some ss -> ss
     | None    -> []
   in
+  (* 未登録の名前は gradual に許容: ビルトインかユーザ未定義かを区別せず、
+     呼び出しサイトの型は受け入れ、戻り値は fresh tvar として返す *)
+  if schemes = [] then begin
+    if not (Hashtbl.mem warned_unknown name) then begin
+      Hashtbl.add warned_unknown name ();
+      Printf.eprintf "[type warning] unknown function '%s' treated as gradual (any -> any)\n%!" name
+    end;
+    Types.TVar (Types.fresh_tvar ())
+  end else
   let ok =
     List.filter_map
       (fun sch ->
@@ -414,15 +427,18 @@ let prebind_global_actors (p : Ast.program) (env : env) : unit =
 let preinfer_all_classes (p : Ast.program) (g0 : Types.tenv) : unit =
   let infer_one_class (c : Ast.class_decl) : (string * Types.scheme) list =
     let env_cls = clone g0 in
+    let field_types_acc = ref [] in
       List.iter
         (fun (st:Ast.stmt) ->
           match st.Ast.sdesc with
           | Ast.VarDecl (name, rhs) ->
             let t = infer_expr env_cls rhs in
+            field_types_acc := (name, Types.repr t) :: !field_types_acc;
             let sch = generalize (ftv_env env_cls) t in
             set_var_scheme env_cls name sch
           | _ -> ()
         ) c.Ast.fields;
+      Types.register_class_field_types c.Ast.cname (List.rev !field_types_acc);
     let infer_method (m : Ast.method_decl) =
     let env_m = clone env_cls in
       set_var_scheme env_m "self"

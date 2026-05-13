@@ -1,8 +1,10 @@
 import { Runtime } from "./runtime.js";
+import { runTypeCheck } from "./typecheck.js";
 
 export class Interpreter {
   constructor(printer) {
     this.runtime = new Runtime(printer);
+    this.typeCheckEnabled = true;
   }
 
   setCanvas(canvas) {
@@ -10,6 +12,14 @@ export class Interpreter {
   }
 
   runProgram(ast) {
+    if (this.typeCheckEnabled) {
+      try {
+        runTypeCheck(ast);
+      } catch (e) {
+        // hard-fail (mirrors OCaml/C "type error" behavior)
+        throw new Error("[type error] " + e.message);
+      }
+    }
     this.runtime.reset();
     for (const cls of ast.classes) {
       this.runtime.registerClass(cls);

@@ -65,6 +65,47 @@ let lookup_method_scheme (cls : string) (mname : string) : scheme option =
   | Some lst ->
       (try Some (List.assoc mname lst) with Not_found -> None)
 
+(* ===================================================== *)
+(* クラスのフィールド型レジストリ                       *)
+(*   C コード生成側からフィールドの具体的な C 型を       *)
+(*   選ぶために使う。preinfer_all_classes で埋める。     *)
+(* ===================================================== *)
+
+(* クラス名 → (フィールド名 × 推論された ty) のリスト *)
+let class_field_types : (string, (string * ty) list) Hashtbl.t = Hashtbl.create 97
+
+let register_class_field_types (cls : string) (fts : (string * ty) list) : unit =
+  Hashtbl.replace class_field_types cls fts
+
+let lookup_field_type (cls : string) (fname : string) : ty option =
+  match Hashtbl.find_opt class_field_types cls with
+  | None -> None
+  | Some lst -> List.assoc_opt fname lst
+
+let class_field_list (cls : string) : (string * ty) list =
+  match Hashtbl.find_opt class_field_types cls with
+  | None -> []
+  | Some lst -> lst
+
+(* ===================================================== *)
+(* 関数 / メソッド本体のローカル変数型レジストリ        *)
+(*   キー: (cls_name, method_name, var_name)             *)
+(*   値: 推論された ty                                   *)
+(*   グローバル var は cls_name="", method_name=""       *)
+(* ===================================================== *)
+let local_var_types : ((string * string * string), ty) Hashtbl.t = Hashtbl.create 257
+
+let register_local_type ~cls ~mname ~var (t : ty) : unit =
+  Hashtbl.replace local_var_types (cls, mname, var) t
+
+let lookup_local_type ~cls ~mname ~var : ty option =
+  Hashtbl.find_opt local_var_types (cls, mname, var)
+
+(* デバッグ・テスト時にクリアする *)
+let clear_field_and_local_types () : unit =
+  Hashtbl.clear class_field_types;
+  Hashtbl.clear local_var_types
+
 let register_class (name : string) (methods : (string * scheme) list) : unit =
   Hashtbl.replace class_method_schemes name methods
 

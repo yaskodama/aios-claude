@@ -1,7 +1,7 @@
 (* abcl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: abcl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python]";
+  prerr_endline "usage: abcl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python] [--no-typecheck]";
   exit 1
 
 let () =
@@ -10,6 +10,8 @@ let () =
   let max_msgs = ref 12 in
   let xinu = ref false in
   let py = ref false in
+  let no_typecheck = ref false in
+  let dump_types = ref false in
   let args = Array.to_list Sys.argv |> List.tl in
   let rec loop = function
     | [] -> ()
@@ -17,6 +19,8 @@ let () =
     | "--max-msgs" :: n :: rest -> max_msgs := int_of_string n; loop rest
     | "--xinu" :: rest -> xinu := true; loop rest
     | "--python" :: rest -> py := true; loop rest
+    | "--no-typecheck" :: rest -> no_typecheck := true; loop rest
+    | "--dump-types" :: rest -> dump_types := true; loop rest
     | "-h" :: _ | "--help" :: _ -> usage ()
     | f :: rest when !input = None -> input := Some f; loop rest
     | x :: _ -> Printf.eprintf "unknown arg: %s\n" x; usage ()
@@ -39,6 +43,29 @@ let () =
       exit 2
   in
   close_in ic;
+  if not !no_typecheck then begin
+    if not (Typecheck.run prog) then begin
+      Printf.eprintf "[abcl2c] type errors in %s — aborting C generation\n" input;
+      Printf.eprintf "         (use --no-typecheck to bypass)\n";
+      exit 3
+    end
+  end;
+  if !dump_types then begin
+    Printf.printf "=== inferred field types ===\n";
+    Hashtbl.iter (fun cls fields ->
+      Printf.printf "class %s:\n" cls;
+      List.iter (fun (fname, ty) ->
+        Printf.printf "  %s : %s\n" fname (Types.string_of_ty ty)
+      ) fields
+    ) Types.class_field_types;
+    Printf.printf "=== inferred method types ===\n";
+    Hashtbl.iter (fun cls methods ->
+      Printf.printf "class %s:\n" cls;
+      List.iter (fun (mname, Types.Forall (_, t)) ->
+        Printf.printf "  %s : %s\n" mname (Types.string_of_ty t)
+      ) methods
+    ) Types.class_method_schemes;
+  end;
   let c_code =
     if !py        then C_translator.gen_program_python ~max_messages:!max_msgs prog
     else if !xinu then C_translator.gen_program_xinu   ~max_messages:!max_msgs prog
