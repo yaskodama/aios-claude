@@ -13,7 +13,15 @@ type value =
   | VUnit
   | VActor of string * (string, value) Hashtbl.t
   | VArray of value array * Types.ty option
+  | VRecord of (string * value) list
+  | VTuple of value list
   | VFuture of string  (* reply-slot id; resolved by reply(v) on the receiving actor *)
+  | VImage of image_data
+and image_data = {
+  iwidth : int;
+  iheight : int;
+  ipixels : Bytes.t;   (* RGBA, row-major, length = w*h*4 *)
+}
 
 type mmessage = {
   from : string;
@@ -352,6 +360,44 @@ let find_class_exn (name:string) : class_decl =
   | Some c -> c
   | None -> failwith ("Class not found: " ^ name)
 
+(* === Top-level user functions (function name(p) { ...; return e; }) === *)
+let function_env : (string, function_decl) Hashtbl.t = Hashtbl.create 64
+
+let register_function (fd : function_decl) : unit =
+  Hashtbl.replace function_env fd.fn_name fd
+
+let find_function_opt (name:string) : function_decl option =
+  Hashtbl.find_opt function_env name
+
+(* Carries a return value up through nested eval_stmt calls. Caught by
+   the function call wrapper; bare `return e;` outside a function turns
+   into a top-level failure. *)
+exception Return_value of value
+
+(* === Method injection: parse "method foo(p) { ... }" snippets and
+   merge them into a class table or an individual actor's method table.
+   Mirrors the Python runtime's add_method / remove_method / methods_of. === *)
+
+let parse_methods_from_source (src : string) : method_decl list =
+  (* Wrap the snippet in a throwaway class so the existing parser can
+     handle it without a new entry rule. *)
+  let wrapped = "class _AIPL_patch { " ^ src ^ " }" in
+  let lb = Lexing.from_string wrapped in
+  let prog =
+    try Ast.normalize_program (Parser.program Lexer.token lb)
+    with _ -> failwith "add_method: parse error in method source"
+  in
+  match prog with
+  | [Ast.Class c] -> c.methods
+  | _ -> failwith "add_method: expected one or more method declarations"
+
+let register_class_method_types (c : class_decl) : unit =
+  let ms_arity =
+    c.methods |> List.map (fun (m : method_decl) ->
+      (m.mname, List.length m.params))
+  in
+  Types.register_class_auto c.cname ms_arity
+
 (* ===== debug switches ===== *)
 let debug_send      = ref true
 let debug_dispatch  = ref true
@@ -373,6 +419,19 @@ let rec string_of_value v =
         a |> Array.to_list |> List.map string_of_value |> String.concat ", "
       in
       "[" ^ items ^ "]"
+  | VRecord fs ->
+      let items =
+        fs |> List.map (fun (l, v) -> l ^ ": " ^ string_of_value v)
+           |> String.concat ", "
+      in
+      "{" ^ items ^ "}"
+  | VTuple vs ->
+      let items =
+        vs |> List.map string_of_value |> String.concat ", "
+      in
+      "(" ^ items ^ ")"
+  | VImage img ->
+      Printf.sprintf "<image %dx%d RGBA>" img.iwidth img.iheight
 
 let pp_recv = function
   | Var id -> id
@@ -387,6 +446,9 @@ let type_name_of_value = function
   | VActor _  -> "actor"
   | VFuture _ -> "future"
   | VArray _  -> "array"
+  | VRecord _ -> "record"
+  | VTuple _  -> "tuple"
+  | VImage _  -> "image"
 
 let lookup_opt (env : (string, 'a) Hashtbl.t) (k : string) : 'a option =
   Hashtbl.find_opt env k
@@ -418,6 +480,9 @@ let to_bool = function
   | VUnit -> false
   | VActor _   -> failwith "actor is not allowed as condition"
   | VArray (_,_)   -> failwith "array is not allowed as condition"
+  | VRecord _ -> failwith "record is not allowed as condition"
+  | VTuple _  -> failwith "tuple is not allowed as condition"
+  | VImage _  -> failwith "image is not allowed as condition"
   | VInt i -> i <> 0
 
 let as_bool = function
@@ -427,6 +492,9 @@ let as_bool = function
   | VUnit     -> false
   | VActor _  -> failwith "actor is not allowed as condition"
   | VArray (_,_)   -> failwith "array is not allowed as condition"
+  | VRecord _ -> failwith "record is not allowed as condition"
+  | VTuple _  -> failwith "tuple is not allowed as condition"
+  | VImage _  -> failwith "image is not allowed as condition"
   | VInt i -> i <> 0
 
 let as_float (v : value) : float =
@@ -445,7 +513,7 @@ let as_string = function
   | VString s -> s
   | v -> failwith (Printf.sprintf "expected string, got %s" (type_name_of_value v))
 
-let to_string_plain = function
+let rec to_string_plain = function
   | VString s -> s
   | VFloat f  -> string_of_float f
   | VInt n -> string_of_int n
@@ -453,21 +521,22 @@ let to_string_plain = function
   | VUnit     -> "()"
   | VActor (n,_)  -> "<actor:" ^ n ^ ">"
   | VFuture id   -> "<future:" ^ id ^ ">"
-  | VArray (a,_)   ->                           (* 追加：簡易表現でOK *)
+  | VArray (a,_)   ->
       let items =
-        a |> Array.to_list
-          |> List.map (function
-                | VString s -> s
-                | VInt n    -> string_of_int n
-                | VFloat f  -> string_of_float f
-                | VBool b   -> if b then "true" else "false"
-                | VUnit     -> "()"
-                | VActor (n,_)  -> "<actor:" ^ n ^ ">"
-                | VFuture id    -> "<future:" ^ id ^ ">"
-                | VArray (_,_)  -> "<array>")
-          |> String.concat ", "
+        a |> Array.to_list |> List.map to_string_plain |> String.concat ", "
       in
       "[" ^ items ^ "]"
+  | VRecord fs ->
+      let items =
+        fs |> List.map (fun (l, v) -> l ^ ": " ^ to_string_plain v)
+           |> String.concat ", "
+      in
+      "{" ^ items ^ "}"
+  | VTuple vs ->
+      let items = vs |> List.map to_string_plain |> String.concat ", " in
+      "(" ^ items ^ ")"
+  | VImage img ->
+      Printf.sprintf "<image %dx%d RGBA>" img.iwidth img.iheight
 
 (* 追加: 数値かどうか判定＆Floatに昇格するヘルパ *)
 let is_number = function
@@ -601,27 +670,16 @@ let value_of_json_atom (s:string) : value =
           | Some f -> VFloat f
           | None   -> VString s))
 
-let expr_of_value = function
+let expr_of_value v = match v with
   | VInt n    -> Int n            (* keep integers as Int, not String *)
   | VFloat f  -> Float f
   | VString s -> String s
   | VBool  b  -> String (if b then "true" else "false")  (* Bool/Unit の式型が無ければ文字列化でOK *)
   | VUnit     -> String "()"
   | VActor (n,_)  -> String ("<actor:" ^ n ^ ">")
-  | VArray (a,_)  ->                                        (* 追加：簡易表示でOK *)
-      let items =
-        a |> Array.to_list
-          |> List.map (function
-                | VString s -> s
-                | VInt n    -> string_of_int n
-                | VFloat f  -> string_of_float f
-                | VBool b   -> if b then "true" else "false"
-                | VUnit     -> "()"
-                | VActor (n,_)  -> "<actor:" ^ n ^ ">"
-                | VArray (_,_)  -> "<array>")
-          |> String.concat ", "
-      in
-      String ("[" ^ items ^ "]")
+  | VFuture id    -> String ("<future:" ^ id ^ ">")
+  | VArray _ | VRecord _ | VTuple _ | VImage _ ->
+      String (to_string_plain v)
       
 (* === Value extractors === *)
 let get_var_a (actor:actor) (x:string) : value =
@@ -1060,18 +1118,24 @@ let rec eval_expr (actor:actor) (e : expr) =
       let v2 = eval_expr actor e2 in
       apply_binop op v1 v2
   | Call (fname, arg1) ->
-      let vs = List.map (eval_expr actor) arg1 in
-      (* Make print observable from Web UI by recording it per actor. *)
-      if fname = "print" then (
-        match vs with
-        | [v] ->
-            let line = string_of_value v in
-            push_log actor.name line;
-            print_endline line;
-            VUnit
-        | _ -> failwith "print(s): arity 1 expected"
-      ) else
-        call_prim fname vs
+      (* User-defined top-level function takes priority over builtins. *)
+      (match find_function_opt fname with
+       | Some fd ->
+           let vs = List.map (eval_expr actor) arg1 in
+           call_user_function actor fd vs
+       | None ->
+           let vs = List.map (eval_expr actor) arg1 in
+           (* Make print observable from Web UI by recording it per actor. *)
+           if fname = "print" then (
+             match vs with
+             | [v] ->
+                 let line = string_of_value v in
+                 push_log actor.name line;
+                 print_endline line;
+                 VUnit
+             | _ -> failwith "print(s): arity 1 expected"
+           ) else
+             call_prim fname vs)
   | Expr e -> eval_expr actor e
   | New (_cls, _args) ->
       failwith "eval_expr: New is not supported here"
@@ -1143,6 +1207,70 @@ let rec eval_expr (actor:actor) (e : expr) =
       (match eval_expr actor fe with
        | VFuture slot_id -> wait_reply_slot slot_id
        | v -> failwith ("await: expected future, got " ^ type_name_of_value v))
+  | RecordLit fs ->
+      VRecord (List.map (fun (l, e1) -> (l, eval_expr actor e1)) fs)
+  | TupleLit es ->
+      VTuple (List.map (eval_expr actor) es)
+  | FieldAccess (e1, f) ->
+      (match eval_expr actor e1 with
+       | VRecord fs ->
+           (try List.assoc f fs
+            with Not_found -> failwith ("no field " ^ f ^ " in record"))
+       | v -> failwith ("field access on non-record: " ^ type_name_of_value v))
+  | IndexExpr (e1, n) ->
+      (match eval_expr actor e1 with
+       | VTuple vs ->
+           if n < 0 || n >= List.length vs then
+             failwith (Printf.sprintf "tuple index %d out of bounds" n);
+           List.nth vs n
+       | VArray (a, _) ->
+           if n < 0 || n >= Array.length a then
+             failwith (Printf.sprintf "array index %d out of bounds" n);
+           a.(n)
+       | v -> failwith ("index on non-tuple/array: " ^ type_name_of_value v))
+  | ArraySized (dims, init_opt) ->
+      let dim_vals = List.map (fun d -> as_int (eval_expr actor d)) dims in
+      let fill = match init_opt with
+        | Some i -> eval_expr actor i
+        | None   -> VInt 0
+      in
+      (* Build the nested array bottom-up so each row/cell is a fresh
+         copy of `fill` (or a fresh inner array). *)
+      let rec build = function
+        | [] -> fill
+        | n :: rest ->
+            VArray (Array.init n (fun _ -> build rest), None)
+      in
+      build dim_vals
+
+and call_user_function (actor:actor) (fd:function_decl) (vs:value list) : value =
+  let n_p = List.length fd.fn_params and n_v = List.length vs in
+  if n_p <> n_v then
+    failwith (Printf.sprintf "function %s: arity mismatch (expected %d, got %d)"
+                fd.fn_name n_p n_v);
+  (* Save current bindings for the parameter names, then replace.
+     Restore on exit so the calling scope is unchanged.  The caller's
+     actor is reused for env access (so the body can read globals /
+     fields available in the caller's frame), but the parameters
+     shadow any same-named variables for the duration of the call. *)
+  let saved =
+    List.map (fun p -> (p, Hashtbl.find_opt actor.env p)) fd.fn_params
+  in
+  List.iter2 (fun p v -> Hashtbl.replace actor.env p v) fd.fn_params vs;
+  let restore () =
+    List.iter (fun (p, ov) ->
+      match ov with
+      | Some v -> Hashtbl.replace actor.env p v
+      | None   -> Hashtbl.remove actor.env p) saved
+  in
+  try
+    eval_stmt actor fd.fn_body;
+    restore ();
+    VUnit
+  with
+  | Return_value v -> restore (); v
+  | exn            -> restore (); raise exn
+
 and eval_stmt (actor:actor) (s : Ast.stmt) =
   match s.sdesc with
   | Assign (x, e) -> set_var_a actor x (eval_expr actor e)
@@ -1256,14 +1384,36 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
           (* Expose `sender` as a plain string so == / != against "" works *)
           Hashtbl.replace actor.env "sender" (VString actor.last_sender);
           Hashtbl.replace actor.env "self"   (VString actor.name);
-            eval_stmt actor mdecl.body;
+            (* Catch `return v;` inside the method body and treat it as
+               an implicit `reply(v);` so synchronous callers (now /
+               future + await) get the value back. *)
+            (try
+               eval_stmt actor mdecl.body
+             with Return_value v ->
+               (* Mirror the reply primitive: fulfill the local slot
+                  and route the HTTP slot for the current msg id. *)
+               (match get_current_msg_id () with
+                | Some id -> ignore (try_fulfill_reply_slot id v)
+                | None -> ()));
             List.iter (fun (p, ov) ->
               match ov with Some v -> Hashtbl.replace actor.env p v | None -> Hashtbl.remove actor.env p
           ) saved
     | None ->
-      let vs = List.map (eval_expr actor) args in
-        ignore (call_prim mname vs)
+      (* Fall back to a user-defined top-level function before primitives. *)
+      (match find_function_opt mname with
+       | Some fd ->
+           let vs = List.map (eval_expr actor) args in
+           ignore (call_user_function actor fd vs)
+       | None ->
+           let vs = List.map (eval_expr actor) args in
+           ignore (call_prim mname vs))
     end
+  | Return e_opt ->
+    let v = match e_opt with
+      | Some e -> eval_expr actor e
+      | None   -> VUnit
+    in
+    raise (Return_value v)
   | Send (target, meth, args) ->
     let arg_vals = List.map (eval_expr actor) args in
     let arg_exprs = List.map (fun v -> mk_expr (expr_of_value v)) arg_vals in
@@ -1440,22 +1590,18 @@ and pop_matching_message actor (cases:select_case list)
 let actor_exists (name:string) : bool =
   Hashtbl.mem actor_table name
 
-let spawn_actor ~(class_name:string) ~(actor_name:string) : unit =
+let spawn_actor ?(init_args : value list = []) ~(class_name:string) ~(actor_name:string) () : unit =
   if actor_exists actor_name then ()
   else begin
-    (* class_decl を class_env から取得 *)
     let obj : class_decl = find_class_exn class_name in
-
-    (* actor生成 *)
     let a = create_actor actor_name class_name in
 
-    (* ★必須：メソッド表をコピー *)
+    (* メソッド表 *)
     List.iter (fun (m:method_decl) ->
       Hashtbl.replace a.methods m.mname m
     ) obj.methods;
 
-    (* （任意）fields 初期化：必要なら後で追加。まずは methods だけで init/add を動かす *)
-    (*
+    (* フィールド初期化 *)
     List.iter (fun (st:Ast.stmt) ->
       match st.sdesc with
       | VarDecl (k, init) ->
@@ -1463,14 +1609,19 @@ let spawn_actor ~(class_name:string) ~(actor_name:string) : unit =
           Hashtbl.replace a.env k v
       | _ -> ()
     ) obj.fields;
-    *)
 
-    (* 登録・起動 *)
     Hashtbl.add actor_table actor_name a;
     ignore (Thread.create actor_loop a);
 
-    (* init を送る *)
-    send_message ~from:"<new>" actor_name (mk_stmt (CallStmt ("init", [])));
+    (* init を送る。init_args が空なら無引数で、そうでなければ値を式化して渡す *)
+    let arg_exprs =
+      List.map (fun v -> mk_expr (expr_of_value v)) init_args
+    in
+    let has_init =
+      List.exists (fun (m:Ast.method_decl) -> m.mname = "init") obj.methods
+    in
+    if has_init then
+      send_message ~from:"<spawn>" actor_name (mk_stmt (CallStmt ("init", arg_exprs)))
   end
 
 (*
@@ -1488,6 +1639,65 @@ let spawn_actor ~(class_name:string) ~(actor_name:string) : unit =
     send_message ~from:"<new>" actor_name (mk_stmt (CallStmt ("init", [])));
 end
 *)
+
+(* Patch the class table: replace methods with matching names, append
+   new ones.  Live actors of this class are also patched so the change
+   is visible to in-flight execution. *)
+let add_methods_to_class (class_name : string) (new_methods : method_decl list)
+  : int =
+  let c = find_class_exn class_name in
+  let merged =
+    List.fold_left
+      (fun acc (m : method_decl) ->
+         let filtered = List.filter (fun (m' : method_decl) -> m'.mname <> m.mname) acc in
+         filtered @ [m])
+      c.methods new_methods
+  in
+  register_class { c with methods = merged };
+  Hashtbl.iter (fun _name (a : actor) ->
+    if a.cls = class_name then
+      List.iter (fun (m : method_decl) ->
+        Hashtbl.replace a.methods m.mname m) new_methods
+  ) actor_table;
+  register_class_method_types { c with methods = merged };
+  List.length new_methods
+
+(* Per-actor injection: methods land on this instance only and shadow
+   the class table for resolution (eval_stmt checks actor.methods
+   first). *)
+let add_methods_to_actor (actor_name : string) (new_methods : method_decl list)
+  : int =
+  let a = find_actor_exn actor_name in
+  List.iter (fun (m : method_decl) ->
+    Hashtbl.replace a.methods m.mname m) new_methods;
+  List.length new_methods
+
+let remove_method_from_class (class_name : string) (mname : string) : bool =
+  let c = find_class_exn class_name in
+  let kept = List.filter (fun (m : method_decl) -> m.mname <> mname) c.methods in
+  let changed = List.length kept < List.length c.methods in
+  if changed then begin
+    register_class { c with methods = kept };
+    Hashtbl.iter (fun _name (a : actor) ->
+      if a.cls = class_name then Hashtbl.remove a.methods mname
+    ) actor_table;
+    register_class_method_types { c with methods = kept }
+  end;
+  changed
+
+let remove_method_from_actor (actor_name : string) (mname : string) : bool =
+  let a = find_actor_exn actor_name in
+  let had = Hashtbl.mem a.methods mname in
+  if had then Hashtbl.remove a.methods mname;
+  had
+
+let methods_of_class (class_name : string) : string list =
+  let c = find_class_exn class_name in
+  List.map (fun (m : method_decl) -> m.mname) c.methods
+
+let methods_of_actor (actor_name : string) : string list =
+  let a = find_actor_exn actor_name in
+  Hashtbl.fold (fun k _ acc -> k :: acc) a.methods []
 
 let wait_ms ms =
    let seconds = ms /. 1000.0 in

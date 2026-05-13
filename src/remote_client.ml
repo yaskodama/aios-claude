@@ -19,8 +19,56 @@ let parse_hostport hostport =
   | [h] -> (h, 8080)
   | _ -> failwith ("bad hostport: " ^ hostport)
 
+(* === HMAC signing ====================================================
+   If ABCL_REMOTE_SECRET is set in the environment, every outgoing
+   request body is signed with HMAC-SHA256 and the hex digest is sent
+   in an X-ABCL-Sig header.  Matches python-aipl/aipl_remote.py and
+   the C runtime's protocol so the OCaml runtime can interop with
+   either side. *)
+let _shared_secret () : string =
+  try Sys.getenv "ABCL_REMOTE_SECRET" with Not_found -> ""
+
+let sign_body (body : string) : string option =
+  let secret = _shared_secret () in
+  if secret = "" then None
+  else Some (Hmac_sha256.hmac_sha256_hex ~key:secret body)
+
+(* Wrap a Unix-level remote operation: returns Ok () / Ok body or Error msg.
+   Caller decides whether to log + swallow (fire-and-forget) or
+   propagate via a falsy reply value (synchronous case). *)
+let with_connection ~hostport ~handler =
+  let host, port =
+    try parse_hostport hostport
+    with _ -> failwith ("bad hostport: " ^ hostport)
+  in
+  let addr =
+    try Unix.ADDR_INET (resolve_host host, port)
+    with _ -> failwith ("cannot resolve host: " ^ host)
+  in
+  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+  try
+    Unix.connect sock addr;
+    let oc = Unix.out_channel_of_descr sock in
+    let ic = Unix.in_channel_of_descr sock in
+    let r = handler ic oc in
+    close_in_noerr ic;
+    close_out_noerr oc;
+    Ok r
+  with
+  | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
+      (try Unix.close sock with _ -> ());
+      Error ("connection refused to " ^ hostport)
+  | Unix.Unix_error (Unix.ETIMEDOUT, _, _) ->
+      (try Unix.close sock with _ -> ());
+      Error ("connection timeout to " ^ hostport)
+  | Unix.Unix_error (err, fn, _) ->
+      (try Unix.close sock with _ -> ());
+      Error (Printf.sprintf "remote io: %s (%s)" (Unix.error_message err) fn)
+  | exn ->
+      (try Unix.close sock with _ -> ());
+      Error ("remote io: " ^ Printexc.to_string exn)
+
 let remote_send ~hostport ~to_actor ~meth ~args ~from =
-  let host, port = parse_hostport hostport in
   let body =
     Printf.sprintf
       {|{"to":%S,"method":%S,"args":[%s],"from":%S}|}
@@ -29,22 +77,30 @@ let remote_send ~hostport ~to_actor ~meth ~args ~from =
       (String.concat "," (List.map json_of_expr args))
       from
   in
- let addr = Unix.ADDR_INET (resolve_host host, port) in
-  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-  Unix.connect sock addr;
-  let oc = Unix.out_channel_of_descr sock in
-  let ic = Unix.in_channel_of_descr sock in
-  Printf.fprintf oc "POST /api/json/send HTTP/1.1\r\n";
-  Printf.fprintf oc "Host: %s\r\n" hostport;
-  Printf.fprintf oc "Content-Type: application/json\r\n";
-  Printf.fprintf oc "Content-Length: %d\r\n" (String.length body);
-  Printf.fprintf oc "Connection: close\r\n";
-  Printf.fprintf oc "\r\n";
-  output_string oc body;
-  flush oc;
-  (try while true do ignore (input_line ic) done with End_of_file -> ());
-  close_in_noerr ic;
-  close_out_noerr oc
+  let sig_hdr = match sign_body body with
+    | Some s -> Printf.sprintf "X-ABCL-Sig: %s\r\n" s
+    | None   -> ""
+  in
+  let r =
+    with_connection ~hostport ~handler:(fun ic oc ->
+      Printf.fprintf oc "POST /api/json/send HTTP/1.1\r\n";
+      Printf.fprintf oc "Host: %s\r\n" hostport;
+      Printf.fprintf oc "Content-Type: application/json\r\n";
+      Printf.fprintf oc "Content-Length: %d\r\n" (String.length body);
+      output_string oc sig_hdr;
+      Printf.fprintf oc "Connection: close\r\n";
+      Printf.fprintf oc "\r\n";
+      output_string oc body;
+      flush oc;
+      (try while true do ignore (input_line ic) done with End_of_file -> ()))
+  in
+  match r with
+  | Ok () -> ()
+  | Error msg ->
+      (* Fire-and-forget: don't crash the calling actor. Surface to
+         stderr so the failure is observable. *)
+      Printf.eprintf "[remote_send] %s.%s -> %s: %s\n%!"
+        from meth to_actor msg
 
 (* ---- Synchronous remote call: POST /api/json/call, return the raw
    JSON value of the "reply" field as a string. ---- *)
@@ -129,7 +185,6 @@ let extract_reply_value (body:string) : string =
         String.sub body start (!stop - start) |> String.trim
 
 let remote_call ~hostport ~to_actor ~meth ~args ~from ?(timeout_ms=30000) () : string =
-  let host, port = parse_hostport hostport in
   let body =
     Printf.sprintf
       {|{"to":%S,"method":%S,"args":[%s],"from":%S}|}
@@ -138,22 +193,31 @@ let remote_call ~hostport ~to_actor ~meth ~args ~from ?(timeout_ms=30000) () : s
       (String.concat "," (List.map json_of_expr args))
       from
   in
-  let addr = Unix.ADDR_INET (resolve_host host, port) in
-  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-  Unix.connect sock addr;
-  let oc = Unix.out_channel_of_descr sock in
-  let ic = Unix.in_channel_of_descr sock in
   let path = Printf.sprintf "/api/json/call?timeout_ms=%d" timeout_ms in
-  Printf.fprintf oc "POST %s HTTP/1.1\r\n" path;
-  Printf.fprintf oc "Host: %s\r\n" hostport;
-  Printf.fprintf oc "Content-Type: application/json\r\n";
-  Printf.fprintf oc "Content-Length: %d\r\n" (String.length body);
-  Printf.fprintf oc "Connection: close\r\n";
-  Printf.fprintf oc "\r\n";
-  output_string oc body;
-  flush oc;
-  let raw = read_all_in ic in
-  close_in_noerr ic;
-  close_out_noerr oc;
-  let resp_body = strip_http_headers raw in
-  extract_reply_value resp_body
+  let sig_hdr = match sign_body body with
+    | Some s -> Printf.sprintf "X-ABCL-Sig: %s\r\n" s
+    | None   -> ""
+  in
+  let r =
+    with_connection ~hostport ~handler:(fun ic oc ->
+      Printf.fprintf oc "POST %s HTTP/1.1\r\n" path;
+      Printf.fprintf oc "Host: %s\r\n" hostport;
+      Printf.fprintf oc "Content-Type: application/json\r\n";
+      Printf.fprintf oc "Content-Length: %d\r\n" (String.length body);
+      output_string oc sig_hdr;
+      Printf.fprintf oc "Connection: close\r\n";
+      Printf.fprintf oc "\r\n";
+      output_string oc body;
+      flush oc;
+      let raw = read_all_in ic in
+      let resp_body = strip_http_headers raw in
+      extract_reply_value resp_body)
+  in
+  match r with
+  | Ok v -> v
+  | Error msg ->
+      (* Surface the error to the caller as a JSON string value so it
+         can be inspected at runtime instead of crashing the actor. *)
+      Printf.eprintf "[remote_call] %s.%s -> %s: %s\n%!"
+        from meth to_actor msg;
+      Printf.sprintf "\"<remote-error: %s>\"" msg

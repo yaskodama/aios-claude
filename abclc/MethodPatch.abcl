@@ -1,0 +1,46 @@
+// Runtime method injection (OCaml runtime).
+//
+//   add_method(target, source)
+//       - target  is either a class name or an actor name.
+//       - source  is a string holding one or more `method ...` declarations.
+//   remove_method(target, name)  -> bool (true if removed)
+//   methods_of(target)           -> array[string]
+//
+// Class-level injection patches every live actor of that class.
+// Actor-level injection only touches the named instance and shadows
+// the class-level table for that one actor.
+class Greeter {
+  var label = "g1";
+  method greet(n) {
+    print("[" + label + "] hello, " + n);
+  }
+}
+
+var g = new Greeter();
+send g.greet("Alice");
+
+// Class-level: add a shout() method visible to every Greeter actor.
+var added = add_method("Greeter",
+  "method shout(n) { print(\"[\" + label + \"] HEY!! \" + n); }");
+print("added " + added + " new method(s)");
+
+send g.greet("Bob");
+// Runtime-injected methods are unknown to the static type checker, so we
+// use `send!` (unsafe send) to bypass class signature checking. Use the
+// regular `send` form for the original `greet` method.
+send! g.shout("Carol");
+
+// Actor-level: only g sees this whisper. A second instance won't.
+var added2 = add_method("g",
+  "method whisper(n) { print(\"[\" + label + \"] *psst* \" + n); }");
+print("added " + added2 + " per-actor method(s)");
+send! g.whisper("Dave");
+
+// Synchronous introspection (returns immediately, before queued sends fire).
+print("Greeter has: " + methods_of("Greeter"));
+print("Actor g has: " + methods_of("g"));
+
+// Note: AIPL globals fire all pending sends AFTER all non-send statements,
+// so a `remove_method` placed here would happen *before* the queued sends
+// are processed.  To demonstrate removal cleanly, do it from inside a
+// method body, where `send` is processed in order with surrounding stmts.

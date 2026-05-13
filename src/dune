@@ -12,6 +12,7 @@
   infer
   typecheck
   sdl_helper
+  hmac_sha256
   remote_client
   parser
   lexer

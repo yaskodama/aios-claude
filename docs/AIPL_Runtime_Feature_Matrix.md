@@ -79,6 +79,8 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 **Erlang** = `aipl2c --erlang` → Erlang `.erl` module;
 **Go** = `aipl2c --go` → Go `main.go` source;
 **Prolog** = `aipl2c --prolog` → SWI-Prolog `.pl` (threads + msg queues);
+**LLVM** = `aipl2c --llvm` → C with clang `__attribute__((hot/cold))` + LLVM/clang build instructions for native binary or `.ll` IR;
+**OpenMP** = `aipl2c --openmp` → C + pthread but the initial actor-spawn loop runs as `#pragma omp parallel for` and message-counter updates use `#pragma omp atomic` (build with `gcc-fopenmp`);
 **JS-B** = browser-abcl; **JS-N** = node-aipl-server.
 
 | Feature category | Sample(s) | Where | What it checks | Target |
@@ -89,11 +91,11 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Dining philosophers** | `Philosophers`, `philosophers{-1,-2}`, `Philosophers5{,_debug,_trace,Gui,Py,Xinu}` | py-aipl + abclc + browser-abcl | fork as actor, deadlock-free serialisation, SDL/Python/Xinu codegen variants | Py, OCaml, C, SDL2, Py-gen, Xinu, JS-B, JS-N |
 | **`become` (class swap)** | `become.abcl`, `bbecome.abcl` | abclc | runtime actor-class replacement | Py, OCaml |
 | **`select` / selective receive** | `Channels.abcl`, `Channels2.abcl` | py-aipl/samples | typed channels, worker-pool with request/result | Py |
-| **Method injection** | `MethodPatch.abcl` | py-aipl/samples | `add_method` / `remove_method` runtime patching | Py |
-| **Dynamic compile** | `Dynamic.abcl`, `DynamicWorkerPool.abcl` | py-aipl/samples | `compile()` builtin → runtime class generation; worker pool driven by it | Py |
-| **Top-level functions** | `Functions.abcl`, `Signatures.abcl` | py-aipl/samples | user functions, multiple overload signatures, typeof | Py |
-| **Records** | `Records.abcl` | py-aipl/samples | `{a:int, b:string}` literal, dot-field access, structural typeof | Py |
-| **Tuples** | `Tuples.abcl` | py-aipl/samples | positional, immutable, mixed slot types, nesting | Py |
+| **Method injection** | `MethodPatch.abcl` | py-aipl/samples + abclc/ | `add_method` / `remove_method` runtime patching | Py, OCaml |
+| **Dynamic compile** | `Dynamic.abcl`, `DynamicWorkerPool.abcl` | py-aipl/samples + abclc/ | `compile()` builtin → runtime class generation; worker pool driven by it | Py, OCaml |
+| **Top-level functions** | `Functions.abcl`, `Signatures.abcl` | py-aipl/samples + abclc/ | user functions, multiple overload signatures, typeof | Py, OCaml |
+| **Records** | `Records.abcl` | py-aipl/samples + abclc/ | `{a:int, b:string}` literal, dot-field access, structural typeof | Py, OCaml |
+| **Tuples** | `Tuples.abcl` | py-aipl/samples + abclc/ | positional, immutable, mixed slot types, nesting | Py, OCaml |
 | **Arrays** | `Arrays.abcl`, `MultiDimArrays.abcl` | py-aipl/samples | static-sized, multi-dim, dynamic sizes | Py |
 | **Gradual type checker** | `Typecheck.abcl`, `Typecheck11{b,c,de}.abcl` | py-aipl/samples | Phase 11 → 11e progression: literals, call-site validation, unions/generics, narrowing, length-tagged arrays | Py |
 | **Phase 11 typed counter** | `Phase11_TypedCounter.abcl` | abclc | typed annotations / generics / typeof narrowing | OCaml |
@@ -116,6 +118,8 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Erlang codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — `sender` not tracked) | abclc | `aipl2c --erlang` emits a single `.erl` module; `class` → spawn + receive loop; fields → loop args with versioned variables on assign; methods → `receive` clauses | Erlang |
 | **Go codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `aipl2c --go` emits a single Go `main.go`; `class` → struct + goroutine `run()`; each method → typed message struct + `Method()` helper that pushes to a buffered `chan any` mailbox; dispatch via type switch in `run()` | Go |
 | **Prolog codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `aipl2c --prolog` emits a single SWI-Prolog `.pl` file using `library(thread)`; `class` → `c_loop(Fields)` thread with `thread_get_message` + `Msg = m(Args) -> body ; ...` dispatch; expressions are hoisted into prolog goals (`X is A + B`, `format(atom(S), "~w~w", [A,B])`) | Prolog |
+| **LLVM codegen target** | `Hello`, `counter` (verified) | abclc | `aipl2c --llvm` emits the same C as the default backend with clang-specific `__attribute__((hot))` / `__attribute__((cold))` annotations + a header banner listing `clang -O2 -pthread`, `clang -emit-llvm -S` (text IR), and `clang -emit-llvm -c` + `lli` flows | LLVM |
+| **OpenMP codegen target** | `Hello`, `counter` (verified) | abclc | `aipl2c --openmp` emits C + `<omp.h>`; the initial spawn loop becomes `#pragma omp parallel for schedule(dynamic)` and `messages_processed++` uses `#pragma omp atomic` instead of the dedicated mutex.  Build with `gcc-15 -fopenmp` or `clang -fopenmp`.  pthreads still drive per-actor message loops (compatible with OpenMP) | OpenMP |
 | **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 
@@ -125,28 +129,40 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 
 | #   | Feature                                             | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C    |
 | --- | --------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :--: |
-| 1   | **method injection** (`add_method`/`remove_method`) |  ✅  |  ✅  |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
+| 1   | **method injection** (`add_method`/`remove_method`) |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
 | 2   | `now` synchronous send                              |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 3   | `future` async send                                 |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 4   | `await` future block                                |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 5   | `send` fire-and-forget                              |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 6   | `become` actor class swap                           |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
 | 7   | `select` selective receive                          |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ❌  |
-| 8   | top-level functions                                 |  ✅  |  ✅  |  🟡   |  🟡  |  ❌  |  ❌  |  ✅  |
+| 8   | top-level functions                                 |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ✅  |
 | 9   | signatures / overloads                              |  ❌  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
-| 10  | dynamic compile (`compile()`)                       |  ✅  |  ✅  |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
-| 11  | worker pool / `DynamicWorkerPool`                   |  ✅  |  ✅  |  ❌   |  ❌  |  🟡  |  🟡  |  ❌  |
+| 10  | dynamic compile (`compile()`)                       |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
+| 11  | worker pool / `DynamicWorkerPool`                   |  ✅  |  ✅  |  ✅   |  ✅  |  🟡  |  🟡  |  ❌  |
+| 12a | text file I/O (`read_file`/`write_file`/`append_file`/`file_exists`) |  ✅  |  ✅  |  ✅   |  ✅  |  ✅¹  |  ✅¹  |  ❌  |
+| 12b | image I/O (`image_create`/`image_load`/`image_save`/`image_size`/`image_pixel`/`image_set_pixel`) |  ✅²  |  ✅²  |  ✅³  |  ✅³  |  ✅¹³  |  ✅¹³  |  ❌  |
+
+¹ JS-B/JS-N expose the I/O builtins through the runtime, but they only
+work when the host injects Node's `fs` (server.mjs does this
+automatically; in the browser the calls throw "not available").
+
+² Py-A/Py-I use Pillow → PNG/JPEG/GIF/WebP via magic bytes.
+
+³ OCaml / JS-O / JS-B / JS-N use a pure-runtime PPM (P6) backend (RGBA
+in memory, alpha dropped on save, viewable in Preview.app / GIMP /
+ImageMagick).  PNG would require an external decoder library.
 
 ## Type system
 
 | #   | Feature                              | Py-A      | Py-I       | OCaml      | JS-O       | JS-B                       | JS-N                       | C                       |
 | --- | ------------------------------------ | :-------: | :--------: | :--------: | :--------: | :------------------------: | :------------------------: | :---------------------: |
 | 12  | type inference                       | 🟡 trace  | ✅ HM       | ✅ HM       | ✅ HM       | ✅ flow-sensitive          | ✅ flow-sensitive          | ✅ HM + specialization  |
-| 13  | type annotations (`var x: int`)      | ✅        | 🟡 ignored  | ❌         | ❌         | ❌                         | ❌                         | ❌                      |
-| 14  | records `{a: int, b: string}`        | ✅        | ✅          | ❌ type only | ❌       | ❌                         | ❌                         | 🟡 type only            |
-| 15  | tuples `(1, "a")`                    | ✅        | ✅          | ❌         | ❌         | ❌                         | ❌                         | ❌                      |
-| 16  | arrays (typed, multi-dim)            | ✅        | ✅          | ✅         | ✅         | 🟡                         | 🟡                         | 🟡                      |
-| 17  | generics on functions                | ❌        | ✅ Forall   | 🟡 Forall  | 🟡         | ❌                         | ❌                         | ❌                      |
+| 13  | type annotations (`var x: int`)      | ✅        | 🟡 ignored  | ✅         | ✅         | ❌                         | ❌                         | ❌                      |
+| 14  | records `{a: int, b: string}`        | ✅        | ✅          | ✅         | ✅         | ❌                         | ❌                         | 🟡 type only            |
+| 15  | tuples `(1, "a")`                    | ✅        | ✅          | ✅         | ✅         | ❌                         | ❌                         | ❌                      |
+| 16  | arrays (typed, multi-dim)            | ✅        | ✅          | ✅         | ✅         | ✅                         | ✅                         | 🟡                      |
+| 17  | generics on functions                | ❌        | ✅ Forall   | ✅ Forall  | ✅         | ❌                         | ❌                         | ❌                      |
 
 ## Phase 11+ advanced features
 
@@ -181,7 +197,7 @@ abort.
 
 | #   | Feature                                       | Py-A                       | Py-I                | OCaml         | JS-O          | JS-B         | JS-N                          | C        |
 | --- | --------------------------------------------- | :------------------------: | :-----------------: | :-----------: | :-----------: | :----------: | :---------------------------: | :------: |
-| 27  | remote actors (HTTP)                          | ✅                          | ✅                   | 🟡 no WS      | 🟡            | ❌           | 🟡 server itself, no client   | ✅ (via OCaml) |
+| 27  | remote actors (HTTP)                          | ✅                          | ✅                   | ✅¹           | ✅¹           | ❌           | 🟡 server itself, no client   | ✅ (via OCaml) |
 | 28  | WebSocket                                     | ✅ (`websockets` lib + `ws_listen` / `ws_send` / `ws_close` builtins) | ✅ (= Py-A; HM prelude registered) | ✅ (built-in `web_gateway.ml`, 40+ LOC, verified handshake 101) | ✅ (via OCaml backend) | ✅ (browser-native `WebSocket`) | ✅ (`ws` lib, `/ws?sid=` endpoint + `/api/broadcast`) | ✅ (`abcl_ws_runtime.c` + libwebsockets, `ws_listen` / `ws_send` / `ws_close` extern) |
 | 29  | AI integration (`ai_call`)                    | ✅ (stream, image)          | ✅                   | ✅            | ✅            | ✅ mock only | ✅ mock only                  | ✅       |
 | 29a | `ai_call([provider,] prompt)` — int 1/2/3 = gemini/anthropic/openai (default: gemini auto) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (via OCaml) |
@@ -189,7 +205,24 @@ abort.
 | 29c | `future actor.m(...)` + `await(f)` + `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no future slot in C runtime) |
 | 29d | `send` + callback pattern (`send a.ask(rcv); ...; send rcv.got(reply)`) with `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | 30  | AI governance (budget / concurrent / fallback)| ✅                          | ✅                   | ✅            | ✅            | ❌           | ❌                            | ✅       |
-| 31  | HMAC-signed remote send                       | ✅                          | ✅                   | ❌            | ❌            | ❌           | ❌                            | ✅       |
+| 31  | HMAC-signed remote send                       | ✅                          | ✅                   | ✅²           | ✅²           | ❌           | ❌                            | ✅       |
+
+¹ OCaml's remote actor client (`src/remote_client.ml`) supports all
+three send forms — `send` (fire-and-forget), `now` (blocking, returns
+reply), and `future` (parallel; await for value) — and recovers
+gracefully from ECONNREFUSED/timeouts (logged to stderr, calling
+actor stays alive).  Verified end-to-end by `src/test_remote_actor.sh`.
+JS-O inherits this through the OCaml backend.
+
+² Pure-OCaml HMAC-SHA256 (`src/hmac_sha256.ml`, verified against
+RFC 6234 / RFC 4231 test vectors) protects cross-process traffic
+when `ABCL_REMOTE_SECRET` is set on both sides.  Every outgoing
+POST carries `X-ABCL-Sig: <hex>`; `verify_hmac_or_reject` in
+`web_gateway.ml` returns 401 on missing / mismatched signatures.
+Wire-compatible with `python-aipl/aipl_remote.py` and the C
+runtime.  The previous fork-an-openssl receiver implementation is
+replaced by the in-process pure-OCaml version (no subprocess
+overhead per request).
 | 32  | persistent actor state                        | ✅ (`ABCL_NODE_STATE_FILE`) | ✅                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
 | 33  | live dashboard (SSE)                          | ✅                          | ✅                   | 🟡 polling    | 🟡            | ❌           | ❌                            | ✅       |
 | 34  | `/api/typecheck` JSON endpoint                | ❌                          | ❌                   | ✅            | ✅            | ❌           | ✅                            | N/A      |
@@ -271,57 +304,67 @@ program text.  The same `.abcl` file:
 
 ## Key observations
 
-### Python (annotated) is the most feature-complete runtime (~28/30 ✅)
+### Python (annotated) — the research frontier (≈28/32 ✅)
 - All of Phase 11–17 (channels / linear / owned / effects / structured / transient)
-- The only runtimes with **method injection** are the two Python variants
-- The only runtimes with **dynamic compile** are again the two Python variants
-- Full AI integration including streaming and images
+- Full AI integration including streaming and multimodal images
+- Pillow-backed image I/O (PNG/JPEG/GIF/WebP via magic-byte detection)
 
-### Python (inferred) is Python's HM-typed twin (~24/30 ✅)
+### Python (inferred) — Python's HM-typed twin (≈25/32 ✅)
 - Runtime features match Python (annotated) exactly (shared interpreter)
-- Trades the Phase 11+ annotation-driven static checks (effects /
+- Trades Phase 11+ annotation-driven static checks (effects /
   linear / owned / transient) for full Hindley-Milner inference
-- Inferred types cross-verified against OCaml: identical on shared
+- Cross-verified against OCaml: identical inferred types on shared
   samples (Hello.abcl, counter.abcl)
-- Method injection still works at runtime — HM inference treats
-  `add_method` calls as gradual
 
-### OCaml is the canonical core (~15/30 ✅)
-- Phase 11+ features exist only as `.abcl` design-document samples,
-  not implemented
-- Solid `become` / `select` / HM inference
-- Remote is HTTP only (no HMAC, no WebSocket)
+### OCaml — feature parity with Python on the core (≈24/32 ✅)
+- Recently caught up on **method injection** (`add_method`/`remove_method`),
+  **dynamic compile** (`compile()` + `spawn()`), **top-level functions**
+  (`function f(...) -> T { return ...; }`), **generics** (`function id(x: T) -> T`),
+  **type annotations** (`var x: int`), **records & tuples**, **sized
+  arrays** (`var x[N][M]`), **text/image file I/O** (PPM backend for images).
+- Phase 11+ effect/linear/owned/transient features still only exist as
+  `.abcl` design-document samples — not enforced statically.
+- Solid `become` / `select` / WebSocket (built into `web_gateway.ml`)
+  and HTTP remote actor calls (send / now / future, error-tolerant)
+  with **HMAC-signed traffic** (`ABCL_REMOTE_SECRET` env, pure-OCaml
+  HMAC-SHA256 in `src/hmac_sha256.ml`, wire-compatible with Python
+  and C).
 
 ### JS-OCaml (server) ≈ OCaml
-- It's a thin HTTP client over the OCaml backend, so features inherit
-- The only differentiator: the new `/api/typecheck` JSON endpoint
+- A thin HTTP client (`src/app.js` etc.) over the OCaml backend
+  exposed by `web_gateway.ml`. **Every OCaml-side feature is reachable
+  via `/api/repl`**, so method injection / dynamic compile / top-level
+  functions / generics / type annotations / file & image I/O all work
+  from a browser or `curl` without code changes.
+- The OCaml-specific differentiator: the `/api/typecheck` JSON endpoint.
 
-### JS-Browser (serverless, browser-abcl) is the minimal implementation (~8/30 ✅)
+### JS-Browser (serverless, browser-abcl) — minimal in-browser engine (≈12/32 ✅)
 - Basic actor model + flow-sensitive type inference
-- No `become`, no channels, no remote
+- Plus **sized arrays** (`var x[N]`), **text & image file I/O**
+  (host-injected `fs`; throws in browsers)
+- No `become`, no channels, no remote, no method injection
 - AI integration exists but is **mock only** (no real LLM)
 
-### JS-Node (Node-server, NEW)
+### JS-Node (Node-server) ≈ JS-Browser + fs
 - Wraps the browser-abcl runtime inside a Node.js HTTP server
-- Exposes `/api/typecheck` (matching the OCaml endpoint's JSON shape)
-  and `/api/run` (executes a snippet and returns stdout)
-- Runtime feature set is identical to browser-abcl; the value-add is
-  having both the *type-checker* and the *interpreter* reachable
-  from any HTTP client without spinning up a browser
-- Uses the same flow-sensitive type inference as browser-abcl
+  (`src/node-aipl-server/server.mjs`); auto-injects Node's `fs` so text
+  & image I/O builtins work
+- Exposes `/api/typecheck` and `/api/run` for headless use
+- Same flow-sensitive type inference as browser-abcl
 
-### C version (~17/30 ✅) — surprisingly strong on infrastructure
-- `become` and `select` are not implemented (codegen emits `/* unsupported */`)
-- But it inherits OCaml's **HMAC**, **SSE**, **AI governance**, and
-  adds **three additional codegen targets** (SDL2, Xinu, Python)
-- Fields, parameters, and locals are specialized to native C types
-
-### Method injection — a Python-family exclusive
-- Both Python variants use mutable method dispatch tables that can
-  be mutated at runtime via `add_method` / `remove_method`
-- Other runtimes substitute `become` (whole-class swap)
-- `browser-abcl` / `node-aipl-server` lack even `become` (pure actor
-  execution)
+### C codegen — broadest target diversity (≈19/32 ✅)
+- `become` and `select` are codegen-unsupported (emit `/* unsupported */`)
+- But it inherits OCaml's **HMAC**, **SSE**, **AI governance**
+- **9 backends** from one front-end:
+  - C + pthread (default)
+  - **C + LLVM/clang** (`--llvm`, attaches `__attribute__((hot/cold))`
+    + headers for `clang -emit-llvm`)
+  - **C + OpenMP** (`--openmp`, `#pragma omp parallel for` spawn loop +
+    `#pragma omp atomic` counter)
+  - C + SDL2 (GUI demos)
+  - Xinu / Python / Pony / Erlang / Go / SWI-Prolog
+- Fields, parameters, and locals are specialised to native C types
+  via HM inference + per-class field-type registry
 
 ### Type inference cross-verification
 
@@ -355,7 +398,10 @@ schemes the same way.
 
 ---
 
-*Generated 2026-05-13.  Includes the `python-aipl-inferred` runtime
-(commit `270f291`) and the `node-aipl-server` runtime (this commit).
-For source pointers, run `grep` against the files listed in each
-runtime's source column.*
+*Generated 2026-05-14.  Cumulative through the OCaml feature catch-up
+(records / tuples / dynamic compile / method injection / top-level
+functions / generics / type annotations / sized arrays / text & image
+I/O) and the C-codegen LLVM / OpenMP targets.  Earlier additions of
+the `python-aipl-inferred` runtime (commit `270f291`) and the
+`node-aipl-server` runtime are included.  For source pointers, run
+`grep` against the files listed in each runtime's source column.*

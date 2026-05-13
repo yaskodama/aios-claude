@@ -62,6 +62,27 @@ export function StringLit(value) {
   return { type: "StringLit", value };
 }
 
+// Used by grammar.jison to interpret backslash escapes inside string
+// literals (\\, \n, \t, \r, \") consistently with the OCaml lexer.
+export function unescapeString(s) {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "\\" && i + 1 < s.length) {
+      const n = s[i + 1];
+      if      (n === "\\") { out += "\\"; i++; }
+      else if (n === "n")  { out += "\n"; i++; }
+      else if (n === "t")  { out += "\t"; i++; }
+      else if (n === "r")  { out += "\r"; i++; }
+      else if (n === "\"") { out += "\""; i++; }
+      else                 { out += c; }
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
 export function Binop(op, left, right) {
   return { type: "Binop", op, left, right };
 }
@@ -92,4 +113,16 @@ export function Future(target, method, args) {
 
 export function Await(expr) {
   return { type: "Await", expr };
+}
+
+export function ArraySized(dims, init) {
+  return { type: "ArraySized", dims, init };
+}
+
+export function IndexExpr(name, dims) {
+  return { type: "IndexExpr", name, dims };
+}
+
+export function IndexAssign(name, dims, expr) {
+  return { type: "IndexAssign", name, dims, expr };
 }

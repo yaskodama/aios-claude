@@ -1,0 +1,28 @@
+// Sized-array declaration syntax (JS-B / JS-N).
+//
+//   var x[N];           N-element array, zero-filled
+//   var x[N] = init;    N copies of init
+//   var grid[R][C];     2D R x C, zero-filled
+//   var grid[R][C] = v; every cell = v
+class Demo {
+  var counts[5];
+  var labels[3] = "blank";
+  var grid[2][3];
+  var ones[2][2] = 1;
+
+  method run() {
+    var local[4];
+    local[0] = 10;
+    local[1] = 20;
+    print("counts = " + counts);
+    print("labels = " + labels);
+    print("grid   = " + grid);
+    print("ones   = " + ones);
+    print("local  = " + local);
+    print("local[0] = " + local[0]);
+    print("grid[1][2] = " + grid[1][2]);
+  }
+}
+
+var d = new Demo();
+send d.run();

@@ -132,19 +132,9 @@ let strip_trailing_newline (s:string) : string =
   let n = String.length s in
   if n > 0 && s.[n - 1] = '\n' then String.sub s 0 (n - 1) else s
 
+(* Pure-OCaml HMAC-SHA256: avoids spawning openssl on every request. *)
 let hmac_sha256_hex ~(secret:string) ~(data:string) : string =
-  let cmd = Printf.sprintf "openssl dgst -sha256 -hmac %s" (Filename.quote secret) in
-  let (ic, oc) = Unix.open_process cmd in
-  output_string oc data;
-  close_out oc;
-  let line = strip_trailing_newline (read_all_in ic) in
-  let _ = Unix.close_process (ic, oc) in
-  (* openssl prints either "(stdin)= <hex>" or just "<hex>"; take the
-     last whitespace-separated token. *)
-  match String.rindex_opt line ' ' with
-  | Some i when i + 1 < String.length line ->
-      String.sub line (i + 1) (String.length line - i - 1)
-  | _ -> line
+  Hmac_sha256.hmac_sha256_hex ~key:secret data
 
 let constant_time_eq (a:string) (b:string) : bool =
   if String.length a <> String.length b then false
@@ -1023,7 +1013,7 @@ let handle_send_direct_json (body:string) : (int * string * string) =
           let exprs = List.map ast_of_json_value args_json in
           if sid <> "" && real_to <> to_ then (
             if not (Eval_thread.actor_exists real_to) then
-            Eval_thread.spawn_actor ~class_name:"Calc" ~actor_name:real_to
+            Eval_thread.spawn_actor ~class_name:"Calc" ~actor_name:real_to ()
           );
           let (ok, msg, exprs2) =
             if unsafe then (true, "", exprs)
@@ -1128,7 +1118,7 @@ let handle_send_exposed_json ~(key:string) (body:string) : (int * string * strin
               let exprs = List.map ast_of_json_value args_json in
               if sid <> "" && real_to <> to_ then (
                 if not (Eval_thread.actor_exists real_to) then
-                  Eval_thread.spawn_actor ~class_name:"Calculator" ~actor_name:real_to
+                  Eval_thread.spawn_actor ~class_name:"Calculator" ~actor_name:real_to ()
               );
               let (ok, msg, exprs2) =
                 if unsafe then (true, "", exprs)

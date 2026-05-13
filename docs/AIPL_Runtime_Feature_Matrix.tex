@@ -166,11 +166,11 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   Dining philosophers & \texttt{Philosophers}, \texttt{philosophers\{-1,-2\}}, \texttt{Philosophers5\{,\_debug,\_trace,Gui,Py,Xinu\}} & py-aipl + abclc + browser-abcl & fork as actor, deadlock-free serialisation, SDL/Python/Xinu variants & Py, OCaml, C, SDL2, Py-gen, Xinu, JS-B, JS-N \\
   \texttt{become} (class swap) & \texttt{become}, \texttt{bbecome} & abclc & runtime actor-class replacement & Py, OCaml \\
   \texttt{select} / selective recv & \texttt{Channels}, \texttt{Channels2} & py-aipl/samples & typed channels, worker pool with request/result & Py \\
-  Method injection & \texttt{MethodPatch} & py-aipl/samples & \texttt{add\_method}/\texttt{remove\_method} runtime patching & Py \\
-  Dynamic compile & \texttt{Dynamic}, \texttt{DynamicWorkerPool} & py-aipl/samples & \texttt{compile()} builtin $\to$ runtime class generation & Py \\
-  Top-level functions & \texttt{Functions}, \texttt{Signatures} & py-aipl/samples & user functions, overload signatures, typeof & Py \\
-  Records & \texttt{Records} & py-aipl/samples & \texttt{\{a:int, b:string\}} literal, field access, structural typeof & Py \\
-  Tuples & \texttt{Tuples} & py-aipl/samples & positional, immutable, mixed slot types, nesting & Py \\
+  Method injection & \texttt{MethodPatch} & py-aipl/samples + abclc/ & \texttt{add\_method}/\texttt{remove\_method} runtime patching & Py, OCaml \\
+  Dynamic compile & \texttt{Dynamic}, \texttt{DynamicWorkerPool} & py-aipl/samples + abclc/ & \texttt{compile()} builtin $\to$ runtime class generation & Py, OCaml \\
+  Top-level functions & \texttt{Functions}, \texttt{Signatures} & py-aipl/samples + abclc/ & user functions, overload signatures, typeof & Py, OCaml \\
+  Records & \texttt{Records} & py-aipl/samples + abclc/ & \texttt{\{a:int, b:string\}} literal, field access, structural typeof & Py, OCaml \\
+  Tuples & \texttt{Tuples} & py-aipl/samples + abclc/ & positional, immutable, mixed slot types, nesting & Py, OCaml \\
   Arrays & \texttt{Arrays}, \texttt{MultiDimArrays} & py-aipl/samples & static-sized, multi-dim, dynamic sizes & Py \\
   Gradual type checker & \texttt{Typecheck}, \texttt{Typecheck11\{b,c,de\}} & py-aipl/samples & Phase 11 $\to$ 11e: literals, call-site validation, unions/generics, narrowing, length-tagged arrays & Py \\
   Phase 11 typed counter & \texttt{Phase11\_TypedCounter} & abclc & typed annotations / generics / typeof narrowing & OCaml \\
@@ -193,6 +193,8 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   Erlang codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --erlang} emits an \texttt{.erl} module; \texttt{class} $\to$ \texttt{spawn} + \texttt{receive} loop; fields $\to$ loop args with versioned variables on assign & Erlang \\
   Go codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --go} emits a single \texttt{main.go}; \texttt{class} $\to$ struct + goroutine; methods $\to$ typed message structs + helper methods + type-switch dispatch & Go \\
   Prolog codegen target & \texttt{Hello}, \texttt{counter} (verified); \texttt{PingPong} (xfail) & abclc & \texttt{aipl2c --prolog} emits a single SWI-Prolog \texttt{.pl} using \texttt{library(thread)}; \texttt{class} $\to$ \texttt{c\_loop(Fields)} thread + \texttt{thread\_get\_message} + \texttt{Msg = m(Args) -> body} dispatch; expressions hoisted to goals (\texttt{X is A + B}, \texttt{format(atom(S), ...)}) & Prolog \\
+  LLVM codegen target & \texttt{Hello}, \texttt{counter} (verified) & abclc & \texttt{aipl2c --llvm} emits the default C with clang-specific \texttt{\_\_attribute\_\_((hot))} / \texttt{((cold))} on the actor / watchdog / print paths, plus a header banner listing \texttt{clang -O2 -pthread} (native), \texttt{clang -emit-llvm -S} (text IR), and \texttt{clang -emit-llvm -c + lli} (interpret) workflows & LLVM \\
+  OpenMP codegen target & \texttt{Hello}, \texttt{counter} (verified) & abclc & \texttt{aipl2c --openmp} emits C + \texttt{<omp.h>}; the initial actor-spawn loop is converted to \texttt{\#pragma omp parallel for schedule(dynamic)} and the message counter uses \texttt{\#pragma omp atomic}. Build with \texttt{gcc-15 -fopenmp} or \texttt{clang -fopenmp}. pthreads still drive per-actor message loops (coexist with OpenMP) & OpenMP \\
   Drone / simulation & \texttt{drone\_simulator} & browser-abcl & obstacle-aware drone swarm with comm + view range & JS-B, JS-N \\
   Trace / minimal repros & \texttt{H}, \texttt{P}, \texttt{T*}, \texttt{LD*}, \texttt{MS}, \texttt{AA}, \texttt{PP}, \texttt{PH}, \texttt{line*}, \texttt{Philosophers5\_\{debug,trace\}} & abclc & reduced repro cases used during runtime / TLA+ / Spin model-checking & OCaml \\
   \bottomrule
@@ -208,19 +210,25 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   \midrule
   \endhead
 
-  method injection (\texttt{add\_method}/\texttt{remove\_method}) & \Yes & \Yes & \No & \No & \No & \No & \No \\
+  method injection (\texttt{add\_method}/\texttt{remove\_method}) & \Yes & \Yes & \Yes & \Yes & \No & \No & \No \\
   \texttt{now} synchronous send                                   & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{future} async send                                      & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{await} future block                                     & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{send} fire-and-forget                                   & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{become} actor class swap                                & \Yes & \Yes & \Yes & \Yes & \No  & \No  & \No  \\
   \texttt{select} selective receive                               & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No  \\
-  top-level functions                                             & \Yes & \Yes & \Part & \Part & \No  & \No  & \Yes \\
+  top-level functions                                             & \Yes & \Yes & \Yes & \Yes & \No  & \No  & \Yes \\
   signatures / overloads                                          & \No  & \No  & \Yes & \Yes & \No  & \No  & \No  \\
-  dynamic compile (\texttt{compile()})                            & \Yes & \Yes & \No & \No & \No & \No & \No \\
-  worker pool / \texttt{DynamicWorkerPool}                        & \Yes & \Yes & \No & \No & \Part & \Part & \No \\
+  dynamic compile (\texttt{compile()})                            & \Yes & \Yes & \Yes & \Yes & \No & \No & \No \\
+  worker pool / \texttt{DynamicWorkerPool}                        & \Yes & \Yes & \Yes & \Yes & \Part & \Part & \No \\
+  text file I/O (\texttt{read\_file}/\texttt{write\_file}/\texttt{append\_file}/\texttt{file\_exists}) & \Yes & \Yes & \Yes & \Yes & \Yes\textsuperscript{a} & \Yes\textsuperscript{a} & \No \\
+  image I/O (\texttt{image\_create}/\texttt{image\_load}/\texttt{image\_save}/\texttt{image\_size}/\texttt{image\_pixel}/\texttt{image\_set\_pixel}) & \Yes\textsuperscript{b} & \Yes\textsuperscript{b} & \Yes\textsuperscript{c} & \Yes\textsuperscript{c} & \Yes\textsuperscript{a\textsuperscript{,}c} & \Yes\textsuperscript{a\textsuperscript{,}c} & \No \\
   \bottomrule
 \end{longtable}
+
+\textsuperscript{a} \small JS-B / JS-N の I/O ビルトインは host が Node の \texttt{fs} を注入したとき (\texttt{server.mjs} が自動で行う) のみ動作。ブラウザ内では "not available" を投げる。\\
+\textsuperscript{b} \small Py-A / Py-I は Pillow 経由で PNG / JPEG / GIF / WebP を判定して読み書き。\\
+\textsuperscript{c} \small OCaml / JS-O / JS-B / JS-N は純ランタイムの PPM (P6) バックエンド (RGBA メモリ表現、保存時はアルファ破棄)。PNG は外部ライブラリが必要。
 
 \section*{Type system}
 
@@ -231,11 +239,11 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   \endhead
 
   type inference                  & \Part trace & \Yes HM & \Yes HM & \Yes HM & \Yes flow & \Yes flow & \Yes HM+spec \\
-  type annotations                & \Yes        & \Part ignored & \No & \No & \No & \No & \No \\
-  records \texttt{\{a:int, b:str\}} & \Yes  & \Yes & \Part type only & \No & \No & \No & \Part type only \\
-  tuples \texttt{(1, "a")}          & \Yes  & \Yes & \No  & \No  & \No  & \No  & \No  \\
-  arrays (typed, multi-dim)         & \Yes  & \Yes & \Yes & \Yes & \Part & \Part & \Part \\
-  generics on functions             & \No   & \Yes Forall & \Part Forall & \Part & \No & \No & \No \\
+  type annotations                & \Yes        & \Part ignored & \Yes & \Yes & \No & \No & \No \\
+  records \texttt{\{a:int, b:str\}} & \Yes  & \Yes & \Yes & \Yes & \No & \No & \Part type only \\
+  tuples \texttt{(1, "a")}          & \Yes  & \Yes & \Yes & \Yes  & \No  & \No  & \No  \\
+  arrays (typed, multi-dim)         & \Yes  & \Yes & \Yes & \Yes & \Yes & \Yes & \Part \\
+  generics on functions             & \No   & \Yes Forall & \Yes Forall & \Yes & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 
@@ -287,7 +295,7 @@ the program does not abort.
   \midrule
   \endhead
 
-  remote actors (HTTP)                          & \Yes & \Yes & \Part no WS & \Part & \No & \Part srv only & \Yes via OCaml \\
+  remote actors (HTTP)                          & \Yes & \Yes & \Yes\textsuperscript{d} & \Yes\textsuperscript{d} & \No & \Part srv only & \Yes via OCaml \\
   WebSocket                                     & \Yes \texttt{ws\_listen/send/close} builtins (websockets lib) & \Yes (=Py-A) & \Yes built-in (verified 101) & \Yes via OCaml & \Yes browser-native & \Yes \texttt{/ws?sid=} + \texttt{/api/broadcast} (ws lib) & \Yes \texttt{abcl\_ws\_runtime.c} + libwebsockets \\
   AI integration (\texttt{ai\_call})            & \Yes stream/img & \Yes & \Yes & \Yes & \Yes mock & \Yes mock & \Yes \\
   \quad provider arg (\texttt{ai\_call([1|2|3,] prompt)}) — 1=gemini, 2=anthropic, 3=openai & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes (via OCaml) \\
@@ -295,7 +303,7 @@ the program does not abort.
   \quad \texttt{future actor.m(...)} + \texttt{await(f)} + \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   \quad \texttt{send}\,+\,callback pattern with \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   AI governance (budget/concurrent/fallback)    & \Yes & \Yes & \Yes & \Yes & \No & \No & \Yes \\
-  HMAC-signed remote send                       & \Yes & \Yes & \No & \No & \No & \No & \Yes \\
+  HMAC-signed remote send                       & \Yes & \Yes & \Yes\textsuperscript{e} & \Yes\textsuperscript{e} & \No & \No & \Yes \\
   persistent actor state                        & \Yes & \Yes & \No & \No & \No & \No & \No \\
   live dashboard (SSE)                          & \Yes & \Yes & \Part polling & \Part & \No & \No & \Yes \\
   \texttt{/api/typecheck} JSON endpoint         & \No & \No & \Yes & \Yes & \No & \Yes & \NA \\
@@ -401,10 +409,11 @@ file:
 Of the 30 surveyed features, Python (annotated) ticks roughly 28.
 It owns the full Phase 11--17 stack (channels, linear types, owned
 fields, effects, structured concurrency, transient casts), method
-injection, dynamic compile, persistent actor state, and full AI
-integration (including streaming and images).
+injection, dynamic compile, persistent actor state, full AI
+integration (streaming + multimodal images), and Pillow-backed
+image I/O (PNG / JPEG / GIF / WebP).
 
-\subsection*{Python (inferred) is Python's HM-typed twin}
+\subsection*{Python (inferred) --- Python's HM-typed twin}
 
 Runtime features match Python (annotated) exactly because the
 interpreter is shared.  The trade is on the static side: the Phase
@@ -413,51 +422,81 @@ inference pass.  Inferred types cross-verified against OCaml: on
 shared samples (\texttt{Hello.abcl}, \texttt{counter.abcl}) the two
 runtimes produce identical type schemes.
 
-\subsection*{OCaml is the canonical core}
+\subsection*{OCaml --- feature parity with Python on the core}
 
-Implements roughly 15 of the surveyed features.  Phase 11+ exist
-only as \texttt{.abcl} design-document samples, not implemented.
-Solid \texttt{become} / \texttt{select} / HM inference; remote is
-HTTP only (no HMAC, no WebSocket).
+After the OCaml feature catch-up, the runtime supports
+\textbf{method injection} (\texttt{add\_method}/\texttt{remove\_method}),
+\textbf{dynamic compile} (\texttt{compile()} + \texttt{spawn()}),
+\textbf{top-level functions} with \textbf{generics}
+(\texttt{function id(x: T) -> T}), \textbf{type annotations},
+\textbf{records \& tuples}, \textbf{sized arrays}
+(\texttt{var x[N][M]}), and \textbf{text/image file I/O} (PPM
+backend for images).  Phase 11+ effect / linear / owned / transient
+features still only exist as \texttt{.abcl} design-document samples
+\textemdash{} not statically enforced.  Solid \texttt{become} /
+\texttt{select} / WebSocket (built into \texttt{web\_gateway.ml})
+and HTTP remote actor calls (\texttt{send}\,/\,\texttt{now}\,/\,\texttt{future},
+error-tolerant) with \textbf{HMAC-signed traffic}
+(\texttt{ABCL\_REMOTE\_SECRET} 環境変数, 純 OCaml HMAC-SHA256 in
+\texttt{src/hmac\_sha256.ml}, Python / C 版とワイヤ互換).
+
+\textsuperscript{d} \small OCaml の remote client (\texttt{src/remote\_client.ml}) は \texttt{send} (fire-and-forget) / \texttt{now} (同期 reply) / \texttt{future} (並列 + await) の 3 形式すべてをサポート。ECONNREFUSED / timeout は stderr に記録され、呼び出し側のアクターは生存する。エンドツーエンド検証は \texttt{src/test\_remote\_actor.sh} (9/9)。JS-O は OCaml バックエンド経由でこれを継承する。
+
+\textsuperscript{e} \small 純 OCaml HMAC-SHA256 (\texttt{src/hmac\_sha256.ml}, RFC 6234 / 4231 テストベクタで verify) を sender と receiver の両側で使う。\texttt{ABCL\_REMOTE\_SECRET} が両端でセットされたとき、全リクエストに \texttt{X-ABCL-Sig: <hex>} が付与される。\texttt{web\_gateway.ml} の \texttt{verify\_hmac\_or\_reject} は不一致なら 401 を返す。\texttt{python-aipl/aipl\_remote.py} と C ランタイムにワイヤ互換。以前は受信側が \texttt{openssl dgst} をサブプロセス起動していたが、インプロセスの純 OCaml 版に置換 (リクエスト毎の fork 排除)。
 
 \subsection*{JS-OCaml $\approx$ OCaml}
 
-Thin HTTP client over the OCaml backend, so features inherit.  The
-only differentiator is the \texttt{/api/typecheck} endpoint added
-in commit \texttt{5227f87}.
+A thin HTTP client (\texttt{src/app.js} etc.) over the OCaml
+backend exposed by \texttt{web\_gateway.ml}.  Every OCaml-side
+feature \textemdash{} method injection, dynamic compile, top-level
+functions, generics, type annotations, file \& image I/O
+\textemdash{} is reachable via \texttt{/api/repl} from a browser or
+\texttt{curl}.  The OCaml-specific differentiator is the
+\texttt{/api/typecheck} JSON endpoint.
 
-\subsection*{JS-Browser is the minimal implementation}
+\subsection*{JS-Browser --- minimal in-browser engine}
 
-Around 8 of the 30 features.  Basic actor model plus our
-newly-added flow-sensitive type inference.  No \texttt{become}, no
-channels, no remote.  AI integration exists but is mock-only.
+Basic actor model plus flow-sensitive type inference.
+Recently picked up \textbf{sized arrays} (\texttt{var x[N]}) and
+\textbf{text \& image file I/O} (host-injected \texttt{fs}; throws
+in browsers).  No \texttt{become}, no channels, no remote, no
+method injection.  AI integration exists but is mock-only.
 
-\subsection*{JS-Node (Node-server, newest)}
+\subsection*{JS-Node $\approx$ JS-Browser + fs}
 
-Wraps the browser-abcl parser, type-checker, and interpreter
-inside a Node.js HTTP server.  Exposes \texttt{/api/typecheck} (the
-same JSON shape as OCaml's endpoint) and \texttt{/api/run}
-(executes and returns stdout) — the only runtime with the latter.
-Runtime feature set mirrors browser-abcl; the value-add is having
-both the type-checker and the interpreter reachable over HTTP
-without bringing up either OCaml or a browser.
+Wraps the browser-abcl runtime inside a Node.js HTTP server
+(\texttt{src/node-aipl-server/server.mjs}); auto-injects Node's
+\texttt{fs} so the text \& image I/O builtins are functional.
+Exposes \texttt{/api/typecheck} and \texttt{/api/run} for headless
+use.  Same flow-sensitive type inference as browser-abcl.
 
-\subsection*{C version --- surprisingly strong on infrastructure}
+\subsection*{C codegen --- broadest target diversity}
 
-About 17 of 30.  \texttt{become} and \texttt{select} are not
-implemented (codegen emits \texttt{/* unsupported */}), but it
-inherits OCaml's HMAC, SSE, AI governance, and adds \textbf{three
-additional codegen targets} (SDL2, Xinu, Python).  Fields,
-parameters, and locals are specialized to native C types.
+\texttt{become} and \texttt{select} remain codegen-unsupported
+(emit \texttt{/* unsupported */}), but the codegen inherits OCaml's
+HMAC, SSE, and AI governance, and offers \textbf{9 backends} from
+one front-end:
+\begin{itemize}\itemsep0pt
+  \item C + pthread (default)
+  \item \textbf{C + LLVM / clang} (\texttt{--llvm}: adds
+    \texttt{\_\_attribute\_\_((hot/cold))} + headers for
+    \texttt{clang -emit-llvm})
+  \item \textbf{C + OpenMP} (\texttt{--openmp}: \texttt{\#pragma omp
+    parallel for} spawn loop + \texttt{\#pragma omp atomic} counter)
+  \item C + SDL2 (GUI demos)
+  \item Xinu / Python / Pony / Erlang / Go / SWI-Prolog
+\end{itemize}
+Fields, parameters, and locals are specialised to native C types
+via HM inference + per-class field-type registry.
 
-\section*{Method injection --- a Python-family exclusive}
+\section*{Method injection \textemdash{} now in three runtime families}
 
-Both Python variants use mutable method dispatch tables that can
-be mutated at runtime via \texttt{add\_method} /
-\texttt{remove\_method}.  Other runtimes substitute \texttt{become}
-(whole-class swap) as the closest equivalent.  \texttt{JS-Browser}
-and \texttt{JS-Node} lack even \texttt{become} (pure actor
-execution).
+Both Python variants and the OCaml runtime (with JS-OCaml piggy-backing
+on it) implement mutable method dispatch tables with runtime
+\texttt{add\_method} / \texttt{remove\_method} / \texttt{methods\_of}.
+\texttt{browser-abcl} and \texttt{node-aipl-server} still lack even
+\texttt{become} and rely on the unchanging method table baked at
+parse time.
 
 \section*{Type inference cross-verification}
 
@@ -496,9 +535,13 @@ HM-style polymorphic inference --- a different research axis
 \smallskip
 
 \noindent\small
-Generated 2026-05-13.  Includes \texttt{python-aipl-inferred}
-(commit \texttt{270f291}) and \texttt{node-aipl-server} (commit
-\texttt{adeb0b6}).  For source pointers, run \texttt{grep} against
-the files listed in each runtime's source column.
+Generated 2026-05-14.  Cumulative through the OCaml feature catch-up
+(records / tuples / dynamic compile / method injection / top-level
+functions / generics / type annotations / sized arrays / text \& image
+I/O) and the C-codegen LLVM / OpenMP targets.  Earlier additions of
+\texttt{python-aipl-inferred} (commit \texttt{270f291}) and
+\texttt{node-aipl-server} (commit \texttt{adeb0b6}) are included.
+For source pointers, run \texttt{grep} against the files listed in
+each runtime's source column.
 
 \end{document}

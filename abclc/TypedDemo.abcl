@@ -1,0 +1,51 @@
+// Type annotations in the OCaml runtime.
+//
+//   var x: T = expr;                  -- local/field with declared type
+//   function f(p: T, q: U) -> R { ... }  -- function with typed params + return
+//   method m(p: T) -> R { ... }       -- typed method
+//
+// HM inference still runs underneath: annotations only narrow the
+// inference result.  Mismatches between the annotation and the
+// inferred type fail at the declaration site.
+//
+// Supported type expressions:
+//   int | float | string | bool | unit | any
+//   array[T]
+//   (T, U, ...)        -- tuple
+//   {a: T, b: U, ...}  -- record
+
+// Typed top-level functions.
+function add(a: int, b: int) -> int {
+  return a + b;
+}
+
+function greet(name: string) -> string {
+  return "hello, " + name;
+}
+
+// Typed local variables.
+var n: int = add(3, 4);
+var msg: string = greet("alice");
+print("n   = " + n);
+print("msg = " + msg);
+
+// Typed method parameters + return.
+class Counter {
+  var count: int = 0;
+
+  method bump(by: int) -> int {
+    count = count + by;
+    return count;
+  }
+}
+
+var c = new Counter();
+var after = now c.bump(5);
+print("counter = " + after);
+
+// Typed records and tuples — types match values structurally.
+var pt: {x: int, y: int} = {x: 3, y: 4};
+print("pt.x = " + pt.x);
+
+var pair: (int, string) = (42, "hello");
+print("pair[1] = " + pair[1]);

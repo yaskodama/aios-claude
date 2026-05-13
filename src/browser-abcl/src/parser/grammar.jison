@@ -32,6 +32,8 @@
 ","  return ',';
 "."  return '.';
 "="  return '=';
+"["  return '[';
+"]"  return ']';
 "<"  return 'LT';
 ">"  return 'GT';
 "+"  return '+';
@@ -89,6 +91,15 @@ class_member
       { $$ = $1; }
   | VAR IDENT '=' expr ';'
       { $$ = yy.VarField($2, $4); }
+  | VAR IDENT dim_list ';'
+      { $$ = yy.VarField($2, yy.ArraySized($3, null)); }
+  | VAR IDENT dim_list '=' expr ';'
+      { $$ = yy.VarField($2, yy.ArraySized($3, $5)); }
+  ;
+
+dim_list
+  : '[' expr ']'                { $$ = [$2]; }
+  | '[' expr ']' dim_list       { $$ = [$2].concat($4); }
   ;
 
 method_decl
@@ -114,7 +125,10 @@ stmts
 
 stmt
   : VAR IDENT '=' expr ';'                       { $$ = yy.VarDecl($2, $4); }
+  | VAR IDENT dim_list ';'                       { $$ = yy.VarDecl($2, yy.ArraySized($3, null)); }
+  | VAR IDENT dim_list '=' expr ';'              { $$ = yy.VarDecl($2, yy.ArraySized($3, $5)); }
   | IDENT '=' expr ';'                           { $$ = yy.Assign($1, $3); }
+  | IDENT dim_list '=' expr ';'                  { $$ = yy.IndexAssign($1, $2, $4); }
   | SEND IDENT '.' IDENT '(' args ')' ';'        { $$ = yy.Send($2, $4, $6, false); }
   | UNSAFESEND IDENT '.' IDENT '(' args ')' ';'  { $$ = yy.Send($2, $4, $6, true); }
   | PRINT '(' expr ')' ';'                       { $$ = yy.Print($3); }
@@ -163,13 +177,14 @@ args
 expr
   : INT                       { $$ = yy.IntLit(Number(yytext)); }
   | FLOAT                     { $$ = yy.FloatLit(parseFloat(yytext)); }
-  | STRING                    { $$ = yy.StringLit(yytext.slice(1, -1)); }
+  | STRING                    { $$ = yy.StringLit(yy.unescapeString(yytext.slice(1, -1))); }
   | IDENT                     { $$ = yy.Var($1); }
   | NEW IDENT '(' args ')'    { $$ = yy.NewExpr($2, $4); }
   | IDENT '(' args ')'        { $$ = yy.CallExpr($1, $3); }
   | NOW IDENT '.' IDENT '(' args ')'    { $$ = yy.Now($2, $4, $6); }
   | FUTURE IDENT '.' IDENT '(' args ')' { $$ = yy.Future($2, $4, $6); }
   | AWAIT expr                          { $$ = yy.Await($2); }
+  | IDENT dim_list                      { $$ = yy.IndexExpr($1, $2); }
   | '(' expr ')'              { $$ = $2; }
   | expr '+' expr             { $$ = yy.Binop('+', $1, $3); }
   | expr '-' expr             { $$ = yy.Binop('-', $1, $3); }

@@ -5,6 +5,59 @@ open Ast
 
 let in_preinfer = ref false
 
+(* Heuristic: treat a single uppercase identifier (T, U, A, …, T1, T2) as
+   a user-declared type variable.  Anything else lowers to TAny. *)
+let is_tvar_name (n : string) : bool =
+  let len = String.length n in
+  if len = 0 then false
+  else
+    let c = n.[0] in
+    c >= 'A' && c <= 'Z' &&
+    (* T, U, V, ... or T1, A2, etc. — keep short to avoid colliding
+       with future class names *)
+    len <= 3 &&
+    (* Reject reserved-looking names that might be classes/actors *)
+    not (n = "AI")
+
+(* Lower a user-written surface type expression to the internal `ty`.
+   `tbl` maps each user-visible type-variable name (e.g. "T") to a
+   fresh `tvar ref` so the SAME name in the same signature produces
+   the SAME tvar (essential for `pair(a: T, b: T)`). Pass an empty
+   table to disable type-variable handling. *)
+let rec ty_of_type_expr_with_tbl
+    (tbl : (string, Types.tvar ref) Hashtbl.t option)
+    (te : Ast.type_expr) : Types.ty =
+  let go = ty_of_type_expr_with_tbl tbl in
+  match te with
+  | Ast.TyEInt -> Types.TInt
+  | Ast.TyEFloat -> Types.TFloat
+  | Ast.TyEString -> Types.TString
+  | Ast.TyEBool -> Types.TBool
+  | Ast.TyEUnit -> Types.TUnit
+  | Ast.TyEAny -> Types.TAny
+  | Ast.TyEArray t -> Types.TArray (go t)
+  | Ast.TyETuple ts -> Types.TTuple (List.map go ts)
+  | Ast.TyERecord fs ->
+      Types.TRecord (List.map (fun (l, t) -> (l, go t)) fs)
+  | Ast.TyEName n ->
+      (match tbl with
+       | Some t when is_tvar_name n ->
+           (match Hashtbl.find_opt t n with
+            | Some tv -> Types.TVar tv
+            | None ->
+                let tv = Types.fresh_tvar () in
+                Hashtbl.replace t n tv;
+                Types.TVar tv)
+       | _ -> Types.TAny)
+
+let ty_of_type_expr ?tvar_table te =
+  ty_of_type_expr_with_tbl tvar_table te
+
+(* Tracks the return type of the function whose body is currently being
+   type-checked, so that `return e;` can unify e's inferred type with
+   the function's declared return slot.  None when outside any function. *)
+let current_return_ty : Types.ty option ref = ref None
+
 let unify_at (loc:Location.t) (t1:ty) (t2:ty): bool =
   try
     Types.unify ~loc t1 t2; true
@@ -176,7 +229,52 @@ let rec infer_expr (env:env) (e:expr) : ty =
   | Await fe ->
       ignore (infer_expr env fe);
       TAny
-    
+  | RecordLit fields ->
+      let typed = List.map (fun (l, ex) -> (l, infer_expr env ex)) fields in
+      TRecord typed
+  | TupleLit es ->
+      TTuple (List.map (infer_expr env) es)
+  | FieldAccess (e1, fname) ->
+      let t1 = infer_expr env e1 in
+      (match repr t1 with
+       | TRecord fs ->
+           (match List.assoc_opt fname fs with
+            | Some t -> t
+            | None ->
+                raise (Type_error (e.loc,
+                  Printf.sprintf "no field %s in record %s"
+                    fname (Types.string_of_ty_pretty t1))))
+       | TAny | TVar _ -> TVar (Types.fresh_tvar ())
+       | other ->
+           raise (Type_error (e.loc,
+             Printf.sprintf "field access .%s on non-record type %s"
+               fname (Types.string_of_ty_pretty other))))
+  | IndexExpr (e1, n) ->
+      let t1 = infer_expr env e1 in
+      (match repr t1 with
+       | TTuple ts ->
+           if n < 0 || n >= List.length ts then
+             raise (Type_error (e.loc,
+               Printf.sprintf "tuple index %d out of bounds (size %d)"
+                 n (List.length ts)));
+           List.nth ts n
+       | TArray elt -> elt
+       | TAny | TVar _ -> TVar (Types.fresh_tvar ())
+       | other ->
+           raise (Type_error (e.loc,
+             Printf.sprintf "index [%d] on non-tuple/array type %s"
+               n (Types.string_of_ty_pretty other))))
+  | ArraySized (dims, init_opt) ->
+      List.iter (fun d ->
+        let t = infer_expr env d in
+        ignore (unify_try e.loc t TInt)) dims;
+      let elt_ty = match init_opt with
+        | Some i -> infer_expr env i
+        | None   -> TInt    (* default fill value is 0 (int) *)
+      in
+      (* Wrap with TArray once per dimension. *)
+      List.fold_left (fun acc _ -> TArray acc) elt_ty dims
+
 let set (e:env) (name:string) (sch:scheme) =
   Hashtbl.replace e name [sch]
 
@@ -198,9 +296,24 @@ let rec check_stmt (env:env) (s:stmt) : unit =
          raise (Type_error (s.sloc,("cannot assign to overloaded name: " ^ x))));
     ()
   | VarDecl (name, rhs) ->
-      let t   = infer_expr env rhs in
+      let t = infer_expr env rhs in
+      (* Honor any `var name: T = ...` annotation recorded by the
+         parser/normalizer.  The annotation must unify with the inferred
+         RHS type; an explicit mismatch fails at the declaration site
+         instead of much later. *)
+      (match Ast.lookup_var_annotation s.sloc with
+       | Some te ->
+           let declared = ty_of_type_expr te in
+           (try Types.unify ~loc:s.sloc declared t
+            with Types.Type_error (_, msg) ->
+              raise (Types.Type_error (s.sloc,
+                Printf.sprintf "var %s: annotation %s does not match inferred %s (%s)"
+                  name
+                  (Ast.string_of_type_expr te)
+                  (Types.string_of_ty_pretty t)
+                  msg)))
+       | None -> ());
       let sch = Types.generalize (ftv_env env) t in
-      (* 単一束縛として“置き換え” *)
         set_var_scheme env name sch;
         ()
   | If (cond, tbr, fbr) ->
@@ -312,6 +425,17 @@ let rec check_stmt (env:env) (s:stmt) : unit =
           end
     end
   | UnsafeSend (_target, _mname, args) -> List.iter (fun e -> ignore (infer_expr env e)) args
+  | Return e_opt ->
+      let t = match e_opt with
+        | None -> Types.TUnit
+        | Some e -> infer_expr env e
+      in
+      (match !current_return_ty with
+       | Some rt -> ignore (unify_try s.sloc rt t)
+       | None ->
+           (* `return` outside a function body is permitted but a no-op
+              for typing purposes — keeps gradual behavior. *)
+           ())
   | Select (cases, (to_ms_opt, to_body_opt)) ->
     (* timeout body *)
     (match (to_ms_opt, to_body_opt) with
@@ -365,15 +489,63 @@ let check_decl (env:env) = function
         set env_m "self" (Forall ([], TActor (c.Ast.cname, [])));
         set env_m "sender" (Forall ([], TAny));
 
-        List.iter (fun p ->
-          let a = Types.fresh_tvar () in
-          set env_m p (Forall ([], Types.TVar a))
-        ) m.params;
+        (* Bind each parameter with its declared type when annotated;
+           otherwise fall back to a fresh tvar so HM can still pin it
+           from the body. *)
+        List.iter2 (fun p t_opt ->
+          let t = match t_opt with
+            | Some te -> ty_of_type_expr te
+            | None -> Types.TVar (Types.fresh_tvar ())
+          in
+          set env_m p (Forall ([], t))
+        ) m.params m.param_types;
 
-        check_stmt env_m m.body
+        let ret_ty = match m.ret_ty with
+          | Some te -> ty_of_type_expr te
+          | None -> TAny
+        in
+        let prev_ret = !current_return_ty in
+        current_return_ty := Some ret_ty;
+        (try check_stmt env_m m.body
+         with e -> current_return_ty := prev_ret; raise e);
+        current_return_ty := prev_ret
 	) c.methods
-  | Global s ->                         
+  | Global s ->
       check_stmt env s
+  | Function fd ->
+      (* Share a tvar_table across parameter / return annotations so
+         that occurrences of the same user name (e.g. `T`) inside one
+         signature alias to the same `tvar ref`.  Each occurrence of
+         `T` in the *body* then refers to that same ref via env
+         binding. *)
+      let tvar_table : (string, Types.tvar ref) Hashtbl.t = Hashtbl.create 4 in
+      let env_fn = clone env in
+      let param_tys =
+        List.map (fun t_opt ->
+          match t_opt with
+          | Some te -> ty_of_type_expr ~tvar_table te
+          | None    -> TAny)
+        fd.fn_param_types
+      in
+      List.iter2 (fun p t -> set env_fn p (Forall ([], t)))
+        fd.fn_params param_tys;
+      let ret_ty = match fd.fn_ret_ty with
+        | Some te -> ty_of_type_expr ~tvar_table te
+        | None    -> TAny
+      in
+      let prev_ret = !current_return_ty in
+      current_return_ty := Some ret_ty;
+      (try check_stmt env_fn fd.fn_body
+       with e -> current_return_ty := prev_ret; raise e);
+      current_return_ty := prev_ret;
+      let ftype = TFun (param_tys, ret_ty) in
+      (* Generalize over any tvar that is (a) introduced by the
+         signature's `T`/`U`/… annotations and (b) still unlinked after
+         body checking.  `generalize` does exactly this: it pulls free
+         vars from `ftype` (which prunes through links) and removes
+         vars free in the surrounding env. *)
+      let sch = Types.generalize (ftv_env env) ftype in
+      set_var_scheme env fd.fn_name sch
 
 let build_proto (m : Ast.method_decl) : string * Types.ty =
   let tvs = List.init (List.length m.Ast.params) (fun _ -> Types.fresh_tvar ()) in
@@ -484,12 +656,29 @@ let infer_method (m : Ast.method_decl) =
     | _ -> ()
   ) p
 
+(* Pre-register each top-level `function f(...)` so that its name is in
+   the typing env BEFORE any global statement is checked.  The signature
+   is intentionally TAny everywhere: the existing operator-overload
+   resolution (`pick_overload`) uses destructive unification that
+   poisons fresh tvars across overload candidates, so a fully-polymorphic
+   slot would get spuriously narrowed by the first matching `+` rule.
+   TAny short-circuits unification and lets the runtime do the rest. *)
+let preinfer_all_functions (p : Ast.program) (env : Types.tenv) : unit =
+  List.iter (function
+    | Ast.Function fd ->
+        let n = List.length fd.Ast.fn_params in
+        let param_tys = List.init n (fun _ -> Types.TAny) in
+        let ftype = Types.TFun (param_tys, Types.TAny) in
+        set_var_scheme env fd.Ast.fn_name (Types.Forall ([], ftype))
+    | _ -> ()) p
+
 let check_program (p: Ast.program) : (Types.tenv, string) result =
   let env0 = Typing_env.prelude () in
   try
     prebind_global_actors p env0;
     in_preinfer := true;
     preinfer_all_classes p env0;           (* ★ 先に全クラスのメソッド型を登録 *)
+    preinfer_all_functions p env0;         (* ★ トップレベル関数の型シグネチャ登録 *)
     in_preinfer := false;
     Types.debug_print_class_method_schemes ();
     List.iter (check_decl env0) p;          (* それから通常どおりトップレベルを検査 *)

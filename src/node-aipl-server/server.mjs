@@ -36,6 +36,7 @@ import { createRequire } from "node:module";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import * as fs from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BROWSER = resolve(__dirname, "..", "browser-abcl");
@@ -142,6 +143,10 @@ function handleRun(source, opts = {}) {
   // Capture stdout
   const printer = (s) => stdoutLines.push(String(s));
   const runtime = new rt_module.Runtime(printer);
+  // Inject Node's fs so the runtime's read_file / write_file / etc.
+  // work — the same runtime.js file is also used in the browser, where
+  // fs is unavailable.
+  runtime.injectFs(fs);
   runtime.reset();
   for (const cls of tree.classes) runtime.registerClass(cls);
   const topEnv = {};

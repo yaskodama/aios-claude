@@ -14,6 +14,7 @@ and ty =
   | TArray of ty
   | TAny
   | TRecord of (string * ty) list
+  | TTuple of ty list
 and scheme = Forall of int list * ty
 
 exception Type_error of Location.t * string
@@ -186,6 +187,9 @@ let rec string_of_ty (t : ty) : string =
         |> String.concat "; "
       in
       "{" ^ fs ^ "}"
+  | TTuple ts ->
+      let xs = ts |> List.map string_of_ty |> String.concat " * " in
+      "(" ^ xs ^ ")"
   | TArray t1 -> Printf.sprintf "%s array" (string_of_ty t1)
   | TFun (ps, r) ->
     let ps_s =
@@ -207,6 +211,8 @@ let rec occurs (v : tvar ref) (t : ty) : bool =
   match repr t with
   | TVar v'      -> v == v'
   | TArray t1    -> occurs v t1
+  | TRecord fs   -> List.exists (fun (_,t) -> occurs v t) fs
+  | TTuple ts    -> List.exists (occurs v) ts
   | TFun(ps,r)   -> List.exists (occurs v) ps || occurs v r
   | _            -> false
 
@@ -229,6 +235,21 @@ let rec unify ?(loc = Location.dummy) (t1 : ty) (t2 : ty) : unit =
       ()
   | TArray a, TArray b ->
       unify ~loc a b  (* ★ loc を引き継ぐ *)
+  | TTuple ts1, TTuple ts2 ->
+      if List.length ts1 <> List.length ts2 then
+        raise (Type_error (loc, "tuple arity mismatch"));
+      List.iter2 (unify ~loc) ts1 ts2
+  | TRecord fs1, TRecord fs2 ->
+      if List.length fs1 <> List.length fs2 then
+        raise (Type_error (loc, "record field count mismatch"));
+      let sort = List.sort (fun (a,_) (b,_) -> compare a b) in
+      let fs1' = sort fs1 and fs2' = sort fs2 in
+      List.iter2
+        (fun (l1,t1) (l2,t2) ->
+           if l1 <> l2 then
+             raise (Type_error (loc, "record label mismatch: " ^ l1 ^ " vs " ^ l2));
+           unify ~loc t1 t2)
+        fs1' fs2'
   | TFun (ps1, r1), TFun (ps2, r2) ->
       if List.length ps1 <> List.length ps2 then
         raise (Type_error (loc, "arity mismatch"));
@@ -263,6 +284,7 @@ let rec prune t =
            t'')
   | TArray t1 -> TArray (prune t1)
   | TRecord fs -> TRecord (List.map (fun (l,t1) -> (l, prune t1)) fs)
+  | TTuple ts -> TTuple (List.map prune ts)
   | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,prune t1)) ms)
   | TFun (ps,r) -> TFun (List.map prune ps, prune r)
   | _ -> t
@@ -278,8 +300,12 @@ let string_of_ty_pretty (t : ty) : string =
         let base = Char.code 'a' + (!next mod 26) in
         let suffix = !next / 26 in
         incr next;
-        if suffix = 0 then Printf.sprintf "'%c" (Char.chr base)
-        else Printf.sprintf "'%c%d" (Char.chr base) suffix
+        let name =
+          if suffix = 0 then Printf.sprintf "'%c" (Char.chr base)
+          else Printf.sprintf "'%c%d" (Char.chr base) suffix
+        in
+        Hashtbl.replace names id name;   (* memoize so repeats reuse the name *)
+        name
   in
   let rec go ty =
     match prune ty with
@@ -287,6 +313,8 @@ let string_of_ty_pretty (t : ty) : string =
     | TArray t1   -> go t1 ^ "[]"
     | TRecord fs  ->
         "{" ^ (fs |> List.map (fun (l,t)-> l ^ " : " ^ go t) |> String.concat "; ") ^ "}"
+    | TTuple ts   ->
+        "(" ^ (ts |> List.map go |> String.concat " * ") ^ ")"
     | TActor(n,ms) ->
         "actor(" ^ n ^ ") { "
         ^ (ms |> List.map (fun (m,t)-> m ^ " : " ^ go t) |> String.concat "; ")
@@ -316,6 +344,8 @@ let rec ftv_ty t =
   | TArray t1 -> ftv_ty t1
   | TRecord fs ->
       List.fold_left (fun acc (_,t1)->ISet.union acc (ftv_ty t1)) ISet.empty fs
+  | TTuple ts ->
+      List.fold_left (fun acc t1 -> ISet.union acc (ftv_ty t1)) ISet.empty ts
   | TActor (_n,ms) ->
       List.fold_left (fun acc (_,t1)->ISet.union acc (ftv_ty t1)) ISet.empty ms
   | TFun (ps,r) ->
@@ -335,6 +365,7 @@ let instantiate (Forall (qs, t)) : ty =
     | TInt | TFloat | TBool | TString | TAny | TUnit -> ty
     | TArray t1 -> TArray (inst t1)
     | TRecord fs -> TRecord (List.map (fun (l,t1)->(l,inst t1)) fs)
+    | TTuple ts -> TTuple (List.map inst ts)
     | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,inst t1)) ms)
     | TFun (ps,r) -> TFun (List.map inst ps, inst r)
     | TVar tv ->

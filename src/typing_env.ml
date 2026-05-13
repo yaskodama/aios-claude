@@ -44,6 +44,21 @@ let prelude () : env =
   let a1 = fresh_tvar () in
   add_poly e "print" (Forall ([(!a1).id], TFun ([TVar a1], TUnit)));
 
+  (* IMPORTANT: overload-resolution order matters because pick_overload
+     uses destructive unification and accepts the FIRST matching scheme.
+     `add_mono`/`add_poly` PREPEND to the scheme list, so the LATEST
+     registered scheme is tried FIRST.  We register the most generic
+     (polymorphic / TAny-friendly) overloads FIRST so the more specific
+     concrete-type overloads (added later, tried first) are preferred. *)
+
+  (* 2.6 first) 文字列連結: 片側が string なら string — most generic,
+     registered first so concrete numeric overloads (below) win the
+     tie-breaker via prepend order. *)
+  let a = fresh_tvar () in
+  add_poly e "+" (Forall ([(!a).id], TFun ([TString; TVar a], TString)));
+  let a = fresh_tvar () in
+  add_poly e "+" (Forall ([(!a).id], TFun ([TVar a; TString], TString)));
+
   (* 2.5.1) 二項算術 — int と float の混在は float に昇格 *)
   let add_f2 f = add_mono e f (TFun ([TFloat; TFloat], TFloat)) in
   List.iter add_f2 [ "+"; "-"; "*"; "/" ];
@@ -62,12 +77,6 @@ let prelude () : env =
   let add_f6 f = add_mono e f (TFun ([TString; TString], TBool)) in
   List.iter add_f6 [ "=="; "!=" ];
 
-  (* 2.6) 文字列連結: 片側が string なら string *)
-  let a = fresh_tvar () in
-  add_poly e "+" (Forall ([(!a).id], TFun ([TString; TVar a], TString)));
-  let a = fresh_tvar () in
-  add_poly e "+" (Forall ([(!a).id], TFun ([TVar a; TString], TString)));
-
   (* reply : 'a -> unit  （まずは多相でもOK。型が厳しいなら int/float/string の overload に） *)
   let a = fresh_tvar () in
     add_poly e "reply" (Forall ([(!a).id], TFun([TVar a], TUnit)));
@@ -78,6 +87,24 @@ let prelude () : env =
   (* ---- web gateway ---- *)
   add_mono e "web_listen" (TFun ([TInt],   TUnit));
   add_mono e "web_listen" (TFun ([TFloat], TUnit));   (* float も許すなら *)
+
+  (* ---- text file I/O ---- *)
+  add_mono e "read_file"   (TFun ([TString],          TString));
+  add_mono e "write_file"  (TFun ([TString; TString], TInt));
+  add_mono e "append_file" (TFun ([TString; TString], TInt));
+  add_mono e "file_exists" (TFun ([TString],          TInt));
+
+  (* ---- image I/O (PPM P6 backend) ----
+     Images are an opaque value type; for typing purposes treat them as
+     TAny so that callers don't have to introduce a TImage variant. *)
+  add_mono e "image_create" (TFun ([TInt;TInt;TInt;TInt;TInt],      TAny));
+  add_mono e "image_create" (TFun ([TInt;TInt;TInt;TInt;TInt;TInt], TAny));
+  add_mono e "image_load"   (TFun ([TString], TAny));
+  add_mono e "image_save"   (TFun ([TAny; TString], TInt));
+  add_mono e "image_size"   (TFun ([TAny], TAny));
+  add_mono e "image_pixel"  (TFun ([TAny; TInt; TInt], TAny));
+  add_mono e "image_set_pixel" (TFun ([TAny; TInt; TInt; TInt; TInt; TInt],      TInt));
+  add_mono e "image_set_pixel" (TFun ([TAny; TInt; TInt; TInt; TInt; TInt; TInt], TInt));
   add_mono e "web_expose" (TFun ([TString; TString], TUnit));
 
   (* ---- wait: sleep milliseconds ---- *)
@@ -92,7 +119,14 @@ let prelude () : env =
   add_mono e "sdl_init" (TFun ([TFloat; TFloat], TUnit));
   add_mono e "sdl_init" (TFun ([TInt;   TInt  ], TUnit));
 
-  add_mono e "spawn" (TFun ([TString; TString], TUnit));
+  (* spawn(class, name [, init_args...]) returns the actor name (string).
+     Multiple overloads cover 0-4 init args; more args are accepted at
+     runtime but require additional entries here for static checking. *)
+  add_mono e "spawn" (TFun ([TString; TString], TString));
+  add_mono e "spawn" (TFun ([TString; TString; TAny], TString));
+  add_mono e "spawn" (TFun ([TString; TString; TAny; TAny], TString));
+  add_mono e "spawn" (TFun ([TString; TString; TAny; TAny; TAny], TString));
+  add_mono e "spawn" (TFun ([TString; TString; TAny; TAny; TAny; TAny], TString));
 
   (* ---- AI integration: Gemini via curl shell-out ---- *)
   add_mono e "ai_call"             (TFun ([TString], TString));

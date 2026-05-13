@@ -1,0 +1,23 @@
+// Text file I/O built-ins (OCaml runtime + JS-O).
+//
+//   read_file(path)            -> string
+//   write_file(path, s)        -> int (1 on success)
+//   append_file(path, s)       -> int
+//   file_exists(path)          -> int (1 if exists else 0)
+//
+// All paths are interpreted relative to the process's current working
+// directory.  Errors raise a failwith caught at the call site.
+
+var path = "/tmp/_aipl_io_test.txt";
+
+// Make sure we start clean.
+var initial_exists = file_exists(path);
+print("initial file_exists      = " + initial_exists);
+
+write_file(path, "hello, AIPL file I/O\n");
+print("after write, exists      = " + file_exists(path));
+print("read_file()              = " + read_file(path));
+
+append_file(path, "second line\n");
+append_file(path, "third line\n");
+print("read_file() after append =\n" + read_file(path));

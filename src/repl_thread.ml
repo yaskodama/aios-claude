@@ -68,7 +68,7 @@ let parse_program_safe (src : string) : (Ast.program, string) result =
   let lb = Lexing.from_string src in
   try
     lb.Lexing.lex_curr_pos <- 0;
-    Ok (Parser.program Lexer.token lb)
+    Ok (Ast.normalize_program (Parser.program Lexer.token lb))
   with
   | Failure msg when String.length msg >= 0 ->
       (* parser.mly から投げた Syntax_error を位置付きで表示 *)
@@ -308,7 +308,7 @@ let load_file (fname : string) : Ast.program option =
 (*    show_tokens (); *)
     let decls =
       let lb = Lexing.from_string src in
-      Parser.program Lexer.token lb
+      Ast.normalize_program (Parser.program Lexer.token lb)
     in
     print_endline "[AST]";
     Ast.dump_program decls;
@@ -403,6 +403,10 @@ let rec process_command line =
         Types.register_class_auto obj.cname ms_arity;
         Printf.printf "[Registered types for class %s: %s]\n%!" obj.cname
         (String.concat ", " (List.map (fun (m,a)-> Printf.sprintf "%s/%d" m a) ms_arity));
+    | Function fd ->
+      Printf.printf "[Defined function %s/%d]\n%!"
+        fd.fn_name (List.length fd.fn_params);
+      Eval_thread.register_function fd
     | _ -> ()
     ) !program_buffer;
     (* Persistent <top> actor — re-used across all top-level stmts so that
@@ -470,7 +474,19 @@ let rec process_command line =
           let arg_vals = List.map (Eval_thread.eval_expr top_actor) args in
           let arg_exprs = List.map (fun v ->
             mk_expr (Eval_thread.expr_of_value v)) arg_vals in
-          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt)
+          let tgt_name = string_of_send_target tgt in
+          (* Resolve via <top>'s env so that a variable holding an actor
+             name (e.g. from `var g = spawn(...)`) is dereferenced. *)
+          let actual_target =
+            match tgt with
+            | LocalTarget t -> (
+                match Hashtbl.find_opt top_actor.env t with
+                | Some (Eval_thread.VString s) when s <> "" -> s
+                | Some (Eval_thread.VActor (n, _)) -> n
+                | _ -> tgt_name)
+            | RemoteTarget _ -> tgt_name
+          in
+          Eval_thread.send_message ~from:"<top>" actual_target
             (mk_stmt (CallStmt (mname, arg_exprs)))
           ) :: !pending_global_sends)
       | UnsafeSend (tgt, mname, args) -> (
@@ -478,7 +494,17 @@ let rec process_command line =
           let arg_vals = List.map (Eval_thread.eval_expr top_actor) args in
           let arg_exprs = List.map (fun v ->
             mk_expr (Eval_thread.expr_of_value v)) arg_vals in
-          Eval_thread.send_message ~from:"<top>" (string_of_send_target tgt)
+          let tgt_name = string_of_send_target tgt in
+          let actual_target =
+            match tgt with
+            | LocalTarget t -> (
+                match Hashtbl.find_opt top_actor.env t with
+                | Some (Eval_thread.VString s) when s <> "" -> s
+                | Some (Eval_thread.VActor (n, _)) -> n
+                | _ -> tgt_name)
+            | RemoteTarget _ -> tgt_name
+          in
+          Eval_thread.send_message ~from:"<top>" actual_target
             (mk_stmt (CallStmt (mname, arg_exprs)))
           ) :: !pending_global_sends)
       | CallStmt (fname, args) -> (
@@ -502,6 +528,7 @@ let rec process_command line =
             Printf.printf "[Top-level Assign %s error] %s\n%!" name (Printexc.to_string exn))
       | _ -> ())
     | Class _ -> ()
+    | Function _ -> ()  (* already registered in the earlier pass *)
     ) !program_buffer;
     List.iter (fun thunk -> thunk ()) (List.rev !pending_global_sends);
     pending_global_sends := [];
@@ -901,11 +928,301 @@ let () =
       VUnit
   | _ -> failwith "reply(x): arity 1 expected");
 
+  (* ===== Text file I/O =====
+     Mirrors python-aipl/aipl_interp.py:
+       read_file(path)            -> string         (whole file as UTF-8)
+       write_file(path, content)  -> int (1 on success)  (truncates / overwrites)
+       append_file(path, content) -> int (1 on success)
+       file_exists(path)          -> int (1 if exists else 0)
+     Failures are surfaced as `failwith` -> [Top-level CallStmt error]. *)
+  let read_whole_file path =
+    let ic = open_in path in
+    let len = in_channel_length ic in
+    let buf = Bytes.create len in
+    really_input ic buf 0 len;
+    close_in ic;
+    Bytes.to_string buf
+  in
+  let write_string_to_file ?(append=false) path content =
+    let flags =
+      if append then [Open_wronly; Open_creat; Open_append; Open_text]
+      else [Open_wronly; Open_creat; Open_trunc; Open_text]
+    in
+    let oc = open_out_gen flags 0o644 path in
+    output_string oc content;
+    close_out oc
+  in
+  add_prim "read_file" (function
+  | [VString path] ->
+      (try VString (read_whole_file path)
+       with Sys_error msg -> failwith ("read_file: " ^ msg))
+  | _ -> failwith "read_file(path:string) -> string");
+
+  add_prim "write_file" (function
+  | [VString path; VString content] ->
+      (try write_string_to_file path content; VInt 1
+       with Sys_error msg -> failwith ("write_file: " ^ msg))
+  | _ -> failwith "write_file(path:string, content:string) -> int");
+
+  add_prim "append_file" (function
+  | [VString path; VString content] ->
+      (try write_string_to_file ~append:true path content; VInt 1
+       with Sys_error msg -> failwith ("append_file: " ^ msg))
+  | _ -> failwith "append_file(path:string, content:string) -> int");
+
+  add_prim "file_exists" (function
+  | [VString path] -> VInt (if Sys.file_exists path then 1 else 0)
+  | _ -> failwith "file_exists(path:string) -> int");
+
+  (* ===== Image I/O =====
+     A tiny RGBA bitmap kept entirely in memory, persisted as PPM P6
+     (binary, RGB; alpha is dropped on save and set to 255 on load).
+     Compatible with Preview.app / GIMP / ImageMagick.
+
+       image_create(w, h, r, g, b [, a]) -> image     single-colour fill
+       image_load(path)                  -> image     reads PPM P6
+       image_save(image, path)           -> int (1)   writes PPM P6
+       image_size(image)                 -> tuple(w, h)
+       image_pixel(image, x, y)          -> tuple(r, g, b, a)
+       image_set_pixel(img, x, y, r, g, b [, a]) -> int (1)
+  *)
+  let image_create w h r g b a =
+    let buf = Bytes.create (w * h * 4) in
+    for i = 0 to w * h - 1 do
+      Bytes.set buf (i*4    ) (Char.chr (r land 0xff));
+      Bytes.set buf (i*4 + 1) (Char.chr (g land 0xff));
+      Bytes.set buf (i*4 + 2) (Char.chr (b land 0xff));
+      Bytes.set buf (i*4 + 3) (Char.chr (a land 0xff));
+    done;
+    Eval_thread.{ iwidth = w; iheight = h; ipixels = buf }
+  in
+  let image_save (img : Eval_thread.image_data) path =
+    let oc = open_out_bin path in
+    output_string oc (Printf.sprintf "P6\n%d %d\n255\n" img.iwidth img.iheight);
+    for i = 0 to img.iwidth * img.iheight - 1 do
+      output_char oc (Bytes.get img.ipixels (i*4    ));
+      output_char oc (Bytes.get img.ipixels (i*4 + 1));
+      output_char oc (Bytes.get img.ipixels (i*4 + 2));
+    done;
+    close_out oc
+  in
+  let image_load path =
+    let ic = open_in_bin path in
+    (* Helper: read whitespace-separated tokens from the header, skipping
+       comments starting with '#'. *)
+    let read_token () =
+      let buf = Buffer.create 8 in
+      (* skip whitespace + comments *)
+      let rec skip () =
+        let c = input_char ic in
+        if c = '#' then (
+          (* comment until newline *)
+          while input_char ic <> '\n' do () done;
+          skip ()
+        ) else if c = ' ' || c = '\t' || c = '\n' || c = '\r' then skip ()
+        else Buffer.add_char buf c
+      in
+      skip ();
+      (try
+        while true do
+          let c = input_char ic in
+          if c = ' ' || c = '\t' || c = '\n' || c = '\r' then raise Exit
+          else Buffer.add_char buf c
+        done
+      with Exit | End_of_file -> ());
+      Buffer.contents buf
+    in
+    let magic = read_token () in
+    if magic <> "P6" then failwith ("image_load: unsupported PPM magic '" ^ magic ^ "' (only P6 supported)");
+    let w = int_of_string (read_token ()) in
+    let h = int_of_string (read_token ()) in
+    let maxv = int_of_string (read_token ()) in
+    if maxv <> 255 then failwith "image_load: PPM maxval must be 255";
+    let buf = Bytes.create (w * h * 4) in
+    for i = 0 to w * h - 1 do
+      let r = input_char ic in
+      let g = input_char ic in
+      let b = input_char ic in
+      Bytes.set buf (i*4    ) r;
+      Bytes.set buf (i*4 + 1) g;
+      Bytes.set buf (i*4 + 2) b;
+      Bytes.set buf (i*4 + 3) (Char.chr 255);
+    done;
+    close_in ic;
+    Eval_thread.{ iwidth = w; iheight = h; ipixels = buf }
+  in
+
+  (* Coerce a numeric value (int or float) to int for image coordinates
+     and pixel components.  AIPL's arithmetic promotes int+int to float
+     by default, so call sites like `x*16` arrive here as VFloat. *)
+  let as_int_loose = function
+    | VInt n -> n
+    | VFloat f -> int_of_float f
+    | v -> failwith ("expected int/float, got " ^ Eval_thread.type_name_of_value v)
+  in
+  add_prim "image_create" (function
+  | [w; h; r; g; b] ->
+      VImage (image_create (as_int_loose w) (as_int_loose h)
+                (as_int_loose r) (as_int_loose g) (as_int_loose b) 255)
+  | [w; h; r; g; b; a] ->
+      VImage (image_create (as_int_loose w) (as_int_loose h)
+                (as_int_loose r) (as_int_loose g) (as_int_loose b)
+                (as_int_loose a))
+  | _ -> failwith "image_create(w:int, h:int, r:int, g:int, b:int [, a:int]) -> image");
+
+  add_prim "image_load" (function
+  | [VString path] ->
+      (try VImage (image_load path)
+       with Sys_error msg -> failwith ("image_load: " ^ msg))
+  | _ -> failwith "image_load(path:string) -> image");
+
+  add_prim "image_save" (function
+  | [VImage img; VString path] ->
+      (try image_save img path; VInt 1
+       with Sys_error msg -> failwith ("image_save: " ^ msg))
+  | _ -> failwith "image_save(image, path:string) -> int");
+
+  add_prim "image_size" (function
+  | [VImage img] -> VTuple [VInt img.iwidth; VInt img.iheight]
+  | _ -> failwith "image_size(image) -> tuple(int, int)");
+
+  add_prim "image_pixel" (function
+  | [VImage img; xv; yv] ->
+      let x = as_int_loose xv and y = as_int_loose yv in
+      if x < 0 || x >= img.iwidth || y < 0 || y >= img.iheight then
+        failwith (Printf.sprintf "image_pixel: (%d, %d) out of bounds (%dx%d)"
+                    x y img.iwidth img.iheight);
+      let off = (y * img.iwidth + x) * 4 in
+      let g i = Char.code (Bytes.get img.ipixels (off + i)) in
+      VTuple [VInt (g 0); VInt (g 1); VInt (g 2); VInt (g 3)]
+  | _ -> failwith "image_pixel(image, x:int, y:int) -> tuple");
+
+  add_prim "image_set_pixel" (function
+  | [VImage img; xv; yv; rv; gv; bv] ->
+      let x = as_int_loose xv and y = as_int_loose yv in
+      let r = as_int_loose rv and g = as_int_loose gv and b = as_int_loose bv in
+      if x < 0 || x >= img.iwidth || y < 0 || y >= img.iheight then
+        failwith (Printf.sprintf "image_set_pixel: (%d, %d) out of bounds (%dx%d)"
+                    x y img.iwidth img.iheight);
+      let off = (y * img.iwidth + x) * 4 in
+      Bytes.set img.ipixels (off    ) (Char.chr (r land 0xff));
+      Bytes.set img.ipixels (off + 1) (Char.chr (g land 0xff));
+      Bytes.set img.ipixels (off + 2) (Char.chr (b land 0xff));
+      Bytes.set img.ipixels (off + 3) (Char.chr 255);
+      VInt 1
+  | [VImage img; xv; yv; rv; gv; bv; av] ->
+      let x = as_int_loose xv and y = as_int_loose yv in
+      let r = as_int_loose rv and g = as_int_loose gv
+      and b = as_int_loose bv and a = as_int_loose av in
+      if x < 0 || x >= img.iwidth || y < 0 || y >= img.iheight then
+        failwith (Printf.sprintf "image_set_pixel: (%d, %d) out of bounds (%dx%d)"
+                    x y img.iwidth img.iheight);
+      let off = (y * img.iwidth + x) * 4 in
+      Bytes.set img.ipixels (off    ) (Char.chr (r land 0xff));
+      Bytes.set img.ipixels (off + 1) (Char.chr (g land 0xff));
+      Bytes.set img.ipixels (off + 2) (Char.chr (b land 0xff));
+      Bytes.set img.ipixels (off + 3) (Char.chr (a land 0xff));
+      VInt 1
+  | _ -> failwith "image_set_pixel(image, x, y, r, g, b [, a]) -> int");
+
   add_prim "spawn" (function
   | [VString class_name; VString actor_name] ->
-      Eval_thread.spawn_actor ~class_name ~actor_name;  (* これを実装 *)
-      VUnit
-  | _ -> failwith "spawn(class, name): arity 2 expected (string,string)");
+      Eval_thread.spawn_actor ~class_name ~actor_name ();
+      VString actor_name
+  | VString class_name :: VString actor_name :: rest ->
+      Eval_thread.spawn_actor ~init_args:rest ~class_name ~actor_name ();
+      VString actor_name
+  | _ -> failwith "spawn(class:string, name:string [, init_args...])");
+
+  (* === Method injection === *)
+  (* add_method(target, source) — target is a class name or an actor
+     name. source is a string of one or more `method ...` declarations.
+     Live actors of a patched class are updated in place. Returns the
+     number of methods added. *)
+  add_prim "add_method" (function
+  | [VString target; VString src] ->
+      let methods = Eval_thread.parse_methods_from_source src in
+      let n =
+        if Hashtbl.mem Eval_thread.class_env target then
+          Eval_thread.add_methods_to_class target methods
+        else if Eval_thread.actor_exists target then
+          Eval_thread.add_methods_to_actor target methods
+        else
+          failwith ("add_method: target not found: " ^ target)
+      in
+      VInt n
+  | _ -> failwith "add_method(target:string, source:string)");
+
+  add_prim "remove_method" (function
+  | [VString target; VString mname] ->
+      let ok =
+        if Hashtbl.mem Eval_thread.class_env target then
+          Eval_thread.remove_method_from_class target mname
+        else if Eval_thread.actor_exists target then
+          Eval_thread.remove_method_from_actor target mname
+        else
+          failwith ("remove_method: target not found: " ^ target)
+      in
+      VBool ok
+  | _ -> failwith "remove_method(target:string, name:string)");
+
+  add_prim "methods_of" (function
+  | [VString target] ->
+      let names =
+        if Hashtbl.mem Eval_thread.class_env target then
+          Eval_thread.methods_of_class target
+        else if Eval_thread.actor_exists target then
+          Eval_thread.methods_of_actor target
+        else
+          failwith ("methods_of: target not found: " ^ target)
+      in
+      make_array (Array.of_list (List.map (fun n -> VString n) names))
+  | _ -> failwith "methods_of(target:string)");
+
+  (* Dynamic compile: parse an AIPL source string at runtime, register all
+     `class` declarations into the class table, and execute top-level
+     statements (var, send, call) on the persistent <top> actor. Returns
+     the number of classes newly registered as VInt. *)
+  add_prim "compile" (function
+  | [VString src] ->
+      let prog =
+        match parse_program_safe src with
+        | Ok p -> p
+        | Error msg -> failwith ("compile: " ^ msg)
+      in
+      let n = ref 0 in
+      List.iter (function
+        | Ast.Class obj ->
+            Eval_thread.register_class obj;
+            let ms_arity =
+              obj.methods |> List.map (fun (md:Ast.method_decl) ->
+                (md.mname, List.length md.params))
+            in
+            Types.register_class_auto obj.cname ms_arity;
+            incr n
+        | Ast.Function fd ->
+            Eval_thread.register_function fd;
+            incr n
+        | _ -> ()
+      ) prog;
+      let top_actor =
+        match Hashtbl.find_opt Eval_thread.actor_table "<top>" with
+        | Some a -> a
+        | None ->
+            let a = Eval_thread.create_actor "<top>" "<top>" in
+            Hashtbl.add Eval_thread.actor_table "<top>" a;
+            a
+      in
+      List.iter (function
+        | Ast.Global s ->
+            (try Eval_thread.eval_stmt top_actor s
+             with exn ->
+               Printf.printf "[compile: top-level error] %s\n%!"
+                 (Printexc.to_string exn))
+        | _ -> ()
+      ) prog;
+      VInt !n
+  | _ -> failwith "compile(source:string)");
 
   (* AI integration: synchronous LLM call.  Each blocks the calling
      actor until the provider responds.  Provider can be passed as

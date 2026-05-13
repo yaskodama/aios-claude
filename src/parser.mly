@@ -17,14 +17,15 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token METHOD FLOAT CALL SEND UNSAFESEND REMOTE
 %token NOW FUTURE AWAIT
 %token IF THEN ELSE WHILE DO
-%token ASSIGN PLUS MINUS TIMES DIV LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA
+%token ASSIGN PLUS MINUS TIMES DIV LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COLON SEMICOLON COMMA
 %token GE LE GT LT SELF SENDER CLASS
 %token SELECT CASE TIMEOUT
 %token ARROW /* -> */
 %token EOF NEW
-%token VAR EQ NEQ DOT BECOME
+%token VAR EQ NEQ DOT BECOME FUNCTION RETURN
 %left PLUS MINUS
 %left TIMES DIV
+%left DOT LBRACK
 %start program
 %type <Ast.program> program
 %type <Ast.send_target> send_target
@@ -47,9 +48,20 @@ arg_list:
 decl:
   | CLASS ID LBRACE fields methods RBRACE  { Class { cname = $2; fields = $4; methods = $5 } }
   | CLASS ID LBRACE methods RBRACE         { Class { cname = $2; fields = []; methods = $4 } }
+  | FUNCTION ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
+      { let (names, tys) = List.split $4 in
+        Function { fn_name = $2; fn_params = names; fn_param_types = tys;
+                   fn_ret_ty = $6; fn_body = mk_stmt1 2 (Seq $8) } }
   | VAR ID ASSIGN expr SEMICOLON           { Global (mk_stmt1 2 (VarDecl ($2, $4))) }
+  | VAR ID COLON type_expr ASSIGN expr SEMICOLON
+      { Global (mk_stmt1 2 (TypedVarDecl ($2, $4, $6))) }
+  | VAR ID dim_list SEMICOLON
+      { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, None))))) }
+  | VAR ID dim_list ASSIGN expr SEMICOLON
+      { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, Some $5))))) }
   | VAR ID ASSIGN NEW ID LPAREN args RPAREN SEMICOLON
     { Global (mk_stmt1 2 (VarDecl ($2, mk_expr1 4 (New ($5, $7))))) }
+  | ID ASSIGN expr SEMICOLON               { Global (mk_stmt1 1 (Assign ($1, $3))) }
   | SEND send_target DOT ID LPAREN args RPAREN SEMICOLON               { Global (mk_stmt1 1 (Send ($2, $4, $6))) }
   | UNSAFESEND send_target DOT ID LPAREN args RPAREN SEMICOLON         { Global (mk_stmt1 1 (UnsafeSend ($2, $4, $6))) }
   | ID LPAREN args RPAREN SEMICOLON        { Global (mk_stmt1 1 (CallStmt ($1, $3))) }
@@ -61,19 +73,66 @@ fields:
 field:
   | FLOAT ID ASSIGN expr SEMICOLON { mk_stmt1 2  (VarDecl ($2, $4)) }
   | VAR ID ASSIGN expr SEMICOLON { mk_stmt1 2 (VarDecl ($2, $4)) }
+  | VAR ID COLON type_expr ASSIGN expr SEMICOLON
+      { mk_stmt1 2 (TypedVarDecl ($2, $4, $6)) }
+  | VAR ID dim_list SEMICOLON
+      { mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, None)))) }
+  | VAR ID dim_list ASSIGN expr SEMICOLON
+      { mk_stmt1 2 (VarDecl ($2, mk_expr1 3 (ArraySized ($3, Some $5)))) }
   
 methods:
   | method_decl { [$1] }
   | method_decl methods { $1 :: $2 }
 
 method_decl:
-  | METHOD ID LPAREN param_list RPAREN LBRACE stmts RBRACE
-    { { mname = $2; params = $4; body = mk_stmt1 2 (Seq $7) } }
+  | METHOD ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
+    { let (names, tys) = List.split $4 in
+      { mname = $2; params = names; param_types = tys; ret_ty = $6;
+        body = mk_stmt1 2 (Seq $8) } }
 
 param_list:
   |    { [] }
   | ID { [$1] }
   | ID COMMA param_list { $1::$3 }
+
+annot_param:
+  | ID                          { ($1, None) }
+  | ID COLON type_expr          { ($1, Some $3) }
+
+annot_param_list:
+  |                                  { [] }
+  | annot_param                      { [$1] }
+  | annot_param COMMA annot_param_list { $1 :: $3 }
+
+method_ret_opt:
+  |                              { None }
+  | ARROW type_expr              { Some $2 }
+
+type_expr:
+  | ID                                  { match $1 with
+                                          | "int" -> TyEInt
+                                          | "float" -> TyEFloat
+                                          | "string" -> TyEString
+                                          | "bool" -> TyEBool
+                                          | "unit" -> TyEUnit
+                                          | "any" -> TyEAny
+                                          | n -> TyEName n }
+  | ID LBRACK type_expr RBRACK          { if $1 = "array" then TyEArray $3
+                                          else TyEName ($1 ^ "[" ^ "...]") }
+  | LPAREN type_expr_tuple RPAREN       { TyETuple $2 }
+  | LBRACE type_expr_record RBRACE      { TyERecord $2 }
+
+type_expr_tuple:
+  | type_expr COMMA type_expr           { [$1; $3] }
+  | type_expr COMMA type_expr_tuple     { $1 :: $3 }
+
+type_expr_record:
+  | ID COLON type_expr                       { [($1, $3)] }
+  | ID COLON type_expr COMMA type_expr_record { ($1, $3) :: $5 }
+
+dim_list:
+  | LBRACK expr RBRACK            { [$2] }
+  | LBRACK expr RBRACK dim_list   { $2 :: $4 }
 
 send_target:
     ID                                                { LocalTarget $1 }
@@ -100,11 +159,19 @@ stmt:
   | WHILE expr DO stmt { mk_stmt1 2 (While ($2, $4)) }
   | LBRACE stmt_list RBRACE { mk_stmt1 2 (Seq $2) }
   | VAR ID ASSIGN expr SEMICOLON { mk_stmt1 2 (VarDecl($2, $4)) }
+  | VAR ID COLON type_expr ASSIGN expr SEMICOLON
+      { mk_stmt1 2 (TypedVarDecl($2, $4, $6)) }
+  | VAR ID dim_list SEMICOLON
+      { mk_stmt1 2 (VarDecl($2, mk_expr1 3 (ArraySized($3, None)))) }
+  | VAR ID dim_list ASSIGN expr SEMICOLON
+      { mk_stmt1 2 (VarDecl($2, mk_expr1 3 (ArraySized($3, Some $5)))) }
   | VAR ID ASSIGN NEW ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (VarDecl($2, mk_expr1 4 (New($5,$7)))) }
   | ID LPAREN args RPAREN SEMICOLON { mk_stmt1 1 (CallStmt ($1, $3)) }
   | BECOME ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, $4)) } 
   | BECOME ID LPAREN RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, [])) }
   | SELECT LBRACE select_cases select_timeout_opt RBRACE { mk_stmt1 3 (Select($3, $4)) }
+  | RETURN expr SEMICOLON                              { mk_stmt1 1 (Return (Some $2)) }
+  | RETURN SEMICOLON                                   { mk_stmt1 1 (Return None) }
 
 select_cases:
     select_cases select_case { $1 @ [$2] }
@@ -164,6 +231,14 @@ expr:
   | expr EQ  expr { mk_expr1 2 (Binop ("==", $1, $3)) }
   | expr NEQ expr { mk_expr1 2 (Binop ("!=", $1, $3)) }
   | LPAREN expr RPAREN { $2 }
+  | LPAREN expr COMMA arg_list RPAREN             { mk_expr1 1 (TupleLit ($2 :: $4)) }
+  | LBRACE record_fields RBRACE                   { mk_expr1 1 (RecordLit $2) }
+  | expr DOT ID                                   { mk_expr1 2 (FieldAccess ($1, $3)) }
+  | expr LBRACK INTLIT RBRACK                     { mk_expr1 2 (IndexExpr ($1, $3)) }
   | NOW send_target DOT ID LPAREN args RPAREN     { mk_expr1 1 (Now ($2, $4, $6)) }
   | FUTURE send_target DOT ID LPAREN args RPAREN  { mk_expr1 1 (Future ($2, $4, $6)) }
   | AWAIT expr                                    { mk_expr1 1 (Await $2) }
+
+record_fields:
+  | ID COLON expr                       { [($1, $3)] }
+  | ID COLON expr COMMA record_fields   { ($1, $3) :: $5 }

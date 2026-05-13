@@ -91,10 +91,12 @@ export class Runtime {
     const cls = this.classes.get(className);
     if (!cls) throw new Error("Class not found: " + className);
 
-    // Evaluate class field defaults to initialise actor state
+    // Evaluate class field defaults to initialise actor state.  Fields
+    // are evaluated in declaration order so a later field can refer to
+    // an earlier one (e.g. `var cells[rows][cols];`).
     const state = {};
     for (const field of (cls.fields || [])) {
-      state[field.name] = this._evalFieldExpr(field.expr);
+      state[field.name] = this._evalFieldExpr(field.expr, state);
     }
 
     const actor = {
@@ -124,20 +126,36 @@ export class Runtime {
   }
 
   // Simple expression evaluator for class field default values (no env needed)
-  _evalFieldExpr(expr) {
+  _evalFieldExpr(expr, state = {}) {
     if (!expr) return null;
     if (expr.type === "IntLit")   return expr.value;
     if (expr.type === "FloatLit") return expr.value;
     if (expr.type === "StringLit") return expr.value;
+    if (expr.type === "Var" && state && expr.name in state) return state[expr.name];
     if (expr.type === "Binop") {
-      const l = this._evalFieldExpr(expr.left);
-      const r = this._evalFieldExpr(expr.right);
+      const l = this._evalFieldExpr(expr.left, state);
+      const r = this._evalFieldExpr(expr.right, state);
       switch (expr.op) {
         case "+": return l + r;
         case "-": return l - r;
         case "*": return l * r;
         case "/": return l / r;
       }
+    }
+    if (expr.type === "ArraySized") {
+      const dims = expr.dims.map(d => this._evalFieldExpr(d, state) | 0);
+      const fill = expr.init === null
+        ? 0
+        : this._evalFieldExpr(expr.init, state);
+      const build = (ds) => {
+        if (ds.length === 0) return fill;
+        const n = ds[0];
+        const rest = ds.slice(1);
+        const arr = new Array(n);
+        for (let i = 0; i < n; i++) arr[i] = build(rest);
+        return arr;
+      };
+      return build(dims);
     }
     return 0;
   }
@@ -338,6 +356,24 @@ export class Runtime {
           const actor = this.actors.get(env.__currentActor);
           if (actor && stmt.name in actor.state) actor.state[stmt.name] = v;
         }
+        return v;
+      }
+
+      case "IndexAssign": {
+        // a[i][j]… = expr
+        let target = env[stmt.name];
+        if (!Array.isArray(target))
+          throw new Error("IndexAssign on non-array: " + stmt.name);
+        const lastIdx = stmt.dims.length - 1;
+        for (let i = 0; i < lastIdx; i++) {
+          const idx = this.evalExpr(stmt.dims[i], env) | 0;
+          if (!Array.isArray(target[idx]))
+            throw new Error("IndexAssign: intermediate slot is not an array");
+          target = target[idx];
+        }
+        const finalIdx = this.evalExpr(stmt.dims[lastIdx], env) | 0;
+        const v = this.evalExpr(stmt.expr, env);
+        target[finalIdx] = v;
         return v;
       }
 
@@ -594,6 +630,23 @@ export class Runtime {
         if (k) k.add(Number(obsId));
         break;
       }
+
+      /* ---- text file I/O (Node host only) ---- */
+      case "read_file":   this._fsRead(args[0]); break;
+      case "write_file":  this._fsWrite(args[0], args[1], false); break;
+      case "append_file": this._fsWrite(args[0], args[1], true); break;
+      case "file_exists": /* discarded as a statement */ break;
+
+      /* ---- image I/O ---- */
+      case "image_save":      this._imageSave(args[0], args[1]); break;
+      case "image_set_pixel": this._imageSetPixel(args); break;
+      /* image_create / image_load / image_size / image_pixel are
+         expression-only — using them as stmts has no observable
+         effect, so we just discard. */
+      case "image_create":
+      case "image_load":
+      case "image_size":
+      case "image_pixel":     break;
 
       default:
         this.print(`[call] ${name}(${args.join(", ")})`);
@@ -1131,6 +1184,145 @@ export class Runtime {
     return `[mock${provTag}] reply${sysTag} for: ${head}`;
   }
 
+  // ---- Text file I/O ---------------------------------------------------
+  // Lazily resolve Node's `fs` so the same runtime file works in the
+  // browser (where there is no filesystem).  The browser path returns
+  // null and each I/O helper throws a clear "not available" error.
+  //
+  // Resolution prefers an `fs` module injected by the embedder (used
+  // by node-aipl-server) so we don't have to dance around ESM/CJS
+  // boundaries; otherwise we look for the Node-global `__aipl_fs`
+  // hook.  Both browsers and tests can shim a fake `fs` on the
+  // runtime via `runtime.injectFs(fs)`.
+  injectFs(fs) {
+    this.__fsCached = fs || null;
+  }
+  _fs() {
+    if (this.__fsCached !== undefined) return this.__fsCached;
+    if (typeof globalThis !== "undefined" && globalThis.__aipl_fs) {
+      this.__fsCached = globalThis.__aipl_fs;
+      return this.__fsCached;
+    }
+    this.__fsCached = null;
+    return null;
+  }
+  _fsRead(path) {
+    const fs = this._fs();
+    if (!fs) throw new Error("read_file: filesystem not available in browser");
+    return fs.readFileSync(String(path), "utf8");
+  }
+  _fsWrite(path, content, append) {
+    const fs = this._fs();
+    if (!fs) throw new Error((append ? "append_file" : "write_file") +
+      ": filesystem not available in browser");
+    if (append) {
+      fs.appendFileSync(String(path), String(content), "utf8");
+    } else {
+      fs.writeFileSync(String(path), String(content), "utf8");
+    }
+    return 1;
+  }
+  _fsExists(path) {
+    const fs = this._fs();
+    if (!fs) return 0;
+    return fs.existsSync(String(path)) ? 1 : 0;
+  }
+
+  // ---- Image I/O (PPM P6, RGBA in memory) -----------------------------
+  // An image is a plain object { __image: true, w, h, px } where `px` is a
+  // Uint8Array of length w*h*4 (RGBA, row-major).
+  _imageCreate(args) {
+    const w = args[0] | 0, h = args[1] | 0;
+    const r = args[2] | 0, g = args[3] | 0, b = args[4] | 0;
+    const a = args.length >= 6 ? (args[5] | 0) : 255;
+    const px = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      px[i*4] = r; px[i*4+1] = g; px[i*4+2] = b; px[i*4+3] = a;
+    }
+    return { __image: true, w, h, px };
+  }
+  _imageSave(img, path) {
+    const fs = this._fs();
+    if (!fs) throw new Error("image_save: filesystem not available in browser");
+    if (!img || !img.__image) throw new Error("image_save: not an image");
+    const header = `P6\n${img.w} ${img.h}\n255\n`;
+    // Pack RGB (drop A) into a fresh buffer.
+    const rgb = Buffer.alloc(img.w * img.h * 3);
+    for (let i = 0; i < img.w * img.h; i++) {
+      rgb[i*3]   = img.px[i*4];
+      rgb[i*3+1] = img.px[i*4+1];
+      rgb[i*3+2] = img.px[i*4+2];
+    }
+    fs.writeFileSync(String(path), Buffer.concat([Buffer.from(header, "utf8"), rgb]));
+    return 1;
+  }
+  _imageLoad(path) {
+    const fs = this._fs();
+    if (!fs) throw new Error("image_load: filesystem not available in browser");
+    const buf = fs.readFileSync(String(path));
+    // Parse PPM header: token-based, comments start with '#'.
+    let i = 0;
+    const skip = () => {
+      while (i < buf.length) {
+        const c = String.fromCharCode(buf[i]);
+        if (c === '#') {
+          while (i < buf.length && buf[i] !== 0x0a) i++;
+          i++;
+        } else if (c === ' ' || c === '\n' || c === '\r' || c === '\t') {
+          i++;
+        } else break;
+      }
+    };
+    const token = () => {
+      skip();
+      let s = "";
+      while (i < buf.length) {
+        const c = String.fromCharCode(buf[i]);
+        if (c === ' ' || c === '\n' || c === '\r' || c === '\t') { i++; break; }
+        s += c; i++;
+      }
+      return s;
+    };
+    const magic = token();
+    if (magic !== "P6") throw new Error("image_load: unsupported PPM magic '" + magic + "'");
+    const w = parseInt(token(), 10);
+    const h = parseInt(token(), 10);
+    const maxv = parseInt(token(), 10);
+    if (maxv !== 255) throw new Error("image_load: PPM maxval must be 255");
+    const px = new Uint8Array(w * h * 4);
+    for (let p = 0; p < w * h; p++) {
+      px[p*4]   = buf[i++];
+      px[p*4+1] = buf[i++];
+      px[p*4+2] = buf[i++];
+      px[p*4+3] = 255;
+    }
+    return { __image: true, w, h, px };
+  }
+  _imageSize(img) {
+    if (!img || !img.__image) throw new Error("image_size: not an image");
+    return [img.w, img.h];   // surfaces as an array (no AIPL tuple type in JS-B)
+  }
+  _imagePixel(img, x, y) {
+    if (!img || !img.__image) throw new Error("image_pixel: not an image");
+    x |= 0; y |= 0;
+    if (x < 0 || x >= img.w || y < 0 || y >= img.h)
+      throw new Error(`image_pixel: (${x}, ${y}) out of bounds (${img.w}x${img.h})`);
+    const off = (y * img.w + x) * 4;
+    return [img.px[off], img.px[off+1], img.px[off+2], img.px[off+3]];
+  }
+  _imageSetPixel(args) {
+    const img = args[0];
+    if (!img || !img.__image) throw new Error("image_set_pixel: not an image");
+    const x = args[1] | 0, y = args[2] | 0;
+    const r = args[3] | 0, g = args[4] | 0, b = args[5] | 0;
+    const a = args.length >= 7 ? (args[6] | 0) : 255;
+    if (x < 0 || x >= img.w || y < 0 || y >= img.h)
+      throw new Error(`image_set_pixel: (${x}, ${y}) out of bounds (${img.w}x${img.h})`);
+    const off = (y * img.w + x) * 4;
+    img.px[off] = r; img.px[off+1] = g; img.px[off+2] = b; img.px[off+3] = a;
+    return 1;
+  }
+
   // Map AIPL-side provider id (int 1..3 / string) to canonical name.
   _resolveProvider(p) {
     if (p == null || p === 0) return null;
@@ -1262,6 +1454,24 @@ export class Runtime {
           }
           case "prod_speed":          return this._prodSpeed;
           case "cons_speed":          return this._consSpeed;
+
+          /* ---- text file I/O ----
+             Available in Node (JS-N) via `fs`. In the browser (JS-B)
+             these throw — the host UI has no filesystem access. */
+          case "read_file":   return this._fsRead(args[0]);
+          case "write_file":  return this._fsWrite(args[0], args[1], /*append*/ false);
+          case "append_file": return this._fsWrite(args[0], args[1], /*append*/ true);
+          case "file_exists": return this._fsExists(args[0]);
+
+          /* ---- image I/O (PPM P6 backend) ----
+             Same fs gating as text I/O. */
+          case "image_create":    return this._imageCreate(args);
+          case "image_load":      return this._imageLoad(args[0]);
+          case "image_save":      return this._imageSave(args[0], args[1]);
+          case "image_size":      return this._imageSize(args[0]);
+          case "image_pixel":     return this._imagePixel(args[0], args[1], args[2]);
+          case "image_set_pixel": return this._imageSetPixel(args);
+
           default: {
             // AIOS / protocol builtins (shared with CallStmt)
             const ap = this._dispatchAiosProtocol(expr.name, args, env);
@@ -1307,6 +1517,38 @@ export class Runtime {
         const initArgs = (expr.args || []).map(a => this.evalExpr(a, env));
         this.createActor(name, expr.className, initArgs);
         return name;
+      }
+
+      case "ArraySized": {
+        // Build an N-dim nested array filled with `init` (or 0).
+        const dims = expr.dims.map(d => this.evalExpr(d, env) | 0);
+        const fill = expr.init === null
+          ? 0
+          : this.evalExpr(expr.init, env);
+        const build = (ds) => {
+          if (ds.length === 0) return fill;
+          const n = ds[0];
+          const rest = ds.slice(1);
+          const arr = new Array(n);
+          for (let i = 0; i < n; i++) arr[i] = build(rest);
+          return arr;
+        };
+        return build(dims);
+      }
+
+      case "IndexExpr": {
+        // a[i][j]…
+        let v = env[expr.name];
+        if (v === undefined && this.actors.has(expr.name)) {
+          // Indexing an actor name doesn't make sense — fall through.
+        }
+        for (const d of expr.dims) {
+          const idx = this.evalExpr(d, env) | 0;
+          if (!Array.isArray(v))
+            throw new Error("IndexExpr on non-array: " + expr.name);
+          v = v[idx];
+        }
+        return v;
       }
 
       default:

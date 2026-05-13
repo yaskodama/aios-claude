@@ -1,0 +1,29 @@
+// Dynamic compilation in AIPL (OCaml runtime).
+//
+//   compile(source)         -- parse an AIPL source string at runtime,
+//                              register class declarations, run top-level
+//                              statements. Returns the number of classes
+//                              newly registered.
+//   spawn(class, name)      -- instantiate a registered class (no args).
+//   spawn(class, name, a..) -- instantiate with init(args).
+//
+// Both calls return the actor name as a string, which can be used as the
+// `send target.method(...)` target.
+class Factory {
+  method build(class_name, source, actor_name) {
+    var n = compile(source);
+    print("[Factory] compiled " + n + " new class(es)");
+    var who = spawn(class_name, actor_name);
+    print("[Factory] spawned " + who);
+    reply(who);
+  }
+}
+
+var f = new Factory();
+
+// Build a Greeter class at runtime and instantiate it via spawn.
+var src = "class Greeter { var label = \"g1\"; method hi(n) { print(\"hello \" + n + \" from \" + label); } }";
+var g = now f.build("Greeter", src, "g1");
+
+send g.hi("Alice");
+send g.hi("Bob");

@@ -1,0 +1,47 @@
+// Sized-array declaration syntax (OCaml runtime + JS-O).
+//
+//   var x[N];           N-element array, zero-filled
+//   var x[N] = init;    N copies of init
+//   var grid[R][C];     2D R x C, zero-filled
+//   var grid[R][C] = v; 2D, every cell = v
+//
+// Dimensions can be any int-typed expression (variables, fields,
+// arithmetic).  Element access uses array_get / array_set / e[i].
+
+// 1D, zero-filled
+var counts[5];
+print("counts        = " + counts);
+print("counts[2]     = " + array_get(counts, 2));
+
+// 1D, init-filled
+var labels[3] = "blank";
+print("labels        = " + labels);
+
+// 2D, zero-filled
+var grid[2][3];
+print("grid          = " + grid);
+print("grid[1]       = " + array_get(grid, 1));
+
+// 2D, init-filled
+var ones[3][2] = 1;
+print("ones          = " + ones);
+
+// Dynamic dimensions via local vars
+var R = 2;
+var C = 4;
+var pad[R][C] = 9;
+print("pad           = " + pad);
+
+// Fields in a class can also use sized-array syntax.
+class Matrix {
+  var rows = 3;
+  var cols = 2;
+  var cells[rows][cols];
+
+  method dump() {
+    print("Matrix.cells = " + cells);
+  }
+}
+
+var m = new Matrix();
+send m.dump();

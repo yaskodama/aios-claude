@@ -1,0 +1,17 @@
+// Image I/O round-trip on the JS-B / JS-N runtime (Node host).
+class Demo {
+  method init() {
+    var path = "/tmp/_aipl_jsb_img.ppm";
+    var img = image_create(8, 8, 200, 50, 200);
+    print("size  = " + image_size(img));
+    image_set_pixel(img, 3, 3, 0, 255, 0);
+    print("p33 a = " + image_pixel(img, 3, 3));
+    print("p00 a = " + image_pixel(img, 0, 0));
+    image_save(img, path);
+    var loaded = image_load(path);
+    print("size' = " + image_size(loaded));
+    print("p33 b = " + image_pixel(loaded, 3, 3));
+    print("p00 b = " + image_pixel(loaded, 0, 0));
+  }
+}
+var d = new Demo();

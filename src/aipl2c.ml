@@ -1,7 +1,7 @@
 (* aipl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog] [--no-typecheck]";
+  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog | --llvm | --openmp] [--no-typecheck]";
   exit 1
 
 let () =
@@ -14,6 +14,8 @@ let () =
   let erl = ref false in
   let go = ref false in
   let pl = ref false in
+  let llvm = ref false in
+  let openmp = ref false in
   let no_typecheck = ref false in
   let dump_types = ref false in
   let args = Array.to_list Sys.argv |> List.tl in
@@ -27,6 +29,8 @@ let () =
     | "--erlang" :: rest -> erl := true; loop rest
     | "--go" :: rest -> go := true; loop rest
     | "--prolog" :: rest -> pl := true; loop rest
+    | "--llvm" :: rest -> llvm := true; loop rest
+    | "--openmp" :: rest -> openmp := true; loop rest
     | "--no-typecheck" :: rest -> no_typecheck := true; loop rest
     | "--dump-types" :: rest -> dump_types := true; loop rest
     | "-h" :: _ | "--help" :: _ -> usage ()
@@ -88,6 +92,8 @@ let () =
     else if !pl   then C_translator.gen_program_prolog                     prog
     else if !py   then C_translator.gen_program_python ~max_messages:!max_msgs prog
     else if !xinu then C_translator.gen_program_xinu   ~max_messages:!max_msgs prog
+    else if !openmp then C_translator.gen_program_openmp ~max_messages:!max_msgs prog
+    else if !llvm   then C_translator.gen_program_llvm   ~max_messages:!max_msgs prog
     else               C_translator.gen_program        ~max_messages:!max_msgs prog
   in
   let oc = open_out output in

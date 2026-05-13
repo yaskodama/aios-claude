@@ -1522,7 +1522,7 @@ let () =
     | _  -> failwith "array_empty(): arity 0 expected");
   Eval_thread.add_prim "spawn" (function
     | [VString cls; VString a] ->
-        Eval_thread.spawn_actor ~class_name:cls ~actor_name:a; VUnit
+        Eval_thread.spawn_actor ~class_name:cls ~actor_name:a (); VUnit
     | _ -> failwith "spawn(class, name)");
   Eval_thread.add_prim "reply" (function
     | [v] ->

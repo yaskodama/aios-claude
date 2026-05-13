@@ -1,0 +1,912 @@
+% !TEX program = xelatex
+% AIPL ユーザーズマニュアル
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.85]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!60!black,
+  citecolor=black,
+  pdftitle={AIPL ユーザーズマニュアル},
+  pdfauthor={Yasushi Kodama}
+}
+
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\definecolor{codestr}{RGB}{160,40,40}
+
+\lstdefinelanguage{aipl}{
+  keywords={class, method, function, return, var, float, int, new, send, call, become,
+            if, else, while, do, self, sender, now, future, await, true, false, pub, linear,
+            scope, transient, reply, channel, select, case, timeout, then, remote},
+  keywordstyle=\color{codekw}\bfseries,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{codecmt}\itshape,
+  string=[b]",
+  stringstyle=\color{codestr},
+  sensitive=true,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+  literate={→}{{$\rightarrow$}}1,
+}
+\lstdefinelanguage{shell}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+}
+\lstset{language=aipl}
+
+\title{AIPL ユーザーズマニュアル\\
+\large Actor-based Intelligent Parallel Language}
+\author{児玉 靖 \\ \small \texttt{yaskodama@gmail.com}}
+\date{2026年5月13日}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\textbf{AIPL} (Actor-based Intelligent Parallel Language; 旧称 ABCL/c+) は,
+東京工業大学・米澤明憲研究室で設計された並行オブジェクト指向言語 ABCL/1 を,
+現代的なシンタックスとマルチランタイム(OCaml ネイティブ・ブラウザ JS・Node.js・C)で
+再実装した言語である. 本マニュアルは言語仕様の概要と,付属サンプルの解説,組込み関数の
+リファレンスをまとめる.
+\par\vspace{4pt}
+{\small 後方互換のため,ファイル拡張子 \texttt{.abcl},Python ランタイムのモジュール名
+(\texttt{aipl\_main.py} 等),環境変数 \texttt{ABCL\_AI\_PROVIDER} などは旧称のまま維持している.}
+\par\vspace{4pt}
+\textbf{対象バージョン}: 本リポジトリ (\texttt{abclcp-project}) 同梱の OCaml REPL 実装\\
+\textbf{主要ソース}: \texttt{src/lexer.mll}, \texttt{src/parser.mly}, \texttt{src/eval\_thread.ml}\\
+\textbf{サンプル群}: \texttt{abclc/*.abcl}, \texttt{src/*.abcl}
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{はじめに}
+% ============================================================
+
+AIPL は \textbf{アクターモデル} に基づく並行プログラミング言語である.
+プログラムは複数の独立した \emph{アクター} (クラスのインスタンス) から構成され,
+アクター同士は \textbf{非同期メッセージ} によって通信する.
+
+\begin{itemize}
+  \item 各アクターは固有のメッセージキュー (メールボックス) を持つ
+  \item 状態 (フィールド) はアクター内に閉じ込められ,外部から直接読み書きできない
+  \item メソッド呼び出しは \textbf{メッセージ送信 (\texttt{send})} として表現される
+  \item 受信側は到着順,または \texttt{select} 文で条件付きに処理する
+\end{itemize}
+
+伝統的な ABCL/1 にあった past/now/future の三種類の送信モードを,
+AIPL では \texttt{send} (past, fire-and-forget) / \texttt{now expr.m()} (同期返答) /
+\texttt{future expr.m()} + \texttt{await} (非同期返答) として完全に提供する.
+
+% ============================================================
+\section{処理系のビルドと実行}
+% ============================================================
+
+\subsection{ビルド}
+
+トップディレクトリで \texttt{make} を実行すると OCaml 実装と JS 実装の両方をビルドする.
+
+\begin{lstlisting}[language=shell]
+make            # = make all (OCaml + JS)
+make ocaml      # OCaml REPL のみ (_build/default/src/repl_thread.exe)
+make js         # ブラウザ用パーサ再生成
+\end{lstlisting}
+
+\subsection{サンプル実行}
+
+\begin{lstlisting}[language=shell]
+make run-hello             # abclc/Hello.abcl
+make run-philosophers      # 5 哲学者
+make run-rotate4           # SDL 描画デモ
+./run_bounded_buffer.sh    # 有界バッファ
+./run_pingpong_xinu.sh     # PingPong (XINU バックエンド)
+\end{lstlisting}
+
+任意のソースを直接食わせるには:
+
+\begin{lstlisting}[language=shell]
+_build/default/src/repl_thread.exe abclc/Hello.abcl
+\end{lstlisting}
+
+\subsection{ブラウザ実行}
+
+\texttt{src/browser-abcl/} 以下にブラウザ版がある.\texttt{make serve-js} で
+\url{http://localhost:3000/} から各デモ HTML (\texttt{viz\_philosophers.html} 等) が開ける.
+
+% ============================================================
+\section{言語仕様}
+% ============================================================
+
+\subsection{字句要素}
+
+\subsubsection*{コメント}
+
+\begin{lstlisting}
+// 行コメント
+/* ブロック
+   コメント */
+\end{lstlisting}
+
+\subsubsection*{キーワード}
+
+\begin{lstlisting}
+class  method  var  float  new  become
+send   send!   call  remote  reply
+if  then  else  while  do
+select  case  timeout  ->
+self  sender  now  future  await
+\end{lstlisting}
+
+\subsubsection*{演算子}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+種別 & 演算子 \\
+\midrule
+算術 & \texttt{+} \texttt{-} \texttt{*} \texttt{/} \\
+比較 & \texttt{==} \texttt{!=} \texttt{<} \texttt{<=} \texttt{>} \texttt{>=} \\
+代入 & \texttt{=} \\
+フィールド/インデックス & \texttt{.} \texttt{[n]} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{+} は数値加算と文字列連結の両方に使われる.
+片方が文字列なら他方は自動で文字列化される (\texttt{"count = " + 5}).
+
+\subsubsection*{リテラル}
+
+\begin{itemize}
+  \item 整数: \texttt{0}, \texttt{42}
+  \item 浮動小数: \texttt{3.14}, \texttt{100.}(末尾ドット可)
+  \item 文字列: \texttt{"hello{\textbackslash}n"}(エスケープは \texttt{{\textbackslash}{\textbackslash}}, \texttt{{\textbackslash}"}, \texttt{{\textbackslash}n}, \texttt{{\textbackslash}t}, \texttt{{\textbackslash}r})
+  \item 識別子: \texttt{[A-Za-z\_][A-Za-z0-9\_]*}
+\end{itemize}
+
+\subsection{型と値}
+
+AIPL は \textbf{Hindley-Milner 型推論} を中核に持ちつつ,動的値表現を併用する.
+代表的な型を以下に示す.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+型名 & 例 & 備考 \\
+\midrule
+\texttt{int} & \texttt{42} & 64bit 整数 \\
+\texttt{float} & \texttt{3.14}, \texttt{100.} & 倍精度 \\
+\texttt{string} & \texttt{"abc"} & UTF-8 \\
+\texttt{bool} & 比較演算の結果 & \\
+\texttt{actor(C)} & \texttt{new C()} の結果 & クラス \texttt{C} のインスタンス \\
+\texttt{array} & \texttt{array\_empty()} 等 & 要素は同型 \\
+\texttt{record} & \texttt{\{a: 1, b: "x"\}} & 構造的型,フィールド型を保持 \\
+\texttt{tuple} & \texttt{(1, "two", 3.0)} & 位置別型,長さ固定 \\
+\texttt{future} & \texttt{future expr.m()} & 後で \texttt{await} で取り出す \\
+\texttt{unit} & \texttt{print(...)} の戻り & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{typeof(x)} で実行時に型名 (文字列) を取得できる.
+
+\subsection{式と文}
+
+\subsubsection*{式}
+
+\begin{lstlisting}
+expr := リテラル
+      | 識別子                  // 変数参照、self、sender
+      | expr op expr            // 二項演算
+      | new C(arg, ...)         // アクター生成 (式中)
+      | f(arg, ...)             // 組込み関数呼び出し
+      | { l1: e1, l2: e2, ... } // レコードリテラル
+      | ( e1, e2, ... )         // タプル (>=2 要素)
+      | expr . field            // フィールドアクセス
+      | expr [ n ]              // タプル / 配列インデックス
+      | now target.m(args)      // 同期メッセージ送信
+      | future target.m(args)   // 非同期送信 -> future
+      | await expr              // future 値を取り出す
+      | ( expr )
+\end{lstlisting}
+
+\subsubsection*{文}
+
+\begin{lstlisting}
+stmt := var x = expr ;                 // ローカル変数宣言
+      | x = expr ;                     // 代入
+      | f(arg, ...) ;                  // 関数呼び出し (戻り値破棄)
+      | call f(arg, ...) ;             // 同上 (明示形)
+      | send target.method(args) ;     // 非同期メッセージ送信
+      | send! target.method(args) ;    // 型検査をバイパスする送信
+      | become C(args) ;               // 自己の振る舞い置換
+      | if (expr) stmt [else stmt]
+      | while expr do stmt
+      | { stmt; stmt; ... }            // ブロック
+      | select { case ... timeout ... }
+\end{lstlisting}
+
+\texttt{if} の条件は \texttt{expr} で,\texttt{==}, \texttt{!=}, \texttt{<}, \texttt{<=},
+\texttt{>}, \texttt{>=} を組み合わせる.
+
+\subsection{クラスとアクター}
+
+\begin{lstlisting}
+class ClassName {
+  // フィールド宣言 (初期化必須)
+  var fieldA = 0;
+  var fieldB = 0.0;
+  float fieldC = 1.5;     // 型付き宣言 (float のみ専用キーワード)
+
+  method init(args...) { ... }      // インスタンス生成時に自動起動
+  method other(args...) { ... }
+}
+\end{lstlisting}
+
+\begin{itemize}
+  \item フィールドは \textbf{必ず初期化付き} で宣言する
+  \item \texttt{init} メソッドが定義されていれば \texttt{new} 時に自動で実行される
+  \item 未定義の場合,生成時のメッセージはスキップされ警告ログが出る
+\end{itemize}
+
+トップレベルで実体化:
+
+\begin{lstlisting}
+var name = new ClassName(args);
+\end{lstlisting}
+
+\texttt{name} がそのままアクター名 (メールボックス参照) になる.
+
+\subsection{メッセージ送信}
+
+\subsubsection*{\texttt{send} --- 非同期メッセージ送信 (推奨)}
+
+\begin{lstlisting}
+send target.method(args);
+\end{lstlisting}
+
+\begin{itemize}
+  \item \texttt{target} はトップレベルで作ったアクター変数か,\texttt{self} / \texttt{sender}
+  \item 呼び出しは即座に戻り,メッセージは相手のメールボックスに積まれる
+  \item 型検査が通ったメッセージのみ送る
+\end{itemize}
+
+\subsubsection*{\texttt{send!} --- 型検査をバイパス}
+
+リモート相手やインタプリタが完全に型を見切れない動的状況のためのエスケープハッチ.
+\textbf{通常は \texttt{send} を使う.}
+
+\subsubsection*{\texttt{call} --- 組込み関数の呼び出し}
+
+組込み関数 (\texttt{print}, \texttt{sdl\_*}, \texttt{wait} など) に対しては
+\texttt{call f(...)} または単に \texttt{f(...);} を使う.これは戻りを待つ通常の関数呼び出しで,
+他アクターのメソッド呼び出しではない.
+
+\subsubsection*{\texttt{now} / \texttt{future} / \texttt{await} (同期・非同期返答付き送信)}
+
+\begin{lstlisting}
+var v = now calc.add(3, 4);         // ブロックして reply 値を取得
+var f = future ai.ask("long task"); // すぐ Future 値を返す
+var ans = await(f);                  // 後で値を取り出す
+\end{lstlisting}
+
+ABCL/1 で言うところの now 型送信と future 型送信に対応する.
+
+\subsection{\texttt{select} による選択受信}
+
+メールボックスから \textbf{特定のメッセージだけ} を待ち受けたい場合に使う.
+
+\begin{lstlisting}
+select {
+  case add(a, b) -> {
+    reply(a + b);
+  }
+  case mul(a, b) -> {
+    reply(a * b);
+  }
+  timeout 15000 -> {
+    print("15 秒待っても来なかった");
+  }
+}
+\end{lstlisting}
+
+\begin{itemize}
+  \item 各 \texttt{case} のパターンは \texttt{メソッド名(変数名, ...)} だけを書ける(ガード式は無し)
+  \item 一致しないメッセージはキューに残る (消費されない)
+  \item \texttt{timeout N} はミリ秒. \texttt{N} 経過すると対応するブロックが実行される
+  \item \texttt{timeout} 節は省略可 (その場合は永久に待つ)
+\end{itemize}
+
+\subsection{\texttt{become} による振る舞い更新}
+
+アクター自身を別のクラスに「化ける」ことができる.
+
+\begin{lstlisting}
+class A {
+  method ping() {
+    print("A.ping");
+    become B();
+  }
+}
+class B {
+  method ping() {
+    print("B.ping");
+    become A();
+  }
+}
+\end{lstlisting}
+
+\texttt{become} はメソッド本体内でのみ使え,現在のアクターのフィールドとメソッドを
+新クラスの \texttt{init} 結果で置き換える.メールボックスは保持される.
+
+\subsection{\texttt{reply} と \texttt{sender}}
+
+メソッド本体では暗黙の変数 \texttt{sender} が使える (直近にこのメッセージを送ったアクター).
+
+\begin{lstlisting}
+method add(a, b) {
+  reply(a + b);     // sender に "戻り値" メッセージを送る
+}
+\end{lstlisting}
+
+\begin{itemize}
+  \item \texttt{reply(v)} は \texttt{sender} 側に値 \texttt{v} を返す
+  \item 送信側が Web ゲートウェイ (HTTP) 経由なら,HTTP 応答ボディとして返る
+  \item 送信側がアクターなら,待ちパターン (\texttt{select}) に届く
+\end{itemize}
+
+\texttt{send sender.X(args)} のように \texttt{sender} に対して任意のメソッドを送ることも可能.
+
+\subsection{リモート送信}
+
+別ホストや別プロセスのアクターには次の構文で送れる.
+
+\begin{lstlisting}
+send remote("localhost:8080", "fork2").take(0);
+\end{lstlisting}
+
+\begin{itemize}
+  \item 第 1 引数: ホストとポート (OCaml 側 \texttt{web\_listen} で待ち受ける)
+  \item 第 2 引数: 相手プロセス内のアクター名
+\end{itemize}
+
+\subsection{レコードと組型 (タプル)}
+
+OCaml ランタイムでは構造的なレコードとタプルがリテラルとフィールド/インデックス
+アクセスとともに利用できる.HM 型推論が型を構造的に保持する.
+
+\begin{lstlisting}
+// レコード: ラベル付きフィールド
+var alice = {name: "alice", age: 30};
+print(alice.name);          // "alice"
+print(alice.age);           // 30
+var p = {pos: {x: 3, y: 4}, label: "origin"};
+print(p.pos.x);             // 3 -- チェーンアクセス可
+
+// 組型 (タプル): 位置別型, >=2 要素
+var t = (1, "two", 3.5);
+print(t[0]);                // 1
+print(t[1]);                // "two"
+print(t[2]);                // 3.5
+var pair = ((10, 20), "label");
+print(pair[1]);             // "label"
+\end{lstlisting}
+
+\textbf{型表現}:
+
+\begin{itemize}
+  \item レコード: \texttt{\{name : string; age : int\}}
+  \item 組型: \texttt{(int * string * float)}
+\end{itemize}
+
+両者とも HM 推論で \texttt{unify} 時にラベル/位置と要素型を照合する.
+
+% ============================================================
+\section{組込み関数リファレンス}
+% ============================================================
+
+\texttt{src/eval\_thread.ml} の \texttt{prim\_table} に登録されている関数群である.
+すべて \texttt{f(args)} または \texttt{call f(args);} で呼び出す.
+
+\subsection{入出力}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{print(v)} & 値を文字列化して標準出力へ.Web UI のログにも残る \\
+\texttt{typeof(v)} & 型名 (\texttt{"int"}, \texttt{"float"}, \texttt{"string"}, \texttt{"actor(C)"} \dots) を返す \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{制御}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{wait(ms)} & 現在のアクター (スレッド) を \texttt{ms} ミリ秒スリープ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{数学関数}
+
+\texttt{sin}, \texttt{cos}, \texttt{tan}, \texttt{asin}, \texttt{acos}, \texttt{atan},
+\texttt{sqrt}, \texttt{exp}, \texttt{log10}, \texttt{abs}, \texttt{floor}, \texttt{ceil},
+\texttt{round} --- いずれも \texttt{float -> float}.
+
+\subsection{配列}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{array\_empty()} & 空配列を生成 \\
+\texttt{array\_len(a)} & 要素数 \\
+\texttt{array\_get(a, i)} & i 番目の要素 (範囲外は例外) \\
+\texttt{array\_set(a, i, v)} & i 番目を v に置換した \textbf{新しい配列} を返す \\
+\texttt{array\_push(a, v)} & 末尾に v を追加した \textbf{新しい配列} を返す \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+配列は永続的データ構造として扱われる (破壊的更新は無い). したがって
+\texttt{a = array\_set(a, 0, 99.);} のように再代入する.
+
+\subsection{SDL 描画}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{sdl\_init(w, h)} & ウィンドウを開く \\
+\texttt{sdl\_clear()} & 画面クリア \\
+\texttt{sdl\_present()} & フロントバッファ反映 \\
+\texttt{sdl\_line(x1,y1,x2,y2)} & 白線 \\
+\texttt{sdl\_line\_c(x1,y1,x2,y2,r,g,b)} & RGB 指定線 \\
+\texttt{sdl\_erase\_line(x1,y1,x2,y2)} & 線を消去 (背景色で再描画) \\
+\texttt{sdl\_poll\_key()} & キーのスキャンコード (押されてなければ 0) \\
+\texttt{sdl\_mouse\_x()} / \texttt{sdl\_mouse\_y()} & マウス座標 \\
+\texttt{sdl\_mouse\_down()} & 左ボタン状態 (0/1) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Web ゲートウェイ}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{web\_listen(port)} & 内蔵 HTTP サーバを起動 \\
+\texttt{web\_expose(path, actorName)} & フレンドリーパスを公開 \\
+\texttt{reply(v)} & HTTP リクエスト発のメッセージなら応答ボディとして返す \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{POST /api/json/send} または \texttt{POST /api/x/<path>} で外部からアクターを呼べる.
+
+\subsection{AI 呼び出し (\texttt{ai\_call})}
+
+\begin{lstlisting}
+ai_call("hello")              // 自動選択 (デフォルト Gemini)
+ai_call(1, "hello")           // Gemini
+ai_call(2, "hello")           // Claude
+ai_call(3, "hello")           // ChatGPT
+ai_call_with_system(2, "be brief", "hi")
+\end{lstlisting}
+
+第一引数の整数 (省略可) でプロバイダを切り替える:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+値 & プロバイダ \\
+\midrule
+\texttt{1} / 省略 & Gemini (デフォルト) \\
+\texttt{2} & Anthropic Claude \\
+\texttt{3} & OpenAI ChatGPT \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\texttt{ABCL\_AI\_PROVIDER=mock} を設定すれば全部 mock に流れる (テスト/デモ用).
+
+\textbf{3 並行モデル経由の AI 呼び出し} もそのまま使える:
+
+\begin{lstlisting}
+var ans  = now ai.ask("hello");          // 同期 reply 待ち
+var fut  = future ai.ask("long task");   // future 取得
+var done = await(fut);                    // 後で取り出す
+send ai.ask("fire and forget");          // past 型,戻り値不要
+\end{lstlisting}
+
+\subsection{デバッグ}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+関数 & 説明 \\
+\midrule
+\texttt{actor\_dump(a)} & アクターの型情報 (クラス名・メソッド一覧) を整形出力 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ============================================================
+\section{サンプルプログラム}
+% ============================================================
+
+\subsection{Hello --- 最小サンプル}
+
+\texttt{abclc/Hello.abcl}
+
+\begin{lstlisting}
+class Hello {
+  var count = 0.;
+
+  method init(n) {
+    count = n;
+    print("Hello object initialized with " + n);
+  }
+
+  method greet() {
+    print("Hello! count = " + count);
+  }
+
+  method inc() {
+    count = count + 1.;
+    print("count incremented to " + count);
+  }
+}
+
+var h = new Hello(5);     // init(5) が自動呼び出し
+send h.greet();           // Hello! count = 5
+send h.inc();             // count incremented to 6
+send h.greet();           // Hello! count = 6
+\end{lstlisting}
+
+\textbf{学べること}: フィールド宣言, \texttt{init} の自動呼び出し,\texttt{send} による
+非同期メッセージ,文字列連結 \texttt{+}.
+
+\begin{lstlisting}[language=shell]
+make run-hello
+\end{lstlisting}
+
+\subsection{Counter --- 自己メッセージとフィールド}
+
+\texttt{abclc/counter.abcl}
+
+\begin{lstlisting}
+class Counter {
+  var count = 0.;
+  method inc() {
+    count = count + 1.;
+    print("count:" + count);
+    send self.dec(3.);
+  }
+  method dec(x) {
+    count = count - x;
+    print(count);
+  }
+}
+
+var c1 = new Counter();
+var c2 = new Counter();
+send c1.inc();
+send c2.inc();
+\end{lstlisting}
+
+\textbf{学べること}: \texttt{self} を使って自分自身にメッセージを送る,
+複数アクターが独立したメールボックスを持つこと.
+
+\subsection{PingPong --- 二者間メッセージ往復}
+
+\texttt{abclc/PingPong.abcl}
+
+\begin{lstlisting}
+class Pinger {
+  method init() {
+    print("Pinger starting");
+    send ponger.ping();
+  }
+  method pong() {
+    print("Pinger got pong");
+    send sender.ping();
+  }
+}
+
+class Ponger {
+  method ping() {
+    print("Ponger got ping");
+    send sender.pong();
+  }
+}
+
+var pinger = new Pinger();
+var ponger = new Ponger();
+\end{lstlisting}
+
+\textbf{学べること}: \texttt{sender} による「直前の送信元」への返信,
+循環メッセージでずっと走り続けるアクター. \texttt{init} の中から外部アクターへ \texttt{send} できる.
+
+\subsection{Become --- 振る舞いの動的入れ替え}
+
+\texttt{abclc/become.abcl}
+
+\begin{lstlisting}
+class A {
+  method ping() {
+    print("A.ping");
+    become B();
+  }
+}
+
+class B {
+  method ping() {
+    print("B.ping");
+    become A();
+  }
+}
+
+var x = new A();
+send x.ping();   // A.ping  -> B 化
+send x.ping();   // B.ping  -> A 化
+send x.ping();   // A.ping
+\end{lstlisting}
+
+\textbf{学べること}: 同じアクター変数 \texttt{x} の振る舞いが受信ごとに切り替わる.
+メッセージの順序は保たれ,\texttt{become} は次のメッセージから効く.
+
+\subsection{Records --- レコード型}
+
+\texttt{abclc/Records.abcl} (OCaml ランタイムで追加された新機能)
+
+\begin{lstlisting}
+var alice = {name: "alice", age: 30};
+print("alice.name = " + alice.name);
+print("alice.age  = " + alice.age);
+
+// ネストレコードとチェーンアクセス
+var p = {pos: {x: 3, y: 4}, label: "origin"};
+print("p.label = " + p.label);
+print("p.pos.x = " + p.pos.x);
+print("p.pos.y = " + p.pos.y);
+\end{lstlisting}
+
+\textbf{学べること}: 構造的レコード型 (\texttt{TRecord}) の生成と参照.
+HM 推論はラベル名とフィールド型を完全に保持し,\texttt{unify} 時に
+ラベル集合と各型を厳密に照合する.
+
+\subsection{Tuples --- 組型}
+
+\texttt{abclc/Tuples.abcl}
+
+\begin{lstlisting}
+var t = (1, "two", 3.5);
+print("t[0] = " + t[0]);
+print("t[1] = " + t[1]);
+print("t[2] = " + t[2]);
+
+var pair = ((10, 20), "label");
+print("pair[1] = " + pair[1]);
+\end{lstlisting}
+
+\textbf{学べること}: 位置別型を持つ組型 (\texttt{TTuple}) の作成.
+インデックスはリテラル整数のみ (静的に位置を解決し,要素型を取り出す).
+
+\subsection{BoundedBuffer --- 生産者・消費者問題}
+
+\texttt{abclc/bounded\_buffer.abcl} (抜粋)
+
+\begin{lstlisting}
+class Buffer {
+  var cap = 4;
+  var s0 = 0; var s1 = 0; var s2 = 0; var s3 = 0;
+  var head = 0; var tail = 0; var count = 0;
+  var pwaiter = ""; var pitem = 0;
+  var cwaiter = "";
+
+  method put(item) {
+    if (cwaiter != "") {
+      send sender.put_ok();
+      send cwaiter.got(item);
+      cwaiter = "";
+    } else {
+      if (count == cap) {
+        pwaiter = sender;     // 満杯 → 生産者を待たせる
+        pitem   = item;
+      } else {
+        // ... スロットに格納 ...
+        send sender.put_ok();
+      }
+    }
+  }
+  method get() { /* ... */ }
+}
+\end{lstlisting}
+
+\textbf{学べること}:
+
+\begin{itemize}
+  \item ロックを \textbf{使わずに} 同期する手法(待機キューを自前のフィールドに保持)
+  \item \texttt{sender} を保存しておき,後で \texttt{send pwaiter.put\_ok();} のように
+        「呼び出し側に応答を返す」非同期パターン
+  \item 配列ではなくスロット変数で容量 4 を表現(言語の最小機能で書ける例)
+\end{itemize}
+
+\subsection{Philosophers --- 食事する哲学者}
+
+\texttt{abclc/Philosophers5.abcl} (5 哲学者).
+5 つのアクター間の対称デッドロックを,ハンドオフによって回避する古典問題.
+SDL 版 (\texttt{Philosophers5Gui.abcl}) ではビジュアライズも可能.
+
+\begin{lstlisting}[language=shell]
+make run-philosophers     # コンソール
+./run_viz_philosophers.sh # SDL ビジュアル
+\end{lstlisting}
+
+\subsection{Rotate4Lines --- SDL 描画とタイマー}
+
+\texttt{abclc/Rotate4Lines.abcl}
+
+\begin{lstlisting}
+class Line {
+  var cx = 0.0; var cy = 0.0;
+  var angle = 0.0; var len = 50.0;
+  var r = 255; var g = 255; var b = 255;
+  var x1 = 0.0; var y1 = 0.0; var x2 = 0.0; var y2 = 0.0;
+  var drawn = 0;
+
+  method init(startCx, startCy, startAngle, cr, cg, cb) {
+    cx = startCx; cy = startCy; angle = startAngle;
+    r = cr; g = cg; b = cb;
+  }
+
+  method rotate() {
+    if (drawn == 1) { call sdl_erase_line(x1, y1, x2, y2); }
+    angle = angle + 3.0;
+    var rad = angle * 3.14159 / 180.0;
+    var dx = cos(rad) * len;
+    var dy = sin(rad) * len;
+    x1 = cx - dx; y1 = cy - dy;
+    x2 = cx + dx; y2 = cy + dy;
+    call sdl_line_c(x1, y1, x2, y2, r, g, b);
+    call sdl_present();
+    drawn = 1;
+    call wait(32);
+    send self.rotate();
+  }
+}
+
+sdl_init(500, 500);
+var li1 = new Line(125.0, 125.0,   0.0, 255,  80,  80);
+var li2 = new Line(375.0, 125.0,  90.0,  80, 255, 120);
+var li3 = new Line(125.0, 375.0, 180.0,  80, 160, 255);
+var li4 = new Line(375.0, 375.0, 270.0, 255, 200,  40);
+send li1.rotate(); send li2.rotate(); send li3.rotate(); send li4.rotate();
+\end{lstlisting}
+
+\textbf{学べること}: \texttt{wait(ms)} と \texttt{send self.rotate()} の組み合わせによる
+「自前のタイマーループ」,4 つのアクターが独立 30FPS で回るマルチスレッド描画.
+
+\subsection{WebCalc --- HTTP ゲートウェイと \texttt{select}}
+
+\texttt{src/web\_calc1.abcl}
+
+\begin{lstlisting}
+class Calc {
+  method init() {
+    print("Calc initialized");
+    send self.main();
+  }
+
+  method add(a, b) {
+    reply(999);            // すぐ来た add は 999 を返す
+  }
+
+  method main() {
+    print("waiting...");
+    select {
+      case add(a, b) -> {
+        reply(a + b);     // main 待ちの間に来た add だけ正規計算
+      }
+      timeout 15000 -> {
+        print("timeout occurred");
+      }
+    }
+    print("select finished");
+  }
+}
+
+var calc = new Calc();
+web_listen(8080);
+web_expose("/calc", "calc");
+print("Open http://localhost:8080/ and send to actor 'calc'");
+\end{lstlisting}
+
+\textbf{学べること}:
+
+\begin{itemize}
+  \item \texttt{select} で「特定のメッセージだけ」を待つ書き方
+  \item \texttt{timeout} 節
+  \item \texttt{reply} で HTTP 応答に値を返す
+  \item \texttt{web\_listen} + \texttt{web\_expose} による外部 API 化
+\end{itemize}
+
+ブラウザで \texttt{http://localhost:8080/} を開き,actor \texttt{calc} に
+\texttt{\{"method":"add","args":[3,4]\}} を POST すると 7 が返ってくる.
+
+% ============================================================
+\section{付録: トラブルシューティング}
+% ============================================================
+
+\begin{center}
+\begin{tabular}{p{6cm}p{8cm}}
+\toprule
+症状 & 対処 \\
+\midrule
+\texttt{Unknown function: foo} & 組込みの綴り誤り. \texttt{prim\_table} (\texttt{src/eval\_thread.ml}) の登録名と照合 \\
+\texttt{Actor X not found} & \texttt{var X = new ...;} より前に \texttt{send X....} していないか確認 \\
+\texttt{[Actor] X.init arity mismatch} & \texttt{new C(args)} の引数数と \texttt{init} の仮引数数が違う \\
+\texttt{select} がいつまでも返らない & パターンが受信メッセージと一致していない/\texttt{timeout} 未指定 \\
+SDL ウィンドウが反応しない & \texttt{sdl\_present()} を毎フレーム呼ぶ/\texttt{wait} で yield する \\
+HTTP リクエストでハング & \texttt{reply} を呼んでいない or \texttt{select} が適切な \texttt{case} を持たない \\
+\texttt{no overload of foo matches (...)} & HM 推論がオーバーロード候補と整合しなかった.実引数の型を \texttt{typeof} で確認 \\
+\texttt{no field f in record \{...\}} & レコードにそのラベルが無い.ラベル名の綴りを確認 \\
+\texttt{tuple index N out of bounds} & 組型のサイズと \texttt{[N]} の整合性を確認 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\par\vspace{8pt}
+\noindent\textbf{設計指針のまとめ}: AIPL では「同期したいなら sender に reply,
+待ちたいなら select,状態を切り替えたいなら become」と覚えておくと,
+大半の並行パターンを言語機能だけで表現できる.型は HM 推論で自動的に
+決まるため,通常は注釈を書かずに走らせて構わない.明示したい場合のみ
+Python (annotated) ランタイムを使うとよい.
+
+\end{document}

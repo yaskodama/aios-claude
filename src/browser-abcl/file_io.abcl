@@ -1,0 +1,18 @@
+// Text file I/O — Node host only (JS-N).  In the browser these throw.
+class Demo {
+  method init() {
+    var path = "/tmp/_aipl_jsb_io_test.txt";
+    var before = file_exists(path);
+    print("exists before = " + before);
+
+    write_file(path, "hello from JS-B / JS-N\n");
+    print("exists after  = " + file_exists(path));
+    print("content       = " + read_file(path));
+
+    append_file(path, "line 2\n");
+    append_file(path, "line 3\n");
+    print("after append  =\n" + read_file(path));
+  }
+}
+
+var d = new Demo();

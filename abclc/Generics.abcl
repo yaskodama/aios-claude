@@ -1,0 +1,49 @@
+// Generic top-level functions (OCaml runtime + JS-O HTTP).
+//
+//   function id(x: T) -> T { ... }
+//   function pair(a: T, b: T) -> (T, T) { ... }
+//   function fst(t: (T, U)) -> T { ... }
+//
+// Type variables are written as single uppercase identifiers (T, U, V…,
+// or T1, T2 for short numeric suffixes).  Each call site re-instantiates
+// the function fresh, so the same `id` can be called with int and with
+// string in turn.  Multiple occurrences of the SAME name in one
+// signature must unify (e.g. `pair(a: T, b: T)` rejects mixed types).
+
+function id(x: T) -> T {
+  return x;
+}
+
+// Same name 'T' used in two slots — both calls must agree on its type.
+function pair(a: T, b: T) -> (T, T) {
+  return (a, b);
+}
+
+// Two distinct type variables.
+function fst(t: (T, U)) -> T {
+  return t[0];
+}
+
+function snd(t: (T, U)) -> U {
+  return t[1];
+}
+
+// id is polymorphic; each call instantiates 'T' freshly.
+var i: int = id(42);
+var s: string = id("hello");
+print("id(42)      = " + i);
+print("id(\"hello\") = " + s);
+
+// pair builds a (T, T) tuple.
+var pp = pair(10, 20);
+print("pair(10, 20)[0] = " + pp[0]);
+print("pair(10, 20)[1] = " + pp[1]);
+
+// fst / snd pick out a tuple's slots with generic types.
+var ms = ("alice", 30);
+print("fst(ms) = " + fst(ms));
+print("snd(ms) = " + snd(ms));
+
+// Generic identity even survives wrapping nested in another generic.
+var r = id(id(id(7)));
+print("id(id(id(7))) = " + r);

@@ -1,0 +1,32 @@
+// Remote actor client (OCaml side B). Run RemoteServer.abcl first.
+//
+// Demonstrates all three forms of remote send:
+//   - send remote(...).note(...)   — async, fire-and-forget
+//   - now  remote(...).ask(...)    — synchronous, blocks for reply
+//   - future remote(...).ask(...)  — async, returns a future; await for value
+class Driver {
+  method init() {
+    // --- past-style (fire-and-forget) ---
+    send! remote("localhost:8090", "echo").note("hello-1");
+    send! remote("localhost:8090", "echo").note("hello-2");
+
+    // --- now-style (blocking on local actor thread) ---
+    var r = now remote("localhost:8090", "echo").ask("sync-q");
+    print("[client] now reply : " + r);
+
+    // --- future-style (parallel, await later) ---
+    var f1 = future remote("localhost:8090", "echo").ask("future-a");
+    var f2 = future remote("localhost:8090", "echo").ask("future-b");
+    var a = await(f1);
+    var b = await(f2);
+    print("[client] future a  : " + a);
+    print("[client] future b  : " + b);
+
+    // --- error path: unreachable host should not crash the actor.
+    //     Both send! (which uses unsafe path) and now should report nicely.
+    send! remote("localhost:9999", "echo").note("nobody-listens");
+    print("[client] tolerated unreachable send!");
+  }
+}
+
+var d = new Driver();

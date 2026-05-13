@@ -1,0 +1,4 @@
+// Boot script for the JS-O HTTP frontend.  Opens the web gateway so
+// the browser/curl can drive the OCaml runtime via /api/repl.
+web_listen(8765);
+print("[jso] gateway up on http://localhost:8765");

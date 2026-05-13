@@ -29,6 +29,8 @@ rule token = parse
 | "class"      { CLASS }
 | "become"     { BECOME }
 | "method"     { METHOD }
+| "function"   { FUNCTION }
+| "return"     { RETURN }
 | "float"      { FLOAT }
 | "call"       { CALL }
 | "send!"      { UNSAFESEND }
@@ -62,6 +64,9 @@ rule token = parse
 | ")"          { RPAREN }
 | "{"          { LBRACE }
 | "}"          { RBRACE }
+| "["          { LBRACK }
+| "]"          { RBRACK }
+| ":"          { COLON }
 | ";"          { SEMICOLON }
 | ","          { COMMA }
 | "."          { DOT }
@@ -78,9 +83,30 @@ rule token = parse
 (* 3. 「100」形式（整数） *)
 | ['0'-'9']+ as num                 { INTLIT (int_of_string num) }
 | '"' ([^ '"' '\\'] | '\\' ['\\' '"' 'n' 't' 'r'] )* '"' as lit {
-    let s = String.sub lit 1 (String.length lit - 2)
-    in
-    STRINGLIT s
+    (* Strip outer quotes and unescape the recognized sequences so that
+       runtime-fed source strings (e.g. via compile()) see the intended
+       characters (`\"` -> `"`, `\n` -> newline, etc.). *)
+    let inner = String.sub lit 1 (String.length lit - 2) in
+    let n = String.length inner in
+    let buf = Buffer.create n in
+    let i = ref 0 in
+    while !i < n do
+      let c = inner.[!i] in
+      if c = '\\' && !i + 1 < n then begin
+        (match inner.[!i + 1] with
+         | '\\' -> Buffer.add_char buf '\\'
+         | '"'  -> Buffer.add_char buf '"'
+         | 'n'  -> Buffer.add_char buf '\n'
+         | 't'  -> Buffer.add_char buf '\t'
+         | 'r'  -> Buffer.add_char buf '\r'
+         | other -> Buffer.add_char buf '\\'; Buffer.add_char buf other);
+        i := !i + 2
+      end else begin
+        Buffer.add_char buf c;
+        incr i
+      end
+    done;
+    STRINGLIT (Buffer.contents buf)
 }
 | ['a'-'z' 'A'-'Z' '_']['a'-'z' 'A'-'Z' '0'-'9' '_']* as id { ID id }
 
