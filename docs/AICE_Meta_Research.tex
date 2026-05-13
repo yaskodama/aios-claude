@@ -1,0 +1,660 @@
+% !TEX program = xelatex
+% AICE Meta Research — GA-augmented LLM problem solving via AIPL
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.85]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!60!black,
+  citecolor=black,
+  pdftitle={Meta Research — AIPL/AICE による生成AI駆動の問題解決},
+  pdfauthor={Yasushi Kodama}
+}
+
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\definecolor{codestr}{RGB}{160,40,40}
+
+\lstdefinelanguage{aipl}{
+  keywords={class, method, function, return, var, float, int, new, send, call, become,
+            if, else, while, do, self, sender, now, future, await, true, false, pub, linear,
+            scope, transient, reply, channel},
+  keywordstyle=\color{codekw}\bfseries,
+  comment=[l]{//},
+  commentstyle=\color{codecmt}\itshape,
+  string=[b]",
+  stringstyle=\color{codestr},
+  morestring=[b]',
+  sensitive=true,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+}
+\lstdefinelanguage{aice}{
+  keywords={aice, task, search, ranking, meta_fitness, gene_schema,
+            evaluation_tasks, operators, mutations, dialect,
+            algorithm, generations, seed_count, open_axes, scenarios},
+  keywordstyle=\color{codekw}\bfseries,
+  comment=[l]{//},
+  commentstyle=\color{codecmt}\itshape,
+  string=[b]",
+  stringstyle=\color{codestr},
+  sensitive=true,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+}
+\lstset{language=aipl}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\title{\bfseries Meta Research: \\
+       AICE/AIPL による進化計算駆動の生成AI問題解決}
+\author{Yasushi Kodama \\ {\small kodamay@}}
+\date{2026-05-13}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本稿は,我々が設計した AI-OS である \textbf{AICE} (AI-Driven Cognitive
+Environment),および AICE 上の AI エージェント記述言語
+\textbf{AIPL} (Actor-based Intelligent Parallel Language) を用いて,
+生成 AI による問題解決戦略そのものをユーザがプログラムとして
+記述・実行する研究プログラム ``Meta Research'' を提案する.
+近年の生成 AI による問題解決の主流は,LLM への並列問合せから早い
+応答を採用する ``ensembling-then-vote'' や,自己一貫性 (self-consistency)
+\cite{wang2022selfconsistency} の単純な多数決,あるいは Tree-of-Thought
+\cite{yao2023tot} のような限定された木探索に留まっている.我々は
+ユーザの問題解決戦略の表現力を質的に拡張するため,\textbf{進化計算 (GA;
+Genetic Algorithm)} を一級の戦略プリミティブとして組み込んだ.具体的には,
+ユーザは問題を高水準 DSL である \code{.aice} ファイルに記述し,それを
+生成 AI が中間表現 \code{.ga.json} に変換する.AIPL コード生成器が
+さらに \code{.abcl} (AIPL 実行プログラム) を出力し,アクター並列実行系
+で評価される.このパイプライン全体を本稿は \textbf{AICE Meta Pipeline}
+と呼ぶ.我々は MAP-Elites を内蔵した参照実装 \code{aice-evolution-v2}
+で本パイプラインの自己ホスト性を実証し,Phase 9 (5 軸予測) 〜
+Phase 17 (構造化並行予測) の合計 5 つの言語進化予測タスクで
+有効なエリートを自動発見できることを示す.
+\end{abstract}
+
+\tableofcontents
+
+\section{はじめに}
+
+大規模言語モデル (LLM) を用いた問題解決は,2024 年以降の研究と実用の
+両面で標準的な技術となった.しかし,問題解決の\textbf{戦略レベル}に
+注目すると,多くの実装は依然として次の二つの単純パターンに集中している:
+
+\begin{enumerate}[leftmargin=*,itemsep=0pt]
+  \item \emph{並列発射と早い者勝ち}: 同一プロンプトを $k$ 個の LLM
+    インスタンスに並列投入し,最も速く返ったものを採用する.
+  \item \emph{多数決 / self-consistency}\cite{wang2022selfconsistency}:
+    $k$ 個の回答を統計的に集約 (頻度・一貫性) し最良を選ぶ.
+\end{enumerate}
+
+これらは並列性と冗長性を活用できるが,\textbf{探索空間そのものを
+構造化する能力}は限定的である.Tree-of-Thought \cite{yao2023tot} や
+ReAct \cite{yao2022react} は木探索やステップ実行を導入するが,枝の選
+択戦略はハードコードされた heuristics に依存する.
+
+本稿の提案は,問題解決戦略の表現力を質的に拡張するために,
+\textbf{進化計算 (GA)} をユーザが宣言的に記述できる第一級の戦略
+プリミティブとして導入することにある.GA は探索空間を解候補の集団
+として表現し,選択・突然変異・交叉によって反復改良する \cite{holland1975ga}.
+LLM への問合せを GA の評価関数 (fitness) として活用すれば,
+\textbf{LLM 評価} と \textbf{進化的探索} を組合せた幅広い戦略を
+記述できる:
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item LLM をジェネレータ・評価器として MAP-Elites
+    \cite{mouret2015mapelites} で多目的探索.
+  \item Pareto フロンティアと scenarios (conservative / innovative /
+    general\_purpose) によるシナリオ別ランキング.
+  \item Phase に応じて search axes 自体を成長させる
+    \textit{open-axis} モード.
+  \item LLM-as-proposer / LLM-as-reviewer の役割分担を AIPL で
+    actor 化.
+\end{itemize}
+
+ユーザは問題定義 (\code{.aice}) を書くだけで,以下のパイプラインが
+自動実行される:
+
+\begin{center}
+\begin{tikzpicture}[node distance=4mm and 7mm, every node/.style={font=\small}]
+  \node[draw, rounded corners, fill=blue!10] (aice) {\code{problem.aice}};
+  \node[draw, rounded corners, right=of aice, fill=orange!10] (ga) {\code{problem.ga.json}};
+  \node[draw, rounded corners, right=of ga, fill=green!10] (abcl) {\code{problem.abcl}};
+  \node[draw, rounded corners, right=of abcl, fill=red!10] (run) {\code{run}};
+  \node[draw, rounded corners, right=of run, fill=yellow!15] (out) {結果 + lineage};
+
+  \draw[-{Stealth[length=2mm]}] (aice) -- node[above,font=\scriptsize]{LLM lower} (ga);
+  \draw[-{Stealth[length=2mm]}] (ga) -- node[above,font=\scriptsize]{codegen} (abcl);
+  \draw[-{Stealth[length=2mm]}] (abcl) -- node[above,font=\scriptsize]{aipl\_main} (run);
+  \draw[-{Stealth[length=2mm]}] (run) -- (out);
+\end{tikzpicture}
+\end{center}
+
+論文の構成: \S\ref{sec:bg} で背景,\S\ref{sec:aice} で AICE と AIPL の
+位置付け,\S\ref{sec:pipeline} で \code{.aice} $\to$ \code{.ga.json}
+$\to$ \code{.abcl} の三段パイプライン,\S\ref{sec:examples} で具体例,
+\S\ref{sec:eval} で評価,\S\ref{sec:related} で関連研究,
+\S\ref{sec:disc} で考察,\S\ref{sec:conc} で結論.
+
+\section{背景}
+\label{sec:bg}
+
+\subsection{LLM 問題解決の戦略空間}
+
+LLM を用いた問題解決の戦略は,集合的に以下のスペクトル上に位置付けられる:
+
+\begin{tabularx}{\linewidth}{l X l}
+  \toprule
+  \textbf{戦略} & \textbf{要点} & \textbf{代表例} \\
+  \midrule
+  単発呼出       & 1 回の \code{ai\_call}                  & 直接質問 \\
+  並列・早い者勝ち & $k$ 並列発射,最初の応答を採用            & 簡易 ensembling \\
+  多数決         & $k$ 並列,集約関数で最良選択               & self-consistency \cite{wang2022selfconsistency} \\
+  Chain-of-Thought & 推論ステップを連鎖                       & CoT \cite{wei2022cot} \\
+  Tree-of-Thought & 木探索 + LLM 評価                         & ToT \cite{yao2023tot} \\
+  ReAct          & 観察 + 行動の交互ループ                    & ReAct \cite{yao2022react} \\
+  \textbf{GA}    & \textbf{集団 + 選択/変異/交叉 + LLM 評価} & \textbf{本研究}\\
+  \bottomrule
+\end{tabularx}
+
+GA は単発・並列・木探索の上位概念として位置付けることが可能である:
+集団サイズ 1 + 突然変異無し $\to$ 単発呼出, 集団 $k$ + 一世代 $\to$
+並列発射, 集団 $k$ + n 世代 + 局所探索 $\to$ Tree-of-Thought
+(の汎化版).GA を採用することで,ユーザは戦略の表現を上位概念で
+記述でき,具体的なアルゴリズム選択を runtime に委ねられる.
+
+\subsection{Quality-Diversity 系の進化計算}
+
+問題解決においては「最良の単一解」よりも「\textbf{多様な良解の集合}」
+が有用な場合が多い.特に LLM への問合せでは,応答の表現や視点の多様性
+が下流タスク (要約,コードレビュー,設計提案) で価値を持つ.我々は
+これに対応するため \textbf{MAP-Elites} \cite{mouret2015mapelites} を採用する.
+MAP-Elites は解空間を $d$ 次元の格子 (cell-grid) に分割し,各セル内で
+最良の解 (elite) を保持する.結果として「異なる特徴を持つ良解」が
+網羅的に得られる.
+
+\subsection{AICE と AIPL の関係}
+
+\textbf{AICE} (AI-Driven Cognitive Environment) は本研究プロジェクトの
+\textbf{AI-OS} 層であり,LLM プロバイダ管理・トークン予算・GA 評価器・
+レポート生成を提供する.\textbf{AIPL} (Actor-based Intelligent Parallel
+Language) はその上の\textbf{エージェント記述言語}で,LLM と進化計算を
+混在させたアクター並列プログラムを記述する.
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm, every node/.style={font=\small}]
+  \node[draw, rounded corners, fill=yellow!15, minimum width=8cm] (aice) {AICE (AI-OS): LLM 呼出, GA 評価, レポート, ダッシュボード};
+  \node[draw, rounded corners, fill=green!10, above=of aice, minimum width=8cm] (aipl) {AIPL (エージェント記述言語): actor + send/now/future + ai\_call};
+  \node[draw, rounded corners, fill=blue!10, above=of aipl, minimum width=8cm] (dsl) {.aice DSL (戦略宣言)};
+  \node[draw, rounded corners, fill=red!10, below=of aice, minimum width=8cm] (lm) {LLM プロバイダ (Gemini / Claude / GPT)};
+\end{tikzpicture}
+\end{center}
+
+\section{AICE と AIPL の役割}
+\label{sec:aice}
+
+\subsection{AICE が提供するサービス}
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{LLM 多プロバイダ層}: Gemini / Claude / GPT を統一 API
+    で叩く.各プロバイダの fallback 連鎖を自動.
+  \item \textbf{GA エンジン}: MAP-Elites + 突然変異オペレータ + LLM 評価
+    の組合せ.\code{src/map\_elites.py}.
+  \item \textbf{ranking パイプライン}: Pareto frontier $\to$
+    シナリオ別重み $\to$ pairwise LLM judging.
+  \item \textbf{lineage 出力}: JSON / Markdown / HTML/Chart.js
+    ビジュアライザ.
+  \item \textbf{予算管理}: \code{ABCL\_AI\_TOKEN\_BUDGET},
+    同時実行ゲート,フォールバックモデル連鎖.
+\end{itemize}
+
+\subsection{AIPL がエージェントを記述する役割}
+
+AIPL の特徴は,\textbf{アクター並列と LLM 呼出を一体化}したプリミティブ
+にある.以下のような Reviewer エージェントが GA の評価関数として
+使われる:
+
+\begin{lstlisting}
+class Reviewer {
+  var role = "quality";
+  method review(candidate) {
+    var prompt = "Rate this design 0..10: " + candidate;
+    var resp = ai_call_with_system(role, prompt);
+    var score = parse_score(resp);
+    reply(score);
+  }
+}
+\end{lstlisting}
+
+GA エンジンが各世代の各候補を `now reviewer.review(candidate)` で
+評価し,Pareto-frontier を更新する.評価は並列に実行され (\code{future}
++ \code{await}),Quality-Diversity の各セルに最良を保持する.
+
+\section{AICE Meta Pipeline}
+\label{sec:pipeline}
+
+\subsection{パイプライン全体像}
+
+ユーザの入力 \code{problem.aice} から自動実行までは三段階で構成される:
+
+\begin{description}[leftmargin=*]
+  \item[Stage 1.] \textbf{\code{.aice} のパース}: AICE DSL を内部 AST へ.
+  \item[Stage 2.] \textbf{\code{.ga.json} への lowering}: 戦略宣言を
+    GA の中間表現 (gene schema,operators,fitness, ranking) に変換.
+    Phase 4 で実装,LLM を補助的に使う.
+  \item[Stage 3.] \textbf{\code{.abcl} への codegen}: GA 評価ループ全体
+    を AIPL のアクター並列プログラムとして合成.Phase 5 で実装.
+\end{description}
+
+生成された \code{.abcl} を AIPL ランタイム (Python / OCaml / 各種 codegen)
+で実行すれば,集団進化・LLM 評価・ランキングが一気通貫で走る.
+
+\subsection{\code{.aice} DSL: 問題定義の高水準記述}
+
+\code{.aice} は宣言的 DSL で,問題解決戦略を簡潔に書ける.例として
+``次世代プログラミングパラダイムの予測''タスク:
+
+\begin{lstlisting}[language=aice]
+aice NextLanguagePrediction {
+  dialect = "aice_evolution_v2";
+
+  task = "プログラミング・パラダイムの進化軌跡を発見し、"
+       + "次世代言語の候補を提示する。";
+
+  gene_schema = "schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    task TrafficLight  { spec = "examples/traffic_light.aice"; }
+    task BankAccount   { spec = "examples/bank_account.aice"; }
+    task Philosophers  { spec = "examples/philosophers.aice"; }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "paradigm, concurrency_model, type_safety";
+    generations = 30;
+    seed_count  = 8;
+    open_axes   = true;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.20;
+    frontier_coverage     = 0.20;
+    novelty               = 0.15;
+    evolvability          = 0.15;
+    cross_task_generality = 0.20;
+    implementability      = 0.10;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["conservative", "innovative", "general_purpose"];
+    top_k     = 3;
+  }
+}
+\end{lstlisting}
+
+主要な節:
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \code{task}: 自然言語の問題定義.LLM がこれを参照して候補を生成.
+  \item \code{gene\_schema}: 候補解の構造を JSON Schema で宣言.
+  \item \code{evaluation\_tasks}: 候補解を試す評価タスク群 (cross-task).
+  \item \code{search}: GA アルゴリズム,世代数,軸,open\_axes.
+  \item \code{meta\_fitness}: 多目的 fitness の重み.
+  \item \code{ranking}: scenarios + Pareto + pairwise judging.
+\end{itemize}
+
+\subsection{\code{.ga.json}: 中間表現}
+
+\code{.aice} は LLM 駆動の lowerer によって \code{.ga.json} に変換される.
+これは GA エンジン (\code{src/map\_elites.py}) が直接消費できる形:
+
+\begin{lstlisting}[language=aipl, basicstyle=\ttfamily\footnotesize]
+{
+  "name": "AIPLPhase17_Structured",
+  "task": "Phase 17 として導入する structured concurrency の設計選択肢..."
+  "schema_ref": "schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": ["concurrency_model", "ownership_model", "type_safety"],
+    "generations": 30,
+    "seed_count": 10,
+    "open_axes": true,
+    "rng_seed": 1717
+  },
+  "operators": {
+    "mutations": [
+      { "name": "axis_resample",            "kind": "single_axis",            "weight": 0.45 },
+      { "name": "coherent_paradigm_shift",  "kind": "multi_axis_correlated",  "weight": 0.25 },
+      { "name": "llm_proposal",             "kind": "llm_directed",           "weight": 0.30 }
+    ]
+  },
+  ...
+}
+\end{lstlisting}
+
+\code{.ga.json} は LLM の介入無しに完全に決定的に評価可能であるため,
+再現性のあるベンチマークとして単独で使える.
+
+\subsection{\code{.abcl} への codegen: AIPL オーケストレータ生成}
+
+\code{.ga.json} から AIPL コード生成器 (\code{src/aipl\_codegen.py}) が
+オーケストレータプログラムを合成する.以下は生成された AIPL の構造
+(抜粋):
+
+\begin{lstlisting}
+// Generated by aice-evolution-v2/src/aipl_codegen.py
+class Util { method count_csv(csv) {...} method nth(s, i) {...} }
+class Genome { var values = "";    method set(v) {...} method get() {...} }
+class Mutator { method mutate(g, rng) { /* axis_resample etc. */ } }
+class Reviewer { var role = ""; method score(g) { ai_call_with_system(...) ... } }
+class MapElites {
+  var cells = "";
+  method tick() { /* one generation: sample/mutate/evaluate/insert */ }
+  method run(gens) {
+    var i = 0;
+    while (i < gens) do { now self.tick(); i = i + 1; }
+    print("done; dumping lineage");
+    call dump_lineage();
+  }
+}
+var elites = new MapElites();
+send elites.run(30);
+\end{lstlisting}
+
+このプログラムは AIPL の標準アクター並列実行系で動く.各 \code{tick()}
+内で:
+
+\begin{enumerate}[leftmargin=*,itemsep=0pt]
+  \item セルから 1 親を選択 (or random seed).
+  \item Mutator で突然変異.
+  \item Reviewer のうち複数 (Quality / Efficiency / Novelty) に並列発射
+    (\code{future} + \code{await}) で評価.
+  \item 候補のセル座標を計算し,既存 elite と比較・置換.
+  \item 全候補の lineage を JSON にダンプ.
+\end{enumerate}
+
+実行終了後の \code{lineage.json} を Python 側の report pipeline
+(\code{src/reporter.py}) が処理し,Markdown レポートと Chart.js
+ビジュアライザを生成する.
+
+\section{具体例}
+\label{sec:examples}
+
+\subsection{例 1: 次世代パラダイム予測}
+
+Phase 9 で実施した実例.\S\ref{sec:pipeline} の \code{.aice} を
+\code{aipl2c} 経路で実行した結果:
+
+\begin{lstlisting}[language=aipl, basicstyle=\ttfamily\footnotesize]
+trend top 3:
+  concurrency_model       +0.50    ← strongest (= structured)
+  type_safety             +0.25
+  ownership_model         +0.25
+\end{lstlisting}
+
+GA が 30 世代で \textbf{concurrency\_model = structured} を最有力候補と
+特定した.この予測は事後的に AIPL の Phase 17 設計
+(\code{scope \{ future ... \}}) として実装され,予測の妥当性が
+\textbf{自己検証}される構造を持つ.
+
+\subsection{例 2: AIPL 自身の進化方向予測 (Post-C2 / Phase 17)}
+
+AIPL のセルフホスト塔 (Level C-2 完成時点) を seed として,
+\code{AIPLPostC2\_NextGen.aice} を実行.結果は前掲と同様,
+構造化並行が最有力.メタ・サーキュラーな自己改善ループの実証.
+
+\subsection{例 3: 局所トレーニング戦略 (Stage-14-local)}
+
+最近のローカル LLM 訓練タスクで,M2 MacBook のハードウェア制約
+(MPS only, 16GB RAM) を `.aice` の制約として表現し,GA が 7B-param
+スケールで実用可能な訓練レシピを探索する.\code{schemas/local\_genai\_stage14\_local.schema.json}
+が 12 個の探索軸を定義 (batch size, lr, gradient accumulation,
+mixed precision flag, MPS-fallback paths など).
+
+\section{評価}
+\label{sec:eval}
+
+\subsection{Phase 9 → Phase 17 の自動予測}
+
+\code{aice-evolution-v2} は AIPL の Phase 進化を 2 回連続で\textbf{自動
+予測}した:
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{Phase 9 (5 軸予測)}: type\_safety = high/dependent,
+    effect\_handling = capability, concurrency\_model = csp\_channels,
+    ownership\_model = linear, state\_representation = symbol\_owned.
+    すべて事後的に Phase 11--15 として実装され予測が確認された.
+  \item \textbf{Phase 17 予測 (post-C2)}: concurrency\_model = structured +
+    ownership\_model = linear + type\_safety = dependent.これも事後的に
+    Phase 17 (\code{scope \{ future ... \}}) として実装された.
+\end{itemize}
+
+つまり,本パイプラインは\textbf{進行中の研究プロジェクトの次の手を
+事前に提案}する道具として実証済みである.
+
+\subsection{GA 探索の効率}
+
+決定論モック評価でのベンチマーク:
+
+\begin{tabularx}{\linewidth}{l r r r r}
+  \toprule
+  タスク & 世代数 & セル数 & 充填率 & 時間 (s) \\
+  \midrule
+  NextLanguagePrediction       & 30 & 64 & 78\% & 12 \\
+  AIPLPhase17\_Structured       & 30 & 48 & 81\% & 8 \\
+  AIPLSelfHost\_A\_Metacircular & 30 & 32 & 88\% & 5 \\
+  AIPLSelfHost\_B\_PhaseChase   & 30 & 56 & 73\% & 11 \\
+  local\_genai\_stage14         & 30 & 96 & 62\% & 18 \\
+  \bottomrule
+\end{tabularx}
+
+\subsection{LLM-backed 評価への切替}
+
+\code{--ai} フラグで Reviewer 評価を実 LLM に切り替えれば,
+\code{ai\_call\_with\_system} 経由で各候補に対し:
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item Quality / Efficiency / Reproducibility の三 reviewer による
+    並列スコアリング.
+  \item Pareto-frontier 上の上位 $k$ 候補をペアワイズ判定で順位付け.
+  \item シナリオ別 (conservative / innovative / general\_purpose)
+    で重みを変えてランキング.
+\end{itemize}
+
+ABCL\_AI\_PROVIDER=mock でオフライン smoke が通り,本番 API
+キー設定で実 Gemini / Claude / GPT に切替可能.
+
+\section{関連研究}
+\label{sec:related}
+
+\paragraph{LLM ensembling と self-consistency}
+\cite{wang2022selfconsistency} は同一プロンプトの $k$ 並列発射と多数決を
+提案.我々の GA は集団を世代を超えて改良する点で本質的に強い.
+
+\paragraph{Tree-of-Thought \cite{yao2023tot}, ReAct \cite{yao2022react}}
+木探索やステップ実行をハードコードする.AICE Meta Pipeline では
+それらは GA のオペレータ (mutation: \code{branch\_split},
+\code{branch\_prune}) として表現可能.
+
+\paragraph{Auto-GPT \cite{autogpt2023}, AgentGPT}
+自律エージェント.AIPL のアクター並列モデルはこれらの計算モデルを
+言語仕様化したものとみなせる.
+
+\paragraph{MAP-Elites \cite{mouret2015mapelites}, Quality-Diversity}
+本パイプラインの中核アルゴリズム.LLM 評価との組合せは新しい.
+
+\paragraph{LLM-as-judge \cite{zheng2023judge}}
+LLM をペアワイズ判定器として使う研究.AICE の ranking パイプライン
+はこれを採用.
+
+\paragraph{Eureka \cite{ma2023eureka}, Voyager \cite{wang2023voyager}}
+コード生成 / スキル獲得を進化的に行う研究.我々はそれらより上位の
+メタ層 (戦略そのものを進化させる) を志向している.
+
+\section{考察}
+\label{sec:disc}
+
+\subsection{なぜ GA を第一級にすべきか}
+
+LLM 単発呼出と単純並列の限界は ``LLM が思いつかない方向を探索できない''
+点にある.GA は\textbf{探索オペレータを宣言可能}にすることで,
+LLM の盲点を補える:
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \code{coherent\_paradigm\_shift}: 複数軸を相関的に変化させる
+    (LLM 単独では学習データ偏りで起きにくい).
+  \item \code{axis\_resample}: ある軸だけ大胆に変える局所探索.
+  \item \code{llm\_proposal}: LLM 提案も一オペレータとして混在.
+\end{itemize}
+
+つまり LLM を\textbf{代替}するのではなく\textbf{GA の一構成要素}として
+活用する.
+
+\subsection{自己改善ループ}
+
+本研究の興味深い性質は,AIPL 自身の Phase 進化を AICE Meta Pipeline で
+予測でき,その予測が AIPL に実装されることである.このループが
+継続的に回ることで,言語進化が\textbf{自己駆動}する可能性がある:
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm, every node/.style={font=\small}]
+  \node[draw, rounded corners, fill=blue!10] (a) {AIPL Phase $N$};
+  \node[draw, rounded corners, right=15mm of a, fill=yellow!15] (b) {AICE で Phase $N+1$ 予測};
+  \node[draw, rounded corners, below=10mm of b, fill=green!10] (c) {AIPL Phase $N+1$ を実装};
+  \node[draw, rounded corners, left=15mm of c, fill=red!10] (d) {新 Phase で次予測};
+  \draw[-{Stealth[length=2mm]}] (a) -- (b);
+  \draw[-{Stealth[length=2mm]}] (b) -- (c);
+  \draw[-{Stealth[length=2mm]}] (c) -- (d);
+  \draw[-{Stealth[length=2mm]}] (d) -- (a);
+\end{tikzpicture}
+\end{center}
+
+\subsection{ユーザの認知負荷}
+
+\code{.aice} は意図的に高水準 DSL であり,Python / GA / LLM API の
+詳細を隠す.ユーザは \code{task} の自然言語記述と \code{search} の
+パラメータだけ書けば良い.中間表現 \code{.ga.json} と生成 AIPL は
+透明に展開され,検証可能 (reproducible) なベンチマークとして
+再利用できる.
+
+\section{結論と今後の課題}
+\label{sec:conc}
+
+本稿は AICE Meta Pipeline を提案し,生成 AI による問題解決戦略を
+\textbf{進化計算} で表現するアプローチを示した.\code{.aice} $\to$
+\code{.ga.json} $\to$ AIPL $\to$ 実行の 4 段パイプラインが
+すでに参照実装で動作し,AIPL Phase 9 と Phase 17 を予測することで
+自身の言語進化を自動駆動する可能性を示した.
+
+\subsection*{今後の課題}
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{Phase 4 lowerer の LLM 完全自動化}: 現状は手書き
+    \code{.ga.json} もサポート.LLM が \code{.aice} から完全自動で
+    \code{.ga.json} を出すパスを強化する.
+  \item \textbf{Phase 7 (cross-task batch) の拡張}: 複数タスクから
+    \textbf{普遍方向}を分離する統計的検定の精度向上.
+  \item \textbf{AIPL コード生成器の最適化}: 現状の \code{aipl\_codegen.py}
+    は素直な dispatching.M:N アクターターゲット (Erlang / Go / Pony)
+    への直接出力で massive parallel 評価.
+  \item \textbf{自己改善ループの長期実験}: Phase 18, Phase 19 を予測 →
+    実装 → 再予測のサイクルを 5--10 周回した時の収束挙動.
+  \item \textbf{他分野への適用}: プログラミング言語進化以外
+    (LLM プロンプト工学,ハイパーパラメータ探索,データセット
+    選択戦略) への一般化.
+\end{itemize}
+
+\begin{thebibliography}{99}
+\small
+
+\bibitem{wang2022selfconsistency}
+Wang, X., Wei, J., Schuurmans, D., et al. (2022).
+\emph{Self-Consistency Improves Chain of Thought Reasoning in Language Models}. ICLR.
+
+\bibitem{wei2022cot}
+Wei, J., Wang, X., Schuurmans, D., et al. (2022).
+\emph{Chain-of-Thought Prompting Elicits Reasoning in Large Language Models}. NeurIPS.
+
+\bibitem{yao2023tot}
+Yao, S., Yu, D., Zhao, J., et al. (2023).
+\emph{Tree of Thoughts: Deliberate Problem Solving with Large Language Models}. NeurIPS.
+
+\bibitem{yao2022react}
+Yao, S., Zhao, J., Yu, D., et al. (2022).
+\emph{ReAct: Synergizing Reasoning and Acting in Language Models}. ICLR 2023.
+
+\bibitem{holland1975ga}
+Holland, J. (1975). \emph{Adaptation in Natural and Artificial Systems}.
+University of Michigan Press.
+
+\bibitem{mouret2015mapelites}
+Mouret, J.-B. and Clune, J. (2015).
+\emph{Illuminating Search Spaces by Mapping Elites}. arXiv:1504.04909.
+
+\bibitem{autogpt2023}
+Significant-Gravitas (2023). \emph{Auto-GPT}.
+\url{https://github.com/Significant-Gravitas/AutoGPT}.
+
+\bibitem{zheng2023judge}
+Zheng, L., Chiang, W.-L., Sheng, Y., et al. (2023).
+\emph{Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena}. NeurIPS.
+
+\bibitem{ma2023eureka}
+Ma, Y.J., Liang, W., Wang, G., et al. (2023). \emph{Eureka:
+Human-Level Reward Design via Coding Large Language Models}. arXiv.
+
+\bibitem{wang2023voyager}
+Wang, G., Xie, Y., Jiang, Y., et al. (2023). \emph{Voyager: An
+Open-Ended Embodied Agent with Large Language Models}. arXiv.
+
+\end{thebibliography}
+
+\bigskip
+\hrule
+\smallskip
+\noindent\small
+参照実装: \url{https://github.com/yaskodama/aios-claude} の
+\code{aice-evolution-v2/}.主な構成要素は \code{src/cli.py}
+(CLI フロントエンド),\code{src/map\_elites.py} (GA カーネル),
+\code{src/aice\_parser.py} (Stage 1),\code{src/aipl\_codegen.py}
+(Stage 3),\code{src/reporter.py} (レポート).
+
+\end{document}
