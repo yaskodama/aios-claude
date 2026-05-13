@@ -288,7 +288,7 @@ the program does not abort.
   \endhead
 
   remote actors (HTTP)                          & \Yes & \Yes & \Part no WS & \Part & \No & \Part srv only & \Yes via OCaml \\
-  WebSocket                                     & \Part \texttt{pip install websockets} & \Part (=Py-A) & \Yes built-in (verified 101) & \Yes via OCaml & \Yes browser-native & \Part \texttt{npm install ws} & \Part libwebsockets \\
+  WebSocket                                     & \Yes \texttt{ws\_listen/send/close} builtins (websockets lib) & \Yes (=Py-A) & \Yes built-in (verified 101) & \Yes via OCaml & \Yes browser-native & \Yes \texttt{/ws?sid=} + \texttt{/api/broadcast} (ws lib) & \Yes \texttt{abcl\_ws\_runtime.c} + libwebsockets \\
   AI integration (\texttt{ai\_call})            & \Yes stream/img & \Yes & \Yes & \Yes & \Yes mock & \Yes mock & \Yes \\
   \quad provider arg (\texttt{ai\_call([1|2|3,] prompt)}) — 1=gemini, 2=anthropic, 3=openai & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes (via OCaml) \\
   \quad \texttt{now actor.m(...)} + \texttt{ai\_call} inside method (blocking) & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
