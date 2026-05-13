@@ -1,0 +1,97 @@
+// LocalGenAIStage14GigaCorpusJP — Stage-14 進化計算仕様 (.aice).
+//
+// Stage-13 までで以下が確認された:
+//   - 60MB 英語のみで 1B トークン訓練 (Stage-11): bpb 1.586
+//   - 99MB 多言語 (1% JP) で ~1B トークン (Stage-12): bpb 1.667
+//   - 113MB 多言語 (15% JP) で ~1B トークン (Stage-13): bpb 1.494
+//
+// Stage-13 で日本語比率 15% で fluency が劇的改善 (Aozora 文学風が
+// 生成可能に). 次の自然なスケーリングは:
+//   (a) コーパス 1GB ≈ Stage-13 の 10x
+//   (b) 訓練トークン 10B ≈ Stage-13 の 10x
+//   (c) 日本語比率 15% → 30% (Stage-13 で証明された改善を加速)
+//
+// 課題: 10B トークン × M2 MPS は推定 5-7 日連続稼働. 現実的には:
+//   - hardware_class を進化軸として明示し、 local_m2_mps / cloud_h100 /
+//     cloud_tpu_v4 の 3 種類を選択肢に
+//   - cloud_h100 (1 GPU) で 10B トークン ≈ 12-24 時間
+//   - cloud_tpu_v4-8 で 10B トークン ≈ 3-6 時間
+//
+// Stage-13 で確立した recipe (orth 3-set + RoPE + MeCab + BPE-4096 +
+// depth=6 + d=128 + long cosine) を prior にし、 (token_budget,
+// corpus_composition, jp_ratio, hardware_class) の 4 新軸を進化計算で
+// 探索する.
+
+aice LocalGenAIStage14GigaCorpusJP {
+  dialect = "aice_evolution_v2";
+
+  task = "Stage-13 で確立した recipe を seed に、 corpus を 113MB → 1GB に拡大 + 訓練トークンを 1B → 10B に拡大 + 日本語比率を 15% → 30% に上げ、 (token_budget, corpus_size_class, jp_ratio, hardware_class) の 4 軸を進化計算で探索する. cell は (model_family, hardware_class, corpus_size_class, token_budget, jp_ratio) の 5 軸. champion は bits-per-byte (BPB) で比較し、 Stage-13 の bpb 1.494 を baseline とする. 終端目標は (multi_block_transformer, cloud_h100, 1GB, 10B_tokens, jp_ratio_30) の単一 cell が bpb 1.3 を切ること、 もしくは (multi_block_transformer, local_m2_mps, 500MB, 3B_tokens, jp_ratio_30) で bpb 1.35 を達成して local 環境で実用 Pareto を更新すること.";
+
+  gene_schema = "schemas/local_genai_stage14.schema.json";
+
+  evaluation_tasks {
+    task BitsPerByteOnSharedHoldout {
+      spec = "全候補を共通 holdout (1GB tail) で再評価. BPB は唯一の cross-tokenizer fair 指標. Stage-13 baseline = 1.494. 期待 BPB レンジは (113MB,1B=1.45-1.50), (300MB,3B=1.35-1.45), (1GB,10B=1.20-1.35), (1GB,30B=1.15-1.25). 5 byte/param 未満の極端な overcapacity は別途 reviewer が減点.";
+    }
+    task JapaneseFluencyBenchmark {
+      spec = "20 個の日本語プロンプト (MeCab 分かち書き済) で生成し、 (a) ASCII へのリーク率、 (b) 文末記号 (。 ！ ？) の妥当性、 (c) 漢字-平仮名比率の文体整合性、 を 0-3 点で採点. Stage-13 baseline = 9/9 程度 (Aozora 風が安定出る). Stage-14 目標 = 7/9 以上を高温度 (1.0+) でも保てる.";
+    }
+    task DataCeilingAndSaturation {
+      spec = "(corpus_size, token_budget) マトリクスで BPB 改善曲線を追跡. 113MB→300MB で bpb -0.10 以上、 300MB→1GB で bpb -0.05 以上の改善が観測されること. 改善が頭打ちのセルは 'data-saturated' と判定. token_budget × corpus_size 比 (tokens-seen / unique-tokens) が 1-5 で healthy, 10+ で diminishing returns.";
+    }
+    task TrainTimeBudget {
+      spec = "ハードウェア別 train time 上限: local_m2_mps=72h, cloud_h100_1=24h, cloud_h100_8=8h, cloud_tpu_v4_8=6h. 越える候補は失格. M2 MPS で 10B トークン (≈ 1.6M steps × batch=24 × bptt=256) は完走不可とみなし、 cloud_h100_1 以上を要求する.";
+    }
+    task CrossLingualConsistency {
+      spec = "英語プロンプト → 英語継続、 日本語プロンプト → 日本語継続が温度 0.6-1.0 の範囲で保たれること. Stage-13 で温度 0.85 以上で英語混入 (code-switching) が観測されたが、 1.0 以上は許容、 0.6-0.85 は分離すべき.";
+    }
+    task ReproducibilityChecklist {
+      spec = "seed 固定 / corpus build スクリプト公開 / SHA-256 lock / 依存最小 (python+pytorch+numpy+tokenizers+fugashi+unidic-lite) / 単一スクリプト train+eval+chat / 20 プロンプト × 3 温度サンプル保存 / 日本語サンプルでの fluency check スクリプト. 7 項目 0-2 点で計 0-14 点.";
+    }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "model_family, hardware_class, corpus_size_class, token_budget, jp_ratio";
+    generations = 100;
+    seed_count  = 30;
+    open_axes   = true;
+    rng_seed    = 42;
+  }
+
+  // Stage-13 champion を seed の中核とする.
+  prior_seeds = "
+    multi_block_transformer | local_m2_mps  | 113MB | 1B  | jp_ratio_15 | rope | rmsnorm | orthogonal_3_set | long_40k | bpe_4096 | medium_4_to_6 | d_model_128 | depth_6
+    multi_block_transformer | local_m2_mps  | 300MB | 3B  | jp_ratio_30 | rope | rmsnorm | orthogonal_3_set | long_80k | bpe_4096 | medium_4_to_6 | d_model_128 | depth_6
+    multi_block_transformer | cloud_h100_1  | 1GB   | 10B | jp_ratio_30 | rope | rmsnorm | orthogonal_3_set | long_80k | bpe_8192 | medium_4_to_6 | d_model_256 | depth_8
+    multi_block_transformer | cloud_h100_8  | 1GB   | 30B | jp_ratio_30 | rope | rmsnorm | orthogonal_3_set | very_long_160k | bpe_16384 | deep_8plus | d_model_384 | depth_12
+  ";
+
+  meta_fitness {
+    trend_alignment       = 0.20;
+    frontier_coverage     = 0.15;
+    novelty               = 0.10;
+    evolvability          = 0.15;
+    cross_task_generality = 0.15;
+    implementability      = 0.15;
+    multilingual_quality  = 0.10;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["local_pareto", "cloud_pareto", "jp_fluency_pareto", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer Quality {
+      persona = "あなたは言語品質レビュアーです. 候補ジェノムから (corpus_size_class, jp_ratio, token_budget, model_size) を確認し、 BPB の期待値が Stage-13 baseline (113MB×1B×15%JP=1.494) を踏まえて整合しているかを見ます. 期待 BPB レンジは (113MB,1B=1.45-1.50), (300MB,3B=1.35-1.45), (1GB,10B=1.20-1.35). 採点は 5 軸 [BPB が world 内か / 日本語 fluency (Aozora 風が安定) / 英語 fluency (Shakespearean+Victorian+American 風) / 言語混入率が温度域内 / overcapacity / undercapacity でない] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Efficiency {
+      persona = "あなたは効率レビュアーです. tokens-seen / unique-tokens 比 (1-5 = healthy, 10+ = diminishing), train_time / hardware_budget 比、 BPE vocab × jp_ratio バランス (jp_ratio 30% なら vocab 8192+ が望ましい) を最重視します. 採点は 5 軸 [data efficiency / hardware budget 内 / vocab size 適正 / inference cost / model_size と corpus の整合] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.";
+    }
+    reviewer Reproducibility {
+      persona = "あなたは再現性レビュアーです. 採点は 7 軸 [seed 固定 / corpus が SHA-256 ロック / corpus build スクリプト公開 / 外部 API 不使用 (cloud は IaaS なので OK) / 依存最小 (pytorch+tokenizers+fugashi) / 単一スクリプト train+eval+chat / 20 プロンプト × 3 温度サンプル + 日本語 fluency check] それぞれ 0-2 点、 計 0-14 点. cloud_h100 / cloud_tpu_v4 利用は terraform / docker compose を提示すれば減点しない. 最後に最良候補番号を 1 行で返します.";
+    }
+  }
+}

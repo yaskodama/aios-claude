@@ -1,0 +1,237 @@
+{
+  "name": "local_genai_stage14",
+  "based_on": "local_genai_stage10",
+  "notes": "Stage-14 schema. Extends Stage-10 with hardware_class, token_budget, jp_ratio, and a d_model / depth pair of fine-grained design axes. Drops the implicit assumption that all training fits on M2 MPS — cloud GPU/TPU classes become first-class.",
+  "axes": {
+    "model_family": [
+      "ngram_count",
+      "char_rnn",
+      "single_block_transformer",
+      "multi_block_transformer",
+      "multi_block_transformer_compact",
+      "self_evolving_compact"
+    ],
+    "positional": [
+      "none",
+      "implicit_recurrence",
+      "learned_absolute",
+      "rope",
+      "sinusoidal"
+    ],
+    "normalization": [
+      "none",
+      "layernorm",
+      "rmsnorm"
+    ],
+    "regularization_combo": [
+      "none",
+      "dropout_only",
+      "orthogonal_3_set"
+    ],
+    "schedule_length": [
+      "short_5k",
+      "medium_20k",
+      "long_40k",
+      "very_long_80k",
+      "very_long_160k",
+      "epic_320k"
+    ],
+    "tokenizer": [
+      "byte",
+      "bpe_1024",
+      "bpe_2048",
+      "bpe_4096",
+      "bpe_8192",
+      "bpe_16384",
+      "bpe_32768"
+    ],
+    "depth_class": [
+      "shallow_3",
+      "medium_4_to_6",
+      "deep_8plus",
+      "very_deep_12plus"
+    ],
+    "d_model": [
+      "d_64",
+      "d_96",
+      "d_128",
+      "d_192",
+      "d_256",
+      "d_384",
+      "d_512"
+    ],
+    "param_class": [
+      "32K",
+      "200K",
+      "500K",
+      "2M",
+      "3M",
+      "6M",
+      "10M",
+      "20M",
+      "50M",
+      "100M"
+    ],
+    "corpus_size_class": [
+      "10KB",
+      "100KB",
+      "500KB",
+      "1MB",
+      "10MB",
+      "60MB",
+      "100MB",
+      "300MB",
+      "1GB",
+      "3GB"
+    ],
+    "corpus_composition": [
+      "shakespeare_only",
+      "shakespeare_plus_kjv",
+      "mixed_elizabethan",
+      "mixed_classics_en",
+      "mixed_modern_en",
+      "bilingual_en_jp",
+      "bilingual_en_jp_jp_heavy"
+    ],
+    "jp_ratio": [
+      "jp_ratio_0",
+      "jp_ratio_1",
+      "jp_ratio_5",
+      "jp_ratio_15",
+      "jp_ratio_30",
+      "jp_ratio_50"
+    ],
+    "token_budget": [
+      "100M_tokens",
+      "300M_tokens",
+      "1B_tokens",
+      "3B_tokens",
+      "10B_tokens",
+      "30B_tokens"
+    ],
+    "hardware_class": [
+      "stdlib_cpu",
+      "local_m2_mps",
+      "cloud_a100_1",
+      "cloud_h100_1",
+      "cloud_h100_8",
+      "cloud_tpu_v4_8"
+    ],
+    "training_paradigm": [
+      "count_normalize",
+      "maximum_likelihood_sgd",
+      "distillation",
+      "distillation_plus_dpo",
+      "self_proposed_mutation"
+    ],
+    "data_augmentation_strategy": [
+      "naive_multi_epoch",
+      "shuffled_blocks",
+      "curriculum_short_to_long",
+      "synthetic_paraphrase",
+      "language_oversample"
+    ],
+    "data_per_param_health": [
+      "below_5_severe_overfit",
+      "5_to_50_data_rich",
+      "50_to_200_balanced",
+      "above_200_underfit_room",
+      "above_2000_severe_undertrained"
+    ],
+    "regularization": [
+      "none",
+      "dropout_005",
+      "dropout_010"
+    ],
+    "inference_optimization": [
+      "none",
+      "kv_cache",
+      "kv_cache_plus_int8",
+      "kv_cache_plus_int4"
+    ],
+    "self_evolution": [
+      "none",
+      "local_llm_proposes_three_mutations",
+      "local_llm_writes_full_stage",
+      "local_llm_critiques_then_proposes"
+    ]
+  },
+  "ordinal_axes": {
+    "param_class": ["32K", "200K", "500K", "2M", "3M", "6M", "10M", "20M", "50M", "100M"],
+    "corpus_size_class": ["10KB", "100KB", "500KB", "1MB", "10MB", "60MB", "100MB", "300MB", "1GB", "3GB"],
+    "jp_ratio": ["jp_ratio_0", "jp_ratio_1", "jp_ratio_5", "jp_ratio_15", "jp_ratio_30", "jp_ratio_50"],
+    "token_budget": ["100M_tokens", "300M_tokens", "1B_tokens", "3B_tokens", "10B_tokens", "30B_tokens"],
+    "hardware_class": ["stdlib_cpu", "local_m2_mps", "cloud_a100_1", "cloud_h100_1", "cloud_h100_8", "cloud_tpu_v4_8"],
+    "schedule_length": ["short_5k", "medium_20k", "long_40k", "very_long_80k", "very_long_160k", "epic_320k"],
+    "tokenizer": ["byte", "bpe_1024", "bpe_2048", "bpe_4096", "bpe_8192", "bpe_16384", "bpe_32768"],
+    "depth_class": ["shallow_3", "medium_4_to_6", "deep_8plus", "very_deep_12plus"],
+    "d_model": ["d_64", "d_96", "d_128", "d_192", "d_256", "d_384", "d_512"],
+    "regularization_combo": ["none", "dropout_only", "orthogonal_3_set"],
+    "regularization": ["none", "dropout_005", "dropout_010"],
+    "inference_optimization": ["none", "kv_cache", "kv_cache_plus_int8", "kv_cache_plus_int4"],
+    "data_per_param_health": [
+      "below_5_severe_overfit",
+      "5_to_50_data_rich",
+      "50_to_200_balanced",
+      "above_200_underfit_room",
+      "above_2000_severe_undertrained"
+    ]
+  },
+  "coherence": [
+    {"if": {"hardware_class": "stdlib_cpu"},
+     "then_in": {"model_family": ["ngram_count", "char_rnn"],
+                 "param_class": ["32K", "200K"],
+                 "tokenizer": ["byte"],
+                 "token_budget": ["100M_tokens", "300M_tokens"]}},
+    {"if": {"hardware_class": "local_m2_mps"},
+     "then_in": {"param_class": ["32K", "200K", "500K", "2M", "3M"],
+                 "token_budget": ["100M_tokens", "300M_tokens", "1B_tokens", "3B_tokens"]}},
+    {"if": {"hardware_class": "cloud_h100_1"},
+     "then_in": {"param_class": ["2M", "3M", "6M", "10M", "20M"],
+                 "token_budget": ["1B_tokens", "3B_tokens", "10B_tokens"]}},
+    {"if": {"hardware_class": "cloud_h100_8"},
+     "then_in": {"param_class": ["6M", "10M", "20M", "50M", "100M"],
+                 "token_budget": ["10B_tokens", "30B_tokens"]}},
+    {"if": {"hardware_class": "cloud_tpu_v4_8"},
+     "then_in": {"param_class": ["10M", "20M", "50M", "100M"],
+                 "token_budget": ["10B_tokens", "30B_tokens"]}},
+    {"if": {"token_budget": "10B_tokens"},
+     "then_in": {"corpus_size_class": ["1GB", "3GB"],
+                 "hardware_class": ["cloud_h100_1", "cloud_h100_8", "cloud_tpu_v4_8"]}},
+    {"if": {"token_budget": "30B_tokens"},
+     "then_in": {"corpus_size_class": ["3GB"],
+                 "hardware_class": ["cloud_h100_8", "cloud_tpu_v4_8"]}},
+    {"if": {"corpus_size_class": "1GB"},
+     "then_in": {"jp_ratio": ["jp_ratio_5", "jp_ratio_15", "jp_ratio_30", "jp_ratio_50"]}},
+    {"if": {"corpus_size_class": "3GB"},
+     "then_in": {"jp_ratio": ["jp_ratio_15", "jp_ratio_30", "jp_ratio_50"]}},
+    {"if": {"jp_ratio": "jp_ratio_30"},
+     "then_in": {"tokenizer": ["bpe_4096", "bpe_8192", "bpe_16384", "bpe_32768"]}},
+    {"if": {"jp_ratio": "jp_ratio_50"},
+     "then_in": {"tokenizer": ["bpe_8192", "bpe_16384", "bpe_32768"]}},
+    {"if": {"model_family": "ngram_count"},
+     "then": {"positional": "none", "normalization": "none",
+              "regularization": "none", "regularization_combo": "none",
+              "schedule_length": "short_5k", "tokenizer": "byte",
+              "depth_class": "shallow_3", "inference_optimization": "none",
+              "training_paradigm": "count_normalize",
+              "self_evolution": "none",
+              "param_class": "32K"}},
+    {"if": {"model_family": "char_rnn"},
+     "then": {"positional": "implicit_recurrence", "normalization": "none",
+              "training_paradigm": "maximum_likelihood_sgd",
+              "tokenizer": "byte", "depth_class": "shallow_3"},
+     "then_in": {"regularization_combo": ["none", "dropout_only"]}},
+    {"if": {"model_family": "multi_block_transformer"},
+     "then_in": {"positional": ["learned_absolute", "rope", "sinusoidal"],
+                 "normalization": ["layernorm", "rmsnorm"],
+                 "depth_class": ["medium_4_to_6", "deep_8plus", "very_deep_12plus"]}},
+    {"if": {"param_class": "50M"},
+     "then_in": {"corpus_size_class": ["1GB", "3GB"],
+                 "hardware_class": ["cloud_h100_8", "cloud_tpu_v4_8"]}},
+    {"if": {"param_class": "100M"},
+     "then": {"corpus_size_class": "3GB",
+              "hardware_class": "cloud_tpu_v4_8"}}
+  ],
+  "open_axes": true
+}

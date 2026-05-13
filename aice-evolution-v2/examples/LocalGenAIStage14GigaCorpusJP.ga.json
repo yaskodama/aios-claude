@@ -1,0 +1,113 @@
+{
+  "name": "LocalGenAIStage14GigaCorpusJP",
+  "task": "Stage-13 で確立した recipe を seed に、 corpus を 113MB → 1GB に拡大 + 訓練トークンを 1B → 10B に拡大 + 日本語比率を 15% → 30% に上げ、 (token_budget, corpus_size_class, jp_ratio, hardware_class) の 4 軸を進化計算で探索する. cell は (model_family, hardware_class, corpus_size_class, token_budget, jp_ratio) の 5 軸. champion は bits-per-byte (BPB) で比較し、 Stage-13 の bpb 1.494 を baseline とする. 終端目標は (multi_block_transformer, cloud_h100, 1GB, 10B_tokens, jp_ratio_30) の単一 cell が bpb 1.3 を切ること、 もしくは (multi_block_transformer, local_m2_mps, 500MB, 3B_tokens, jp_ratio_30) で bpb 1.35 を達成して local 環境で実用 Pareto を更新すること.",
+  "schema_ref": "schemas/local_genai_stage14.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "model_family",
+      "hardware_class",
+      "corpus_size_class",
+      "token_budget",
+      "jp_ratio"
+    ],
+    "generations": 100,
+    "seed_count": 30,
+    "open_axes": true,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.45
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.25
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.25
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.05
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "BitsPerByteOnSharedHoldout",
+      "JapaneseFluencyBenchmark",
+      "DataCeilingAndSaturation",
+      "TrainTimeBudget",
+      "CrossLingualConsistency",
+      "ReproducibilityChecklist"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "Quality",
+        "persona": "あなたは言語品質レビュアーです. 候補ジェノムから (corpus_size_class, jp_ratio, token_budget, model_size) を確認し、 BPB の期待値が Stage-13 baseline (113MB×1B×15%JP=1.494) を踏まえて整合しているかを見ます. 期待 BPB レンジは (113MB,1B=1.45-1.50), (300MB,3B=1.35-1.45), (1GB,10B=1.20-1.35). 採点は 5 軸 [BPB が world 内か / 日本語 fluency (Aozora 風が安定) / 英語 fluency (Shakespearean+Victorian+American 風) / 言語混入率が温度域内 / overcapacity / undercapacity でない] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Efficiency",
+        "persona": "あなたは効率レビュアーです. tokens-seen / unique-tokens 比 (1-5 = healthy, 10+ = diminishing), train_time / hardware_budget 比、 BPE vocab × jp_ratio バランス (jp_ratio 30% なら vocab 8192+ が望ましい) を最重視します. 採点は 5 軸 [data efficiency / hardware budget 内 / vocab size 適正 / inference cost / model_size と corpus の整合] それぞれ 0-3 点、 計 0-15 点. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Reproducibility",
+        "persona": "あなたは再現性レビュアーです. 採点は 7 軸 [seed 固定 / corpus が SHA-256 ロック / corpus build スクリプト公開 / 外部 API 不使用 (cloud は IaaS なので OK) / 依存最小 (pytorch+tokenizers+fugashi) / 単一スクリプト train+eval+chat / 20 プロンプト × 3 温度サンプル + 日本語 fluency check] それぞれ 0-2 点、 計 0-14 点. cloud_h100 / cloud_tpu_v4 利用は terraform / docker compose を提示すれば減点しない. 最後に最良候補番号を 1 行で返します.",
+        "weight": 0.3333333333333333
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.2,
+    "frontier_coverage": 0.15,
+    "novelty": 0.1,
+    "evolvability": 0.15,
+    "cross_task_generality": 0.15,
+    "implementability": 0.15,
+    "multilingual_quality": 0.1
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "local_pareto",
+      "cloud_pareto",
+      "jp_fluency_pareto",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "local_pareto": {},
+      "cloud_pareto": {},
+      "jp_fluency_pareto": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}
