@@ -48,9 +48,14 @@
 /lex
 
 %start program
+/* Precedence stack, lowest to highest. The %nonassoc UAWAIT tag is
+   used by the `AWAIT expr` rule so the prefix `await` doesn't create
+   shift/reduce conflicts with following binops. Mirrors the
+   OCaml-side parser.mly. */
 %left EQ NEQ LT GT LE GE
 %left '+' '-'
 %left '*' '/'
+%nonassoc UAWAIT
 
 %{
 /* keep empty: use yy.X in actions */
@@ -183,7 +188,7 @@ expr
   | IDENT '(' args ')'        { $$ = yy.CallExpr($1, $3); }
   | NOW IDENT '.' IDENT '(' args ')'    { $$ = yy.Now($2, $4, $6); }
   | FUTURE IDENT '.' IDENT '(' args ')' { $$ = yy.Future($2, $4, $6); }
-  | AWAIT expr                          { $$ = yy.Await($2); }
+  | AWAIT expr %prec UAWAIT             { $$ = yy.Await($2); }
   | IDENT dim_list                      { $$ = yy.IndexExpr($1, $2); }
   | '(' expr ')'              { $$ = $2; }
   | expr '+' expr             { $$ = yy.Binop('+', $1, $3); }
