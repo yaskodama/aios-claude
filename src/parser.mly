@@ -114,12 +114,12 @@ method_ret_opt:
 type_expr:
   | ID                                  { match $1 with
                                           | "int" -> TyEInt
-                                          | "float" -> TyEFloat
                                           | "string" -> TyEString
                                           | "bool" -> TyEBool
                                           | "unit" -> TyEUnit
                                           | "any" -> TyEAny
                                           | n -> TyEName n }
+  | FLOAT                               { TyEFloat }   /* `float` is a keyword token */
   | ID LBRACK type_expr RBRACK          { if $1 = "array" then TyEArray $3
                                           else TyEName ($1 ^ "[" ^ "...]") }
   | LPAREN type_expr_tuple RPAREN       { TyETuple $2 }
