@@ -74,21 +74,27 @@
 
 \begin{abstract}
 本稿はアクター指向の並列・並行言語 \textbf{AIPL} (Actor-based Intelligent
-Parallel Language; 旧称 ABCL/c+) の設計と実装を,一つの言語に対する
-\textbf{7 種のランタイム実装}と \textbf{8 種のコード生成ターゲット}を
-横断する形で記述する.本研究の貢献は四つある.第一に,1986 年の ABCL/1 系譜の
+Parallel Language; 旧称 ABCL/c+) の設計と実装を,\textbf{Hindley-Milner 型推論}
+を中核とする型システムを軸に記述する.AIPL は同一ソースに対し
+\textbf{7 種のランタイム実装}と \textbf{8 種のコード生成ターゲット}を持つが,
+このうち推論を採用するのは Python (推論版),OCaml,そして C コード生成
+(\code{aipl2c} の HM + コード特殊化経路) の 3 実装である.本研究の貢献は
+四つある.第一に,アクター言語の表面構文に注釈を一切要求せず,フィールド型・
+メソッドシグネチャを呼び出しサイトと初期化式から自動推論する
+\textbf{型注釈フリーなアクター言語}を実現し,3 実装間で\textbf{同一の推論結果}
+を生成することを経験的に検証した.第二に,推論結果を活用してアクター間
+メッセージ境界以外の領域を \code{value\_t} タグ付き共用体から\textbf{ネイティブ
+C 型に特殊化}する HM 駆動コード生成を確立した.第三に,1986 年の ABCL/1 系譜の
 アクターモデルに現代的な LLM 連携を組み込み,\code{ai\_call(provider,~prompt)}
-プリミティブとして第一級化した.第二に,Hindley-Milner 推論を中心に置きつつ,
-段階的型注釈・フロー敏感推論・実行時セッション型を選択的に重ねた\textbf{多層型
-システム}を,異なる実装ごとに切り替え可能な独立した次元として整理した.
-第三に,同一の \code{.abcl} ソースから OS スレッド (1:1) / 軽量スレッド (M:N) /
-協調イベントループの 3 並行モデルすべてに展開できる\textbf{ターゲット非依存
-セマンティクス}を確立した.第四に,AIPL を AIPL で記述する完全な\textbf{セルフ
-ホスト塔} (Level\,A--C-3, 37/37 スモークテスト合格) を構築し,言語仕様の
-自己一貫性を実証した.全 7 ランタイム × 全機能を 91 ページの比較表に集約した結果,
-言語表面 (\code{send}/\code{now}/\code{future}/\code{await}) は実装間で
-同型に保たれる一方,スケーラビリティ・型保証・ AI 統合の各軸では各実装が
-それぞれ異なる象限を覆っていることが明らかになった.
+プリミティブとして第一級化した.第四に,同一の \code{.abcl} ソースから
+OS スレッド (1:1) / 軽量スレッド (M:N) / 協調イベントループの 3 並行モデル
+すべてに展開できる\textbf{ターゲット非依存セマンティクス}を確立し,
+AIPL を AIPL で記述する完全な\textbf{セルフホスト塔} (Level\,A--C-3,
+37/37 スモークテスト合格) で言語仕様の自己一貫性を実証した.
+段階的型注釈に基づく旧来の Python 実装 (Python 注釈版) は,より広範な
+研究機能 (Phase 11--17, 線形型/効果系/所有/セッション型) を抱える参照実装
+として残置し,推論版との対比で型システム研究の二つの軸を一つの言語で
+同時に比較できるようにした.
 \end{abstract}
 
 \tableofcontents
@@ -105,25 +111,41 @@ Yonezawa らの ABCL/1 \cite{yonezawa1986abcl} が描いた未来像と
 
 本研究は,アクター言語の系譜を母艦としつつ現代の言語理論の成果を
 重ねる試みとして \textbf{AIPL} (Actor-based Intelligent Parallel
-Language) を提案する.AIPL は次の四つを同時に達成することを目標とする:
+Language) を提案する.特に本稿は AIPL の\textbf{型推論版}
+(Python 推論版,OCaml,C コード生成の HM 経路) を中心に据え,
+これら 3 実装が同一ソースに対して\textbf{同一の推論結果}を生成することを
+研究の主軸とする.AIPL は次の四つを同時に達成することを目標とする:
 
 \begin{enumerate}[leftmargin=*]
+  \item \textbf{型注釈フリーなアクター記述}: Hindley-Milner 推論を中核とし,
+    フィールド型・メソッドシグネチャをリテラル・初期化式・呼び出し
+    サイトから自動推論する.プログラマは \code{:~int} などの注釈を
+    書く必要がない.
+  \item \textbf{推論駆動のコード特殊化}: 推論型を C コード生成器に
+    渡し,アクター間メッセージ境界以外を \code{value\_t} タグ付き
+    共用体から \code{long}/\code{double}/\code{const char*} 等の
+    ネイティブ C 型に特殊化する.
   \item \textbf{アクター意味論の保存}: \code{send}/\code{now}/\code{future}/
-    \code{await} の四プリミティブで Hewitt 型アクターを記述できる.
-  \item \textbf{多層型システム}: Hindley-Milner 推論を基底に,段階的注釈・
-    フロー敏感型・効果型・線形型・所有型・セッション型を選択的に重ねられる.
-  \item \textbf{LLM 第一級統合}: \code{ai\_call} を組込みとし,
-    プロバイダ (Gemini / Claude / GPT) を整数 1 / 2 / 3 で指定する.
-    トークン予算・同時実行上限・フォールバック連鎖をランタイムが管理する.
-  \item \textbf{実装多様性}: 同一の \code{.abcl} ソースを Python / OCaml /
-    JS / C / Pony / Erlang / Go / SWI-Prolog の各実装で実行可能とする.
+    \code{await} の四プリミティブで Hewitt 型アクター \cite{hewitt1973} を記述
+    でき,LLM 連携 \code{ai\_call} を組込みとして第一級化する.
+  \item \textbf{実装多様性と意味論保存}: 同一の \code{.abcl} ソースを
+    7 種のランタイムと 8 種のコード生成ターゲットで実行でき,
+    HM ベースの 3 実装は推論結果が一致する.
 \end{enumerate}
 
+段階的型注釈に基づく旧来の Python 実装 (Python 注釈版) は,
+Phase 11--17 の高度型機能 (capability 効果系,CSP チャネル,線形型,
+所有型,構造化並行,transient cast,セッション型) を含む参照実装として
+位置付け,本稿でも適宜参照する.推論版と注釈版を一つの言語仕様に
+対する二つの実装として比較できる構造は,本研究固有の利点である.
+
 論文の構成は次の通りである.\S\ref{sec:bg} で背景を,
-\S\ref{sec:design} で言語設計を,\S\ref{sec:impl} で 7 ランタイム +
-8 コード生成ターゲットの実装を述べる.\S\ref{sec:selfhost} で
-セルフホスト塔,\S\ref{sec:eval} で評価結果,\S\ref{sec:related} で
-関連研究,\S\ref{sec:conc} で結論と今後の課題を示す.
+\S\ref{sec:design} で言語設計を (\S\ref{sec:types} で型推論を中心に
+論じる),\S\ref{sec:impl} で 7 ランタイム + 8 コード生成ターゲットの
+実装を述べる.\S\ref{sec:selfhost} でセルフホスト塔,
+\S\ref{sec:eval} で評価結果 (\S\ref{sec:cross} の推論クロス検証が
+中心),\S\ref{sec:related} で関連研究,\S\ref{sec:conc} で結論と
+今後の課題を示す.
 
 \section{背景}
 \label{sec:bg}
@@ -210,69 +232,130 @@ var w = await(f);           // ... pick up the future later
   \item \code{select} で複数チャネルからの選択受信 (Phase 13).
 \end{itemize}
 
-\subsection{多層型システム}
+\subsection{型システム --- Hindley-Milner 推論を中核に}
+\label{sec:types}
 
-AIPL の型システムは複数の独立した層で構成される.実装ごとに
-どの層を有効にするかが異なる (\S\ref{sec:impl} 参照).
+AIPL の型システムは \textbf{HM 推論}を中核に置き,その周囲に
+オプショナルな注釈ベースの上位機能 (Phase 11--17) を配する設計である.
+本稿が主に論じるのは前者である.
 
-\paragraph{Phase 11: 段階的型注釈}
-変数・パラメータ・戻り値に \code{:~int} 形式で型注釈を付与する.
-注釈の無い場所は \code{any} 扱いの段階的型付け.
+\subsubsection{HM 推論 (本稿の中心)}
+
+AIPL の \code{.abcl} ソースには通常,型注釈を一切書かない:
 
 \begin{lstlisting}
-class Counter {
-  var count: int = 0;
-  method init(n: int) { count = n; }
-  method get() -> int { reply(count); }
+class Hello {
+  float count = 0.;        // 注釈なし — 推論で float に
+  method init(n) {         // n も注釈なし
+    count = n;             // count : float なので n : float に
+    print("hi " + n);
+  }
+  method greet() {
+    print("count = " + count);
+  }
 }
+var h = new Hello(5);      // 呼び出しサイトから init の引数を再特殊化
 \end{lstlisting}
+
+\paragraph{推論アルゴリズム} OCaml の \code{infer.ml} (484 行) は
+教科書通りの Hindley-Milner を実装する: \code{unify} / \code{generalize}
+/ \code{instantiate},mutable union-find な型変数,let-多相化を備える.
+クラスメソッドはまず仮の型変数で\textbf{事前登録}し,本体検査時に
+ボトムアップで具体化する 2 パス方式である.
+
+\paragraph{call-site による自動モノモルフィゼーション}
+クラスメソッドが多相型のままでも,呼び出しサイトの引数型から
+自動的に具体化される.例えば \code{Counter.dec(x)} は宣言時には
+$\forall \alpha. \alpha \to \text{unit}$ だが,本体内で
+\code{count - x} (\code{count : float}) によって $\alpha = \text{float}$
+に固定される.別途モノモルフィゼーション・パスは不要で,
+HM の unify がこの役割を自動で果たす.
+
+\paragraph{センチネルパターンの widening}
+\code{var partner = 0;} と整数初期化したフィールドに後でアクター参照を
+代入する古典的な actor-language 慣用句では純粋な HM は失敗する.
+我々は flow-sensitive な\textbf{join 拡張}(monotonic widening) を補助的に
+組み合わせ,Python 推論版・browser-abcl で実装した.純 HM 派の OCaml /
+C 経路ではこのパターンは \code{any}-型へ後退するかコンパイル時の
+不一致として顕在化する.
+
+\subsubsection{HM 推論の 3 実装}
+
+本稿の主要な実装的貢献は,以下の 3 実装が\textbf{同一アルゴリズムを
+それぞれの言語で再実装し,同じ結果を出すこと}を経験的に検証した点に
+ある (詳細は \S\ref{sec:cross}):
+
+\begin{itemize}[leftmargin=*,itemsep=0pt]
+  \item \textbf{OCaml 実装} (\code{src/infer.ml} + \code{types.ml}
+    + \code{typing\_env.ml},合計 $\sim$985 行)
+  \item \textbf{Python 推論版} (\code{src/python-aipl-inferred/aipl\_infer.py},
+    899 行) --- OCaml の HM を Python に直接移植
+  \item \textbf{C コード生成} (\code{src/aipl2c.ml} + \code{c\_translator.ml})
+    --- OCaml の推論結果を \code{Types.class\_field\_types} と
+    \code{Types.class\_method\_schemes} レジストリ経由で取得し,
+    C コードに型情報を直接埋め込む
+\end{itemize}
+
+これに加え,JS 系の 2 実装 (browser-abcl, node-aipl-server) は\textbf{flow-sensitive な軽量推論}
+(308 行の \code{typecheck.js}) を採用する.HM とは異なるアルゴリズムだが
+基本的なフィールド型推論には十分機能する.
+
+\subsubsection{推論駆動のコード特殊化 (C 経路)}
+
+HM 推論の最大の実用的成果はコード生成側にある.
+\code{c\_translator.ml} は推論結果を活用し,アクター内部の式・代入・
+ローカル変数を \code{value\_t} タグ付き共用体ではなく
+\textbf{ネイティブ C 型}で発行する:
+
+\begin{lstlisting}[language=c]
+// 注釈ベース時代 (推論なし)
+value_t l_x = v_binop("+", l_a, l_b);
+
+// HM 推論ベース (l_a, l_b が int と推論される場合)
+long l_x = (l_a + l_b);
+\end{lstlisting}
+
+\code{v\_binop} のディスパッチを経由しない\textbf{ネイティブ加算}が
+発行されるため,ホットパスの実行速度が大きく改善する.アクター間
+メッセージ境界 (\code{value\_t args[]}) は uniform であり続けるため,
+mailbox の uniformity と内部の特殊化を両立できる.
+
+\subsubsection{オプショナルな上位機能 (Phase 11--17)}
+
+注釈ベースの研究機能は Python 注釈版が参照実装として保持する.
+本稿で扱う推論版では,これらは原則として\textbf{ランタイム側のみ}に
+存在し,静的検査は HM 推論で代替される (例えば line\,14/15/16 の
+特性は実行時にしか問わない).
 
 \paragraph{Phase 12: capability 効果}
-関数・メソッドのシグネチャに副作用集合を宣言する:
-
-\begin{lstlisting}
-method save(path: string) !{fs} { write_file(path, dump()); }
-method ask(q: string) !{ai, net} { reply(ai_call(q)); }
-\end{lstlisting}
-
-呼び出し側はこれらの効果集合の和を上位に伝搬する必要がある.
+\code{!{fs,~ai,~net,~mut}} で副作用集合を宣言.推論版はランタイムを
+共有するため動的に動くが,静的検査は注釈版のみが行う.
 
 \paragraph{Phase 13: CSP チャネル}
-\code{channel[T]} 型と \code{channel\_send} / \code{channel\_recv} /
-\code{select\_recv} ビルトインで CSP \cite{hoare1978csp} 風通信を提供.
+\code{channel[T]} 型,\code{channel\_send} / \code{channel\_recv} /
+\code{select\_recv} を Python ランタイムに実装.両 Python 版で動作する.
 
-\paragraph{Phase 14: 線形型}
-\code{linear} 型の値は一度しか消費できない.データベースハンドルや
-ファイル記述子など,\textbf{二重解放} (\code{double-consume}) や
-\textbf{解放後使用} (\code{use-after-move}) を静的に検出する.
+\paragraph{Phase 14: 線形型,Phase 15: 所有 (pub/owned)}
+注釈ベース.推論版では型レベル enforcement は無いが,ランタイムは
+共通なので実行は可能.
 
-\paragraph{Phase 15: 所有 (owned/pub)}
-クラスフィールドはデフォルト private.\code{pub var} 宣言したものだけが
-外部から書き換え可能.アクターのカプセル化を型階層で表現する.
+\paragraph{Phase 16: transient cast,Phase 17: 構造化並行}
+それぞれ \code{any} 境界での実行時型キャストと \code{scope \{
+future ... \}} の自動 join.後者は推論版にもランタイム経由で
+利用可能 (Java の Project Loom \cite{loom2023} と意味論的に同型).
 
-\paragraph{Phase 16: transient cast}
-\code{any} 境界で実行時型キャストを挿入,\code{TransientCastError} を
-発する.gradual typing の健全性を最低限保証する仕組み.
-
-\paragraph{Phase 17: 構造化並行}
-\code{scope \{ future ... \}} ブロック内で起動した future は,
-ブロック終端で自動的に join される (Java の Project Loom と類似).
-
-\paragraph{Phase 11+追加: セッション型 (実行時)}
-プロトコル全体を一つの仕様として宣言し,各送受信を実行時に検証する:
+\paragraph{セッション型 (動的)}
+プロトコル仕様を文字列で宣言し,通信を実行時に検証する:
 
 \begin{lstlisting}
 session_define("Solve",
   "solver.solve(string) ! string"
   " -> reviewer.review(string,string) ! string"
   " -> planner.solve(string) ! string");
-var sid = session_start("Solve");
-// ... 通常の send / now / future ...
-session_end(sid);
 \end{lstlisting}
 
-違反は \code{session\_events()} に記録される.HM 推論とは独立な
-動的検査として位置付ける.
+HM 推論と独立した\textbf{実行時動的検査}として位置付けるため,
+推論版にも自然に組込まれる.
 
 \subsection{LLM 統合}
 
@@ -332,18 +415,29 @@ AIPL は単一言語に対して 7 種のランタイム実装と 8 種のコー
 
 \subsection{7 ランタイム}
 
+本研究の中核となる HM 推論版 3 実装を最初に置き,その後ろに
+注釈版と JS 系の flow-sensitive 推論を配する:
+
 \begin{longtable}{p{2.7cm} p{3.5cm} p{4.0cm} p{5.0cm}}
   \toprule
   \textbf{短縮名} & \textbf{ソース} & \textbf{型システム} & \textbf{特徴} \\
   \midrule
   \endhead
-  Python (注釈)   & \code{src/python-aipl/}        & 注釈ベース (gradual) & 機能最完備.Phase 11--17 + 動的 compile + メソッドインジェクション \\
-  Python (推論)   & \code{src/python-aipl-inferred/} & HM 推論              & python-aipl からランタイムを継承,型検査層のみ差替え \\
-  OCaml           & \code{src/*.ml}                & HM 推論              & 正典実装.\code{web\_gateway} に WebSocket 内蔵 \\
-  JS-OCaml        & \code{src/app.js} 等 + OCaml gateway & (= OCaml)     & ブラウザ JS が HTTP で OCaml バックエンドを駆動 \\
-  JS-Browser      & \code{src/browser-abcl/}       & flow-sensitive       & ブラウザ単体,canvas デモ可 \\
-  JS-Node         & \code{src/node-aipl-server/}   & flow-sensitive       & Node HTTP server.\code{/api/typecheck} + \code{/ws} \\
-  C (aipl2c)      & \code{src/aipl2c.ml} + 各種 C runtime & HM + 特殊化   & コード生成経路.SDL2/Xinu/Python 他にも展開 \\
+  \multicolumn{4}{l}{\textit{HM 推論版 (本稿の中心)}} \\
+  \midrule
+  OCaml           & \code{src/*.ml}                & \textbf{HM 推論}     & 正典実装.\code{infer.ml} 484 行.\code{web\_gateway} に WebSocket 内蔵 \\
+  Python (推論)   & \code{src/python-aipl-inferred/} & \textbf{HM 推論}    & OCaml の \code{infer.ml} を Python に直接移植 (899 行) \\
+  C (aipl2c)      & \code{src/aipl2c.ml} + 各種 C runtime & \textbf{HM + コード特殊化} & 推論結果を C 型に直接埋込.\code{value\_t} 不要な経路を生成 \\
+  \midrule
+  \multicolumn{4}{l}{\textit{Flow-sensitive 推論版 (JS 系)}} \\
+  \midrule
+  JS-Browser      & \code{src/browser-abcl/}       & flow-sensitive (\code{typecheck.js}) & ブラウザ単体,canvas デモ可 \\
+  JS-Node         & \code{src/node-aipl-server/}   & flow-sensitive (継承) & Node HTTP server.\code{/api/typecheck} + \code{/ws} \\
+  JS-OCaml        & \code{src/app.js} 等 + OCaml gateway & (= OCaml HM)  & ブラウザ JS が HTTP で OCaml バックエンドを駆動 \\
+  \midrule
+  \multicolumn{4}{l}{\textit{注釈版 (参照実装)}} \\
+  \midrule
+  Python (注釈)   & \code{src/python-aipl/}        & 段階的型注釈 (gradual) & Phase 11--17 + 動的 compile + メソッドインジェクションを保持する研究用参照 \\
   \bottomrule
 \end{longtable}
 
@@ -510,10 +604,12 @@ $^*$ OCaml smoke の 9 fail は \code{abclc/} の Gui/Py/Xinu サンプル
 固有の既存型問題 (\code{var partner = 0;} を後で actor 参照で上書きするパターン).
 本実装の追加変更による回帰ではない.
 
-\subsection{型推論のクロス検証}
+\subsection{型推論のクロス検証 (主要結果)}
+\label{sec:cross}
 
-3 つの HM 実装 (OCaml / Python-inferred / C) は,同一の \code{.abcl}
-入力に対して\textbf{同一の推論型}を出力することを確認した:
+本研究の中心的な経験結果として,3 つの HM 実装
+(OCaml / Python 推論版 / C コード生成) が,同一の \code{.abcl}
+入力に対して\textbf{完全に一致する推論型}を出力することを確認した:
 
 \begin{lstlisting}
 // abclc/Hello.abcl
@@ -533,9 +629,22 @@ var h = new Hello(5);
 
 3 実装すべてで \code{init} の引数型が呼び出しサイト
 (\code{new Hello(5)}) の整数リテラルから \code{int} に
-\textbf{モノモルフィゼーション}され,\code{count} のフィールド型が
+\textbf{自動モノモルフィゼーション}され,\code{count} のフィールド型が
 初期値 \code{0.} から \code{float} に固定される.HM 推論は実装言語に
 依存しない普遍的なアルゴリズムであることを,この一致が経験的に示している.
+
+この結果の意義は二点ある.第一に,プログラマは AIPL ソースに
+注釈を一切書かずに,3 実装間で\textbf{型の解釈が一致するという保証}
+を得る.第二に,C コード生成において HM 結果がそのまま
+ネイティブ C 型の選択に使えるため,推論なしで生成される
+タグ付き共用体ベースの C コードに比べ実行速度・コードサイズの
+両面で利得を得る.
+
+注釈版が定義する Phase 11--17 の高度機能 (capability 効果系,
+線形型,所有,セッション型) は推論版にはランタイム経由でのみ
+存在する.このトレードオフを許容することで,推論版は
+「型注釈フリー + ランタイム共有」という研究的に興味深い
+ニッチを開いた.
 
 \subsection{LLM 統合の実証}
 
