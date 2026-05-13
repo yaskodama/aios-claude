@@ -78,6 +78,42 @@ for s in "${SAMPLES[@]}"; do
   esac
 done
 
+# --- Phase 3: WebSocket pub/sub ---
+echo "[Phase 3] /ws WebSocket endpoint"
+total=$((total + 1))
+ws_out=$(node -e '
+import("ws").then(({default: WebSocket}) => {
+  const PORT = '"$PORT"';
+  const c1 = new WebSocket(`ws://localhost:${PORT}/ws?sid=smoke`);
+  const c2 = new WebSocket(`ws://localhost:${PORT}/ws?sid=smoke`);
+  let got_c2 = false;
+  c1.on("open", () => setTimeout(() => c1.send("ping-from-c1"), 150));
+  c2.on("message", m => {
+    const s = m.toString();
+    if (s === "ping-from-c1") got_c2 = true;
+  });
+  setTimeout(() => {
+    c1.close(); c2.close();
+    console.log(got_c2 ? "PASS" : "FAIL");
+    process.exit(0);
+  }, 500);
+}).catch(e => { console.log("FAIL " + e.message); process.exit(1); });
+' 2>&1)
+if echo "$ws_out" | grep -q "PASS"; then
+  pass=$((pass + 1)); printf '  PASS  ws pub/sub between 2 clients\n'
+else
+  fail=$((fail + 1)); printf '  FAIL  ws pub/sub: %s\n' "$ws_out"
+fi
+
+# /api/broadcast endpoint reachable
+total=$((total + 1))
+resp=$(curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"sid":"empty","message":"x"}' http://localhost:$PORT/api/broadcast)
+case "$resp" in
+  '{"ok":true'*) pass=$((pass + 1)); printf '  PASS  /api/broadcast (0 peers)\n' ;;
+  *)             fail=$((fail + 1)); printf '  FAIL  /api/broadcast: %s\n' "$resp" ;;
+esac
+
 # Shut down server
 kill "$SPID" 2>/dev/null
 sleep 0.2

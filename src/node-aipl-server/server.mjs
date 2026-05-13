@@ -12,6 +12,14 @@
 //                          typecheck?: boolean }   // default true; false skips
 //       => { ok, stdout, errors[] }
 //   GET  /                 — small status page
+//   WS   /ws?sid=<id>      — WebSocket endpoint.  Clients can subscribe
+//                            to broadcast messages emitted by /run
+//                            (each printed line becomes a frame), or
+//                            send their own frames which the server
+//                            re-broadcasts to all other clients of
+//                            the same sid.
+//   POST /api/broadcast   { sid: "<id>", message: "..." }
+//                            — server-side broadcast trigger.
 //
 // The server reuses:
 //   - `../browser-abcl/src/parser/parser.js`   (jison-generated parser)
@@ -27,6 +35,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocketServer } from "ws";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BROWSER = resolve(__dirname, "..", "browser-abcl");
@@ -232,6 +241,93 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------
+// WebSocket endpoint: GET /ws?sid=<id>
+//
+// Clients connect by URL.  Frames sent by any client of the same sid
+// are re-broadcast to all peer clients (including loopback).  Server
+// code can also broadcast via POST /api/broadcast or, programmatically,
+// by calling broadcast(sid, message).
+//
+// Mirrors the shape of OCaml's web_gateway ws_clients table.
+
+const wss = new WebSocketServer({ noServer: true });
+const wsClientsBySid = new Map();   // sid -> Set<WebSocket>
+
+function broadcast(sid, message) {
+  const peers = wsClientsBySid.get(sid);
+  if (!peers) return 0;
+  let n = 0;
+  for (const ws of peers) {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(message);
+      n++;
+    }
+  }
+  return n;
+}
+
+wss.on("connection", (ws, request, sid) => {
+  if (!wsClientsBySid.has(sid)) wsClientsBySid.set(sid, new Set());
+  const set = wsClientsBySid.get(sid);
+  set.add(ws);
+  ws.send(JSON.stringify({ kind: "welcome", sid, peers: set.size }));
+
+  ws.on("message", (data) => {
+    const text = typeof data === "string" ? data : data.toString();
+    // Re-broadcast to other peers of this sid.
+    for (const peer of set) {
+      if (peer !== ws && peer.readyState === peer.OPEN) {
+        peer.send(text);
+      }
+    }
+  });
+
+  ws.on("close", () => {
+    set.delete(ws);
+    if (set.size === 0) wsClientsBySid.delete(sid);
+  });
+});
+
+server.on("upgrade", (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname !== "/ws") {
+    socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  const sid = url.searchParams.get("sid") || "default";
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit("connection", ws, req, sid);
+  });
+});
+
+// Add /api/broadcast handler — declare BEFORE listen by patching the
+// existing request dispatcher.  We monkey-patch the server's listener.
+const _origListeners = server.listeners("request").slice();
+server.removeAllListeners("request");
+server.on("request", async (req, res) => {
+  if (req.method === "POST" && req.url === "/api/broadcast") {
+    try {
+      const body = await readBody(req);
+      const j = JSON.parse(body);
+      const sid = j && typeof j.sid === "string" ? j.sid : "default";
+      const msg = j && typeof j.message === "string" ? j.message : "";
+      if (!msg) return send(res, 400, "application/json",
+                           JSON.stringify({ ok:false, errors:["missing message"] }));
+      const n = broadcast(sid, msg);
+      return send(res, 200, "application/json",
+                  JSON.stringify({ ok:true, delivered: n }));
+    } catch (e) {
+      return send(res, 500, "application/json",
+                  JSON.stringify({ ok:false, errors:[String(e.message||e)] }));
+    }
+  }
+  // Forward to original handler.
+  for (const l of _origListeners) l(req, res);
+});
+
 server.listen(PORT, () => {
   process.stdout.write(`AIPL Node server listening on http://localhost:${PORT}/\n`);
+  process.stdout.write(`  WebSocket: ws://localhost:${PORT}/ws?sid=<id>\n`);
 });
