@@ -1,314 +1,249 @@
-# AIPL — Next Session Resume
+# AIPL — Next Session Resume (2026-05-14)
 
-Resume note for the AIPL implementation work.  For the language-model
-training side, see `local-genai/NEXT_SESSION.md` (separate axis,
-Stage-13-jp-heavy was the last champion at bpb 1.494).
+最新コミット `bef02a9` (origin/main と同期済み).
+
+```
+bef02a9 JS-B/JS-N parser: eliminate the 10 AWAIT shift/reduce conflicts
+ea7c11a AIPL: 71/71 sample smoke pass + final LR(1) cleanup
+4474cfb parser + abclc examples: typed-parameter syntax + cleaner precedence rules
+521f8fe AIPL: OCaml feature catch-up + C-codegen LLVM/OpenMP + signed remote
+```
 
 ## Restart prompt to paste into Claude
 
 ```
-docs/AIPL_NEXT_SESSION.md と docs/AIPL_Runtime_Feature_Matrix.md を
+docs/AIPL_NEXT_SESSION.md と docs/AIPL_Runtime_Feature_Matrix.{md,pdf} を
 読み込んで現状を把握して下さい。さらに docs/AIPL_Design_and_Implementation.pdf
-と docs/AICE_Meta_Research.pdf に研究論文が二本あります。
+と docs/AICE_Meta_Research.pdf に研究論文が二本、
+docs/AIPL_User_Manual.pdf にユーザマニュアルがあります。
 
-AIPL は今、7 ランタイム + 8 codegen ターゲット + WebSocket 全実装統合
-+ 研究論文二本の言語プロジェクトです:
-  ランタイム: Python (注釈) / Python (推論) / OCaml /
-              JS-OCaml(server) / JS-Browser / JS-Node(server) /
-              C (aipl2c → runtime variants)
-  codegen   : C+pthread / C+SDL2 / Xinu / Python / Pony /
-              Erlang / Go / Prolog
-  WebSocket : 全 7 runtime/codegen で動作確認済
-  論文      : 設計と実装 (13p, HM推論中心) + Meta Research (9p, GA駆動)
+AIPL は 7 ランタイム + 9 codegen バックエンド + WebSocket + remote
+actors (HMAC) + 研究論文 2 本 + ユーザマニュアルの言語プロジェクトです。
+今セッション (2026-05-14 まで) で OCaml ランタイムは Python と
+ほぼ機能パリティに到達し、3 つのジェネレータ式パーサすべて
+(ocamlyacc / Lark LALR / jison) が conflict-free になりました。
 
-最新 commit: a39d75a (Meta Research 論文追加)
-直近作業: 二本の研究論文 (AIPL_Design_and_Implementation.pdf,
-         AICE_Meta_Research.pdf) を執筆・push。前者は HM 型推論を
-         中心に再構成し ai_call × now/future/send の例を追加、
-         後者は AICE Meta Pipeline (.aice → .ga.json → AIPL →
-         実行) を提案。
-
-次の候補:
-  (a) JVM 系 (Kotlin / Scala / Java) codegen
-  (b) Swift codegen (Swift 5.5+ の actor model)
-  (c) WASM ターゲット (browser でネイティブ実行)
-  (d) AIPL 拡張 — Phase 18 prediction (aice-evolution-v2 で次世代)
-  (e) 既存ターゲット最適化 (C codegen の become/select/now サポート)
-  (f) aipl-self-host を C/Pony/Erlang などにも展開
-  (g) /api/typecheck と /ws を OCaml gateway にも統一仕様で整備
-  (h) Meta Research 論文の Phase 4 lowerer (LLM 自動 .aice→.ga.json)
-      の完全自動化
-  (i) 論文を学会投稿向けに (英語化, abstract 整理, 図の高解像度化)
-
-推奨と理由を一言で教えて下さい。
+最初に走らせるべきは:
+  dune build && bash abclc/_smoke_test.sh | tail -3
+期待出力: total: 71  pass: 71  fail: 0
 ```
 
 ---
 
-## Current state (2026-05-13 session end)
+## 1. 全テストの現状 (再起動後にここが緑なら基準点に戻れる)
 
-### Runtimes (7)
-
-| Short | Source                                   | Type system            | Concurrency      |
-| ----- | ---------------------------------------- | ---------------------- | ---------------- |
-| Py-A  | `src/python-aipl/`                       | annotations (gradual)  | 1:1 OS thread    |
-| Py-I  | `src/python-aipl-inferred/`              | HM inference           | 1:1 OS thread    |
-| OCaml | `src/*.ml`, `_build/.../repl_thread.exe` | HM inference           | 1:1 OS thread    |
-| JS-O  | `src/app.js` + OCaml `web_gateway`       | (= OCaml)              | (= OCaml)        |
-| JS-B  | `src/browser-abcl/`                      | flow-sensitive         | cooperative loop |
-| JS-N  | `src/node-aipl-server/` (Node HTTP)      | flow-sensitive         | cooperative loop |
-| C     | `src/aipl2c.ml` codegen + runtimes       | HM + specialization    | depends on target |
-
-### Codegen targets (7, via `aipl2c`)
-
-| Flag         | Target                          | Concurrency             |
-| ------------ | ------------------------------- | ----------------------- |
-| (default)    | C + pthread                     | 1:1 OS thread           |
-| (default+sdl2) | C + SDL2 GUI binary           | 1:1 OS thread           |
-| `--xinu`     | Xinu embedded-OS C              | 1:1 OS process          |
-| `--python`   | stand-alone Python              | 1:1 OS thread           |
-| `--pony`     | Pony source                     | M:N lightweight         |
-| `--erlang`   | Erlang `.erl` module            | M:N BEAM process        |
-| `--go`       | Go `main.go`                    | M:N goroutine           |
-| `--prolog`   | SWI-Prolog `.pl`                | 1:1 OS thread           |
-
-### Key documents
-
-- **`docs/AIPL_Design_and_Implementation.{tex,pdf}`** — research paper,
-  13 pages, 434 KB.  HM-inference-centric design and implementation
-  exposition; ai_call × past/now/future patterns included.
-- **`docs/AICE_Meta_Research.{tex,pdf}`** — research paper, 9 pages,
-  335 KB.  AICE Meta Pipeline (.aice → .ga.json → AIPL → run) for
-  GA-driven LLM problem solving; companion paper to the design one.
-- **`docs/AIPL_Runtime_Feature_Matrix.{md,tex,pdf}`** — 11-page
-  side-by-side comparison: 35+ feature rows × 7 runtimes; sample-count
-  and per-sample-feature tables; concurrency-model section.
-- `docs/AIPL_Type_Soundness_Report.{tex,pdf}` — older soundness analysis (Phase 15).
-- `aipl-self-host/` — AIPL written in AIPL (9 levels, A → C-3, 37/37 smoke pass).
-- `AIPL_OVERVIEW.md` — bird's-eye index.
-- `USER_MANUAL.md` — language tour.
-- `BUILTINS.md` — builtin reference.
+| Smoke スクリプト | 結果 |
+|---|:-:|
+| `dune build` | exit 0 |
+| `bash abclc/_smoke_test.sh` | **71/71 PASS** |
+| `bash src/test_remote_actor.sh` | **9/9 PASS** (plain + HMAC) |
+| `bash src/test_c_llvm_openmp.sh` | **4/4 PASS** |
+| `cd src/browser-abcl && bash _smoke_test.sh` | syntax 7/7, parse 4/4, typecheck 4/4 |
+| `cd src/node-aipl-server && bash _smoke_test.sh` | 10/10 |
 
 ---
 
-## What this session changed
+## 2. パーサのコンフリクト状況 (全て 0)
 
-Commits this session (most recent first; date 2026-05-13):
+| ファイル | ツール | 利用ランタイム | s/r | r/r |
+|---|---|---|:-:|:-:|
+| `src/parser.mly` | ocamlyacc | OCaml + JS-O + C codegen (9 backends) | **0** | **0** |
+| `src/python-aipl/grammar.lark` | Lark LALR | Py-A + Py-I | **0** | **0** |
+| `src/browser-abcl/src/parser/grammar.jison` | jison | JS-B + JS-N | **0** | **0** |
 
-```
-a39d75a  docs: add Meta Research paper — AICE/AIPL × GA for LLM problem solving
-44a5b5c  docs: AIPL report — ai_call × past/now/future examples in §3.3
-afc0c97  docs: AIPL report — change float→var in §3.2.1 Hello example
-6accd3f  docs: refocus AIPL report on Hindley-Milner inference
-73ec62b  docs: add AIPL design & implementation report (10p)
-387d48a  docs: add AIPL_NEXT_SESSION.md — restart note for next session
-9f4fb15  gitignore: stop tracking tinyshake_100MB_multi.txt (95 MB)
-966dbce  gitignore: stop tracking tinyshake_60MB.txt (57 MB)
-1993ce7  Rename abcl2c → aipl2c; replace ABCL/c+ text with AIPL
-5f754a9  C codegen: libwebsockets runtime (Phase 4 — WS rollout complete)
-4467a35  python-aipl: WebSocket builtins via websockets lib (Phase 3 of WS)
-93c18af  node-aipl-server: add WebSocket endpoint (Phase 2 of WS rollout)
-8f758f8  docs: correct WebSocket row in feature matrix
-b7f667b  AIPL: verify now/future/send+select × ai_call, fix OCaml gaps
-31407a3  AIPL: ai_call provider arg — wire 1/2/3 → gemini/anthropic/openai
-31a12a3  AIPL: --prolog codegen — class → SWI-Prolog thread + receive
-e6c1739  docs: feature matrix — add Actor concurrency model section
-543fc71  AIPL: --go codegen — class → struct + goroutine + channel
-e1f5d64  AIPL: --erlang codegen — class → spawn + receive loop
-d364243  AIPL: --pony codegen — class → actor, capability-secure target
-028811b  docs: feature matrix — add session types + protocol traces + AIOS
-b11dde1  docs: feature matrix — add Target column to sample table
-a5f71d0  docs: feature matrix — add "What each sample exercises" table
-5224776  docs: add sample-count row + LaTeX/PDF version of feature matrix
-de25b45  docs: add python-aipl-inferred to AIPL runtime feature matrix
-270f291  AIPL: add python-aipl-inferred — sixth runtime, HM-typed
-adeb0b6  AIPL: add node-aipl-server — seventh runtime, Node HTTP server
-5227f87  AIPL: JS server — add /api/typecheck endpoint
-60ea659  AIPL: full HM type inference in C/browser-abcl versions
-```
+dangling-else は `%nonassoc IFX < %nonassoc ELSE` + `%prec IFX` で明示的に解消されており、yacc/jison 警告 0 件。AWAIT は `%nonassoc UAWAIT` + `AWAIT expr %prec UAWAIT` で binop との shift/reduce を回避。
 
-### Headline themes
-
-1. **Type inference rollout.**  Added full HM inference to C codegen
-   (with specialization) and flow-sensitive inference to browser-abcl.
-   Added `python-aipl-inferred` as the HM-typed Python sibling.
-   `/api/typecheck` JSON endpoints on OCaml and Node servers.
-2. **Three new codegen targets.**  Pony, Erlang, Go, and Prolog (so
-   `aipl2c` now has 8 targets total).  Each verifies on Hello.abcl +
-   counter.abcl; PingPong xfail-expected.
-3. **`ai_call` provider argument** unified across runtimes:
-   `ai_call([1|2|3,] prompt)`, 1=gemini / 2=anthropic / 3=openai;
-   omitting it auto-selects from env.  Found and fixed two OCaml
-   bugs while testing: mock-env precedence over explicit override,
-   and top-level `Send` not evaluating its args before delivery.
-4. **WebSocket support across all 7 runtimes.**  OCaml already had
-   it (verified handshake 101); JS-Node gained `ws` (`/ws?sid=` +
-   `/api/broadcast`); Python gained `aipl_websocket.py` (4 builtins);
-   C codegen gained `abcl_ws_runtime.c` (libwebsockets).
-5. **Rename `abcl2c` → `aipl2c`** and **`ABCL/c+` → `AIPL`** across the
-   entire repository (52 files).  Public env-var names like
-   `ABCL_AI_PROVIDER` retained (separate concern).
-6. **`local-genai/` cleanups.**  Stage-13-jp-heavy (108 MB) was
-   already gitignored; this session also added `tinyshake_60MB.txt`
-   (57 MB) and `tinyshake_100MB_multi.txt` (95 MB) — both regenerable
-   from `build_*.py`.  No history rewrites.
-7. **二本の研究論文.**  実装側を `AIPL_Design_and_Implementation.pdf`
-   (13p, HM 推論を中核に再構成,ai\_call × past/now/future 例追加),
-   研究戦略側を `AICE_Meta_Research.pdf` (9p, AICE Meta Pipeline で
-   `.aice → .ga.json → AIPL → run` の四段で生成 AI 問題解決を進化
-   計算駆動,Phase 9/17 を自動予測した自己改善ループの実証) で
-   執筆.両方とも xelatex + 日本語フォントでビルドし PDF を docs/
-   に commit.
+手書き再帰下降のため LR 系コンフリクト概念がない: `aice-evolution-v2/src/aice_parser.py` (`.aice` DSL), `aipl-self-host/level-c/parser.abcl` (AIPL セルフホスト).
 
 ---
 
-## How to verify quickly
+## 3. 7 ランタイム × 主要機能 (確定値)
+
+| 機能 | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| method injection | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| now / future / await | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `become` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `select` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| top-level functions | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| dynamic compile | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| worker pool | ✅ | ✅ | ✅ | ✅ | 🟡 | 🟡 | ❌ |
+| text file I/O | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅¹ | ❌ |
+| image I/O | ✅² | ✅² | ✅³ | ✅³ | ✅¹³ | ✅¹³ | ❌ |
+| type inference | 🟡 trace | ✅ HM | ✅ HM | ✅ HM | ✅ flow | ✅ flow | ✅ HM+spec |
+| type annotations | ✅ | 🟡 | ✅ | ✅ | ❌ | ❌ | ❌ |
+| records / tuples | ✅ / ✅ | ✅ / ✅ | ✅ / ✅ | ✅ / ✅ | ❌ | ❌ | 🟡 type only |
+| arrays (var x[N][M]) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🟡 |
+| generics on functions | ❌ | ✅ Forall | ✅ Forall | ✅ | ❌ | ❌ | ❌ |
+| remote actors (HTTP) | ✅ | ✅ | ✅ | ✅ | ❌ | 🟡 srv | ✅ |
+| HMAC-signed remote | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| WebSocket | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| AI integration (ai_call) | ✅ | ✅ | ✅ | ✅ | ✅ mock | ✅ mock | ✅ |
+
+¹ Node fs 注入経由 (browser では throw)  ² Pillow (PNG/JPEG/...)  ³ PPM P6 (純実装、no deps)
+
+---
+
+## 4. 今セッションで追加した OCaml 機能 (新規)
+
+| 機能 | サンプル | 主要ファイル |
+|---|---|---|
+| records / tuples | `abclc/Records.abcl`, `Tuples.abcl` | ast.ml + types.ml + parser.mly + eval_thread.ml + infer.ml |
+| dynamic compile | `abclc/Dynamic.abcl`, `DynamicWorkerPool.abcl` | repl_thread.ml (`add_prim "compile"` + extended `spawn`) |
+| top-level functions | `abclc/Functions.abcl` | ast.ml (`function_decl`, `Return_value` 例外), eval_thread.ml |
+| generics | `abclc/Generics.abcl` | infer.ml (`tvar_table`, `is_tvar_name`) |
+| type annotations | `abclc/TypedDemo.abcl` | ast.ml (`type_expr`, `TypedVarDecl`, `var_annotations`), infer.ml `ty_of_type_expr` |
+| method injection | `abclc/MethodPatch.abcl` | eval_thread.ml (`parse_methods_from_source`, `add_methods_to_class`/`...to_actor`) |
+| sized arrays | `abclc/Arrays.abcl` | ast.ml (`ArraySized`), parser.mly (`dim_list`) |
+| text file I/O | `abclc/FileIO.abcl` | repl_thread.ml (`read_file`/`write_file`/`append_file`/`file_exists`) |
+| image I/O (PPM P6) | `abclc/ImageIO.abcl` | eval_thread.ml (`VImage`), repl_thread.ml (`image_*` 6 builtins) |
+| remote actor 強化 + HMAC | `abclc/RemoteServer.abcl`, `RemoteClient.abcl` | **`src/hmac_sha256.ml` (新規, 173 LOC pure OCaml SHA-256/HMAC)**, remote_client.ml 例外処理、web_gateway.ml の openssl → 純 OCaml |
+
+---
+
+## 5. C codegen の新ターゲット
+
+| フラグ | 出力 | スモーク |
+|---|---|---|
+| `aipl2c --llvm` | C + `__attribute__((hot/cold))` + `clang -emit-llvm` 用ヘッダ | Hello/counter × LLVM PASS |
+| `aipl2c --openmp` | C + `<omp.h>` + `#pragma omp parallel for` spawn loop + `#pragma omp atomic` カウンタ | Hello/counter × OpenMP PASS (gcc-15 -fopenmp 利用) |
+
+総 backend 数: **default (pthread)** / **LLVM** / **OpenMP** / **SDL2 (--gui)** / **Xinu** / **Python** / **Pony** / **Erlang** / **Go** / **Prolog** = **10 種** (LLVM/OpenMP を別カウントすれば).
+
+---
+
+## 6. JS-B / JS-N の追加
+
+- `src/browser-abcl/src/runtime.js` に `_fs* / _image*` メソッド (host injected fs)
+- `src/browser-abcl/src/parser/grammar.jison` に sized array (`var x[N]`), `IndexExpr`, `IndexAssign`, `unescapeString`
+- `src/node-aipl-server/server.mjs` で `runtime.injectFs(fs)` を自動実行 → text & image I/O が動く
+
+---
+
+## 7. 文書
+
+| ファイル | 内容 |
+|---|---|
+| `docs/AIPL_Runtime_Feature_Matrix.{md,tex,pdf}` | 7 ランタイム × ~30 機能の最新比較表 (12 ページ) |
+| `docs/AIPL_User_Manual.{tex,pdf}` | xelatex + Hiragino のユーザマニュアル (15 ページ、新規作成済み) |
+| `docs/AIPL_Design_and_Implementation.{tex,pdf}` | 設計と実装の論文 (HM 推論中心) |
+| `docs/AICE_Meta_Research.{tex,pdf}` | AICE Meta Pipeline (GA-driven LLM 問題解決) 論文 |
+| `USER_MANUAL.md` | Markdown 版ユーザマニュアル |
+| `docs/AIPL_Type_Soundness_Report.pdf` | 型健全性レポート |
+
+---
+
+## 8. 重要な設計判断 (再起動時に思い出すべきポイント)
+
+### 8.1 オーバーロード解決の destructive-unify 順序依存
+
+`pick_overload` (infer.ml) は失敗時に tvar が rollback されないため、最初に当たった候補が tvar を pin する。これを利用して **「具体的なオーバーロードを先に試す」** ようにすべく、`typing_env.ml` で `+` の polymorphic string-concat を**先に登録**し、numeric overloads を後に登録 (`add_mono`/`add_poly` は prepend するので numeric が先に試される)。
+
+### 8.2 `var sum = 0.;` (float 初期化) が必要な理由
+
+`await` / `now` の戻り値は静的に追えないため TAny として扱う。`var sum = 0; sum = sum + await(...)` で `sum + TAny` が `(int, float) → float` overload と当たり、`sum = TFloat` で TInt との unify 失敗。回避: `var sum = 0.;` で最初から float 化。
+
+### 8.3 TypedVarDecl の normalize 戦略
+
+AST の `VarDecl` は 30+ 箇所で pattern match されている。型注釈サポートのために `VarDecl` シグネチャを変えると ripple が大きいため、**`TypedVarDecl(x, T, e)` を AST に追加し、`Ast.normalize_program` でパース直後に `TypedVarDecl → VarDecl + 側ハッシュ (Ast.var_annotations)`** に展開。型検査は `Ast.lookup_var_annotation s.sloc` で取り出し、runtime / codegen は VarDecl だけを見ればよい。
+
+### 8.4 OpenMP は actor タスク化していない (デッドロック回避)
+
+`#pragma omp task` で actor_main を起動する案は **デッドロックする** (`taskwait` が actor_main の永久ループを待ち、watchdog はその後ろにあるため global_shutdown が来ない)。安全策として per-actor は **pthread のまま**、OpenMP は spawn loop の並列化 + 原子カウンタに限定。
+
+### 8.5 LR(1) クリーン化のキー
+
+`parser.mly` の優先順位スタック (低 → 高):
+```
+%nonassoc IFX             /* if-else より低い */
+%nonassoc ELSE
+%left EQ NEQ
+%left LT GT LE GE
+%left PLUS MINUS
+%left TIMES DIV
+%left DOT LBRACK          /* postfix access — 最高に近い */
+%nonassoc UAWAIT          /* AWAIT prefix — 最高 */
+```
++ `IF (...) stmt %prec IFX` と `AWAIT expr %prec UAWAIT` のタグ。JS-B の jison も `%nonassoc UAWAIT` 追加で同じ解決。
+
+### 8.6 remote actor のエラー伝搬
+
+`remote_client.ml` の `with_connection` ヘルパで Unix.Unix_error を全部 `Error msg` に包む:
+- `remote_send` (fire-and-forget): 失敗時 stderr に出力、actor 続行
+- `remote_call` (now / future): 失敗時 `"<remote-error: ...>"` を返す (呼び出し元アクターが死なない)
+
+### 8.7 HMAC-SHA256 純 OCaml 実装
+
+`src/hmac_sha256.ml` — 外部依存ゼロ (cryptokit/digestif/sha 不要)。RFC 6234 (SHA-256) と RFC 4231 (HMAC) のテストベクタで検証済み。`web_gateway.ml` の旧 `openssl dgst` subprocess を置換 (リクエスト毎の fork が消えた)。
+
+---
+
+## 9. ビルド前提
+
+| 必要 | 説明 |
+|---|---|
+| OCaml + dune + ocamlyacc + ocamllex | OCaml 側 |
+| tsdl | SDL2 binding (gui_ide.exe 用) |
+| Node.js + npm + jison | JS-B 側のパーサ再生成 |
+| Python 3 + lark | Py-A / Py-I (`pip install --user --break-system-packages lark`) |
+| `gcc-15` (`/opt/homebrew/bin/gcc-15`) | OpenMP codegen 検証 (Apple Clang は libomp を別途入れる必要) |
+| `clang` (LLVM tool chain) | LLVM codegen 検証 |
+| `xelatex` + Hiragino フォント | 論文 / マニュアル PDF 再ビルド (`docs/build_pdf.sh`) |
+
+---
+
+## 10. サンプル一覧 (今セッション新規追加)
+
+```
+abclc/Arrays.abcl              abclc/MethodPatch.abcl       abclc/RemoteClient.abcl
+abclc/Dynamic.abcl             abclc/Records.abcl           abclc/RemoteServer.abcl
+abclc/DynamicWorkerPool.abcl   abclc/Tuples.abcl            abclc/_jso_server.abcl
+abclc/FileIO.abcl              abclc/TypedDemo.abcl
+abclc/Functions.abcl
+abclc/Generics.abcl
+abclc/ImageIO.abcl
+
+src/browser-abcl/arrays.abcl    src/browser-abcl/file_io.abcl    src/browser-abcl/image_io.abcl
+```
+
+---
+
+## 11. 残タスク候補 (次セッションの選択肢)
+
+優先度の目安付き。
+
+1. ✏️ **C codegen で records / tuples を実装** (現状 🟡 "type only") — value 表現と struct emit が必要
+2. ✏️ **C codegen で arrays multi-dim を完全対応** (現状 🟡)
+3. ✏️ **JS-B / JS-N に method injection / dynamic compile** (残る ❌) — parser 拡張 + runtime
+4. ✏️ **JS-B / JS-N に HMAC-signed remote** — Node の crypto モジュールを使う簡単な実装
+5. ✏️ **OCaml の image I/O を PNG 対応** — 現状 PPM のみ; `digestif` か miniz/zlib ベースの PNG エンコーダが必要
+6. ✏️ **AIPL self-host tower** — `aipl-self-host/level-c/parser.abcl` の現状確認、level-d 試作
+7. ✏️ **Phase 11+ effect / linear / owned / transient を OCaml 側に移植** — 現状 abclc/Phase1*.abcl はサンプルのみ
+8. 📄 **C codegen 9 backend の論文化** — `aipl2c --pony --erlang --go --prolog --llvm --openmp` の比較研究
+9. 🔧 **OCaml の `var pad[R][C] = -1` を許可** — unary minus が parser.mly に無い (pre-existing)
+
+---
+
+## 12. 再開時のヘルスチェック
 
 ```bash
 cd /Users/kodamay/ocaml-app/abclcp-project
 
-# 1) Build OCaml side
-dune build
+# Step 1: ビルド
+dune build && echo "✓ build OK"
 
-# 2) Run every smoke
-bash run_all_smoke_tests.sh                      # OCaml + JS + Python + Dist
-bash src/test_pony_codegen.sh                    # Pony codegen
-bash src/test_erlang_codegen.sh                  # Erlang codegen
-bash src/test_go_codegen.sh                      # Go codegen
-bash src/test_prolog_codegen.sh                  # SWI-Prolog codegen
-bash src/test_c_websocket.sh                     # C + libwebsockets
-bash src/python-aipl-inferred/_smoke_test.sh     # HM-typed Python
-bash src/node-aipl-server/_smoke_test.sh         # Node HTTP + WS
+# Step 2: パーサのコンフリクト数
+ocamlyacc -v src/parser.mly 2>&1 | tail -1  # 期待: 空 (0 conflict)
 
-# 3) Self-host (AIPL in AIPL)
-for d in aipl-self-host/level-*; do
-  [ -f "$d/smoke.sh" ] && (cd "$d" && bash smoke.sh)
-done
+# Step 3: フルスモーク
+bash abclc/_smoke_test.sh 2>&1 | tail -3
+# 期待: total: 71  pass: 71  fail: 0
+
+bash src/test_remote_actor.sh 2>&1 | tail -3
+# 期待: pass: 9  fail: 0
+
+bash src/test_c_llvm_openmp.sh 2>&1 | tail -3
+# 期待: total: 4  pass: 4  fail: 0
 ```
 
-### Latest known-good smoke results
-
-```
-OCaml (run_all_smoke_tests.sh):   48/57 PASS (9 pre-existing Gui/Py/Xinu fails)
-browser-abcl:                     syntax 7/7 + parse 4/4 + typeck 4/4
-node-aipl-server:                 10/10
-python-aipl-inferred:             20/20
-Pony codegen:                     2 PASS + 1 xfail
-Erlang codegen:                   2 PASS + 1 xfail
-Go codegen:                       2 PASS + 1 xfail
-Prolog codegen:                   2 PASS + 1 xfail
-C + WebSocket:                    1/1 PASS
-self-host:                        37/37 PASS (across 9 levels)
-```
-
-### Real LLM call (requires API key, run locally)
-
-```bash
-# Python: pick provider 2 (Anthropic)
-ANTHROPIC_API_KEY=sk-ant-... /usr/bin/python3 \
-  src/python-aipl/aipl_main.py /tmp/test_aic.abcl
-
-# OCaml: same via REPL
-ANTHROPIC_API_KEY=sk-ant-... \
-  printf 'load /tmp/test_aic.abcl\ncompile\n' | \
-  _build/default/src/repl_thread.exe -f /dev/stdin
-```
-
-Where `/tmp/test_aic.abcl`:
-```aipl
-class T {
-  method run() {
-    var r = ai_call(2, "Say hi in 5 words.");
-    print(r);
-  }
-}
-var t = new T();
-send t.run();
-```
-
----
-
-## Known limitations and open items
-
-### C codegen feature gaps
-The `aipl2c` standalone-C path generates working code for Hello /
-counter / many actor samples, but the runtime doesn't include:
-- `become` (codegen emits `/* become unsupported */`)
-- `select` (codegen emits `/* select unsupported */`)
-- `now` reply slot (no future table in `abcl_gui_runtime.c`)
-- `ai_call` (no libcurl integration; would need to be added to
-  the C runtime same way `abcl_ws_runtime.c` adds WebSocket)
-
-The OCaml runtime has all of these; C codegen is best-effort.
-
-### Pre-existing OCaml type errors (9 samples)
-`abclc/BoundedBufferGui.abcl`, `Philosophers5Gui.abcl`,
-`Rotate4LinesGui.abcl` (and their `*Py` / `*Xinu` variants) declare
-fields as numeric defaults (`var partner = 0`) but later assign
-actor references.  Our hard-fail Typecheck.run surfaces these as
-errors during `aipl2c` invocations.  Three pragmatic options:
-1. Rewrite the samples to use a sentinel actor literal.
-2. Relax the hard-fail to a warn-and-continue per the OCaml-REPL behavior.
-3. Add a sentinel-aware widening pass.  Option (3) is what
-   browser-abcl's flow-sensitive checker already does internally.
-
-### `ai_call(N, prompt)` and explicit provider
-When `ABCL_AI_PROVIDER=mock` is set, that wins over an explicit
-provider argument (mirrors Python).  Without that env var, a
-`ai_call(2, ...)` without `ANTHROPIC_API_KEY` will fail hard —
-which is the expected "user explicitly asked for Anthropic"
-behaviour.
-
----
-
-## Possible next directions
-
-| Option | Description | Effort |
-|---|---|---|
-| (a) **JVM family codegen** (Kotlin / Scala / Java) | Coroutines or virtual threads; large user base | ~600-1000 LOC |
-| (b) **Swift codegen** | Apple native `actor`; Phase 17 structured concurrency map | ~800 LOC |
-| (c) **WASM codegen** | Browser-native AOT; complements browser-abcl interpreter | ~1500 LOC |
-| (d) **AIPL Phase 18 prediction** via `aice-evolution-v2` | Run MAP-Elites on current Phase 17 stack | research |
-| (e) **C codegen feature parity** | become / select / now / ai_call in `abcl_gui_runtime.c` | medium |
-| (f) **Self-host on other backends** | Run aipl-self-host Level A on Pony or Go output | small |
-| (g) **OCaml `web_gateway` standardisation** | Mirror `/api/typecheck` + `/api/run` + `/ws` shape so JS-OCaml has parity with JS-Node | small |
-
-Earlier in the session the user expressed interest in Pony first
-(done), then Erlang (done), Go (done), Prolog (done).  Tier-2
-candidates from that conversation: **JVM (Kotlin/Java)** and
-**Swift**.
-
----
-
-## Repository layout (quick reference)
-
-```
-abclcp-project/
-├── src/
-│   ├── aipl2c.ml             — codegen entry (was abcl2c.ml)
-│   ├── c_translator.ml       — emitters for C/Xinu/Python/Pony/Erlang/Go/Prolog
-│   ├── ai.ml, repl_thread.ml — OCaml runtime
-│   ├── web_gateway.ml        — HTTP + WebSocket server
-│   ├── abcl_gui_runtime.c    — C runtime (SDL2 GUI builtins)
-│   ├── abcl_ws_runtime.c     — C runtime extension (libwebsockets)
-│   ├── browser-abcl/         — JS-Browser runtime
-│   ├── node-aipl-server/     — JS-Node HTTP+WS server (uses browser-abcl)
-│   ├── python-aipl/          — Python (annotated) runtime + aipl_websocket.py
-│   ├── python-aipl-inferred/ — Python (HM-inferred) sibling
-│   └── test_*_codegen.sh     — per-target smoke tests
-├── abclc/                    — OCaml-side .abcl samples (115 files)
-├── aipl-self-host/           — AIPL in AIPL (9 levels)
-├── docs/
-│   ├── AIPL_NEXT_SESSION.md  — (this file)
-│   ├── AIPL_Runtime_Feature_Matrix.md / .tex / .pdf
-│   ├── AIPL_OVERVIEW.md      (in repo root)
-│   └── AIPL_Type_Soundness_Report.{tex,pdf}
-├── docker/cross/             — cross-language interop demo
-└── local-genai/              — language model training (separate axis;
-                                 NEXT_SESSION.md there for the LM side)
-```
-
----
-
-*Generated 2026-05-13 (revised post-papers).  Up-to-date through
-commit `a39d75a` (`docs: add Meta Research paper`).*
+すべて緑なら基準点に戻れています。
