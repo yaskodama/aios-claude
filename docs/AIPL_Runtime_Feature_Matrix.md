@@ -182,7 +182,7 @@ abort.
 | #   | Feature                                       | Py-A                       | Py-I                | OCaml         | JS-O          | JS-B         | JS-N                          | C        |
 | --- | --------------------------------------------- | :------------------------: | :-----------------: | :-----------: | :-----------: | :----------: | :---------------------------: | :------: |
 | 27  | remote actors (HTTP)                          | ✅                          | ✅                   | 🟡 no WS      | 🟡            | ❌           | 🟡 server itself, no client   | ✅ (via OCaml) |
-| 28  | WebSocket                                     | ❌                          | ❌                   | ❌            | ❌            | ❌           | ❌                            | ❌       |
+| 28  | WebSocket                                     | 🟡 (`pip install websockets`) | 🟡 (= Py-A)         | ✅ (built-in `web_gateway.ml`, 40+ LOC, verified handshake 101) | ✅ (via OCaml backend) | ✅ (browser-native `WebSocket`, AIPL builtin not yet) | 🟡 (`npm install ws`)         | 🟡 (libwebsockets)       |
 | 29  | AI integration (`ai_call`)                    | ✅ (stream, image)          | ✅                   | ✅            | ✅            | ✅ mock only | ✅ mock only                  | ✅       |
 | 29a | `ai_call([provider,] prompt)` — int 1/2/3 = gemini/anthropic/openai (default: gemini auto) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (via OCaml) |
 | 29b | `now actor.m(...)` + `ai_call(...)` inside method  → reply gets blocking reply | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no `reply()` in C runtime) |
