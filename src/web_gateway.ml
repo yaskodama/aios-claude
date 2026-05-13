@@ -880,7 +880,118 @@ let handle_api_repl (body:string) : (int * string * string) =
       (400, "text/plain; charset=utf-8", "bad JSON: " ^ m)
   | exn ->
       (500, "text/plain; charset=utf-8", "error: " ^ Printexc.to_string exn)
-  
+
+(* ---- /api/typecheck — parse + run HM inference, return JSON ---- *)
+(* リクエスト: { "source": "<AIPL source>" }
+   レスポンス (200):
+     { "ok": true|false,
+       "errors": [ "msg1", ... ],
+       "warnings": [ "msg1", ... ],
+       "classes": {
+         "<ClassName>": {
+           "fields":  { "<field>": "<type>", ... },
+           "methods": { "<method>": "<scheme>", ... }
+         }, ...
+       }
+     }                                                                  *)
+let handle_api_typecheck (body:string) : (int * string * string) =
+  try
+    match parse_json body with
+    | JObject o ->
+      let src =
+        match json_get_string "source" o with
+        | Some s -> s
+        | None -> ""
+      in
+      if src = "" then
+        (400, "application/json; charset=utf-8",
+         "{\"ok\":false,\"errors\":[\"missing source\"]}")
+      else begin
+        (* このリクエスト用に typecheck の累積状態を初期化 *)
+        Types.reset_for_typecheck ();
+        (* バッファから lex/parse → check *)
+        let lexbuf = Lexing.from_string src in
+        let errors = ref [] in
+        let warnings = ref [] in
+        (* warning capture: pick_overload は stderr へ書くので、
+           この呼び出しでは捕捉できないが、副作用として既出のものは
+           再警告されない (Hashtbl 化済み)。
+           将来の拡張余地として warnings 配列を残しておく *)
+        let parse_ok =
+          try
+            let _prog = Parser.program Lexer.token lexbuf in
+            Some _prog
+          with exn ->
+            errors := ("parse error: " ^ Printexc.to_string exn) :: !errors;
+            None
+        in
+        let typed_ok =
+          match parse_ok with
+          | None -> false
+          | Some prog ->
+            try
+              (match Infer.check_program prog with
+               | Ok _ -> true
+               | Error msg -> errors := msg :: !errors; false)
+            with exn ->
+              errors := ("typecheck exception: " ^ Printexc.to_string exn)
+                        :: !errors;
+              false
+        in
+        (* 推論結果をシリアライズ *)
+        let buf = Buffer.create 1024 in
+        Buffer.add_string buf "{\"ok\":";
+        Buffer.add_string buf (if typed_ok then "true" else "false");
+        Buffer.add_string buf ",\"errors\":[";
+        let escape s = "\"" ^ json_escape s ^ "\"" in
+        Buffer.add_string buf (String.concat "," (List.rev_map escape !errors));
+        Buffer.add_string buf "],\"warnings\":[";
+        Buffer.add_string buf (String.concat "," (List.rev_map escape !warnings));
+        Buffer.add_string buf "],\"classes\":{";
+        let first_cls = ref true in
+        Hashtbl.iter (fun cls _fields ->
+          if !first_cls then first_cls := false else Buffer.add_string buf ",";
+          Buffer.add_string buf (escape cls);
+          Buffer.add_string buf ":{\"fields\":{";
+          let fields = Types.class_field_list cls in
+          let first_f = ref true in
+          List.iter (fun (fname, ty) ->
+            if !first_f then first_f := false else Buffer.add_string buf ",";
+            Buffer.add_string buf (escape fname);
+            Buffer.add_string buf ":";
+            Buffer.add_string buf (escape (Types.string_of_ty ty))
+          ) fields;
+          Buffer.add_string buf "},\"methods\":{";
+          let methods =
+            match Hashtbl.find_opt Types.class_method_schemes cls with
+            | Some lst -> lst
+            | None -> []
+          in
+          let first_m = ref true in
+          List.iter (fun (mname, Types.Forall (_, t)) ->
+            if !first_m then first_m := false else Buffer.add_string buf ",";
+            Buffer.add_string buf (escape mname);
+            Buffer.add_string buf ":";
+            Buffer.add_string buf (escape (Types.string_of_ty t))
+          ) methods;
+          Buffer.add_string buf "}}"
+        ) Types.class_field_types;
+        Buffer.add_string buf "}}";
+        (200, "application/json; charset=utf-8", Buffer.contents buf)
+      end
+    | _ ->
+      (400, "application/json; charset=utf-8",
+       "{\"ok\":false,\"errors\":[\"JSON must be an object\"]}")
+  with
+  | Json_error m ->
+      (400, "application/json; charset=utf-8",
+       Printf.sprintf "{\"ok\":false,\"errors\":[\"bad JSON: %s\"]}"
+         (json_escape m))
+  | exn ->
+      (500, "application/json; charset=utf-8",
+       Printf.sprintf "{\"ok\":false,\"errors\":[\"%s\"]}"
+         (json_escape (Printexc.to_string exn)))
+
 let handle_send_direct_json (body:string) : (int * string * string) =
   try
     match parse_json body with
@@ -1613,6 +1724,7 @@ let handle_client (client: file_descr) : unit =
                 | Some err -> err
                 | None -> handle_call_direct_json body q)
            | "POST", "/api/repl" -> handle_api_repl body
+           | "POST", "/api/typecheck" -> handle_api_typecheck body
            | "POST", _ when String.length path >= String.length "/api/x/" &&
                             String.sub path 0 (String.length "/api/x/") = "/api/x/" ->
                let key = String.sub path (String.length "/api/x/") (String.length path - String.length "/api/x/") in

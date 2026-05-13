@@ -106,6 +106,12 @@ let clear_field_and_local_types () : unit =
   Hashtbl.clear class_field_types;
   Hashtbl.clear local_var_types
 
+(* 1 リクエスト分の typecheck セッションで状態を完全初期化する *)
+let reset_for_typecheck () : unit =
+  Hashtbl.clear class_field_types;
+  Hashtbl.clear local_var_types;
+  Hashtbl.clear class_method_schemes
+
 let register_class (name : string) (methods : (string * scheme) list) : unit =
   Hashtbl.replace class_method_schemes name methods
 
