@@ -1,0 +1,26 @@
+# English — modern Q&A style
+# model: Stage-13-jp-heavy depth=6 d=128 vocab=4096 bpb=1.4941
+# temp=0.85  max_chars=260
+
+=== turn 1 ===
+USER> Please explain the use of artificial intelligence in education.
+MODEL> Out of Paris all to restrain the cotton-chamber, but not the rises of
+the balloon in the middle of the sky for a week in the united spot where
+he was. There was a very small fact in the power of being trained and
+must be nine and 1.00 four hours in the morning
+
+=== turn 2 ===
+USER> What about climate change?
+MODEL> Each one was alarming four or eight, and Samuel jumped up in the wirl,
+and then struck the wine-shoes and bone over the useling-movings of
+the narcade. The manufacturely appeared refugeing, with a good humour.
+The new course of these years was armed with a good
+
+=== turn 3 ===
+USER> Describe a sunset over the ocean.
+MODEL> The progress of the realm, and the light would peep through the brow,
+and the stone in its tolasted and humorous inner dusky shoes that on the
+bottom of a newspaper and over the alert.
+
+A dog’s muscles in the presence of immense and gay, like the
+idolonial in

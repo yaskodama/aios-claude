@@ -1,0 +1,37 @@
+# English ↔ 日本語 mix
+# model: Stage-13-jp-heavy depth=6 d=128 vocab=4096 bpb=1.4941
+# temp=0.85  max_chars=240
+
+=== turn 1 ===
+USER> Hello, world! こんにちは 世界 !
+MODEL> Out of Paris! Yes, I’ll have you no distance, I’ll bet the rises.
+
+—Glendin, says the savage.
+
+—I’ll jump back near your neck! Boys!
+
+—You can’t travel before you, Ashiermous, who played on looking round
+my hat. I’ll tell you
+
+=== turn 2 ===
+USER> London is in England. 東京 は 日本 に あり ます 。
+MODEL> 万
+
+
+
+
+　ust: _[irlless "Don’t be aware,” says the bone. “Changed
+tree, flat, nargent! You’ll find a bone hoof of France with those
+rogue royalty! In fact—”
+
+ければならecutor, consumed with his sp laughing lips
+
+=== turn 3 ===
+USER> 桜 の 花 と The cherry blossom is
+MODEL> glad and true. The real interest of Benjamin says:
+
+“Le streets, in defun.”
+
+A humorous voice set the giants in a hurried voice. Dragon, who could
+not be touched with alarm to shore in his ears, addressed it in a doom
+there. The gale, like

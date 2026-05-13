@@ -1,0 +1,35 @@
+# English — Shakespeare-style multi-turn
+# model: Stage-13-jp-heavy depth=6 d=128 vocab=4096 bpb=1.4941
+# temp=0.85  max_chars=240
+
+=== turn 1 ===
+USER> ROMEO. 
+MODEL> [Shut Paris hum ]
+
+
+
+CHAPTER XI
+
+
+NORAS A.V. [Generally]
+
+indifference was the population of one of the Parisians, under the
+section of Lodium,--the traveler's fury in nine and 1.300. However,
+the folding of the seductive the opening was appe
+
+=== turn 2 ===
+USER> What is love?
+MODEL> The one is not performed, but the other has usually reflected about that
+diamond room, and we have all been at the usual point of view. The use
+of the subject is, that the monarch has been originally regulated, and
+thus refinements, with those
+
+=== turn 3 ===
+USER> Tomorrow, and tomorrow, and tomorrow,
+MODEL> and
+for then, saith the real interest, and the mode of receiving a young
+woman's信 in defunction.
+
+To be sure that the study was may be disaned by the presence of a
+blood-door on the other side, but in the popular form of a race of
+meanense
