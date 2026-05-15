@@ -1,0 +1,148 @@
+// ─────────────────────────────────────────────────────────────────────
+//  Pi_Phase2_BignumRefinement.aice
+//
+//  Phase-1 (60 cells × 40 generations) を回した結果, top-6 elites の
+//  4 個以上に共通して現れた軸を「収束軸」として固定し,
+//  残りの自由軸だけ深掘り探索する.
+//
+//  収束軸 (Phase-1 elite_map.json から自動抽出):
+//      paradigm            = "Array_DSL"             (6/6 elites)
+//      arithmetic_strategy = "binary_splitting"      (5/6 elites)
+//      algorithm_family    = "chudnovsky"            (5/6 elites)
+//      precision_model     = "per_value_digits"      (4/6 elites)
+//
+//  自由軸 (Phase-2 で深掘り):
+//      memory_layout       ∈ {heap_array, arena, rope_segments,
+//                              lazy_stream_chunks, mmap_paged}
+//      ownership_model     ∈ {none, rc, region, borrow_check, linear}
+//      type_safety         ∈ {medium, high, refinement, dependent}
+//      primitive_set       ∈ {array_ops, limb_ops_intrinsic,
+//                              ring_Z_p, ring_Q, stream_combinators}
+//      extraction_mode     ∈ {streaming_digits, random_access_digit,
+//                              incremental_refinement}
+//
+//  Phase-1 で発見された「LLM が提案した新軸」も継承する:
+//      proof_obligation_at_compile_time : bool
+//      guard_digits_strategy            : enum {none, +log2N, +sqrt(N)}
+//      simd_lanes                       : enum {scalar, 4x32, 8x32, 16x16}
+// ─────────────────────────────────────────────────────────────────────
+
+aice Pi_Phase2_BignumRefinement {
+  dialect = "aice_evolution_v2";
+
+  task = "Phase-1 で収束した 4 軸 (paradigm=Array_DSL, arithmetic_strategy=binary_splitting, algorithm_family=chudnovsky, precision_model=per_value_digits) を固定し, 残る 5 軸 + Phase-1 が提案した 3 新軸を MAP-Elites で深掘り探索する. 目的は『π を 10,000 桁求めるのに最適な言語仕様』の最終 8 候補を Pareto frontier で選び出すこと.";
+
+  gene_schema = "schemas/pi_paradigm.schema.json";
+
+  seed_from {
+    phase            = "Pi_Phase1_OpenSearch";
+    elite_map        = "Pi_Phase1_OpenSearch.elite_map.json";
+    inherit_trend    = true;
+    promote_seeds    = "top_6";
+  }
+
+  // ─── Phase-1 で収束した軸を固定 (mutation 禁止) ──────────────────
+  pin_axes {
+    paradigm            = "Array_DSL";
+    arithmetic_strategy = "binary_splitting";
+    algorithm_family    = "chudnovsky";
+    precision_model     = "per_value_digits";
+  }
+
+  // ─── Phase-1 が open_axes で発見した新軸を取り込み ───────────────
+  open_axes_inherited {
+    proof_obligation_at_compile_time {
+      kind = "boolean";
+      doc  = "ソースに π の最終桁誤差 < 0.5 ulp を保証する義務を埋め込めるか";
+    }
+    guard_digits_strategy {
+      kind = "enum";
+      values = ["none", "plus_log2N", "plus_sqrtN", "plus_constant"];
+      doc  = "binary splitting の累積誤差を吸収するガード桁の取り方";
+    }
+    simd_lanes {
+      kind = "enum";
+      values = ["scalar", "x4_32bit", "x8_32bit", "x16_16bit"];
+      doc  = "limb の SIMD パッキング";
+    }
+  }
+
+  // ─── 評価タスク: Phase-1 と同 5 つだが weight を作り直し ─────────
+  evaluation_tasks {
+    task Throughput_10k     { spec = "π を 10,000 桁求める"; weight = 0.20; }
+    task ScaleTo_100k       { spec = "100,000 桁にも線形時間で適用可能"; weight = 0.15; }
+    task ScaleTo_1M         { spec = "1,000,000 桁が CPU 単体で 1 時間以内"; weight = 0.15; }
+    task ProvableCorrect    { spec = "10,000 桁全一致を型 / refinement で保証"; weight = 0.20; }
+    task TerseSource        { spec = "30 LoC 未満で π 10k を書ける"; weight = 0.10; }
+    task GuardDigitsCorrect { spec = "binary splitting の誤差吸収 ガード桁が型で決まる"; weight = 0.10; }
+    task SIMDFriendly       { spec = "limb 演算が 1 ソースから SIMD-lowered できる"; weight = 0.10; }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "memory_layout, ownership_model, type_safety, primitive_set, extraction_mode";
+    generations = 30;
+    seed_count  = 8;
+    open_axes   = false;     // Phase-2 はもう新軸を増やさない (収束フェーズ)
+    rng_seed    = 271828;
+
+    operators_override {
+      mutations {
+        axis_resample              = 0.50;   // 自由軸の resample が主役
+        coherent_paradigm_shift    = 0.00;   // paradigm pin 済み
+        llm_proposal               = 0.20;
+        llm_new_axis               = 0.00;   // open_axes=false
+        guard_strategy_tune        = 0.15;
+        simd_lane_tune             = 0.15;
+      }
+      crossovers {
+        uniform                    = 0.40;
+        one_point                  = 0.30;
+        llm_merge                  = 0.20;
+        ownership_safety_splice    = 0.10;   // ownership+type_safety を片親から
+      }
+    }
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.10;   // 既に収束しているので低
+    frontier_coverage     = 0.25;   // 自由軸の Pareto を広く取る
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.30;   // 7 評価タスク横断で機能するか
+    implementability      = 0.20;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["streaming", "verified", "max_throughput", "minimal_DSL"];
+    top_k     = 8;
+  }
+
+  reviewers {
+    reviewer GuardDigits {
+      persona = "あなたは数値誤差レビュアーです。候補の guard_digits_strategy が Chudnovsky × binary-splitting の累積誤差を 10,000 桁時点で吸収できるかを 1 文で答えてください ('OK: +log2N で n_guard = 14 bit' などの具体表現を含めること).";
+    }
+    reviewer OwnershipFit {
+      persona = "あなたは所有権モデル fit レビュアーです。binary splitting の再帰木 (T(a,b) = combine(T(a,m), T(m,b))) において, 中間 limb_array の所有が region / linear / rc のどれと最も整合するかを 1 文で答えてください.";
+    }
+    reviewer SIMDLowering {
+      persona = "あなたは SIMD コード生成レビュアーです。primitive_set が limb_ops_intrinsic か stream_combinators の場合に, 同一ソースから AVX2 (x8_32bit) へ自動下げ可能かを 1 文で答えてください.";
+    }
+    reviewer DSLEconomy {
+      persona = "あなたは DSL 経済性レビュアーです。'pi : Real with digits=10000 = chudnovsky |> emit' のような 1-2 行記述が成立する primitive 集合かを 1 文で答えてください.";
+    }
+    reviewer VerifiedExtraction {
+      persona = "あなたは検証可能抽出レビュアーです。extraction_mode と precision_model の組合せが '生成された 10,000 桁の最終桁誤差 < 0.5 ulp' を型レベルで保証できるかを 1 文で答えてください.";
+    }
+  }
+
+  handoff {
+    next_phase = "Pi_PiLang_Final.aice";
+    select_top {
+      criterion = "lexicographic( ProvableCorrect.weight=hard, Throughput.weight=hard, SourceLoC.weight=soft )";
+      tie_break = "smallest type-safety floor that still satisfies ProvableCorrect (= minimum cognitive load)";
+      output    = "single elite as the spec basis for PiLang";
+    }
+  }
+}

@@ -1,0 +1,185 @@
+// ─────────────────────────────────────────────────────────────────────
+//  Pi_Phase0_LowLevelBaseline.aice
+//
+//  目的:
+//    π を 10,000 桁求めるという固定タスクに対し, 既存の低レベル
+//    プログラミング言語 (assembler / C / BASIC / Forth) で書かれた
+//    リファレンス実装を「種個体 (seed individuals)」として MAP-Elites
+//    の cell map に投入し, それぞれの fitness fingerprint を取る.
+//
+//  Phase-0 の役割:
+//    まだ進化させない. 4 実装の実測値 (digits/sec, LoC, 作業メモリ,
+//    開発工数) を ../bench/fitness_fingerprint.md に固定し, Phase-1
+//    以降の探索が比較対照に使える「現状ベースライン」を作る.
+//
+//  生成物:
+//    Pi_Phase0_LowLevelBaseline.ga.json   (この .aice の resolved IR)
+//    Pi_Phase0_LowLevelBaseline.elite_map.json
+//        ├─ S0 = assembler 種 → cell (assembler, none, none, spigot_digit)
+//        ├─ S1 = C 種        → cell (C,         low,  none, spigot_digit)
+//        ├─ S2 = C+bignum 種 → cell (C,         low,  rc,   multilimb_r2_32)
+//        ├─ S3 = BASIC 種    → cell (BASIC,     low,  gc,   spigot_digit)
+//        └─ S4 = Forth 種    → cell (Forth-IR,  none, none, stack_ops)
+//
+//  Phase-1 (Pi_Phase1_OpenSearch.aice) はこの elite_map から開始する.
+// ─────────────────────────────────────────────────────────────────────
+
+aice Pi_Phase0_LowLevelBaseline {
+  dialect = "aice_evolution_v2";
+
+  task = "π を 10,000 桁求めるという固定タスクに対し, 既存の低レベル言語で書かれた 4 実装 (assembler / C / C+bignum / BASIC / Forth) を seed として MAP-Elites の cell マップに登録し, 各実装の fitness fingerprint (digits/sec, LoC, working set, dev-effort) を計測して Phase-1 以降の基準とする.";
+
+  gene_schema = "schemas/pi_paradigm.schema.json";
+
+  // ─── 4 つの参照プログラムを評価タスクとして固定 ──────────────────
+  evaluation_tasks {
+    task PiSpigotAsm {
+      spec        = "baseline/asm/pi_inner.s + C driver で π=3.14159... の最初 10,000 桁を 2s 未満で出力する";
+      reference   = "baseline/asm/pi_inner.s";
+      metrics     = ["digits_per_sec", "source_loc", "working_set_kb", "first_10k_correct"];
+      seed_genome {
+        paradigm             = "assembler";
+        state_representation = "register_int";
+        type_safety          = "none";
+        ownership_model      = "none";
+        concurrency_model    = "none";
+        effect_handling      = "implicit";
+        arithmetic_strategy  = "spigot_digit";
+        precision_model      = "implicit";
+        memory_layout        = "static_array";
+        algorithm_family     = "spigot";
+        primitive_set        = "register_ops";
+        extraction_mode      = "streaming_digits";
+      }
+    }
+
+    task PiSpigotC {
+      spec        = "baseline/c/pi_spigot.c が π の最初 10,000 桁を出力する";
+      reference   = "baseline/c/pi_spigot.c";
+      metrics     = ["digits_per_sec", "source_loc", "working_set_kb"];
+      seed_genome {
+        paradigm             = "C";
+        state_representation = "limb_array";
+        type_safety          = "low";
+        ownership_model      = "none";
+        concurrency_model    = "none";
+        effect_handling      = "implicit";
+        arithmetic_strategy  = "spigot_digit";
+        precision_model      = "global_digits_const";
+        memory_layout        = "heap_array";
+        algorithm_family     = "spigot";
+        primitive_set        = "array_ops";
+        extraction_mode      = "streaming_digits";
+      }
+    }
+
+    task PiMachinCBignum {
+      spec        = "Machin 公式 + 自前 bignum (radix 2^32) で π の最初 10,000 桁を出力する C プログラム";
+      reference   = "baseline/c/pi_spigot.c (variant)";
+      metrics     = ["digits_per_sec", "source_loc", "working_set_kb"];
+      seed_genome {
+        paradigm             = "C";
+        state_representation = "limb_array";
+        type_safety          = "low";
+        ownership_model      = "rc";
+        concurrency_model    = "none";
+        effect_handling      = "implicit";
+        arithmetic_strategy  = "multilimb_radix2_32";
+        precision_model      = "global_digits_const";
+        memory_layout        = "heap_array";
+        algorithm_family     = "machin";
+        primitive_set        = "limb_ops_intrinsic";
+        extraction_mode      = "compute_all_then_print";
+      }
+    }
+
+    task PiSpigotBASIC {
+      spec        = "baseline/basic/pi_spigot.bas が π の最初 10,000 桁を出力する";
+      reference   = "baseline/basic/pi_spigot.bas";
+      metrics     = ["digits_per_sec", "source_loc", "working_set_kb"];
+      seed_genome {
+        paradigm             = "BASIC";
+        state_representation = "global_num";
+        type_safety          = "low";
+        ownership_model      = "gc";
+        concurrency_model    = "none";
+        effect_handling      = "implicit";
+        arithmetic_strategy  = "spigot_digit";
+        precision_model      = "global_digits_const";
+        memory_layout        = "static_array";
+        algorithm_family     = "spigot";
+        primitive_set        = "array_ops";
+        extraction_mode      = "streaming_digits";
+      }
+    }
+
+    task PiSpigotForth {
+      spec        = "baseline/forth/pi_spigot.fs が π の最初 10,000 桁を出力する";
+      reference   = "baseline/forth/pi_spigot.fs";
+      metrics     = ["digits_per_sec", "source_loc", "working_set_kb"];
+      seed_genome {
+        paradigm             = "Forth";
+        state_representation = "register_int";
+        type_safety          = "none";
+        ownership_model      = "none";
+        concurrency_model    = "none";
+        effect_handling      = "implicit";
+        arithmetic_strategy  = "spigot_digit";
+        precision_model      = "implicit";
+        memory_layout        = "static_array";
+        algorithm_family     = "spigot";
+        primitive_set        = "stack_ops";
+        extraction_mode      = "streaming_digits";
+      }
+    }
+  }
+
+  // ─── Phase-0 は変異させない (generations=0 = fingerprint だけ) ─────
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "paradigm, arithmetic_strategy, precision_model";
+    generations = 0;        // fingerprint only — no mutation in this phase
+    seed_count  = 5;
+    open_axes   = false;
+    rng_seed    = 314159;
+  }
+
+  // ─── ベースライン採点 (4 軸スカラー化) ───────────────────────────
+  meta_fitness {
+    correctness           = 0.40;   // 10k 桁すべて正しいか
+    throughput            = 0.20;   // digits/sec
+    code_size             = 0.10;   // source LoC (小さい方が良い)
+    memory                = 0.10;   // working set
+    dev_effort            = 0.10;   // 拡張容易性 (reviewer scored)
+    implementability      = 0.10;   // 実装の容易さ
+  }
+
+  ranking {
+    strategy  = "fingerprint_only";
+    scenarios = ["compactness", "throughput", "extensibility"];
+    top_k     = 5;
+  }
+
+  // ─── レビュアー: ベースラインに値段を付ける ───────────────────────
+  reviewers {
+    reviewer Compactness {
+      persona = "あなたはコードコンパクトネスのレビュアーです。LoC, リテラル数, 補助宣言の少なさを 1 文で評価してください。";
+    }
+    reviewer Throughput {
+      persona = "あなたはマイクロベンチレビュアーです。10,000 桁を出力するのに何 ms かかるかを seeds で比較し, 'NEAR-OPT: <seed>' / 'GAP: <seed> Xx slower' で 1 文で答えてください。";
+    }
+    reviewer Extensibility {
+      persona = "あなたは設計拡張性レビュアーです。各 seed を Chudnovsky 公式 + 1 M 桁 に拡張する場合, データ層・並列化層・型情報のどれを書き直す必要があるかを 1 文で述べてください。";
+    }
+  }
+
+  // ─── Phase-1 への引き渡しメモ ─────────────────────────────────
+  handoff {
+    next_phase = "Pi_Phase1_OpenSearch.aice";
+    carry_over {
+      trend_vector       = "from bench/fitness_fingerprint.md (S2 dominant on throughput, S0 dominant on code-density-per-clock)";
+      elite_map_snapshot = "Pi_Phase0_LowLevelBaseline.elite_map.json";
+      open_axes_hint     = "precision_model and algorithm_family are under-explored: no seed uses interval_with_error or chudnovsky.";
+    }
+  }
+}

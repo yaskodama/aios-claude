@@ -1,0 +1,134 @@
+// ─────────────────────────────────────────────────────────────────────
+//  Pi_Phase1_OpenSearch.aice
+//
+//  Phase-0 は assembler / C / BASIC / Forth の seed individuals を
+//  cell マップに置いただけ. Phase-1 はその cell マップから出発し,
+//  「π を 10,000 桁求めるのに最適な言語の遺伝子」を MAP-Elites で
+//  オープンに探索する.  open_axes = true なので, スキーマに無い
+//  新軸 (例: tail_extraction_proof, big_endian_limbs, simd_intrinsics)
+//  を LLM 変異が提案する余地がある.
+//
+//  探索の戦略:
+//     - cell_axes に 5 軸 (paradigm, arithmetic_strategy,
+//       algorithm_family, precision_model, memory_layout) を取り,
+//       60 cells × 40 generations で広く撒く.
+//     - meta_fitness は cross_task_generality を低めにし
+//       (π 10k だけが目標なので) , trend_alignment と evolvability
+//       を主役に置く.
+//     - 評価タスクは 5 個: 速度 / メモリ / 桁数を変えたときの
+//       スケール / コード生成のしやすさ / 検証可能性.
+// ─────────────────────────────────────────────────────────────────────
+
+aice Pi_Phase1_OpenSearch {
+  dialect = "aice_evolution_v2";
+
+  task = "π を 10,000 桁求めるという 1 タスクに対して最適化された次世代プログラミング言語の遺伝子 (paradigm × arithmetic_strategy × algorithm_family × precision_model × memory_layout) を MAP-Elites で広域探索する. Phase-0 の 5 seeds を初期 elite として継承し, open_axes=true で新軸の提案も許容する.";
+
+  gene_schema = "schemas/pi_paradigm.schema.json";
+
+  seed_from {
+    phase            = "Pi_Phase0_LowLevelBaseline";
+    elite_map        = "Pi_Phase0_LowLevelBaseline.elite_map.json";
+    inherit_trend    = true;
+    promote_seeds    = ["S0_asm", "S1_C_spigot", "S2_C_machin", "S3_BASIC", "S4_Forth"];
+  }
+
+  // ─── 評価タスク: 1 ドメイン (= π 10k) を 5 切り口で見る ─────────
+  evaluation_tasks {
+    task Throughput_10k {
+      spec = "π を最初 10,000 桁求める. digits/sec を fitness に. 正答は 10,000 桁全一致を要求.";
+      weight = 0.30;
+    }
+    task ScaleTo_100k {
+      spec = "同じソースが N=100,000 桁にも適用できる (再コンパイル可). 計算時間が O(N^2) より緩やかであること.";
+      weight = 0.25;
+    }
+    task MemoryFootprint {
+      spec = "10,000 桁を出力する間の working set が 1 MB を超えない. 入出力は streaming で良い.";
+      weight = 0.15;
+    }
+    task ProvableCorrect {
+      spec = "ソースに 'last digit error < 0.5 ulp' を保証する型注釈 / refinement が書ける.";
+      weight = 0.15;
+    }
+    task TerseSource {
+      spec = "π を 10,000 桁出すソースが 30 LoC 未満で書けるほど primitive_set がリッチである.";
+      weight = 0.15;
+    }
+  }
+
+  // ─── MAP-Elites: 60 cells を 40 世代 ─────────────────────────────
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "paradigm, arithmetic_strategy, algorithm_family, precision_model, memory_layout";
+    generations = 40;
+    seed_count  = 12;        // Phase-0 の 5 + LLM-proposal の 7
+    open_axes   = true;
+    rng_seed    = 31415926;
+
+    operators_override {
+      mutations {
+        axis_resample            = 0.35;
+        coherent_paradigm_shift  = 0.20;
+        llm_proposal             = 0.20;
+        llm_new_axis             = 0.15;   // π 固有軸の発見を促す
+        algorithm_family_swap    = 0.10;   // spigot ↔ chudnovsky など
+      }
+      crossovers {
+        uniform                  = 0.35;
+        one_point                = 0.25;
+        llm_merge                = 0.30;
+        algorithm_layer_splice   = 0.10;   // 算法層だけ親A, データ層は親B
+      }
+    }
+  }
+
+  // ─── meta-fitness ────────────────────────────────────────────────
+  meta_fitness {
+    trend_alignment       = 0.25;   // Phase-0 trend を尊重
+    frontier_coverage     = 0.15;
+    novelty               = 0.20;   // 新軸提案を歓迎
+    evolvability          = 0.20;   // Phase-2 で深掘りできる方向
+    cross_task_generality = 0.05;   // 5 評価タスクは同 1 問の切り口
+    implementability      = 0.15;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["throughput_first", "footprint_first", "provability_first", "balanced"];
+    top_k     = 6;
+  }
+
+  // ─── レビュアー: 5 切り口の意味論を強制 ──────────────────────────
+  reviewers {
+    reviewer NumericCorrectness {
+      persona = "あなたは数値正確性レビュアーです。候補ゲノムが π=3.14159...の 10,000 桁全一致を保証する具体的な機構 (radix 選択 / guard digits / interval) を持つかを 1 文で答えてください。持たないなら 'NG: <欠けている機構>' を返してください。";
+    }
+    reviewer Scalability {
+      persona = "あなたはスケーラビリティレビュアーです。同じソースが N=100k 桁まで再コンパイルだけで通るか, それとも algorithm を書き換える必要があるかを 1 文で答えてください。";
+    }
+    reviewer Ergonomics {
+      persona = "あなたは言語設計エルゴノミクスのレビュアーです。10,000 桁を出すコードが 30 LoC で済む primitive_set / DSL 機能 (例: 'pi |> take 10000 |> emit') を持つかを 1 文で答えてください。";
+    }
+    reviewer Verifiability {
+      persona = "あなたは検証可能性レビュアーです。precision_model が 'last digit error < 0.5 ulp' を型 / refinement で表現できるかを 1 文で答えてください。'OK: <型表現>' / 'NG: <根拠>' で答えてください。";
+    }
+    reviewer NoveltyVsPhase0 {
+      persona = "あなたは Phase-0 ベースラインとの差分レビュアーです。候補が Phase-0 の 5 seeds より何において厳密に勝ち, 何において妥協しているかを 1 文で答えてください。";
+    }
+  }
+
+  // ─── Phase-2 への引き渡し: 高頻度勝者軸を pin する候補 ──────────
+  handoff {
+    next_phase = "Pi_Phase2_BignumRefinement.aice";
+    pin_winning_axes {
+      // 期待される候補 (探索後に書き換える) :
+      //   paradigm            = "Array_DSL"     // C より宣言的, BASIC より型がある
+      //   arithmetic_strategy = "binary_splitting"
+      //   precision_model     = "per_value_digits"
+      //   memory_layout       = "rope_segments"
+      // — これらが top-k に再頻出した場合 Phase-2 で固定する.
+      criteria = "axis value appearing in >= 4 of the top-6 elites for two consecutive generations";
+    }
+  }
+}

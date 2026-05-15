@@ -1,0 +1,117 @@
+// ─────────────────────────────────────────────────────────────────────
+//  Pi_PiLang_Final.aice
+//
+//  Phase-2 が Pareto frontier から選んだ単一エリートを「PiLang」と
+//  名付け, その言語仕様の固定点を宣言する.  この .aice は MAP-Elites
+//  を回さない — generations=0. 役割は次の 3 つ:
+//
+//    1. PiLang の遺伝子型 (全 12 軸の最終値) を凍結する.
+//    2. PiLang のサンプルソース (π=3.14159... の 10,000 桁を 3 行で
+//       書ける証拠) を埋め込む.
+//    3. PiLang 処理系を実装するためのバックエンド・hand-off ノート
+//       (どの LLVM 機能 / どの bignum ライブラリと整合するか) を残す.
+// ─────────────────────────────────────────────────────────────────────
+
+aice Pi_PiLang_Final {
+  dialect = "aice_evolution_v2";
+
+  task = "π を 10,000 桁求めるタスクに最適化された言語『PiLang』の最終仕様を宣言する. Phase-0 (低レベル基準) → Phase-1 (60 cells open search) → Phase-2 (収束軸 pin + 自由軸絞り込み) の進化軌跡を経て選ばれた単一エリートを言語として凍結する.";
+
+  gene_schema = "schemas/pi_paradigm.schema.json";
+
+  // ─── 凍結された PiLang ゲノム ────────────────────────────────────
+  frozen_genome {
+    // Phase-1 で収束した 4 軸
+    paradigm            = "Array_DSL";
+    arithmetic_strategy = "binary_splitting";
+    algorithm_family    = "chudnovsky";
+    precision_model     = "per_value_digits";
+
+    // Phase-2 で選ばれた 5 自由軸
+    memory_layout       = "rope_segments";
+    ownership_model     = "region";          // 中間 limb_array は region 局所
+    type_safety         = "refinement";      // {x:Real | digits(x) >= N}
+    primitive_set       = "stream_combinators";
+    extraction_mode     = "streaming_digits";
+
+    // Phase-1 で open_axes が発見し Phase-2 でチューンした 3 新軸
+    proof_obligation_at_compile_time = true;
+    guard_digits_strategy            = "plus_log2N";   // n_guard = ceil(log2 N)
+    simd_lanes                       = "x8_32bit";     // AVX2 limb pack
+
+    // Phase-0 から継承する低レベル支援軸
+    concurrency_model = "data_parallel";    // binary splitting 葉並列化
+    effect_handling   = "monadic";          // IO emit はモナド
+  }
+
+  // ─── PiLang コア構文 (Phase-2 reviewer DSLEconomy が満たした形) ─
+  pi_lang_syntax {
+    // PiLang は 1 ファイル = 1 計算. 3 行で 10,000 桁が書ける.
+    // (見やすさのため heredoc の代わりにエスケープ付き文字列で持たせる)
+    sample_program = "pi : Real with digits = 10_000  with guard = +log2 N\n   = chudnovsky |> binary_splitting |> emit\n";
+
+    // 上 1 行は次の中間表現に脱糖される.
+    desugared_to = "let n      : Nat                  = 10_000\nlet g      : Nat                  = ceil(log2(n))\nlet limbs  : Region[Limb[u32], n] = region { chudnovsky.bsplit(0, n + g) }\nlet digits : Stream[Digit, n]     = limbs |> to_decimal_stream\nemit digits   -- proof obligation: |last_digit - true| < 0.5 ulp\n";
+
+    primitives {
+      chudnovsky        = "1/π = 12 Σ ((-1)^k (6k)! (545140134k+13591409)) / ((3k)! k!^3 640320^(3k+3/2))";
+      binary_splitting  = "(P,Q,T) を分割統治で結合; depth = ceil(log2 N)";
+      to_decimal_stream = "rope_segments を streaming で base 10 へ";
+      emit              = "Stream[Digit, n] → IO ()  (monadic)";
+      region_block      = "region { ... } はブロック終了で領域内 limb_array を一括解放";
+    }
+
+    type_system {
+      refinement_example = "{ x : Real | digits(x) >= N }  と  { x : Real | error(x) < 0.5 ulp_at(N) }";
+      guard_obligation   = "guard = +log2 N の値は compile-time に解決され, kernel は guarded N+g 桁で動く.";
+      simd_lowering      = "Limb[u32] x8_32bit は AVX2 _mm256_mullo/_mm256_add に下げられる.";
+    }
+  }
+
+  // ─── PiLang 処理系のバックエンド指示 ────────────────────────────
+  backend {
+    target          = "LLVM 17 + libgmp の mpn_*  (= radix 2^32 ABI 互換)";
+    region_to_LLVM  = "lifetime-pin した alloca / arena pool";
+    simd_to_LLVM    = "<8 x i32> intrinsics; fallback to scalar on non-AVX2";
+    stream_to_LLVM  = "tail-position emit を putchar / write(2) buffered I/O に lowering";
+    proof_check     = "refinement subtype は Z3 へ delegate; 失敗時はコンパイルエラー";
+  }
+
+  // ─── 進化軌跡の総括 (ここが評価対象でない記述ブロック) ──────────
+  evolution_trace {
+    phase_0 = "5 種 (asm / C / C+bignum / BASIC / Forth) を seeds として登録.";
+    phase_1 = "60 cells × 40 generations の open_axes 探索で paradigm=Array_DSL, arithmetic=binary_splitting, algorithm=chudnovsky, precision=per_value_digits の 4 軸が収束 (4/6 top-elites).";
+    phase_2 = "残 5 自由軸 + 3 新軸 (proof_obligation, guard_digits, simd_lanes) を 30 generations で絞り込み, ProvableCorrect ∧ Throughput ∧ TerseSource の Pareto 頂点を選択.";
+    final   = "PiLang は 'Array_DSL × refinement-typed × region-owned × streaming' という 4 つ巴の交点として生まれた. 古典低レベル言語の sweet-spot からは見えない設計点.";
+  }
+
+  // ─── 評価フェーズ自体は実行しない (これは spec の凍結) ──────────
+  search {
+    algorithm   = "frozen";
+    generations = 0;
+    seed_count  = 1;
+    open_axes   = false;
+    rng_seed    = 0;
+  }
+
+  meta_fitness {
+    // 唯一の elite を凍結したので fitness は固定. 参考値:
+    trend_alignment       = 1.00;
+    frontier_coverage     = 1.00;
+    novelty               = 0.85;
+    evolvability          = 0.40;
+    cross_task_generality = 0.55;   // π 専用言語なので意図的に低い
+    implementability      = 0.80;
+  }
+
+  ranking { strategy = "fixed_single"; scenarios = ["spec_complete"]; top_k = 1; }
+
+  reviewers {
+    reviewer SpecCompleteness {
+      persona = "あなたは仕様完備性レビュアーです。frozen_genome と pi_lang_syntax と backend の 3 ブロックだけで, 別チームが PiLang コンパイラを実装できるか 1 文で答えてください.";
+    }
+    reviewer PiLangSelfTest {
+      persona = "あなたはセルフテストレビュアーです。pi_lang_syntax.sample_program (3 行) が π の最初 10,000 桁を正しく出すと信じられるか, 怪しい場合はどの primitive が未定義かを 1 文で答えてください.";
+    }
+  }
+}

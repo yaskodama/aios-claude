@@ -1,0 +1,136 @@
+{
+  "name": "pi_paradigm",
+  "extends": "../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "axes": {
+    "paradigm": [
+      "assembler",
+      "BASIC",
+      "C",
+      "Forth",
+      "C_with_bignum_lib",
+      "Functional",
+      "FunctionalOOP",
+      "Array_DSL",
+      "Stream_DSL"
+    ],
+    "state_representation": [
+      "register_int",
+      "global_num",
+      "limb_array",
+      "fixed_point_rational",
+      "ADT",
+      "lazy_stream",
+      "symbol_owned"
+    ],
+    "type_safety": [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "refinement",
+      "dependent"
+    ],
+    "ownership_model": [
+      "none",
+      "gc",
+      "rc",
+      "region",
+      "borrow_check",
+      "linear"
+    ],
+    "concurrency_model": [
+      "none",
+      "threads_locks",
+      "csp_channels",
+      "structured",
+      "data_parallel",
+      "gpu_kernels"
+    ],
+    "effect_handling": [
+      "implicit",
+      "monadic",
+      "algebraic_effects",
+      "capability"
+    ],
+
+    "arithmetic_strategy": [
+      "scalar_int",
+      "spigot_digit",
+      "multilimb_radix2_32",
+      "multilimb_radix10_9",
+      "fft_multiply",
+      "binary_splitting",
+      "gpu_ntt"
+    ],
+    "precision_model": [
+      "implicit",
+      "global_digits_const",
+      "per_value_digits",
+      "interval_with_error",
+      "refinement_typed",
+      "dependent_typed"
+    ],
+    "memory_layout": [
+      "static_array",
+      "heap_array",
+      "arena",
+      "rope_segments",
+      "lazy_stream_chunks",
+      "mmap_paged"
+    ],
+    "algorithm_family": [
+      "leibniz",
+      "machin",
+      "ramanujan",
+      "chudnovsky",
+      "bbp",
+      "gauss_legendre",
+      "spigot",
+      "borwein_quartic"
+    ],
+    "primitive_set": [
+      "register_ops",
+      "stack_ops",
+      "array_ops",
+      "limb_ops_intrinsic",
+      "ring_Z_p",
+      "ring_Q",
+      "field_R_eps",
+      "stream_combinators"
+    ],
+    "extraction_mode": [
+      "compute_all_then_print",
+      "streaming_digits",
+      "random_access_digit",
+      "incremental_refinement"
+    ]
+  },
+  "ordinal_axes": {
+    "type_safety":          ["none","low","medium","high","refinement","dependent"],
+    "precision_model":      ["implicit","global_digits_const","per_value_digits","interval_with_error","refinement_typed","dependent_typed"],
+    "arithmetic_strategy":  ["scalar_int","spigot_digit","multilimb_radix2_32","multilimb_radix10_9","binary_splitting","fft_multiply","gpu_ntt"],
+    "ownership_model":      ["none","gc","rc","region","borrow_check","linear"]
+  },
+  "coherence": [
+    {"if": {"paradigm": "assembler"},
+     "then": {"type_safety": "none", "ownership_model": "none", "precision_model": "implicit"}},
+    {"if": {"paradigm": "BASIC"},
+     "then_in": {"arithmetic_strategy": ["scalar_int","spigot_digit"]}},
+    {"if": {"arithmetic_strategy": "fft_multiply"},
+     "then_in": {"memory_layout": ["heap_array","arena","mmap_paged"]}},
+    {"if": {"arithmetic_strategy": "gpu_ntt"},
+     "then_in": {"concurrency_model": ["data_parallel","gpu_kernels"]}},
+    {"if": {"algorithm_family": "chudnovsky"},
+     "then_in": {"arithmetic_strategy": ["multilimb_radix2_32","binary_splitting","fft_multiply","gpu_ntt"]}},
+    {"if": {"algorithm_family": "bbp"},
+     "then_in": {"extraction_mode": ["random_access_digit","streaming_digits"]}},
+    {"if": {"algorithm_family": "spigot"},
+     "then_in": {"arithmetic_strategy": ["spigot_digit","scalar_int"]}},
+    {"if": {"precision_model": "interval_with_error"},
+     "then_min": {"type_safety": "medium"}},
+    {"if": {"precision_model": "dependent_typed"},
+     "then_min": {"type_safety": "dependent"}}
+  ],
+  "open_axes": true,
+  "notes": "Schema is the v2 paradigm schema extended with five π-specific axes (arithmetic_strategy, precision_model, memory_layout, algorithm_family, primitive_set) plus extraction_mode. Coherence rules forbid combinations the MAP-Elites mutator would otherwise produce but no compiler could realize (e.g. BBP without random-access extraction)."
+}

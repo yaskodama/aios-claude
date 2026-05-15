@@ -1,0 +1,107 @@
+{
+  "name": "Pi_Phase0_LowLevelBaseline",
+  "task": "π を 10,000 桁求めるという固定タスクに対し, 既存の低レベル言語で書かれた 4 実装 (assembler / C / C+bignum / BASIC / Forth) を seed として MAP-Elites の cell マップに登録し, 各実装の fitness fingerprint (digits/sec, LoC, working set, dev-effort) を計測して Phase-1 以降の基準とする.",
+  "schema_ref": "schemas/pi_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm",
+      "arithmetic_strategy",
+      "precision_model"
+    ],
+    "generations": 0,
+    "seed_count": 5,
+    "open_axes": false,
+    "rng_seed": 314159
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "PiSpigotAsm",
+      "PiSpigotC",
+      "PiMachinCBignum",
+      "PiSpigotBASIC",
+      "PiSpigotForth"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "Compactness",
+        "persona": "あなたはコードコンパクトネスのレビュアーです。LoC, リテラル数, 補助宣言の少なさを 1 文で評価してください。",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Throughput",
+        "persona": "あなたはマイクロベンチレビュアーです。10,000 桁を出力するのに何 ms かかるかを seeds で比較し, 'NEAR-OPT: <seed>' / 'GAP: <seed> Xx slower' で 1 文で答えてください。",
+        "weight": 0.3333333333333333
+      },
+      {
+        "name": "Extensibility",
+        "persona": "あなたは設計拡張性レビュアーです。各 seed を Chudnovsky 公式 + 1 M 桁 に拡張する場合, データ層・並列化層・型情報のどれを書き直す必要があるかを 1 文で述べてください。",
+        "weight": 0.3333333333333333
+      }
+    ]
+  },
+  "meta_fitness": {
+    "correctness": 0.4,
+    "throughput": 0.2,
+    "code_size": 0.1,
+    "memory": 0.1,
+    "dev_effort": 0.1,
+    "implementability": 0.1
+  },
+  "ranking": {
+    "strategy": "fingerprint_only",
+    "scenarios": [
+      "compactness",
+      "throughput",
+      "extensibility"
+    ],
+    "scenario_weights": {
+      "compactness": {},
+      "throughput": {},
+      "extensibility": {}
+    },
+    "top_k": 5
+  }
+}

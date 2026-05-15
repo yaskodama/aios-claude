@@ -87,9 +87,41 @@ def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
 
     n_reviewers = len(reviewers)
     reviewer_init_args = ", ".join(f"rev{i}" for i in range(1, n_reviewers + 1))
-    reviewer_count = max(1, n_reviewers)
-    if not reviewers:
-        reviewer_init_args = "0, 0, 0"
+
+    # Build the Evaluator class with exactly n_reviewers slots so that
+    # `new Evaluator(rev1..revN)` matches init's arity for any N >= 0.
+    # (Previously hard-coded to 3 slots, which warned for N != 3.)
+    if n_reviewers == 0:
+        evaluator_class_block = (
+            "class Evaluator {\n"
+            "  method init() { reply(0); }\n"
+            "  method score_for_task(genome, profile) { reply(0.0); }\n"
+            "}"
+        )
+    else:
+        field_decls = "\n".join(f"  var r{i} = 0;" for i in range(1, n_reviewers + 1))
+        init_params = ", ".join(f"rev{i}" for i in range(1, n_reviewers + 1))
+        init_assigns = "\n".join(f"    r{i} = rev{i};" for i in range(1, n_reviewers + 1))
+        fanout_lines: list[str] = []
+        for i in range(1, n_reviewers + 1):
+            fanout_lines.append(f"    var f{i} = future r{i}.score(genome, profile);")
+        for i in range(1, n_reviewers + 1):
+            fanout_lines.append(f"    var s{i} = await(f{i});")
+            fanout_lines.append(f"    var w{i} = now r{i}.get_weight();")
+        combined_expr = " + ".join(f"s{i} * w{i}" for i in range(1, n_reviewers + 1))
+        evaluator_class_block = (
+            "class Evaluator {\n"
+            + field_decls + "\n\n"
+            + f"  method init({init_params}) {{\n"
+            + init_assigns + "\n"
+            + "  }\n\n"
+            + "  method score_for_task(genome, profile) {\n"
+            + "\n".join(fanout_lines) + "\n"
+            + f"    var combined = {combined_expr};\n"
+            + "    reply(combined);\n"
+            + "  }\n"
+            + "}"
+        )
 
     eval_tasks_csv = ",".join(eval_tasks)
 
@@ -463,40 +495,12 @@ class Reviewer {{
 }}
 
 // --------------------------------------------------------------------
-// Evaluator — fans out reviewer scoring with `future`, awaits, aggregates
+// Evaluator — fans out reviewer scoring with `future`, awaits, aggregates.
+// The class is codegen'd with exactly n_reviewers slots (see
+// aipl_codegen.py) so init() arity matches the bootstrap call for any N.
 // --------------------------------------------------------------------
 
-class Evaluator {{
-  var r1 = 0;
-  var r2 = 0;
-  var r3 = 0;
-  var n_revs = 0;
-
-  method init(rev1, rev2, rev3, n) {{
-    r1 = rev1;
-    r2 = rev2;
-    r3 = rev3;
-    n_revs = n;
-  }}
-
-  method score_for_task(genome, profile) {{
-    if (n_revs >= 1) {{
-      var f1 = future r1.score(genome, profile);
-      var s1 = await(f1);
-      var f2 = future r2.score(genome, profile);
-      var s2 = await(f2);
-      var f3 = future r3.score(genome, profile);
-      var s3 = await(f3);
-      var w1 = now r1.get_weight();
-      var w2 = now r2.get_weight();
-      var w3 = now r3.get_weight();
-      var combined = s1 * w1 + s2 * w2 + s3 * w3;
-      reply(combined);
-    }} else {{
-      reply(0.0);
-    }}
-  }}
-}}
+{evaluator_class_block}
 
 // --------------------------------------------------------------------
 // EliteMap — cell -> champion id mapping with parallel arrays
@@ -718,7 +722,7 @@ var lineage = new Lineage();
 var profiles = new TaskProfiles();
 
 {reviewer_decls_block}
-var eval_actor = new Evaluator({reviewer_init_args}, {reviewer_count});
+var eval_actor = new Evaluator({reviewer_init_args});
 var worker = new Worker(util, eval_actor, profiles);
 var coord = new Coordinator(util, generator, eval_actor, elite, lineage, profiles, worker);
 send coord.run();
