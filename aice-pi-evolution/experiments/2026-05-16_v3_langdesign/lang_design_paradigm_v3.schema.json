@@ -1,0 +1,105 @@
+{
+  "name": "lang_design_paradigm_v3",
+  "extends": null,
+  "_comment": "v2 lang_design_paradigm を継承して coherence rules を 4 件追加。実在しない言語の組合せ (refinement+c_like, dependent+python_like 等) を変異が生まないようにする。R6_RealWorldPrecedent reviewer と組み合わせて hard floor を構成する。",
+
+  "axes": {
+    "paradigm":               ["imperative", "functional", "dataflow", "term_rewriting",
+                                "declarative_equation", "oo", "hybrid_imperative_functional"],
+    "evaluation_strategy":    ["strict", "lazy", "call_by_need", "call_by_name"],
+    "type_system":            ["dynamic", "static_simple", "hindley_milner",
+                                "refinement", "dependent"],
+    "arithmetic_primitives":  ["arbitrary_int", "arbitrary_int_plus_rational",
+                                "decimal_with_precision", "real_with_precision_annotation",
+                                "interval_arithmetic", "dependent_precision"],
+    "precision_control":      ["implicit", "global_const", "per_value_annotation",
+                                "automatic_inference", "proof_obligation"],
+    "control_flow":           ["structured_loops", "general_recursion",
+                                "tail_call_only", "pattern_match_fold",
+                                "list_comprehension", "monadic_bind"],
+    "termination_check":      ["none", "structural_recursion", "well_founded", "totality"],
+    "memory_management":      ["manual", "gc", "region_typed", "rc", "linear", "borrow_check"],
+    "io_model":               ["print_only", "stream_emit", "file_io_imperative",
+                                "region_owned_output", "monadic_io"],
+    "syntax_family":          ["c_like", "ml_like", "lisp_like", "apl_like",
+                                "haskell_like", "python_like", "prolog_like",
+                                "custom_minimal"],
+    "abstraction":            ["bare_metal", "libc", "vm_minimal", "stdlib_rich"],
+    "compilation_target":     ["tree_walker_interpreter", "bytecode_vm"]
+  },
+
+  "ordinal_axes": {
+    "type_system":          ["dynamic", "static_simple", "hindley_milner",
+                              "refinement", "dependent"],
+    "arithmetic_primitives":["arbitrary_int", "arbitrary_int_plus_rational",
+                              "decimal_with_precision", "real_with_precision_annotation",
+                              "interval_arithmetic", "dependent_precision"],
+    "termination_check":    ["none", "structural_recursion", "well_founded", "totality"],
+    "abstraction":          ["bare_metal", "libc", "vm_minimal", "stdlib_rich"],
+    "compilation_target":   ["tree_walker_interpreter", "bytecode_vm"]
+  },
+
+  "coherence": [
+    {"_comment": "v2 から継承: 依存型は tree_walker 限定",
+     "if": {"type_system": "dependent"}, "then": {"compilation_target": "tree_walker_interpreter"}},
+    {"_comment": "v2 から継承: 依存型は ML/Haskell/Lisp 系のみ",
+     "if": {"type_system": "dependent"},
+     "then_in": {"syntax_family": ["ml_like", "haskell_like", "lisp_like"]}},
+    {"_comment": "v2 から継承: totality は依存型必須",
+     "if": {"termination_check": "totality"}, "then": {"type_system": "dependent"}},
+    {"_comment": "v2 から継承: imperative は loop/再帰必須",
+     "if": {"paradigm": "imperative"},
+     "then_in": {"control_flow": ["structured_loops", "general_recursion", "tail_call_only"]}},
+    {"_comment": "v2 から継承: functional は GC/region/linear 等",
+     "if": {"paradigm": "functional"},
+     "then_in": {"memory_management": ["gc", "rc", "region_typed", "linear", "borrow_check"]}},
+    {"_comment": "v2 から継承: OO は GC/RC",
+     "if": {"paradigm": "oo"}, "then_in": {"memory_management": ["gc", "rc"]}},
+    {"_comment": "v2 から継承: dependent_precision は refinement/dependent 型必須",
+     "if": {"arithmetic_primitives": "dependent_precision"},
+     "then_in": {"type_system": ["refinement", "dependent"]}},
+    {"_comment": "v2 から継承: monadic bind は関数型のみ",
+     "if": {"control_flow": "monadic_bind"},
+     "then_in": {"paradigm": ["functional", "hybrid_imperative_functional"]}},
+    {"_comment": "v2 から継承: lazy は関数型のみ",
+     "if": {"evaluation_strategy": "lazy"},
+     "then_in": {"paradigm": ["functional", "hybrid_imperative_functional"]}},
+    {"_comment": "v2 から継承: bytecode_vm は libc 以上",
+     "if": {"compilation_target": "bytecode_vm"},
+     "then_in": {"abstraction": ["libc", "vm_minimal", "stdlib_rich"]}},
+    {"_comment": "v2 から継承: term_rewriting は lisp/ml/minimal",
+     "if": {"paradigm": "term_rewriting"},
+     "then_in": {"syntax_family": ["lisp_like", "ml_like", "custom_minimal"]}},
+    {"_comment": "v2 から継承: proof_obligation は強い型必須",
+     "if": {"precision_control": "proof_obligation"},
+     "then_in": {"type_system": ["refinement", "dependent"]}},
+
+    {"_comment": "v3 新規 (A): c_like syntax は dependent/refinement 型と歴史的に共存しない",
+     "if": {"syntax_family": "c_like"},
+     "then_in": {"type_system": ["dynamic", "static_simple", "hindley_milner"]}},
+
+    {"_comment": "v3 新規 (B): lisp_like syntax は関数型/書換系/混成のみ (= LISP/Scheme/Clojure/Mathematica)",
+     "if": {"syntax_family": "lisp_like"},
+     "then_in": {"paradigm": ["functional", "term_rewriting", "hybrid_imperative_functional"]}},
+
+    {"_comment": "v3 新規 (C): prolog_like syntax は logic / declarative / 書換系のみ",
+     "if": {"syntax_family": "prolog_like"},
+     "then_in": {"paradigm": ["declarative_equation", "term_rewriting"]}},
+
+    {"_comment": "v3 新規 (D): apl_like syntax は配列指向 (dataflow / functional)",
+     "if": {"syntax_family": "apl_like"},
+     "then_in": {"paradigm": ["dataflow", "functional"]}},
+
+    {"_comment": "v3 新規 (E): python_like syntax は OO/hybrid/imperative (dynamic 型が普通)",
+     "if": {"syntax_family": "python_like"},
+     "then_in": {"paradigm": ["imperative", "oo", "hybrid_imperative_functional"]}},
+
+    {"_comment": "v3 新規 (F): haskell_like syntax は関数型 + lazy 寄り (Haskell, Idris, …)",
+     "if": {"syntax_family": "haskell_like"},
+     "then_in": {"paradigm": ["functional"]}}
+  ],
+
+  "open_axes": false,
+
+  "notes": "v2 schema (12 axes, 12 coherence rules) + v3 で 6 件追加 (合計 18 件)。新規 6 件はすべて syntax_family ↔ paradigm の整合性を強める方向。R6_RealWorldPrecedent reviewer (.aice 内) と二段構えで現実性を担保する。"
+}

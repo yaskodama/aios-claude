@@ -699,6 +699,11 @@ class Coordinator {{
       var cscore = now worker.compute_score(child, task_csv);
       send lineage.add(cid, child, "", cscore, gen, op, ccell);
       send elite.propose(ccell, cid, child, cscore);
+      // crash-recovery: flush lineage every generation so silent SDK
+      // hangs (cf. Pi_Phase1_OpenSearch v3 attempt 2026-05-16) do not
+      // lose the partial result.  Cost: one fs write per generation.
+      var ckpt_n = now lineage.dump({_abcl_string(out_lineage_path)});
+      print("[ckpt gen=" + gen + "] flushed " + ckpt_n + " individuals");
       gen = gen + 1;
     }}
 

@@ -1,0 +1,275 @@
+# ─────────────────────────────────────────────────────────────────────
+#  LangDesign_Expressive_v3.aice  (案1 YAML)
+#  Series: v3 (parent: v2 LangDesign_Expressive)
+#
+#  v2 で観測した 3 つの reviewer 弱点を直す:
+#    (a) 実在しない言語組合せの混入 (例: c_like + refinement type)
+#        → coherence rules 4 件追加
+#    (b) R5_Generality が「推測で答える」だけで実コード生成が無い
+#        → R5 persona に各 task が要求する primitive を明示し、
+#          axes との照合を 1 タスク 1 行で書かせる
+#    (c) reviewer 5 名の hard-floor 不在 (どの軸も 0 でも全体 0.7 出ていた)
+#        → R6_RealWorldPrecedent を新設し、現実に存在する言語の組合せ
+#          (OCaml-shape, Python-shape, Lisp-shape, Haskell-shape, …)
+#          に該当するかを 0.0/0.5/1.0 で答えさせる。これが 0.0 なら
+#          最終スコアを 0 にする hard floor として運用する。
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: LangDesign_Expressive_v3
+  parent: LangDesign_Expressive_v2
+  version: 0.2.0
+  authors: [yaskodama]
+  created: 2026-05-16
+  description: |
+    v2 と同じ 12 軸の言語デザイン探索を、より厳しい coherence rules と
+    R6_RealWorldPrecedent (現実性チェック) で絞り込んで再実行する。
+    狙いは v2 top 5 に混じった 「実在しない言語の組合せ」 を排除し、
+    実装が現実的で 6 task をすべて書ける言語の遺伝子を発見すること。
+
+context:
+  workdir: aice-pi-evolution/experiments/2026-05-16_v3_langdesign/
+  v2_baseline:
+    max_score: 0.700           # I35 (functional+refinement+c_like — 実装非現実)
+    median_score: 0.508
+    top5_suspicious_features:
+      - "I35: refinement + real_with_precision_annotation + c_like"
+      - "I17: term_rewriting + arbitrary_int_plus_rational + custom_minimal"
+      - "I19/I30: openai (real provider) + claude-haiku (cross-vendor model)"
+  v3_changes:
+    - "coherence: c_like ⇒ type_system ∈ {dynamic, static_simple, hindley_milner}"
+    - "coherence: lisp_like ⇒ paradigm ∈ {functional, term_rewriting, hybrid_imperative_functional}"
+    - "coherence: prolog_like ⇒ paradigm ∈ {declarative_equation, term_rewriting}"
+    - "coherence: apl_like  ⇒ paradigm ∈ {dataflow, functional}"
+    - "reviewer R5 を 6 task × axes 照合の具体的 probing に書き換え"
+    - "reviewer R6_RealWorldPrecedent を追加 (weight 0.10) で hard floor"
+
+# ─── 目的関数 (v2 とほぼ同) ──────────────────────────────────────
+goal:
+  maximize:
+    - algorithm_expressivity_score
+    - generality_count
+    - minimality_score
+    - real_world_precedent       # 新: 既存言語に該当するか
+  minimize:
+    - lines_per_task_median
+    - host_implementation_size
+    - unrealistic_combinations   # 新: coherence で防いだ後の残存
+
+  scalar_fitness:
+    formula: |
+      real_world_floor *
+      (0.25 * normalize(generality_count, [0, 6])
+       + 0.25 * normalize(algorithm_expressivity_score, [0.0, 1.0])
+       + 0.15 * (1 - normalize(lines_per_task_median, [3, 200]))
+       + 0.15 * normalize(minimality_score, [0.0, 1.0])
+       + 0.10 * (1 - normalize(host_implementation_size, [500, 5000]))
+       + 0.10 * normalize(real_world_precedent, [0.0, 1.0]))
+    bounds: [0.0, 1.0]
+    note: "real_world_floor は R6 が 0 を返したら 0、>0 なら 1。hard floor。"
+
+constraints:
+  must_express_pi_chudnovsky_bsplit: true
+  must_express_factorial:            true
+  must_be_implementable:             true
+  must_have_real_world_precedent:    true   # 新
+  host_implementation_size: {max: 5000}
+  lines_per_task_median:    {max: 200}
+
+# ─── 探索変数 (v2 と同じ 12 軸、schema 側で coherence を強化) ────
+variables:
+  paradigm:
+    type: enum
+    values: [imperative, functional, dataflow, term_rewriting,
+             declarative_equation, oo, hybrid_imperative_functional]
+    default: functional
+    cell_axis: true
+  evaluation_strategy:
+    type: enum
+    values: [strict, lazy, call_by_need, call_by_name]
+    default: strict
+  type_system:
+    type: enum
+    values: [dynamic, static_simple, hindley_milner, refinement, dependent]
+    default: static_simple
+    cell_axis: true
+  arithmetic_primitives:
+    type: enum
+    values: [arbitrary_int, arbitrary_int_plus_rational, decimal_with_precision,
+             real_with_precision_annotation, interval_arithmetic, dependent_precision]
+    default: arbitrary_int_plus_rational
+    cell_axis: true
+  precision_control:
+    type: enum
+    values: [implicit, global_const, per_value_annotation,
+             automatic_inference, proof_obligation]
+    default: per_value_annotation
+  control_flow:
+    type: enum
+    values: [structured_loops, general_recursion, tail_call_only,
+             pattern_match_fold, list_comprehension, monadic_bind]
+    default: general_recursion
+    cell_axis: true
+  termination_check:
+    type: enum
+    values: [none, structural_recursion, well_founded, totality]
+    default: none
+  memory_management:
+    type: enum
+    values: [manual, gc, region_typed, rc, linear, borrow_check]
+    default: gc
+  io_model:
+    type: enum
+    values: [print_only, stream_emit, file_io_imperative,
+             region_owned_output, monadic_io]
+    default: stream_emit
+  syntax_family:
+    type: enum
+    values: [c_like, ml_like, lisp_like, apl_like, haskell_like,
+             python_like, prolog_like, custom_minimal]
+    default: ml_like
+    cell_axis: true
+  abstraction:
+    type: enum
+    values: [bare_metal, libc, vm_minimal, stdlib_rich]
+    default: vm_minimal
+  compilation_target:
+    type: enum
+    values: [tree_walker_interpreter, bytecode_vm]
+    default: tree_walker_interpreter
+
+# ─── 評価タスク (v2 と同じ 6 task) ──────────────────────────────
+evaluation:
+  use_ai: true
+  evaluator: Evaluator
+  tasks:
+    - PiChudnovskyBsplit
+    - FactorialN
+    - QuicksortInPlace
+    - FFTMultiply
+    - MatmulNCubed
+    - FibonacciClosedForm
+  task_specs:
+    PiChudnovskyBsplit: { weight: 0.30, hard: true }
+    FactorialN:         { weight: 0.15, hard: true }
+    QuicksortInPlace:   { weight: 0.10 }
+    FFTMultiply:        { weight: 0.10 }
+    MatmulNCubed:       { weight: 0.10 }
+    FibonacciClosedForm: { weight: 0.10 }
+
+  reviewers:
+    - name:    R1_AlgorithmExpressivity
+      weight:  0.25
+      persona: |
+        あなたは R1 (アルゴリズム表現力) を判定するレビュアーです。候補の
+        12 軸を見て、Chudnovsky binary-splitting が当該言語の構文だけで
+        書けるか判定してください。基準: 50 行以内 → 1.0、100 行以内 → 0.7、
+        200 行以内 → 0.3、書けない → 0.0。0.0-1.0 の decimal で半角数字 1
+        つだけ返してください。
+
+    - name:    R2_ArbitraryPrecisionSafety
+      weight:  0.20
+      persona: |
+        あなたは R2 (任意精度安全性) を判定するレビュアーです。arithmetic_primitives
+        と precision_control を見て、N=10000 桁の正確計算が型で保証されるか
+        を判定。1.0 = arbitrary_int_plus_rational 以上 + per_value_annotation
+        以上、0.7 = arbitrary 系 + implicit/global_const、0.3 = decimal_with_precision
+        のみ、0.0 = それ以下。0.0-1.0 で答えてください。
+
+    - name:    R3_RecursionAndIteration
+      weight:  0.15
+      persona: |
+        あなたは R3 (制御フロー) を判定するレビュアーです。control_flow と
+        termination_check が、binary tree 再帰 (Chudnovsky bsplit) と loop
+        (FFT, matmul) の両方を表現できるか判定。1.0 = general_recursion か
+        structured_loops の両方を満たす配置、0.7 = tail_call_only など制約
+        付き、0.3 = pattern_match_fold のみ、0.0 = list_comprehension のみ。
+        0.0-1.0 で答えてください。
+
+    - name:    R4_ImplementabilityFeasibility
+      weight:  0.15
+      persona: |
+        あなたは R4 (ホスト実装可能性) を判定するレビュアーです。compilation_target,
+        syntax_family, type_system, paradigm の組合せが Python ホストで
+        500-3000 行の interpreter として書けるか判定。1.0 = tree_walker +
+        ml_like/c_like/python_like + dynamic/static_simple/hindley_milner、
+        0.7 = bytecode_vm + 単純型 (3000 行以内)、0.3 = dependent 型 (5000 行
+        近い)、0.0 = bytecode_vm + dependent 型のような重複した複雑さ。
+        0.0-1.0 で答えてください。
+
+    - name:    R5_Generality
+      weight:  0.15
+      persona: |
+        あなたは R5 (汎用性) を判定するレビュアーです。各 task が要求する
+        primitive を以下に列挙し、当該言語の軸との一致を数えてください:
+        (1) PiChudnovskyBsplit: arbitrary_int_plus_rational 以上 + 再帰
+            (general_recursion / tail_call_only / pattern_match_fold) + Real sqrt
+        (2) FactorialN: arbitrary_int 以上 + 再帰 OR loop
+        (3) QuicksortInPlace: 可変配列 OR ref + 再帰
+            (memory_management が manual/borrow_check/rc/region なら可、gc/linear なら可、
+             それ以外は配列必要)
+        (4) FFTMultiply: arrays + 複素数 (complex.csv 型必要、interval_arithmetic で代替可)
+            + 再帰
+        (5) MatmulNCubed: 2D array + 3 重 loop (structured_loops 必要)
+        (6) FibonacciClosedForm: 代数的数 OR 行列累乗 (refinement/dependent 型で表現可)
+        満たすタスク数 / 6 を 0.0-1.0 で返してください。
+
+    - name:    R6_RealWorldPrecedent
+      weight:  0.10
+      persona: |
+        あなたは R6 (現実世界の先例) を判定するレビュアーです。候補の遺伝子
+        (12 軸) が、現実に存在するプログラミング言語 のうちどれに近いか
+        を判定する。以下の「先例マッチング」表を参照:
+          - OCaml shape:    functional + hindley_milner + arbitrary_int(_plus_rational) + general_recursion + ml_like
+          - Haskell shape:  functional + hindley_milner + arbitrary_int(_plus_rational) + lazy + haskell_like
+          - Python shape:   hybrid + dynamic + arbitrary_int + structured_loops + python_like
+          - Common Lisp:    functional/hybrid + dynamic + arbitrary_int_plus_rational + general_recursion + lisp_like
+          - Scheme:         functional + dynamic + arbitrary_int_plus_rational + tail_call_only + lisp_like
+          - Clojure:        functional + dynamic + arbitrary_int_plus_rational + general_recursion + lisp_like
+          - SML:            functional + hindley_milner + arbitrary_int + general_recursion + ml_like
+          - Idris/Agda/Coq: functional + dependent + arbitrary_int + structural_recursion/totality + ml_like/haskell_like
+          - C/C++:          imperative + static_simple + arbitrary_int (libgmp) + structured_loops + c_like
+          - Prolog:         declarative_equation + dynamic + arbitrary_int + pattern_match_fold + prolog_like
+          - APL/J/K:        dataflow + dynamic + arbitrary_int + list_comprehension + apl_like
+          - Mathematica:    term_rewriting + dynamic + arbitrary_int_plus_rational + pattern_match_fold + lisp_like/custom_minimal
+        スコア基準:
+          1.0 = 上記いずれかと 5 軸以上一致 (= 既存言語そのもの)
+          0.5 = 3-4 軸一致 (= 既存言語に近い変種)
+          0.0 = 2 軸以下一致 (= 実在しない架空言語)
+        この R6 は HARD FLOOR: 0.0 を返した個体は最終 fitness が 0 に
+        clamp される。0.0-1.0 の decimal を半角数字で返してください。
+
+  ranking:
+    strategy: scalar_with_pareto_tiebreak
+    scenarios: [balanced, expressivity_first, realism_first]
+    top_k: 5
+
+# ─── 検索パラメータ (v2 と同じ) ─────────────────────────────────
+search_params:
+  algorithm: map_elites
+  seed_count: 8
+  generations: 30
+  cell_axes: [paradigm, type_system, arithmetic_primitives, control_flow, syntax_family]
+  open_axes: false
+  rng_seed: 31415927        # v2 と 1 違いの seed で初期分散を変える
+
+runtime:
+  provider:          openai
+  model:             gpt-4o-mini
+  concurrency:       8
+  request_timeout_s: 60
+  sdk_retries:       3
+  drain_timeout_s:   7200
+  idle_ms:           60000
+  checkpoint_per_gen: on
+  caffeinate:        on
+
+plan:
+  step_1_aice:          {status: done}
+  step_2_schema_v3:     {status: todo, note: "v2 schema 継承 + 4 新 coherence rule"}
+  step_3_ga_json:       {status: todo}
+  step_4_aipl:          {status: todo}
+  step_5_run:           {status: todo, estimated_wall_min: 75, estimated_cost_usd: 0.55}
+  step_6_compare_v2_v3: {status: todo}
+  step_7_report:        {status: todo}
