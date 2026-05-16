@@ -1,0 +1,287 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Pi_Phase1_Robustness.aice
+#  Dialect: aice_yaml_v1 (案1: YAML 宣言型 Problem DSL, 2026-05-16 草案)
+#
+#  これは Pi_Phase1_OpenSearch.aice の問題設定そのものではなく、
+#  「Phase-1 を gpt-4o-mini で実行するときの ランタイム / コスト /
+#  失敗モード を扱う」メタ問題を YAML で記述したもの。
+#  2026-05-16 セッションで観測した 3 回試行と性能解析の結果を反映。
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: Pi_Phase1_RealLLM_Robustness
+  parent: Pi_Phase1_OpenSearch     # 子問題: 親の探索プロセスを安全に走らせる
+  version: 0.1.0
+  authors: [yaskodama]
+  created: 2026-05-16
+  description: |
+    aice-pi-evolution の Phase-1 (MAP-Elites 12 seed × 40 generation)
+    を OpenAI gpt-4o-mini で完走させる。silent death と低スループット
+    を避けつつ、コスト・壁時計時間・スコア多様性を両立する。
+    親問題 (Pi_Phase1_OpenSearch) は 言語遺伝子を探索する目的に集中し、
+    本問題は その探索を回す ランタイム条件 を MAP-Elites と同じ
+    フレームで扱う。
+
+context:
+  workdir: /Users/kodamay/ocaml-app/abclcp-project
+  runtime:
+    entry:    src/python-aipl/aipl_main.py
+    program:  aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl
+  provider_module: src/python-aipl/aipl_ai.py
+  external_apis:
+    - name: OpenAI Chat Completions
+      tier: 1
+      rpm:  500
+      tpm:  200_000
+      latency_p50_s: 1.5
+      latency_p99_s: 8.0
+  observed_failures_to_date:
+    - 2026-05-16 trial #1
+    - 2026-05-16 trial #2
+    - 2026-05-16 trial #3
+
+# ─── 目的関数 ─────────────────────────────────────────────────────
+goal:
+  maximize:
+    - completed_generations    # 0..40, 完走 = 40
+    - score_std                # 選択圧が掛かっている証拠
+    - throughput_calls_per_min # 並列化が効いている証拠
+  minimize:
+    - cost_usd
+    - wall_time_min
+    - silent_deaths_count
+
+  # MAP-Elites の fitness としての集約
+  scalar_fitness:
+    formula: |
+      0.5 * (completed_generations / 40)
+      + 0.2 * normalize(score_std, [0.05, 0.30])
+      + 0.2 * normalize(throughput_calls_per_min, [0, 480])
+      + 0.1 * (1 - normalize(cost_usd, [0, 2.0]))
+    bounds: [0.0, 1.0]
+
+# ─── 制約 ─────────────────────────────────────────────────────────
+constraints:
+  cost_usd:        {max: 2.0}
+  wall_time_min:   {max: 30}
+  budget_tokens:   {max: 5_000_000}
+
+  # 失格条件: exit_reason が lineage_dump 以外ならスコア 0
+  exit_reason:
+    must_be: lineage_dump
+    forbidden: [silent_death, idle_timeout, user_kill, budget_exceeded]
+
+# ─── アクター (情報用、評価は Math DSL 側で行う) ───────────────────
+actors:
+  - aipl_main      # CLI エントリ + --timeout / --idle-ms drain
+  - Coordinator    # seed → evolve の主ループ
+  - Generator      # 1 LLM call で genome を mutate / cross
+  - Worker         # compute_cell + compute_score (内部で reviewer fan-out)
+  - Evaluator      # 5 reviewer × 5 task の fan-out 集約
+  - Reviewer       # 1 LLM call で 0..5 のスコアを返す
+  - EliteMap       # cell 単位の elite 保持
+  - Lineage        # 個体台帳 + dump (チェックポイント)
+  - OpenAI_API     # 外部依存
+  - MacOS_Power    # 暗黙の外部依存 (sleep が python を殺す)
+
+# ─── 探索変数 (= MAP-Elites の input + cell 軸候補) ─────────────────
+variables:
+  # ----- provider / model -----
+  provider:
+    type: enum
+    values: [openai, anthropic, vertex, mock]
+    default: openai
+    cell_axis: true
+  model:
+    type: enum
+    values: [gpt-4o-mini, gpt-4o, claude-haiku-4-5]
+    default: gpt-4o-mini
+    cell_axis: true
+
+  # ----- 並列度 / 待機 -----
+  concurrency:
+    type: integer
+    range: [1, 32]
+    default: 8
+    cell_axis: true
+    notes: "AIPL_AI_MAX_CONCURRENT (legacy 名 ABCL_AI_MAX_CONCURRENT で env を渡す)"
+  request_timeout_s:
+    type: integer
+    range: [10, 300]
+    default: 60
+    notes: "AIPL_AI_REQUEST_TIMEOUT — SDK の HTTPS request 単位タイムアウト"
+  sdk_retries:
+    type: integer
+    range: [0, 5]
+    default: 3
+    notes: "AIPL_AI_SDK_RETRIES — openai / anthropic SDK の自動 retry"
+  drain_timeout_s:
+    type: integer
+    range: [60, 14400]
+    default: 7200
+    notes: "--timeout: post-main の actor drain 最大待ち"
+  idle_ms:
+    type: integer
+    range: [1000, 300000]
+    default: 60000
+    notes: "--idle-ms: 連続 idle がこの ms 続いたら drain 完了とみなす"
+
+  # ----- 探索パラメータ -----
+  seed_count:
+    type: integer
+    range: [4, 24]
+    default: 12
+    cell_axis: true
+  generations:
+    type: integer
+    range: [10, 80]
+    default: 40
+    cell_axis: true
+
+  # ----- 永続化 / 環境 -----
+  checkpoint_per_generation:
+    type: bool
+    default: true
+    notes: "Pi_Phase1_OpenSearch.aipl:611-614 で lineage.dump を毎世代呼ぶ"
+  caffeinate:
+    type: bool
+    default: true
+    notes: "Mac の idle sleep で python が殺されるのを防ぐ"
+
+# ─── 評価指標 ─────────────────────────────────────────────────────
+evaluation:
+  collected_metrics:
+    - completed_generations    # int 0..generations
+    - wall_time_min            # float
+    - calls_total              # int
+    - calls_per_min            # float
+    - cost_usd                 # float, ai_usage.json から
+    - score_min                # float, lineage の score 列
+    - score_max
+    - score_mean
+    - score_std
+    - silent_deaths_count      # int, この run 中の死亡回数
+    - exit_reason              # enum
+
+  measurement_protocol:
+    duration: per_run
+    instruments:
+      - ai_usage_file:   out/ai_usage.json
+      - lineage_file:    out/Pi_Phase1_OpenSearch.aipl_lineage.json
+      - log_grep:        "ckpt gen=|seed\\] elite|lineage\\] wrote|Traceback|Error"
+      - process_watch:   "pgrep -f 'Python.*aipl_main'"
+
+# ─── 失敗モード一覧 (3 試行から確定) ─────────────────────────────
+failure_modes:
+  F1_timeout_too_short:
+    cause: "--timeout 2.0 / --idle-ms 120 既定値が real LLM では短すぎ"
+    detector: aipl_main exits within 5s after first LLM call
+    seen_in:  [trial_1_2026-05-16]
+    mitigation:
+      - set: --timeout 7200
+      - set: --idle-ms 60000
+    status: fixed
+
+  F2_sdk_hang:
+    cause: "OpenAI SDK の HTTPS request にタイムアウト無で永久待機 → 全 worker が cond_wait"
+    detector: in_flight > 0 AND throughput_calls_per_min == 0 for > 60s
+    seen_in:  [trial_2_2026-05-16]
+    mitigation:
+      - set: AIPL_AI_REQUEST_TIMEOUT=60
+      - set: AIPL_AI_SDK_RETRIES=3
+      - code: src/python-aipl/aipl_ai.py の _get_openai_client / _get_anthropic_client にパラメータ
+    status: fixed_in_aipl_ai_py
+
+  F3_no_checkpoint:
+    cause: "Lineage.dump が最後だけ呼ばれる → silent death で個体台帳が全消失"
+    detector: aipl_main exits without preceding `[lineage] wrote` line
+    seen_in:  [trial_2_2026-05-16]
+    mitigation:
+      - code: aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl:611-614 で毎世代 lineage.dump
+    status: fixed_in_aipl_program
+
+  F4_low_throughput:
+    cause: "Coordinator.run が `now` ブロッキング await で世代を完全直列化"
+    detector: throughput_calls_per_min < 60 AND concurrency >= 8
+    root_cause: |
+      Coordinator main loop が world step を await でしか進められない:
+        while gen <= generations {
+          parent = now elite.sample(...);
+          child  = now generator.mutate(parent);
+          ccell  = now worker.compute_cell(child);
+          cscore = now worker.compute_score(child);   # 内部 25 calls もほぼ直列
+        }
+      effective_concurrency ≈ 1〜2 (理論 8 の 1/4〜1/8)
+    seen_in:  [trial_3_2026-05-16]
+    mitigation:
+      short_term:
+        - shrink: seed_count 12 → 8
+        - shrink: generations 40 → 20
+      long_term:
+        - redesign: src/aice-evolution-v2/aipl_codegen.py の Evaluator / Coordinator template を
+            send-based fan-out に書き換え (全 Phase を再生成)
+    status: open
+
+  F5_macos_sleep:
+    cause: "Mac の idle sleep が python プロセスを殺す可能性"
+    detector: wall_time_min > 30 AND process disappeared without log message
+    seen_in:  [trial_2_2026-05-16_suspected]
+    mitigation:
+      - command: caffeinate -i &
+    status: precaution
+
+# ─── 観測ベースライン (試行 #3 中断時の実測値) ──────────────────
+observed_baseline:
+  trial_id: 2026-05-16_trial_3
+  exit_reason: user_kill        # 失格扱い
+  completed_generations: 11     # /40
+  calls_total: 599
+  wall_time_min: ~25
+  calls_per_min: 23
+  cost_usd: 0.20
+  score_min: 0.16
+  score_max: 0.58
+  score_mean: 0.32
+  silent_deaths_count: 0
+  notes: |
+    全 23 個体が非ゼロスコアを取得 → 選択圧自体は機能していることを確認。
+    主因は F4_low_throughput。次セッションで案 C (パラメータ縮小) で再試行予定。
+
+# ─── 次のアクション (Plan) ────────────────────────────────────────
+plan:
+  branch_A:
+    name: 23 個体 lineage で完了とみなす
+    actions:
+      - update: aice-pi-evolution/REPORT_JA.md に scores の分布を追記
+      - proceed: Phase-2 を seed_from=Phase-1 (23 個体) で開始
+    additional_cost_usd: 0.0
+    estimated_time_min: 5
+
+  branch_B:
+    name: 現状構造でフル再実行
+    preconditions: [F1_timeout_too_short.status == fixed, F2_sdk_hang.status == fixed_in_aipl_ai_py,
+                    F3_no_checkpoint.status == fixed_in_aipl_program]
+    additional_cost_usd: 0.4
+    estimated_time_min: 60
+
+  branch_C:                       # 推奨
+    name: パラメータ縮小して再実行
+    edit:
+      file: aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl
+      changes:
+        - line: 552
+          from: "var seed_count = 12;"
+          to:   "var seed_count = 8;"
+        - line: 553
+          from: "var generations = 40;"
+          to:   "var generations = 20;"
+    additional_cost_usd: 0.2
+    estimated_time_min: 25
+    recommended: true
+
+  branch_D:
+    name: codegen 改修で真の並列化
+    scope: aice-evolution-v2/src/aipl_codegen.py の Evaluator / Coordinator template
+    side_effects: 全 Phase (0,1,2,Final) を再生成・再テスト必要
+    estimated_engineering_hours: 4-8

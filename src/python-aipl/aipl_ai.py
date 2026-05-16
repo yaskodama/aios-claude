@@ -38,6 +38,69 @@ _anthropic_client = None
 _gemini_client = None
 _openai_client = None
 
+
+def _client_timeout_s() -> float:
+    """Per-request HTTPS timeout in seconds (default 60s).
+    Set AIPL_AI_REQUEST_TIMEOUT to override."""
+    try:
+        return float(_aipl_env("AIPL_AI_REQUEST_TIMEOUT", "60"))
+    except ValueError:
+        return 60.0
+
+
+def _client_max_retries() -> int:
+    """SDK-level retries for transient HTTPS errors (default 3)."""
+    try:
+        return int(_aipl_env("AIPL_AI_SDK_RETRIES", "3"))
+    except ValueError:
+        return 3
+
+
+def _get_anthropic_client():
+    """Lazy-init the anthropic client.
+
+    Honours AIPL_ANTHROPIC_BACKEND:
+      - 'direct' (default): anthropic.Anthropic() — reads ANTHROPIC_API_KEY
+      - 'vertex': anthropic.AnthropicVertex(project_id=..., region=...) —
+        reads ADC + AIPL_VERTEX_PROJECT_ID + AIPL_VERTEX_REGION
+      - 'bedrock': anthropic.AnthropicBedrock() — reads standard AWS env
+    """
+    global _anthropic_client
+    if _anthropic_client is not None:
+        return _anthropic_client
+    import anthropic  # type: ignore
+    backend = _aipl_env("AIPL_ANTHROPIC_BACKEND", "direct").lower()
+    kw = {"timeout": _client_timeout_s(), "max_retries": _client_max_retries()}
+    if backend == "vertex":
+        project_id = _aipl_env("AIPL_VERTEX_PROJECT_ID", "")
+        region = _aipl_env("AIPL_VERTEX_REGION", "us-east5")
+        if not project_id:
+            raise RuntimeError(
+                "AIPL_ANTHROPIC_BACKEND=vertex requires "
+                "AIPL_VERTEX_PROJECT_ID to be set"
+            )
+        _anthropic_client = anthropic.AnthropicVertex(
+            project_id=project_id, region=region, **kw,
+        )
+    elif backend == "bedrock":
+        _anthropic_client = anthropic.AnthropicBedrock(**kw)
+    else:
+        _anthropic_client = anthropic.Anthropic(**kw)
+    return _anthropic_client
+
+
+def _get_openai_client():
+    """Lazy-init the openai client with timeout + retries."""
+    global _openai_client
+    if _openai_client is not None:
+        return _openai_client
+    import openai  # type: ignore
+    _openai_client = openai.OpenAI(
+        timeout=_client_timeout_s(),
+        max_retries=_client_max_retries(),
+    )
+    return _openai_client
+
 DEFAULT_GEMINI_MODEL    = "gemini-2.5-flash"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 DEFAULT_OPENAI_MODEL    = "gpt-4o-mini"
@@ -155,7 +218,11 @@ PRICING_USD_PER_M_TOKENS = {
 
 
 def _price_for(model: str) -> tuple:
-    return PRICING_USD_PER_M_TOKENS.get(model, (0.0, 0.0))
+    # Vertex / Bedrock model IDs are versioned (e.g.
+    # 'claude-haiku-4-5@20251019'); strip the suffix so the same
+    # pricing table works for direct + Vertex calls.
+    base = model.split("@", 1)[0] if model else model
+    return PRICING_USD_PER_M_TOKENS.get(base, (0.0, 0.0))
 
 
 def _cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -611,15 +678,12 @@ def _chat_gemini(messages, system, model, max_tokens):
 
 
 def _chat_claude(messages, system, model, max_tokens):
-    global _anthropic_client
-    import anthropic  # type: ignore
-    if _anthropic_client is None:
-        _anthropic_client = anthropic.Anthropic()
+    client = _get_anthropic_client()
     kwargs = {"model": model, "max_tokens": max_tokens, "messages": messages}
     if system is not None:
         kwargs["system"] = [{"type": "text", "text": system,
                              "cache_control": {"type": "ephemeral"}}]
-    response = _anthropic_client.messages.create(**kwargs)
+    response = client.messages.create(**kwargs)
     usage = getattr(response, "usage", None)
     if usage is not None:
         _record_usage(model,
@@ -630,10 +694,7 @@ def _chat_claude(messages, system, model, max_tokens):
 
 
 def _chat_openai(messages, system, model, max_tokens):
-    global _openai_client
-    import openai  # type: ignore
-    if _openai_client is None:
-        _openai_client = openai.OpenAI()
+    _openai_client = _get_openai_client()
     msgs = []
     if system is not None:
         msgs.append({"role": "system", "content": system})
@@ -706,10 +767,7 @@ def _stream_gemini(prompt, system, model, max_tokens):
 
 
 def _stream_claude(prompt, system, model, max_tokens):
-    global _anthropic_client
-    import anthropic  # type: ignore
-    if _anthropic_client is None:
-        _anthropic_client = anthropic.Anthropic()
+    client = _get_anthropic_client()
     kwargs = {
         "model": model, "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
@@ -719,17 +777,14 @@ def _stream_claude(prompt, system, model, max_tokens):
             {"type": "text", "text": system,
              "cache_control": {"type": "ephemeral"}},
         ]
-    with _anthropic_client.messages.stream(**kwargs) as stream:
+    with client.messages.stream(**kwargs) as stream:
         for text in stream.text_stream:
             if text:
                 yield text
 
 
 def _stream_openai(prompt, system, model, max_tokens):
-    global _openai_client
-    import openai  # type: ignore
-    if _openai_client is None:
-        _openai_client = openai.OpenAI()
+    _openai_client = _get_openai_client()
     messages = []
     if system is not None:
         messages.append({"role": "system", "content": system})
@@ -755,15 +810,14 @@ def _do_claude(
     max_tokens: int = DEFAULT_MAX_TOKENS,
     images: Optional[list] = None,
 ) -> str:
-    global _anthropic_client
     try:
-        import anthropic  # type: ignore
+        import anthropic  # type: ignore  # noqa: F401 — surfaces install errors
     except Exception as e:
         raise RuntimeError(f"anthropic SDK not installed: {e!r}")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    backend = _aipl_env("AIPL_ANTHROPIC_BACKEND", "direct").lower()
+    if backend == "direct" and not os.environ.get("ANTHROPIC_API_KEY"):
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    if _anthropic_client is None:
-        _anthropic_client = anthropic.Anthropic()
+    client = _get_anthropic_client()
     norm_images = _normalize_images(images or [])
     if norm_images:
         content_blocks = [
@@ -792,7 +846,7 @@ def _do_claude(
         kwargs["system"] = [
             {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
         ]
-    response = _anthropic_client.messages.create(**kwargs)
+    response = client.messages.create(**kwargs)
     usage = getattr(response, "usage", None)
     if usage is not None:
         _record_usage(
@@ -821,7 +875,10 @@ def _do_gemini(
     if not os.environ.get("GEMINI_API_KEY"):
         raise RuntimeError("GEMINI_API_KEY is not set")
     if _gemini_client is None:
-        _gemini_client = genai.Client()
+        timeout_s = float(_aipl_env("AIPL_AI_REQUEST_TIMEOUT", "60"))
+        _gemini_client = genai.Client(
+            http_options=types.HttpOptions(timeout=int(timeout_s * 1000))
+        )
     config_kwargs = {"max_output_tokens": max_tokens}
     if system is not None:
         config_kwargs["system_instruction"] = system
@@ -861,15 +918,13 @@ def _do_openai(
     max_tokens: int = DEFAULT_MAX_TOKENS,
     images: Optional[list] = None,
 ) -> str:
-    global _openai_client
     try:
-        import openai  # type: ignore
+        import openai  # type: ignore  # noqa: F401 — surfaces install errors
     except Exception as e:
         raise RuntimeError(f"openai SDK not installed: {e!r}")
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is not set")
-    if _openai_client is None:
-        _openai_client = openai.OpenAI()
+    _openai_client = _get_openai_client()
 
     messages = []
     if system is not None:

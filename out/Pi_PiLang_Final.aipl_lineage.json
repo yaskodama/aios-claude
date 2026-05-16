@@ -1,3 +1,3 @@
 [
-  {"id":"I1","genome":"paradigm=Array_DSL|state_representation=limb_array|type_safety=refinement|ownership_model=none|concurrency_model=threads_locks|effect_handling=algebraic_effects|arithmetic_strategy=scalar_int|precision_model=refinement_typed|memory_layout=static_array|algorithm_family=leibniz|primitive_set=ring_Q|extraction_mode=compute_all_then_print","parent":"","score":0.0,"generation":0,"operator":"seed","cell":"paradigm=Array_DSL"}
+  {"id":"I1","genome":"paradigm=Array_DSL|state_representation=symbol_owned|type_safety=refinement|ownership_model=region|concurrency_model=structured|effect_handling=capability|arithmetic_strategy=multilimb_radix10_9|precision_model=global_digits_const|memory_layout=arena|algorithm_family=leibniz|primitive_set=field_R_eps|extraction_mode=random_access_digit","parent":"","score":0.0,"generation":0,"operator":"seed","cell":"paradigm=Array_DSL"}
 ]

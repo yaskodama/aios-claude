@@ -1,0 +1,56 @@
+# chudnovsky.psi
+# Compute π to 10,000 digits via Chudnovsky binary splitting, in PsiLang.
+#
+# This file expresses the **algorithm itself** (not a dispatch to a
+# host kernel).  The binary-splitting recursion, the per-leaf
+# Chudnovsky term construction, and the final π recovery
+#   π = 426880 · √10005 / S
+# are all written in PsiLang.  Builtin primitives used:
+#   Int:  +  -  *  /  mod  int_fact  int_pow
+#   Rat:  rat  rat_add  rat_num  rat_den
+#   Real: real_from_int  real_from_rat  real_sqrt  real_mul  real_div
+#         real_to_string  set_precision
+#
+# Reference values (well-known):
+#   First 100 digits of π = 3.141592653589793238462643383279502884197...
+#   The 1000th decimal digit = 9
+#   The Feynman point (first "999999") starts at position 762.
+
+# ─── k-th Chudnovsky term as a Rat ────────────────────────────────
+# a_k = (-1)^k · (6k)! · (545140134·k + 13591409)
+# b_k = (3k)! · (k!)^3 · 640320^(3k)
+# term(k) = a_k / b_k
+fn term(k) =
+  let sign = if k mod 2 == 0 then 1 else -1 in
+  let num  = sign * int_fact(6 * k) * (545140134 * k + 13591409) in
+  let den  = int_fact(3 * k) * int_pow(int_fact(k), 3) * int_pow(640320, 3 * k) in
+  rat(num, den)
+
+# ─── Binary splitting on the half-open interval [a, b) ────────────
+# Returns the rational sum  Σ_{k=a..b-1} term(k).
+# Recursive divide-and-conquer: log_2(N) depth, naturally parallelizable.
+fn bsplit(a, b) =
+  if b - a == 1 then term(a)
+  else
+    let m = (a + b) / 2 in
+    let left  = bsplit(a, m) in
+    let right = bsplit(m, b) in
+    rat_add(left, right)
+
+# ─── π via Chudnovsky ─────────────────────────────────────────────
+# π = 426880 · √10005 / S    where S = Σ_{k=0..∞} term(k).
+# 14.18 correct digits per term → need ceil(N/14) + 2 terms.
+fn chudnovsky_pi(n_digits) =
+  let n_terms = n_digits / 14 + 2 in
+  let prec    = n_digits + 20 in
+  let _bump   = set_precision(prec) in
+  let s_rat   = bsplit(0, n_terms) in
+  let s_real  = real_from_rat(s_rat, prec) in
+  let c       = real_mul(real_from_int(426880),
+                          real_sqrt(real_from_int(10005), prec)) in
+  real_div(c, s_real)
+
+# ─── Entry point ──────────────────────────────────────────────────
+let pi  = chudnovsky_pi(10000) in
+let str = real_to_string(pi, 10000) in
+emit(str)

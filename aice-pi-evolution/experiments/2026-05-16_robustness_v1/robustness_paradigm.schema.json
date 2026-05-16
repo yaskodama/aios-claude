@@ -1,0 +1,75 @@
+{
+  "name": "robustness_paradigm",
+  "extends": null,
+  "_comment": "Pi_Phase1_Robustness.aice (YAML) から派生したハイパーパラメタ探索用スキーマ。言語遺伝子ではなく Phase-1 ランタイム設定の組合せを cell として持つ。",
+
+  "axes": {
+    "provider":           ["openai", "anthropic", "vertex", "mock"],
+    "model":              ["gpt-4o-mini", "gpt-4o", "claude-haiku-4-5"],
+    "concurrency":        ["c1", "c2", "c4", "c8", "c16", "c32"],
+    "seed_count":         ["s4", "s6", "s8", "s12", "s16", "s24"],
+    "generations":       ["g10", "g15", "g20", "g30", "g40", "g60", "g80"],
+    "request_timeout_s":  ["t10", "t30", "t60", "t120", "t300"],
+    "sdk_retries":        ["r0", "r1", "r3", "r5"],
+    "drain_timeout_s":    ["d60", "d600", "d3600", "d7200", "d14400"],
+    "idle_ms":            ["i1000", "i5000", "i30000", "i60000", "i300000"],
+    "checkpoint_per_gen": ["off", "on"],
+    "caffeinate":         ["off", "on"]
+  },
+
+  "ordinal_axes": {
+    "concurrency":        ["c1", "c2", "c4", "c8", "c16", "c32"],
+    "seed_count":         ["s4", "s6", "s8", "s12", "s16", "s24"],
+    "generations":        ["g10", "g15", "g20", "g30", "g40", "g60", "g80"],
+    "request_timeout_s":  ["t10", "t30", "t60", "t120", "t300"],
+    "sdk_retries":        ["r0", "r1", "r3", "r5"],
+    "drain_timeout_s":    ["d60", "d600", "d3600", "d7200", "d14400"],
+    "idle_ms":            ["i1000", "i5000", "i30000", "i60000", "i300000"]
+  },
+
+  "coherence": [
+    {
+      "_comment": "F1 mitigation: real LLM では idle_ms と drain_timeout_s を緩めること",
+      "if":      {"provider": "openai"},
+      "then_in": {
+        "idle_ms":         ["i30000", "i60000", "i300000"],
+        "drain_timeout_s": ["d3600", "d7200", "d14400"]
+      }
+    },
+    {
+      "_comment": "F2 mitigation: SDK ハング回避のため timeout と retries を両方設定",
+      "if":      {"provider": "openai"},
+      "then_in": {
+        "request_timeout_s": ["t30", "t60", "t120"],
+        "sdk_retries":       ["r1", "r3", "r5"]
+      }
+    },
+    {
+      "_comment": "F3 mitigation: real LLM 試行ではチェックポイント必須",
+      "if":   {"provider": "openai"},
+      "then": {"checkpoint_per_gen": "on"}
+    },
+    {
+      "_comment": "F4 short-term mitigation: concurrency が小さいときは seed_count × generations を縮める",
+      "if":      {"concurrency": "c8"},
+      "then_in": {
+        "seed_count":  ["s4", "s6", "s8"],
+        "generations": ["g10", "g15", "g20"]
+      }
+    },
+    {
+      "_comment": "F5 mitigation: 大きい組合せでは caffeinate を入れる",
+      "if":      {"generations": "g80"},
+      "then":    {"caffeinate": "on"}
+    },
+    {
+      "_comment": "mock は schema を満たすが評価には使わない",
+      "if":   {"provider": "mock"},
+      "then": {"model": "gpt-4o-mini"}
+    }
+  ],
+
+  "open_axes": false,
+
+  "notes": "Pi_Phase1_Robustness.aice (YAML) の variables セクションと 1:1 対応。enum 表記は意味のある順序を保つため `c1, c2, c4, c8, ...` のように接頭辞付き文字列にした (ordinal_axes で順序を明示)。open_axes=false: ランタイム設定の探索なので LLM が新軸を提案する余地はない。"
+}

@@ -1,0 +1,254 @@
+[
+  {
+    "id": "I35",
+    "score": 0.7000000000000001,
+    "cell": "paradigm=functional|type_system=refinement|arithmetic_primitives=real_with_precision_annotation|control_flow=pattern_match_fold|syntax_family=c_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "refinement",
+      "arithmetic_primitives": "real_with_precision_annotation",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "c_like"
+    }
+  },
+  {
+    "id": "I17",
+    "score": 0.6749999999999999,
+    "cell": "paradigm=term_rewriting|type_system=static_simple|arithmetic_primitives=arbitrary_int_plus_rational|control_flow=pattern_match_fold|syntax_family=custom_minimal",
+    "genome": {
+      "paradigm": "term_rewriting",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "arbitrary_int_plus_rational",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "custom_minimal"
+    }
+  },
+  {
+    "id": "I12",
+    "score": 0.6458333333333334,
+    "cell": "paradigm=functional|type_system=static_simple|arithmetic_primitives=arbitrary_int_plus_rational|control_flow=pattern_match_fold|syntax_family=ml_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "arbitrary_int_plus_rational",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "ml_like"
+    }
+  },
+  {
+    "id": "I37",
+    "score": 0.6383333333333333,
+    "cell": "paradigm=declarative_equation|type_system=static_simple|arithmetic_primitives=arbitrary_int_plus_rational|control_flow=pattern_match_fold|syntax_family=custom_minimal",
+    "genome": {
+      "paradigm": "declarative_equation",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "arbitrary_int_plus_rational",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "custom_minimal"
+    }
+  },
+  {
+    "id": "I15",
+    "score": 0.6348333333333334,
+    "cell": "paradigm=hybrid_imperative_functional|type_system=hindley_milner|arithmetic_primitives=dependent_precision|control_flow=structured_loops|syntax_family=ml_like",
+    "genome": {
+      "paradigm": "hybrid_imperative_functional",
+      "type_system": "hindley_milner",
+      "arithmetic_primitives": "dependent_precision",
+      "control_flow": "structured_loops",
+      "syntax_family": "ml_like"
+    }
+  },
+  {
+    "id": "I3",
+    "score": 0.5833333333333334,
+    "cell": "paradigm=functional|type_system=dependent|arithmetic_primitives=interval_arithmetic|control_flow=general_recursion|syntax_family=ml_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "dependent",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "general_recursion",
+      "syntax_family": "ml_like"
+    }
+  },
+  {
+    "id": "I25",
+    "score": 0.5458333333333333,
+    "cell": "paradigm=declarative_equation|type_system=dependent|arithmetic_primitives=interval_arithmetic|control_flow=structured_loops|syntax_family=haskell_like",
+    "genome": {
+      "paradigm": "declarative_equation",
+      "type_system": "dependent",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "structured_loops",
+      "syntax_family": "haskell_like"
+    }
+  },
+  {
+    "id": "I10",
+    "score": 0.5416666666666667,
+    "cell": "paradigm=functional|type_system=dependent|arithmetic_primitives=interval_arithmetic|control_flow=structured_loops|syntax_family=haskell_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "dependent",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "structured_loops",
+      "syntax_family": "haskell_like"
+    }
+  },
+  {
+    "id": "I9",
+    "score": 0.5333333333333333,
+    "cell": "paradigm=declarative_equation|type_system=dependent|arithmetic_primitives=arbitrary_int|control_flow=structured_loops|syntax_family=haskell_like",
+    "genome": {
+      "paradigm": "declarative_equation",
+      "type_system": "dependent",
+      "arithmetic_primitives": "arbitrary_int",
+      "control_flow": "structured_loops",
+      "syntax_family": "haskell_like"
+    }
+  },
+  {
+    "id": "I1",
+    "score": 0.5176666666666667,
+    "cell": "paradigm=dataflow|type_system=dynamic|arithmetic_primitives=arbitrary_int_plus_rational|control_flow=tail_call_only|syntax_family=python_like",
+    "genome": {
+      "paradigm": "dataflow",
+      "type_system": "dynamic",
+      "arithmetic_primitives": "arbitrary_int_plus_rational",
+      "control_flow": "tail_call_only",
+      "syntax_family": "python_like"
+    }
+  },
+  {
+    "id": "I38",
+    "score": 0.5133333333333333,
+    "cell": "paradigm=functional|type_system=dependent|arithmetic_primitives=decimal_with_precision|control_flow=list_comprehension|syntax_family=ml_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "dependent",
+      "arithmetic_primitives": "decimal_with_precision",
+      "control_flow": "list_comprehension",
+      "syntax_family": "ml_like"
+    }
+  },
+  {
+    "id": "I29",
+    "score": 0.4916666666666667,
+    "cell": "paradigm=functional|type_system=dependent|arithmetic_primitives=interval_arithmetic|control_flow=general_recursion|syntax_family=prolog_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "dependent",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "general_recursion",
+      "syntax_family": "prolog_like"
+    }
+  },
+  {
+    "id": "I7",
+    "score": 0.49125,
+    "cell": "paradigm=imperative|type_system=dependent|arithmetic_primitives=decimal_with_precision|control_flow=structured_loops|syntax_family=c_like",
+    "genome": {
+      "paradigm": "imperative",
+      "type_system": "dependent",
+      "arithmetic_primitives": "decimal_with_precision",
+      "control_flow": "structured_loops",
+      "syntax_family": "c_like"
+    }
+  },
+  {
+    "id": "I36",
+    "score": 0.48666666666666664,
+    "cell": "paradigm=functional|type_system=static_simple|arithmetic_primitives=real_with_precision_annotation|control_flow=pattern_match_fold|syntax_family=c_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "real_with_precision_annotation",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "c_like"
+    }
+  },
+  {
+    "id": "I31",
+    "score": 0.47916666666666674,
+    "cell": "paradigm=declarative_equation|type_system=refinement|arithmetic_primitives=real_with_precision_annotation|control_flow=pattern_match_fold|syntax_family=c_like",
+    "genome": {
+      "paradigm": "declarative_equation",
+      "type_system": "refinement",
+      "arithmetic_primitives": "real_with_precision_annotation",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "c_like"
+    }
+  },
+  {
+    "id": "I5",
+    "score": 0.44583333333333336,
+    "cell": "paradigm=hybrid_imperative_functional|type_system=hindley_milner|arithmetic_primitives=dependent_precision|control_flow=structured_loops|syntax_family=haskell_like",
+    "genome": {
+      "paradigm": "hybrid_imperative_functional",
+      "type_system": "hindley_milner",
+      "arithmetic_primitives": "dependent_precision",
+      "control_flow": "structured_loops",
+      "syntax_family": "haskell_like"
+    }
+  },
+  {
+    "id": "I27",
+    "score": 0.42416666666666664,
+    "cell": "paradigm=functional|type_system=dependent|arithmetic_primitives=interval_arithmetic|control_flow=list_comprehension|syntax_family=ml_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "dependent",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "list_comprehension",
+      "syntax_family": "ml_like"
+    }
+  },
+  {
+    "id": "I32",
+    "score": 0.39999999999999997,
+    "cell": "paradigm=term_rewriting|type_system=static_simple|arithmetic_primitives=real_with_precision_annotation|control_flow=pattern_match_fold|syntax_family=c_like",
+    "genome": {
+      "paradigm": "term_rewriting",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "real_with_precision_annotation",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "c_like"
+    }
+  },
+  {
+    "id": "I4",
+    "score": 0.3875,
+    "cell": "paradigm=hybrid_imperative_functional|type_system=static_simple|arithmetic_primitives=interval_arithmetic|control_flow=structured_loops|syntax_family=prolog_like",
+    "genome": {
+      "paradigm": "hybrid_imperative_functional",
+      "type_system": "static_simple",
+      "arithmetic_primitives": "interval_arithmetic",
+      "control_flow": "structured_loops",
+      "syntax_family": "prolog_like"
+    }
+  },
+  {
+    "id": "I8",
+    "score": 0.38000000000000006,
+    "cell": "paradigm=functional|type_system=refinement|arithmetic_primitives=real_with_precision_annotation|control_flow=pattern_match_fold|syntax_family=apl_like",
+    "genome": {
+      "paradigm": "functional",
+      "type_system": "refinement",
+      "arithmetic_primitives": "real_with_precision_annotation",
+      "control_flow": "pattern_match_fold",
+      "syntax_family": "apl_like"
+    }
+  },
+  {
+    "id": "I28",
+    "score": 0.33016666666666666,
+    "cell": "paradigm=dataflow|type_system=dynamic|arithmetic_primitives=arbitrary_int_plus_rational|control_flow=monadic_bind|syntax_family=python_like",
+    "genome": {
+      "paradigm": "dataflow",
+      "type_system": "dynamic",
+      "arithmetic_primitives": "arbitrary_int_plus_rational",
+      "control_flow": "monadic_bind",
+      "syntax_family": "python_like"
+    }
+  }
+]

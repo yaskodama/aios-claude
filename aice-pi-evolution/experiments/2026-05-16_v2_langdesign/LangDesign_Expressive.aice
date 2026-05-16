@@ -1,0 +1,424 @@
+# ─────────────────────────────────────────────────────────────────────
+#  LangDesign_Expressive.aice
+#  Dialect: aice_yaml_v1 (案1 YAML)
+#  Series:  v2 (parent: v1 = Pi_Phase1_Robustness)
+#
+#  v1 (PhiLang) で得られた言語は「Phase orchestration DSL」であり、
+#  `compute = chudnovsky_binary_splitting` のように Python kernel へ
+#  dispatch するだけだった。すなわち言語自身はアルゴリズムを記述
+#  できておらず、Python 側に押し付けていた。
+#
+#  v2 は、その反省を踏まえて次を満たす言語の遺伝子を進化計算で
+#  探索する:
+#
+#    (a) Chudnovsky binary-splitting を 「言語自身の構文」 で
+#        記述できる (= 漸化式 / 二分木再帰 / 多倍長整数 / 有理数
+#        を言語の primitive で扱える)。
+#    (b) π 計算以外の典型アルゴリズム (factorial, sort, fft,
+#        matmul, fibonacci) も同じ言語で書ける汎用性をもつ。
+#    (c) 言語仕様が小さく (~2000 行のホスト実装で interpreter が
+#        書ける程度)、reviewer の判定が現実的に可能。
+#
+#  v1 が Phase 実行制御の DSL (4 つ巴: bounded burst × mandatory
+#  retry × generous drain × forced checkpoint) を生んだのに対し、
+#  v2 は アルゴリズム記述用の汎用言語を生むことを目標とする。
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: LangDesign_Expressive_v2
+  parent: Pi_Phase1_Robustness_v1
+  ancestor: Pi_Phase1_OpenSearch       # (PiLang を生んだ 2026-05-15 実験)
+  version: 0.1.0
+  authors: [yaskodama]
+  created: 2026-05-16
+  description: |
+    Chudnovsky binary-splitting を「言語自身の構文」で書ける、かつ
+    factorial / sort / FFT / matmul / fibonacci も書ける、比較的
+    汎用的なプログラミング言語の 遺伝子型 を進化計算で発見する。
+    v1 の PhiLang のように compute=X の dispatch shell に逃げず、
+    アルゴリズムを 言語の primitive で 記述できることを必須要件と
+    する。
+
+context:
+  workdir: /Users/kodamay/ocaml-app/abclcp-project/aice-pi-evolution/experiments/2026-05-16_v2_langdesign/
+  motivation: |
+    v1 (Pi_Phase1_Robustness) のレビューで判明した事実 —
+      「`compute = chudnovsky_binary_splitting` という1行は、その
+       アルゴリズムを記述したことにはならない。言語側に loop /
+       recursion / arbitrary precision arithmetic 等の primitive が
+       無ければ、進化計算が示唆した『言語』は実は Python の
+       wrapper にすぎない」
+    を解消する。
+  v1_lesson_applied:
+    - F3 を hard floor 化 (checkpoint 必須)
+    - mock provider 除外
+    - provider × model の coherence rule 追加
+  v1_to_v2_inheritance:
+    runtime_safety_baseline: PhiLang        # ランタイム制御は PhiLang を継承
+    must_extend: algorithm expressiveness   # 上に Algo DSL を追加
+
+# ─── 目的関数 ─────────────────────────────────────────────────────
+goal:
+  maximize:
+    - algorithm_expressivity_score        # 6 タスクをどれだけ書けるか
+    - generality_count                    # 書ける task 数 (0..6)
+    - minimality_score                    # 言語仕様の小ささ
+  minimize:
+    - lines_per_task_median               # 各 task を書くのに必要な行数の中央値
+    - host_implementation_size            # interpreter 推定行数
+    - missing_primitives                  # 自己充足性を欠く primitive の数
+
+  scalar_fitness:
+    formula: |
+      0.30 * normalize(generality_count, [0, 6])
+      + 0.25 * normalize(algorithm_expressivity_score, [0.0, 1.0])
+      + 0.15 * (1 - normalize(lines_per_task_median, [3, 200]))
+      + 0.15 * normalize(minimality_score, [0.0, 1.0])
+      + 0.10 * (1 - normalize(host_implementation_size, [500, 5000]))
+      + 0.05 * (1 - normalize(missing_primitives, [0, 5]))
+    bounds: [0.0, 1.0]
+
+# ─── 制約 ─────────────────────────────────────────────────────────
+constraints:
+  must_express_pi_chudnovsky_bsplit: true   # ハード制約
+  must_express_factorial:            true   # ハード制約
+  must_be_implementable:             true   # interpreter が書ける
+  host_implementation_size: {max: 5000}     # ホスト言語 (Python) 行数
+  lines_per_task_median:    {max: 200}      # アルゴリズム 1 個あたり
+
+# ─── アクター (情報用) ───────────────────────────────────────────
+# v2 は言語デザインの問題なので 実行アクター ではなく
+# 言語仕様のレイヤ を列挙する。
+language_layers:
+  - LexerLayer            # トークナイズ
+  - ParserLayer           # AST 構築
+  - TypeLayer             # 型システム (採用すれば)
+  - EvaluatorLayer        # 値計算 (tree-walker / VM)
+  - ArithmeticLayer       # 数値 primitive (有理数 / 多倍長 / 実数)
+  - MemoryLayer           # 値の所有 (region / gc / linear)
+  - IOLayer               # 出力 (emit / stream / file)
+  - StdlibLayer           # 標準ライブラリ (もしあれば)
+
+# ─── 探索変数 (= 言語の遺伝子) ────────────────────────────────────
+variables:
+  # ----- パラダイム ------------------------------------------------
+  paradigm:
+    type: enum
+    values: [imperative, functional, dataflow, term_rewriting,
+             declarative_equation, oo, hybrid_imperative_functional]
+    default: functional
+    cell_axis: true
+    notes: |
+      pi_paradigm.schema.json の paradigm 軸とは別物。v1 / PiLang
+      では Array_DSL や Stream_DSL を含んでいたが、ここでは
+      実装容易性を優先して上記 7 種に限定。
+
+  evaluation_strategy:
+    type: enum
+    values: [strict, lazy, call_by_need, call_by_name]
+    default: strict
+
+  type_system:
+    type: enum
+    values: [dynamic, static_simple, hindley_milner, refinement,
+             dependent]
+    default: static_simple
+    cell_axis: true
+
+  # ----- 数値系 ----------------------------------------------------
+  arithmetic_primitives:
+    type: enum
+    values: [fixed_int_only,                # 32/64bit のみ
+             arbitrary_int,                 # bigint primitive
+             arbitrary_int_plus_rational,   # bigint + 有理数
+             decimal_with_precision,        # decimal[n] 型
+             real_with_precision_annotation,# real with digits=N
+             interval_arithmetic,           # 区間演算 builtin
+             dependent_precision]           # 桁数依存型
+    default: arbitrary_int_plus_rational
+    cell_axis: true
+    notes: |
+      Chudnovsky bsplit は (a) 巨大整数の積 (b) その商を有理数の
+      まま積み上げる (c) 最後に sqrt で 1 度だけ実数へ落とす を
+      要求するので、最低限 arbitrary_int + rational が必要。
+
+  precision_control:
+    type: enum
+    values: [implicit, global_const, per_value_annotation,
+             automatic_inference, proof_obligation]
+    default: per_value_annotation
+
+  # ----- 制御フロー -----------------------------------------------
+  control_flow:
+    type: enum
+    values: [structured_loops,             # while/for
+             general_recursion,            # 任意の再帰
+             tail_call_only,               # 末尾呼び出しのみ
+             pattern_match_fold,           # foldr/foldl + 再帰なし
+             list_comprehension,           # [f x | x <- xs]
+             monadic_bind]                 # do-notation
+    default: general_recursion
+    cell_axis: true
+
+  termination_check:
+    type: enum
+    values: [none, structural_recursion, well_founded, totality]
+    default: none
+    notes: |
+      none = チェックなし / structural_recursion = 構造的に減少する
+      引数 / well_founded = 整礎関係 / totality = 全関数性証明
+
+  # ----- メモリ / 所有 --------------------------------------------
+  memory_management:
+    type: enum
+    values: [manual, gc, region_typed, rc, linear, borrow_check]
+    default: gc
+
+  # ----- I/O ------------------------------------------------------
+  io_model:
+    type: enum
+    values: [print_only,                   # print 文のみ
+             stream_emit,                  # emit/yield
+             file_io_imperative,           # file open/write
+             region_owned_output,          # 出力リージョン
+             monadic_io]                   # IO monad
+    default: stream_emit
+
+  # ----- 構文 ----------------------------------------------------
+  syntax_family:
+    type: enum
+    values: [c_like, ml_like, lisp_like, apl_like, haskell_like,
+             python_like, prolog_like, custom_minimal]
+    default: ml_like
+    cell_axis: true
+
+  # ----- 実装モデル -----------------------------------------------
+  abstraction:
+    type: enum
+    values: [bare_metal, libc, vm_minimal, stdlib_rich]
+    default: vm_minimal
+
+  compilation_target:
+    type: enum
+    values: [tree_walker_interpreter,      # AST 走査
+             bytecode_vm,                  # 中間命令
+             native_jit,                   # JIT コンパイル
+             native_aot]                   # AOT コンパイル
+    default: tree_walker_interpreter
+    notes: |
+      tree_walker は host 実装が 500-1500 行で済むが遅い。
+      bytecode_vm は 1500-3000 行で 10x 速い。
+      native_jit/aot は 言語デザインの問題というより実装の問題
+      なので、v2 評価では interpreter を仮定して reviewer を回す。
+
+# ─── 評価タスク (= 各アルゴリズムを当該言語で書けるか) ──────────
+evaluation:
+  use_ai: true
+  evaluator: Evaluator
+
+  tasks:
+    - PiChudnovskyBsplit                   # 必須 (制約 must_express_pi_chudnovsky_bsplit)
+    - FactorialN                           # 必須
+    - QuicksortInPlace
+    - FFTMultiply
+    - MatmulNCubed
+    - FibonacciClosedForm
+  task_specs:
+    PiChudnovskyBsplit:
+      spec: |
+        指定された桁数 N に対し、Chudnovsky 級数 の最初 ceil(N/14)+2
+        項を binary-splitting で和を取り、最後に sqrt(10005) を 1 度
+        だけ評価して π を N 桁返す関数を、当該言語で書く。
+        primitive として要求: arbitrary integer arithmetic, rational
+        or fixed-precision real, 再帰 (または等価な loop), sqrt 演算。
+      weight: 0.40
+      hard: true
+    FactorialN:
+      spec: |
+        n! を任意桁の整数として返す関数を当該言語で書く。
+        要求: 任意精度整数 + 再帰 (または loop)。
+      weight: 0.15
+      hard: true
+    QuicksortInPlace:
+      spec: |
+        配列を再帰的にパーティション分割して in-place ソート。
+        要求: 可変配列 (または同等の data structure), 再帰, 比較。
+      weight: 0.10
+    FFTMultiply:
+      spec: |
+        2 つの整数の積を NTT/FFT で求める。
+        要求: 複素数 (または mod prime 整数), 配列, 再帰。
+      weight: 0.10
+    MatmulNCubed:
+      spec: |
+        N×N 行列の素朴な O(N^3) 乗算。
+        要求: 2D 配列, 3 重 loop, 数値演算。
+      weight: 0.10
+    FibonacciClosedForm:
+      spec: |
+        F(n) = (φ^n - ψ^n)/√5 を真の整数として返す
+        (浮動小数点を使わず誤差ゼロ)。
+        要求: 代数的数の閉形式評価 OR 行列累乗。
+      weight: 0.15
+
+  # ----- Reviewer (failure mode 由来) -----
+  reviewers:
+    - name:   R1_AlgorithmExpressivity
+      persona: |
+        あなたは R1 (アルゴリズム表現力) を判定するレビュアーです。
+        候補言語の遺伝子 (paradigm, control_flow, arithmetic_primitives,
+        precision_control, type_system, syntax_family の 6 軸) を見て、
+        対象タスク (例: PiChudnovskyBsplit) を 当該言語の構文だけで
+        実装可能か を判定する。dispatch shell (compute=X 1 行で済む)
+        は不可。スコア基準:
+          1.0 = 直接 50 行以内で書ける
+          0.7 = 100 行以内で書ける
+          0.3 = 書けるが 200 行以上必要
+          0.0 = primitive 不足で書けない
+      weight: 0.30
+    - name:   R2_ArbitraryPrecisionSafety
+      persona: |
+        あなたは R2 (任意精度安全性) を判定するレビュアーです。
+        候補言語の arithmetic_primitives と precision_control を見て、
+        Chudnovsky bsplit に必要な「N=10000 桁の正確な計算」が
+        言語の型システムで保証されるかを判定する。スコア基準:
+          1.0 = arbitrary_int + rational + sqrt あり、桁数を型に
+                書ける (per_value_annotation 以上)
+          0.7 = arbitrary 系はあるが精度は実行時責任
+          0.3 = decimal_with_precision のみ
+          0.0 = fixed_int_only
+      weight: 0.20
+    - name:   R3_RecursionAndIteration
+      persona: |
+        あなたは R3 (制御フロー充実度) を判定するレビュアーです。
+        control_flow と termination_check の組合せが、二分木再帰
+        (binary splitting) と loop (FFT, matmul) の両方を表現できる
+        かを判定する。スコア基準:
+          1.0 = general_recursion かつ structured_loops 等価が両方ある
+          0.7 = どちらか一方だが余裕がある (tail_call_only など)
+          0.3 = pattern_match_fold のみ (binary tree は書けるが loop は
+                奇妙な書き方になる)
+          0.0 = どちらも書けない
+      weight: 0.20
+    - name:   R4_ImplementabilityFeasibility
+      persona: |
+        あなたは R4 (ホスト実装の実現可能性) を判定するレビュアーです。
+        compilation_target と syntax_family と type_system の組合せが、
+        Python ホストで 500-3000 行の interpreter として書けるかを
+        判定する。スコア基準:
+          1.0 = tree_walker + ml_like/c_like/python_like + static_simple
+                 等 (1500 行以内)
+          0.7 = bytecode_vm + 静的型 (3000 行以内)
+          0.3 = dependent type 入り (5000 行近い)
+          0.0 = native_jit/aot を選んだ (実装範疇外)
+      weight: 0.15
+    - name:   R5_Generality
+      persona: |
+        あなたは R5 (汎用性) を判定するレビュアーです。当該言語が
+        6 タスク (PiChudnovskyBsplit, FactorialN, QuicksortInPlace,
+        FFTMultiply, MatmulNCubed, FibonacciClosedForm) のうち何個を
+        書けるかを推定する。スコア基準:
+          1.0 = 5-6 個書ける
+          0.7 = 3-4 個
+          0.3 = 1-2 個
+          0.0 = 0 個 (PiChudnovskyBsplit すら書けない → 失格)
+      weight: 0.15
+
+# ─── 失敗モード ────────────────────────────────────────────────
+failure_modes:
+  F1_NotImplementable:
+    cause: "genome が native_jit/aot や dependent type など、host で書けない組合せ"
+    detector: R4_ImplementabilityFeasibility score < 0.3
+    mitigation: coherence rule で compilation_target を tree_walker / bytecode_vm に絞る
+
+  F2_AlgorithmStuck:
+    cause: "control_flow が pattern_match_fold のみで loop が書けない、または逆"
+    detector: R3_RecursionAndIteration score < 0.3
+    mitigation: control_flow の coherence rule で combinations を絞る
+
+  F3_PrecisionLost:
+    cause: "arithmetic_primitives が fixed_int_only で 10000 桁に届かない"
+    detector: R2_ArbitraryPrecisionSafety score < 0.3
+    mitigation: hard constraint must_express_pi_chudnovsky_bsplit で除外
+
+  F4_TypeSystemOverkill:
+    cause: "dependent type だけ採用して interpreter が 5000 行を超える"
+    detector: R4 score < 0.5 かつ type_system in [dependent]
+    mitigation: coherence rule で dependent はクラスタを限定
+
+  F5_NotGeneral:
+    cause: "1 タスクしか書けず汎用性スコアが低い"
+    detector: R5_Generality score < 0.3
+    mitigation: 進化的に多様な genome を保つ (cell_axis 5 軸)
+
+# ─── v1 から継承する観測ベースライン ────────────────────────────
+v1_inherited_baseline:
+  trial_id: 2026-05-16_robustness_v1_production
+  exit_reason: lineage_dump
+  completed_generations: 30
+  individuals: 38
+  cost_usd: 0.269
+  wall_time_min: 33
+  calls_per_min: 30
+  takeaway: |
+    v2 で同じ規模 (seed=8 / gen=30) を回すと calls/min はやや
+    下がる見込み (reviewer prompt が長め)。 想定: ~$0.30-0.45,
+    ~40 min, ~1000 calls。
+
+# ─── ランタイム設定 (v1 から継承) ───────────────────────────────
+runtime:
+  # v1 で確立した安全策をそのまま使う
+  provider:          openai
+  model:             gpt-4o-mini
+  concurrency:       8
+  request_timeout_s: 60
+  sdk_retries:       3
+  drain_timeout_s:   7200
+  idle_ms:           60000
+  checkpoint_per_gen: on
+  caffeinate:        on
+  # ↑ v1 top-tier 個体から手動で抽出した「実用 robust 設定」
+
+# ─── 次のステップ (本 .aice → .ga.json → .aipl) ─────────────────
+plan:
+  step_1_aice:
+    status: done   # この YAML がそれ
+  step_2_schema:
+    file: schemas/lang_design_paradigm.schema.json
+    status: todo
+    note: |
+      12 軸 (paradigm, evaluation_strategy, type_system,
+      arithmetic_primitives, precision_control, control_flow,
+      termination_check, memory_management, io_model, syntax_family,
+      abstraction, compilation_target) を持つスキーマを新規作成。
+      coherence rule で:
+        - dependent type ⇒ compilation_target ∈ {tree_walker}
+        - native_jit / native_aot は除外 (R4 自動 0)
+        - fixed_int_only は除外 (制約違反)
+        - lisp_like + dependent はクラスタが重い → 除外
+  step_3_ga_json:
+    file: LangDesign_Expressive.ga.json
+    status: todo
+  step_4_aipl:
+    file: LangDesign_Expressive.aipl
+    status: todo
+  step_5_run:
+    estimated_wall_min: 40
+    estimated_cost_usd: 0.40
+    status: todo
+  step_6_synthesize_language:
+    description: |
+      MAP-Elites の top 5 genome を見て、勝った軸の組合せ を
+      手動で「言語仕様」に書き起こす。v1 の PhiLang のように
+      4 ブロック程度の最小構文で記述する。
+    status: todo
+  step_7_implement_interpreter:
+    description: |
+      新言語の interpreter を 500-3000 行で Python で実装し、
+      Chudnovsky bsplit を 当該言語のソースで 書き、π 10000 桁
+      を計算する。v1 の philang/ サブディレクトリと同じレイアウト。
+    status: todo
+  step_8_report:
+    file: REPORT.md
+    status: todo

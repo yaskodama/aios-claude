@@ -1,0 +1,270 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Pi_Phase1_Robustness.math.aice
+#  Dialect: aice_math_v1 (案3: 数理最適化型 Constraint/Optimization DSL)
+#
+#  Pi_Phase1_Robustness.aice (案1 YAML) と同じ問題を、決定変数 +
+#  目的関数 + 制約の数理プログラミング形式で記述する。重複は最小
+#  に抑え、YAML 版にあって数理に落としにくい記述 (説明文・履歴・
+#  plan の手続的差分) はそちらを参照する。
+#
+#  記法:
+#    ∈        : 帰属 (in)
+#    ℤ        : 整数集合
+#    [a,b]    : 閉区間
+#    {a,b,c}  : 列挙集合
+#    ≤ ≥ =    : 比較
+#    ⇒        : 含意
+#    ·        : 乗算
+#    ←        : 観測値の代入 (calibration)
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_math_v1
+problem:  Pi_Phase1_RealLLM_Robustness
+parent_yaml: Pi_Phase1_Robustness.aice
+parent_aipl: Pi_Phase1_OpenSearch.aipl
+version:  0.1.0
+created:  2026-05-16
+
+# ─── 決定変数 ─────────────────────────────────────────────────────
+# 各変数の意味と動機は YAML 版の `variables:` を参照。
+# 数式から見える型と定義域のみここに記す。
+variables:
+    provider           ∈ {openai, anthropic, vertex, mock}
+    model              ∈ {gpt-4o-mini, gpt-4o, claude-haiku-4-5}
+    concurrency        ∈ ℤ ∩ [1, 32]
+    seed_count         ∈ ℤ ∩ [4, 24]
+    generations        ∈ ℤ ∩ [10, 80]
+    request_timeout_s  ∈ ℤ ∩ [10, 300]
+    sdk_retries        ∈ ℤ ∩ [0, 5]
+    drain_timeout_s    ∈ ℤ ∩ [60, 14_400]
+    idle_ms            ∈ ℤ ∩ [1_000, 300_000]
+    checkpoint_per_gen ∈ {0, 1}
+    caffeinate         ∈ {0, 1}
+
+# ─── 環境定数 (model 依存) ────────────────────────────────────────
+constants:
+    RPM(gpt-4o-mini)          = 500
+    RPM(gpt-4o)               = 5_000
+    RPM(claude-haiku-4-5)     = 50         # tier 依存
+    TPM(gpt-4o-mini)          = 200_000
+    latency_p50(gpt-4o-mini)  = 1.5  s
+    latency_p99(gpt-4o-mini)  = 8.0  s
+
+    price_in(gpt-4o-mini)     = 0.15   USD / 10^6 token
+    price_out(gpt-4o-mini)    = 0.60   USD / 10^6 token
+    price_in(gpt-4o)          = 2.50   USD / 10^6 token
+    price_out(gpt-4o)         = 10.00  USD / 10^6 token
+    price_in(claude-haiku)    = 1.00   USD / 10^6 token
+    price_out(claude-haiku)   = 5.00   USD / 10^6 token
+
+    sleep_after_min(macos_default) = 30
+    generations_target             = 40
+
+# ─── 派生量 (closed-form モデル + 観測較正) ───────────────────────
+derived:
+
+    # 1. コール総数モデル (試行 #3 calibration)
+    #    1 個体あたり: mutate 1 + cell 1 + reviewer 5 × task 5 = 27 calls 想定
+    #    観測値: seed あたり 26.6, generation あたり 25.4 (試行 #3 から推定)
+    total_calls(seed_count, generations)
+        = seed_count · 26.6
+        + generations · 25.4
+        ± retry_overhead(sdk_retries, F2_status)
+
+    # 2. コストモデル
+    #    試行 #3 では in/out 比率 ≈ 1.6, 1 call ≈ 1140 tokens 平均
+    cost_usd(total_calls, model)
+        = total_calls
+          · (price_in(model)  · avg_in_tokens
+           + price_out(model) · avg_out_tokens)
+          / 10^6
+    where:
+        avg_in_tokens   = 638        # ← 試行 #3 実測 (382006/599)
+        avg_out_tokens  = 399        # ← 試行 #3 実測 (238899/599)
+
+    # 3. スループットモデル (理論上限 vs 実効)
+    throughput_max(concurrency, model)
+        = min(concurrency, RPM(model) / 60)
+          · 60 / latency_p50(model)
+        [calls/min]
+
+    α(impl_version)
+        ∈ [0.05, 0.25]      if impl_version = current_coordinator
+        ∈ [0.50, 0.90]      if impl_version = redesigned_fan_out
+        ← 0.094              from trial_3_observed   # 23 / 240
+
+    throughput_calls_per_min
+        = α(impl_version) · throughput_max(concurrency, model)
+
+    # 4. 完走確率モデル (失敗モード合成)
+    P(silent_death | request_timeout_s, sdk_retries)
+        = 1.0                  if request_timeout_s = ∞ ∧ sdk_retries = 0
+        ≤ 0.01                 if request_timeout_s ≤ 60 ∧ sdk_retries ≥ 3
+
+    P(lost_progress | checkpoint_per_gen)
+        = 1.0                  if checkpoint_per_gen = 0 ∧ silent_death
+        ≤ (seed_count+1) / total_individuals   if checkpoint_per_gen = 1
+
+    expected_completed_generations(generations)
+        = generations · (1 − P(silent_death) − P(macos_kill))
+
+    # 5. 壁時計時間モデル
+    wall_time_min(seed_count, generations, throughput_calls_per_min)
+        = total_calls(seed_count, generations)
+          / throughput_calls_per_min
+
+# ─── 目的関数 ─────────────────────────────────────────────────────
+objective:
+    maximize:
+        F = W_gen   · expected_completed_generations / generations_target
+          + W_div   · normalize(score_std, [0.05, 0.30])
+          + W_tput  · normalize(throughput_calls_per_min, [0, 480])
+          + W_cost  · (1 − normalize(cost_usd, [0, 2.0]))
+
+    weights:
+        W_gen   = 0.5     # 完走重視
+        W_div   = 0.2     # 多様性 (選択圧)
+        W_tput  = 0.2     # 速度
+        W_cost  = 0.1     # 予算余裕
+
+    bounds: F ∈ [0.0, 1.0]
+
+# ─── 制約 (ハード) ───────────────────────────────────────────────
+hard_constraints:
+    C1_cost:       cost_usd                  ≤ 2.0
+    C2_time:       wall_time_min             ≤ 30
+    C3_budget:     total_tokens              ≤ 5 · 10^6
+    C4_exit:       exit_reason               = lineage_dump
+
+    # 失敗モード由来の構造的制約
+    C5_F1:         drain_timeout_s           ≥ wall_time_min · 60
+                ∧  idle_ms                   ≥ 30_000
+                ⇒  ¬ F1_timeout_too_short
+
+    C6_F2:         request_timeout_s         ∈ [10, 60]
+                ∧  sdk_retries               ≥ 3
+                ⇒  P(F2_sdk_hang) ≤ 0.01
+
+    C7_F3:         checkpoint_per_gen        = 1
+                ⇒  ¬ F3_no_checkpoint
+
+    C8_F4:         (α(impl_version) ≥ 0.5)
+                ∨  (seed_count · generations ≤ 160)
+                ⇒  wall_time_min ≤ 30
+                # 現状 α ≈ 0.094 なので seed_count·generations ≤ 160 が事実上必須
+
+    C9_F5:         caffeinate                = 1   if wall_time_min > sleep_after_min
+
+# ─── ソフト制約 / 推奨 ───────────────────────────────────────────
+soft_constraints:
+    S1_diversity:        score_std            ≥ 0.10
+    S2_coverage:         non_zero_score_count ≥ generations · 0.8
+    S3_selection:        max(score) − min(score) ≥ 0.20
+
+# ─── 観測較正点 (試行 #3, 2026-05-16) ────────────────────────────
+calibration:
+    trial_id: 2026-05-16_trial_3
+    inputs:
+        provider           ← openai
+        model              ← gpt-4o-mini
+        concurrency        ← 8
+        seed_count         ← 12
+        generations        ← 40
+        request_timeout_s  ← 60
+        sdk_retries        ← 3
+        checkpoint_per_gen ← 1
+    measurements_at_interrupt:
+        completed_generations  ← 11
+        total_calls            ← 599
+        wall_time_min          ← 25
+        calls_per_min          ← 23
+        cost_usd               ← 0.20
+        score_min              ← 0.16
+        score_max              ← 0.58
+        score_mean             ← 0.32
+        score_std              ← ?      # 未計測
+        exit_reason            ← user_kill          # ⇒ C4 violation
+    derived_check:
+        α_observed             = 23 / throughput_max(8, gpt-4o-mini)
+                               = 23 / 240
+                               = 0.094
+        total_calls_predicted  = 12 · 26.6 + 11 · 25.4 = 599.6
+        total_calls_observed   = 599        ≈ predicted  ✓
+        wall_time_predicted    = 599 / 23   = 26.0 min   ≈ 25 min ✓
+        cost_predicted         = 599 · (0.15·638 + 0.60·399) / 10^6
+                               = 599 · (95.7 + 239.4) / 10^6
+                               = 599 · 335.1 / 10^6
+                               = 0.201  USD       ≈ observed $0.20 ✓
+
+# ─── ソルバ向けヒント ─────────────────────────────────────────────
+solver_hints:
+    # 連続変数なし → MILP / CP-SAT / random search どれでも可。
+    # 探索空間: |variables| ≈ 4 · 3 · 32 · 21 · 71 · 291 · 6 · 1 · 1 · 2 · 2 ≈ 6 · 10^9
+    # 実用上は cell_axis (provider, model, concurrency, seed_count, generations)
+    # の 5 軸 × 残りは MAP-Elites の自由軸として扱う。
+
+    cell_axes:
+        - provider
+        - model
+        - concurrency
+        - seed_count
+        - generations
+
+    free_axes:
+        - request_timeout_s
+        - sdk_retries
+        - drain_timeout_s
+        - idle_ms
+        - checkpoint_per_gen
+        - caffeinate
+
+    initial_seeds:
+        - { name: trial_3_redo,
+            provider: openai, model: gpt-4o-mini, concurrency: 8,
+            seed_count: 12, generations: 40, ... }
+        - { name: branch_C_recommended,
+            provider: openai, model: gpt-4o-mini, concurrency: 8,
+            seed_count: 8, generations: 20, ... }
+        - { name: high_parallel_target,
+            provider: openai, model: gpt-4o-mini, concurrency: 16,
+            seed_count: 12, generations: 40, ...,
+            requires_implementation_change: redesigned_fan_out }
+
+# ─── 数式から見た 4 ブランチの fitness 予測 ──────────────────────
+branch_predictions:
+    branch_A (use_existing_lineage):
+        completed_generations  = 11
+        cost_usd               = 0.0   (追加)
+        wall_time_min          = 5
+        F                      ≈ 0.5·(11/40) + 0.2·0.30/0.30 + 0.2·0 + 0.1·1.0
+                               = 0.1375 + 0.2 + 0 + 0.1
+                               = 0.4375          # 完走していないが追加コスト 0
+
+    branch_B (full_rerun_current_impl):
+        completed_generations  ≈ 40 · (1 − P_silent_death)
+                               ≈ 40 · 0.95
+                               = 38
+        cost_usd               ≈ 0.40
+        wall_time_min          ≈ 60               # C2 violation!
+        F                      ≈ 0.5·(38/40) + 0.2·0.7 + 0.2·0.1 + 0.1·0.8
+                               = 0.475 + 0.14 + 0.02 + 0.08
+                               = 0.715
+        feasible: false        # C2 violated
+
+    branch_C (shrink_parameters):                # 推奨
+        completed_generations  ≈ 20 · 0.95 = 19
+        cost_usd               ≈ 0.20
+        wall_time_min          ≈ 25
+        F                      ≈ 0.5·(19/20) + 0.2·0.6 + 0.2·0.1 + 0.1·0.9
+                               = 0.475 + 0.12 + 0.02 + 0.09
+                               = 0.705
+        feasible: true   ✓
+
+    branch_D (redesign_fan_out):
+        completed_generations  ≈ 40
+        cost_usd               ≈ 0.40
+        wall_time_min          ≈ 8                # α ≈ 0.7 で 5x 高速
+        F                      ≈ 0.5·1.0 + 0.2·0.8 + 0.2·0.7 + 0.1·0.8
+                               = 0.5 + 0.16 + 0.14 + 0.08
+                               = 0.88
+        feasible: true   ✓
+        engineering_cost: 4-8 hours       # 数理モデル外

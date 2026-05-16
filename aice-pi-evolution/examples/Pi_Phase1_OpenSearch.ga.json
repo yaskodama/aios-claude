@@ -92,7 +92,8 @@
         "persona": "あなたは Phase-0 ベースラインとの差分レビュアーです。候補が Phase-0 の 5 seeds より何において厳密に勝ち, 何において妥協しているかを 1 文で答えてください。",
         "weight": 0.2
       }
-    ]
+    ],
+    "use_ai": true
   },
   "meta_fitness": {
     "trend_alignment": 0.25,

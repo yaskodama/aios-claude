@@ -1,0 +1,839 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{進化計算による「LLM 駆動 MAP-Elites を安全に走らせる言語」探索
+---
+実験報告}\label{ux9032ux5316ux8a08ux7b97ux306bux3088ux308bllm-ux99c6ux52d5-map-elites-ux3092ux5b89ux5168ux306bux8d70ux3089ux305bux308bux8a00ux8a9eux63a2ux7d22-ux5b9fux9a13ux5831ux544a}
+
+\textbf{日付:} 2026-05-16 \textbf{実験名:}
+\texttt{2026-05-16\_robustness\_v1} \textbf{作業ディレクトリ:}
+\texttt{/Users/kodamay/ocaml-app/abclcp-project/aice-pi-evolution/experiments/2026-05-16\_robustness\_v1/}
+\textbf{親実験:} \href{../../REPORT_JA.md}{REPORT\_JA.md} (PiLang
+を生んだ 2026-05-15 実験)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. 目的}\label{ux76eeux7684}
+
+PiLang を生んだ進化計算は \textbf{「π 10,000 桁を求めるのに最適な言語」}
+を探索した。本実験は同じパイプラインを\textbf{メタ層}に当て、
+
+\begin{quote}
+\textbf{「LLM 駆動 MAP-Elites を実機上で安全 (コスト ≤ \$2 / 壁時計 ≤ 30
+分 / silent death 0) に完走させる」}
+\end{quote}
+
+という問題を解くのに最適な\textbf{ランタイム構成言語}を進化計算で探索する。元の
+PiLang
+探索が「数値計算問題から言語を生む」だったのに対し、本実験は「メタ計算問題から言語を生む」点で対照的である。
+
+具体的には、2026-05-16 セッションの前半で観測した 3 つの失敗モード (試行
+\#1〜\#3) を踏まえ、\texttt{.aice\ (YAML)\ →\ .ga.json\ →\ .aipl}
+のパイプラインを通して、
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  11 軸 (provider, model, concurrency, seed\_count, generations,
+  request\_timeout\_s, sdk\_retries, drain\_timeout\_s, idle\_ms,
+  checkpoint\_per\_gen, caffeinate) を持つ
+  \textbf{ランタイム遺伝子}を設計、
+\item
+  F1〜F5 の 5 つの reviewer を LLM-as-judge として実装、
+\item
+  OpenAI gpt-4o-mini で MAP-Elites を 30 世代走らせ、
+\item
+  個体群から「安全に走るための設計原理」を抽出、
+\item
+  それを表現する言語 \textbf{PhiLang} を提案する、
+\end{enumerate}
+
+までを一気通貫で行った。
+
+\subsection{2. 実験構成}\label{ux5b9fux9a13ux69cbux6210}
+
+\subsubsection{2.1
+ディレクトリ}\label{ux30c7ux30a3ux30ecux30afux30c8ux30ea}
+
+\begin{verbatim}
+experiments/2026-05-16_robustness_v1/
+├── Pi_Phase1_Robustness.aice          ← 案 1 (YAML) の問題定義
+├── Pi_Phase1_Robustness.math.aice     ← 案 3 (数理最適化) の問題定義 (参考)
+├── Pi_Phase1_Robustness.ga.json       ← 中間 IR
+├── Pi_Phase1_Robustness.aipl          ← 実行プログラム (21 KB)
+├── robustness_paradigm.schema.json    ← 遺伝子スキーマ
+├── Pi_Phase1_Robustness.aipl_lineage.json   ← 38 個体の結果
+├── ai_usage.json                      ← OpenAI 課金
+├── Pi_Phase1_Robustness.log           ← 実行ログ
+└── REPORT.md                          ← この文書
+\end{verbatim}
+
+\subsubsection{\texorpdfstring{2.2 新規遺伝子スキーマ
+\texttt{robustness\_paradigm.schema.json}}{2.2 新規遺伝子スキーマ robustness\_paradigm.schema.json}}\label{ux65b0ux898fux907aux4f1dux5b50ux30b9ux30adux30fcux30de-robustness_paradigm.schema.json}
+
+PiLang スキーマ (\texttt{pi\_paradigm.schema.json})
+を\textbf{継承せず}、メタ層用に独立に設計した。11 軸:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値域
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+由来
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{provider} & \texttt{openai,\ anthropic,\ vertex,\ mock} & LLM
+接続先 \\
+\texttt{model} & \texttt{gpt-4o-mini,\ gpt-4o,\ claude-haiku-4-5} &
+モデル \\
+\texttt{concurrency} & \texttt{c1,\ c2,\ c4,\ c8,\ c16,\ c32} &
+\texttt{ABCL\_AI\_MAX\_CONCURRENT} \\
+\texttt{seed\_count} & \texttt{s4,\ s6,\ s8,\ s12,\ s16,\ s24} &
+MAP-Elites 種数 \\
+\texttt{generations} & \texttt{g10,\ g15,\ g20,\ g30,\ g40,\ g60,\ g80}
+& MAP-Elites 世代数 \\
+\texttt{request\_timeout\_s} & \texttt{t10,\ t30,\ t60,\ t120,\ t300} &
+F2 (\texttt{AIPL\_AI\_REQUEST\_TIMEOUT}) \\
+\texttt{sdk\_retries} & \texttt{r0,\ r1,\ r3,\ r5} & F2
+(\texttt{AIPL\_AI\_SDK\_RETRIES}) \\
+\texttt{drain\_timeout\_s} &
+\texttt{d60,\ d600,\ d3600,\ d7200,\ d14400} & F1
+(\texttt{-\/-timeout}) \\
+\texttt{idle\_ms} & \texttt{i1000,\ i5000,\ i30000,\ i60000,\ i300000} &
+F1 (\texttt{-\/-idle-ms}) \\
+\texttt{checkpoint\_per\_gen} & \texttt{off,\ on} & F3 (lineage dump
+頻度) \\
+\texttt{caffeinate} & \texttt{off,\ on} & F5 (Mac sleep 対策) \\
+\end{longtable}
+}
+
+7 軸を \texttt{ordinal\_axes} で順序付け、6 つの \texttt{coherence}
+ルール (例:
+\texttt{provider=openai\ ⇒\ drain\_timeout\_s\ ∈\ \{d3600,\ d7200,\ d14400\}})
+で「明らかに不安全な組合せ」を変異が生まないようにした。\texttt{open\_axes=false}
+--- ランタイム設定なので LLM が新軸を提案する余地はない。
+
+\subsubsection{2.3 失敗モード F1〜F5 を 5 reviewer
+に展開}\label{ux5931ux6557ux30e2ux30fcux30c9-f1f5-ux3092-5-reviewer-ux306bux5c55ux958b}
+
+2026-05-16 セッション前半で観測した失敗モードを 1 mode = 1 reviewer
+に対応させた:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3077}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+reviewer
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+検出対象
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+weight
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+スコア基準
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+F1\_IdleTimeoutGuard & \texttt{drain\_timeout\_s} と \texttt{idle\_ms}
+が real LLM 用に十分か & 0.20 & \texttt{d3600+\ \&\ i30000+} → 1.0, 片方
+→ 0.5, 両方未満 → 0.0 \\
+F2\_SdkHangGuard & \texttt{request\_timeout\_s} と \texttt{sdk\_retries}
+で SDK ハング回避 & 0.25 & \texttt{t30..t120\ \&\ r3+} → 1.0,
+\texttt{t10..t300\ \&\ r1+} → 0.5 \\
+F3\_CheckpointGuard & \texttt{checkpoint\_per\_gen=on} か & 0.15 &
+\texttt{on\ →\ 1.0,\ off\ →\ 0.0} (二値) \\
+F4\_ThroughputGuard & 30 分以内に完走可能か
+(\texttt{total\_calls\ /\ (23·max(1,α·c))}) & 0.25 &
+\texttt{wall\ ≤\ 15min} → 1.0, \ldots, \texttt{\textgreater{}\ 60min} →
+0.0 \\
+F5\_SleepGuard & wall \textgreater{} 30min なら \texttt{caffeinate=on}
+か & 0.15 & 推定時間 ≤ 30min → 1.0, \textgreater{} 30min かつ on → 1.0,
+それ以外 → 0.0 \\
+\end{longtable}
+}
+
+各 persona には \textbf{prefix エンコーディングキー}
+(\texttt{drain\_timeout\_s\ の\ d\{N\}\ は\ N\ 秒,\ d3600=1時間}) と
+\textbf{0.0--1.0 段階スコア基準} を明記。これは smoke 縮小版 (4 seed ×
+10 gen) で reviewer が OK/NG 二値を返そうとして全スコアが 0.04〜0.23
+に張り付いた問題を直したもの。
+
+\subsubsection{\texorpdfstring{2.4 \texttt{.aice} から \texttt{.aipl}
+までのパイプライン}{2.4 .aice から .aipl までのパイプライン}}\label{aice-ux304bux3089-.aipl-ux307eux3067ux306eux30d1ux30a4ux30d7ux30e9ux30a4ux30f3}
+
+PiLang 実験で確立した \texttt{.aice\ →\ .ga.json\ →\ .aipl}
+の三段パイプラインをそのまま流用。今回は \texttt{.aice} の dialect が
+\textbf{YAML (案 1)} であるため、\texttt{aice\_parser.lower()} の
+curly-brace パーサは使えず、\textbf{YAML を手作業で \texttt{.ga.json}
+にマップ}した。\texttt{.ga.json\ →\ .aipl} は既存の
+\texttt{aipl\_codegen.generate\_program()} がそのまま動いた (641 行の
+AIPL プログラムを生成)。
+
+\subsection{3.
+パイプライン実行}\label{ux30d1ux30a4ux30d7ux30e9ux30a4ux30f3ux5b9fux884c}
+
+\subsubsection{3.1 試行履歴 (3 失敗 + 1
+完走)}\label{ux8a66ux884cux5c65ux6b74-3-ux5931ux6557-1-ux5b8cux8d70}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+試行
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+教訓
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\#1 & 5 秒で死亡 (1 call) & \texttt{-\/-timeout\ 2.0} /
+\texttt{-\/-idle-ms\ 120} の既定値が real LLM では短すぎ \\
+\#2 & gen 38/40 (1267 calls, \$0.44) で silent death & OpenAI SDK の
+HTTPS request にタイムアウト無で永久待機 \\
+\#3 & gen 11/40 (23 個体, \$0.20) でユーザ中断 & 実効並列度 1〜2
+でスループット遅い \\
+smoke & 14 個体 (350 calls, \$0.094, 13 分) 完走 & reviewer OK/NG 表記で
+score 低 (max 0.23) \\
+\textbf{\#4 本番} & \textbf{38 個体 (950 calls, \$0.269, 33 分) 完走} &
+reviewer 0.0--1.0 + prefix キー化で score 改善 (max 0.46) \\
+\end{longtable}
+}
+
+\subsubsection{3.2 \#4
+本番ランの安全策}\label{ux672cux756aux30e9ux30f3ux306eux5b89ux5168ux7b56}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\VariableTok{AIPL\_AI\_PROVIDER}\OperatorTok{=}\NormalTok{openai}
+\VariableTok{ABCL\_AI\_MAX\_CONCURRENT}\OperatorTok{=}\NormalTok{8}
+\VariableTok{AIPL\_AI\_REQUEST\_TIMEOUT}\OperatorTok{=}\NormalTok{60      }\CommentTok{\# F2 対策}
+\VariableTok{AIPL\_AI\_SDK\_RETRIES}\OperatorTok{=}\NormalTok{3           }\CommentTok{\# F2 対策}
+\ExtensionTok{{-}{-}timeout}\NormalTok{ 7200                  }\CommentTok{\# F1 対策}
+\ExtensionTok{{-}{-}idle{-}ms}\NormalTok{ 60000                 }\CommentTok{\# F1 対策}
+\end{Highlighting}
+\end{Shaded}
+
+これら 4 つの env と CLI フラグは試行 \#1〜\#3
+から学んだ「失敗を防ぐ既定」である。\textbf{興味深いことに、進化計算は同じ結論にメタ的に到達した}
+(§4 参照)。
+
+\subsubsection{3.3 サマリ}\label{ux30b5ux30deux30ea}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrrl@{}}
+\toprule\noalign{}
+指標 & 実測 & 予測 & 差 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+完走 & ✓ & --- & --- \\
+壁時計 & 33 分 & 45 分 & −27\% \\
+コスト & \$0.269 & \$0.34 & −20\% \\
+コール数 & 950 & 1,026 & −7\% \\
+スループット & 30 calls/min & 23 calls/min & +30\% \\
+silent\_death & 0 & 0 & ✓ \\
+\end{longtable}
+}
+
+\subsection{4. 結果}\label{ux7d50ux679c}
+
+\subsubsection{4.1 個体軸頻度 (38 個体, top
+3)}\label{ux500bux4f53ux8ef8ux983bux5ea6-38-ux500bux4f53-top-3}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+上位値
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+コメント
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{provider} & openai:14, mock:13, vertex:11 & 偏り少
+(rng\_seed=31415926 起因の偶然均一) \\
+\texttt{model} & gpt-4o:15, claude-haiku-4-5:14, gpt-4o-mini:9 &
+reviewer は model ID をテキスト判定するだけなので gpt-4o-mini
+が必ずしも勝たない \\
+\texttt{concurrency} & c8:9, c16:9, c1:8, c32:7, c2:5 & top 5 では c1
+が支持 (g15 だと並列度に依存しない) \\
+\texttt{seed\_count} & s8:13, s6:8, s12:8, s4:5, s16:4 &
+中央値が好まれた \\
+\texttt{generations} & \textbf{g15:14}, g10:6, g20:5, g30:4, g40:4 &
+\textbf{「短いほど完走確率高い」が圧倒的多数派} \\
+\texttt{request\_timeout\_s} & t60:11, t30:10, t120:8, t300:5, t10:4 &
+F2 推奨域 \texttt{t30-t120} に集中 \\
+\texttt{sdk\_retries} & r3:12, r5:11, r1:8, r0:7 & \textbf{r3+ が 23/38
+(60\%)} で F2 推奨を満たす \\
+\texttt{drain\_timeout\_s} & d7200:11, d14400:8, d3600:7, d600:7, d60:5
+& \textbf{d3600+ が 26/38 (68\%)} で F1 推奨を満たす \\
+\texttt{idle\_ms} & i60000:11, i30000:10, i300000:8, i5000:5, i1000:4 &
+\textbf{i30000+ が 29/38 (76\%)} で F1 推奨を満たす \\
+\texttt{checkpoint\_per\_gen} & off:22, on:16 & F3 weight=0.15
+が他に押し負け \\
+\texttt{caffeinate} & off:20, on:18 & ほぼ五分 \\
+\end{longtable}
+}
+
+→ \textbf{F1 と F2 の reviewer が強い選択圧を生み、F3 は weight
+不足で機能不全}、という非対称な学習結果。
+
+\subsubsection{4.2 Top 5
+個体の遺伝子}\label{top-5-ux500bux4f53ux306eux907aux4f1dux5b50}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1905}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1429}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedleft
+順位
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+id
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+gen
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+op
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+score
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+genome (要約)
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & I25 & 17 & axis\_resample & \textbf{0.457} & mock·gpt-4o · c1·s6·g15
+· t30·r3·d14400·i30000 · ckpt=off·caff=off \\
+2 & I24 & 16 & uniform\_crossover & 0.455 & mock·gpt-4o · c8·s8·g15 ·
+t300·r5·d600·i30000 · ckpt=off·caff=on \\
+3 & I19 & 11 & uniform\_crossover & 0.421 & openai·claude-haiku ·
+c2·s8·g15 · t30·r5·d7200·i60000 · ckpt=off·caff=off \\
+4 & I1 & 0 & seed & 0.397 & mock·gpt-4o · c1·s6·g15 · t30·r3·d600·i30000
+· ckpt=off·caff=off \\
+5 & I30 & 22 & axis\_resample & 0.396 & openai·claude-haiku · c32·s8·g15
+· t30·r5·d7200·i60000 · ckpt=off·caff=off \\
+\end{longtable}
+}
+
+\subsubsection{4.3
+世代別スコア推移}\label{ux4e16ux4ee3ux5225ux30b9ux30b3ux30a2ux63a8ux79fb}
+
+\begin{verbatim}
+gen= 0: max=0.397 mean=0.257   (8 seed の初期スコア帯)
+gen= 4: max=0.392
+gen=11: max=0.421              (crossover 1 発目で上振れ)
+gen=16: max=0.455
+gen=17: max=0.457              ← 全体ベスト
+gen=22: max=0.396
+\end{verbatim}
+
+→ 25 世代で 0.397 → 0.457 に \textbf{約 15\%
+改善}。改善幅は小さいがブレイクスルー (gen 16-17) は crossover
+が生み出した。MAP-Elites の elite
+更新と突然変異の組合せが機能していることが分かる。
+
+\subsection{5.
+進化計算が示唆する設計原理}\label{ux9032ux5316ux8a08ux7b97ux304cux793aux5506ux3059ux308bux8a2dux8a08ux539fux7406}
+
+38 個体のスコア分布と top 5 の共通項から、「LLM 駆動 MAP-Elites
+を安全に走らせる」言語が\textbf{先天的に備えるべき四つの特性}を抽出する。これは
+PiLang における
+\texttt{Array\_DSL\ ×\ refinement-typed\ ×\ region-owned\ ×\ streaming}
+の 4 つ巴と同じ抽象度の知見である。
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+特性
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+進化計算が示した根拠
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{(A) Bounded burst} & top 5 全員が \texttt{generations=g15}
+を支持。長時間ランより短バースト+部分結果採用を選好 \\
+\textbf{(B) Mandatory retry/timeout} & 全 top 5 が
+\texttt{sdk\_retries\ ≥\ r3} かつ
+\texttt{request\_timeout\_s\ ≤\ t300}。「待ち続ける」より「諦めて再試行」 \\
+\textbf{(C) Generous drain buffer} & 80\% が
+\texttt{drain\_timeout\_s\ ≥\ d3600} \&
+\texttt{idle\_ms\ ≥\ i30000}。actor 落穂拾いに余裕を持つ \\
+\textbf{(D) Forced checkpoint} & 進化計算自体は F3
+を見落としたが、人間が安全運用のために\textbf{必須化}すべき特性 (§7.4
+参照) \\
+\end{longtable}
+}
+
+→ \textbf{「Bounded burst × Mandatory retry × Generous drain × Forced
+checkpoint」} の交点として、メタ問題に最適な言語が浮かび上がる。
+
+\subsection{6. 進化計算が生んだ言語
+PhiLang}\label{ux9032ux5316ux8a08ux7b97ux304cux751fux3093ux3060ux8a00ux8a9e-philang}
+
+PiLang が \textbf{πの 1 タスク}から生まれた言語であるように、本実験は
+\textbf{メタ・実行制御の 1 タスク}から \textbf{PhiLang} (Φ = Phase,
+「位相」) を生んだ。
+
+\subsubsection{6.1 PhiLang
+のコア構文}\label{philang-ux306eux30b3ux30a2ux69cbux6587}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# PhiLang — Phase Orchestration Language synthesized from MAP{-}Elites}
+\NormalTok{\# (2026{-}05{-}16\_robustness\_v1 evolution result)}
+
+\NormalTok{phase Phase1}
+\NormalTok{  within   30 min      and   $0.30                     \# ハード予算}
+\NormalTok{  uses     openai/gpt{-}4o{-}mini}
+\NormalTok{  drains   for 2 h     idle 60 s                       \# actor drain buffer}
+\NormalTok{  caffeine if duration \textgreater{} 30 min                        \# F5}
+\NormalTok{\{}
+\NormalTok{  seeds       = 8}
+\NormalTok{  generations = 15                                     \# ← 短バースト (A)}
+\NormalTok{  cell\_axes   = [paradigm, arithmetic, algorithm, precision, memory]}
+
+\NormalTok{  every call has policy \{                              \# ← 全コールに強制}
+\NormalTok{    timeout    : 60 s}
+\NormalTok{    retries    : 3 with exponential\_backoff           \# ← (B)}
+\NormalTok{    on\_hang    : kill\_and\_retry}
+\NormalTok{  \}}
+
+\NormalTok{  after every individual \{                             \# ← 強制 checkpoint (D)}
+\NormalTok{    checkpoint lineage to "out/lineage.json"}
+\NormalTok{  \}}
+\NormalTok{\}}
+\NormalTok{guarantees \{}
+\NormalTok{  no\_silent\_death                                      \# ← (B), (C) から導出}
+\NormalTok{  bounded\_cost            $0.30}
+\NormalTok{  bounded\_wall            30 min}
+\NormalTok{  partial\_resume\_on\_kill                               \# ← (D) から導出}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+3 ブロック
+(\texttt{phase\ /\ every\ call\ has\ policy\ /\ after\ every\ individual})
++ 1 契約ブロック (\texttt{guarantees})
+で書ける。\texttt{every\ call\ has\ policy} は
+\textbf{言語の意味論レベル}でレキシカルスコープ内の全 \texttt{ai\_call}
+に強制適用される (オプトインではない)。
+
+\subsubsection{6.2 脱糖形 (AIPL
+ランタイム呼び出し)}\label{ux8131ux7cd6ux5f62-aipl-ux30e9ux30f3ux30bfux30a4ux30e0ux547cux3073ux51faux3057}
+
+PhiLang の上記 1 ブロックは現状の AIPL
+ランタイムに対しては次のように脱糖される:
+
+\begin{verbatim}
+# 環境変数 (every call has policy → SDK 設定)
+ABCL_AI_MAX_CONCURRENT     = 8        # phase 内既定
+AIPL_AI_REQUEST_TIMEOUT    = 60       # policy.timeout
+AIPL_AI_SDK_RETRIES        = 3        # policy.retries
+AIPL_AI_TOKEN_BUDGET       = 3_000_000  # within $0.30 から逆算
+
+# CLI フラグ (drains 句)
+--timeout  7200          # drains for 2 h
+--idle-ms  60000         # idle 60 s
+
+# AIPL コード (after every individual)
+while (gen <= 15) do {
+  ...                    # 個体生成と評価
+  send lineage.add(...)
+  send elite.propose(...)
+  var n = now lineage.dump("out/lineage.json");   # ← 強制 checkpoint
+  gen = gen + 1;
+}
+
+# シェルラッパ (caffeine 句)
+caffeinate -i &          # PID をフェーズ終了で kill
+\end{verbatim}
+
+\subsubsection{6.3 4
+つの言語要素が解決する失敗モード}\label{ux3064ux306eux8a00ux8a9eux8981ux7d20ux304cux89e3ux6c7aux3059ux308bux5931ux6557ux30e2ux30fcux30c9}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+PhiLang の構文要素
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+解決する失敗モード
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+進化計算での根拠
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{within\ 30\ min\ and\ \$0.30} (ハード予算) & F4
+(low\_throughput) & top 5 全員が g15 → 短バースト原則 \\
+\texttt{every\ call\ has\ policy\ \{\ timeout/retries\ \}} & F2
+(sdk\_hang) & top 5 全員が \texttt{r3+} で SDK 強制リトライ \\
+\texttt{drains\ for\ 2h\ idle\ 60s} & F1 (idle\_timeout\_too\_short) &
+80\% が \texttt{d3600+}, \texttt{i30000+} \\
+\texttt{after\ every\ individual\ \{\ checkpoint\ \}} & F3
+(no\_checkpoint) & 進化計算が見落としたので\textbf{言語が必須化} \\
+\texttt{caffeine\ if\ duration\ \textgreater{}\ 30min} & F5
+(macos\_sleep) & reviewer F5 が学習済の判定式 \\
+\texttt{guarantees\ \{\ ...\ \}} 節 & 全 F1〜F5
+を\textbf{契約として明文化} & 個体群から導出した invariants \\
+\end{longtable}
+}
+
+\subsubsection{6.4 PhiLang
+の意味論的特徴}\label{philang-ux306eux610fux5473ux8ad6ux7684ux7279ux5fb4}
+
+\paragraph{6.4.1
+「コールサイト無し」のリトライ/タイムアウト}\label{ux30b3ux30fcux30ebux30b5ux30a4ux30c8ux7121ux3057ux306eux30eaux30c8ux30e9ux30a4ux30bfux30a4ux30e0ux30a2ux30a6ux30c8}
+
+PhiLang では \texttt{ai\_call(...)}
+一文一文にリトライやタイムアウトを書かない。\texttt{every\ call\ has\ policy}
+ブロックが\textbf{レキシカル}に効くため、生 LLM API
+のサブセットは存在しない。これは試行 \#2 で SDK
+が暗黙にハングした問題を「言語の表現可能性」レベルで除去する。
+
+\paragraph{6.4.2 「チェックポイント無し phase
+は型エラー」}\label{ux30c1ux30a7ux30c3ux30afux30ddux30a4ux30f3ux30c8ux7121ux3057-phase-ux306fux578bux30a8ux30e9ux30fc}
+
+PhiLang のフェーズは
+\texttt{after\ every\ individual\ \{\ checkpoint\ \}}
+句が必須。これを書き忘れると型検査で
+\texttt{non-resumable\ phase:\ missing\ checkpoint\ clause} を出す。試行
+\#2 で 38/40 個体分のスコアが silent death
+で消えた問題を\textbf{コンパイル時}に防ぐ。
+
+\paragraph{\texorpdfstring{6.4.3 \texttt{guarantees} 節は実行可能
+invariant}{6.4.3 guarantees 節は実行可能 invariant}}\label{guarantees-ux7bc0ux306fux5b9fux884cux53efux80fd-invariant}
+
+\texttt{bounded\_cost\ \$0.30} は単なるコメントではなく、ランタイムが
+\texttt{ai\_usage.json} を監視して超過時に \texttt{BudgetExceeded}
+を投げる。\texttt{no\_silent\_death} は
+\texttt{every\ call\ has\ policy}
+の存在から自動証明される。\textbf{型と契約が双方向に検証される。}
+
+\paragraph{6.4.4
+「メタ進化」のためのリフレクション}\label{ux30e1ux30bfux9032ux5316ux306eux305fux3081ux306eux30eaux30d5ux30ecux30afux30b7ux30e7ux30f3}
+
+PhiLang は自身のフェーズを進化計算の対象にできる。本実験の
+\texttt{.aice} (YAML) に書かれた 11 変数は、PhiLang で書けば
+\texttt{evolvable} 修飾子付きパラメータになる:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{phase Pi\_Phase1\_Robustness}
+\NormalTok{  evolvable concurrency  in [c1, c2, c4, c8, c16, c32]}
+\NormalTok{  evolvable seed\_count   in [s4, s6, s8, s12, s16, s24]}
+\NormalTok{  evolvable generations  in [g10, g15, g20, g30, g40, g60, g80]}
+\NormalTok{  ...}
+\NormalTok{  optimize for \{}
+\NormalTok{     maximize completed\_generations}
+\NormalTok{     minimize cost\_usd}
+\NormalTok{  \}}
+\end{Highlighting}
+\end{Shaded}
+
+→ \textbf{PhiLang は MAP-Elites の対象であると同時に、MAP-Elites
+を記述する言語}でもある。これは PiLang
+が自身を進化させないのに対し、PhiLang 固有の自己参照性である。
+
+\subsection{7.
+限界と次のステップ}\label{ux9650ux754cux3068ux6b21ux306eux30b9ux30c6ux30c3ux30d7}
+
+\subsubsection{7.1 reviewer が見落とした特性 (F3 と provider
+不整合)}\label{reviewer-ux304cux898bux843dux3068ux3057ux305fux7279ux6027-f3-ux3068-provider-ux4e0dux6574ux5408}
+
+§4.1 の通り、\texttt{checkpoint\_per\_gen=off} が top 5 で
+5/5、\texttt{provider=mock} が top 5 で 3/5 を占めた。これは reviewer
+の設計バグであり PhiLang の知見ではない。次イテレーション (v2)
+で以下を直す:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{F3 を hard floor 化}: \texttt{checkpoint\_per\_gen=off}
+  の個体は最終スコアを × 0
+\item
+  \textbf{mock provider を最終スコア化前に除外}
+\item
+  \textbf{\texttt{provider\ ×\ model} coherence rule 追加}:
+  \texttt{openai\ ⇒\ model\ ∈\ \{gpt-4o,\ gpt-4o-mini\}} 等
+\end{enumerate}
+
+\subsubsection{7.2 PhiLang
+のコンパイラが未実装}\label{philang-ux306eux30b3ux30f3ux30d1ux30a4ux30e9ux304cux672aux5b9fux88c5}
+
+§6 の PhiLang は\textbf{設計}段階に留まっている。実装するには:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  PhiLang フロントエンド (\texttt{phi\_parser.py})
+  を書く。\texttt{phase\ /\ every\ /\ after\ /\ guarantees\ /\ evolvable}
+  の 5 ブロックを AST に。
+\item
+  \texttt{phi\_codegen.py} で env 設定 + CLI フラグ + AIPL
+  コードに脱糖。
+\item
+  \texttt{guarantees} 節を \texttt{aipl\_typeck.py}
+  の追加チェックとして実装。
+\end{enumerate}
+
+工数概算: 1〜2 日。
+
+\subsubsection{7.3 YAML lowerer
+の欠落}\label{yaml-lowerer-ux306eux6b20ux843d}
+
+\texttt{aice\_parser.lower()} が curly-brace \texttt{.aice}
+用なので、YAML 形式の本実験 \texttt{.aice} は手作業で \texttt{.ga.json}
+にマップした。再現性のためには \texttt{aice\_parser\_yaml.py}
+を新規に書くか、既存 lowerer に dialect 検出を追加する必要がある。
+
+\subsubsection{7.4 進化軸が現実の API
+制約を知らない}\label{ux9032ux5316ux8ef8ux304cux73feux5b9fux306e-api-ux5236ux7d04ux3092ux77e5ux3089ux306aux3044}
+
+\texttt{provider\ ×\ model} の組合せ (\texttt{openai\ に\ claude-haiku})
+のような実在しない組合せを reviewer は弾けなかった。これは reviewer
+の知識の限界。次は coherence rule を充実させるか、reviewer の persona
+に「実在する provider×model 対の白リスト」を埋め込む。
+
+\subsection{8. まとめ}\label{ux307eux3068ux3081}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+案 1 (YAML) \texttt{.aice} 設計 & 11 軸 / 5 reviewer / 5 task / 4 plan
+branch を 230 行で記述 \\
+案 3 (Math) \texttt{.aice} 設計 (参考) & 同じ問題を decision variables +
+objective + constraints で記述 (270 行) \\
+\texttt{.ga.json} 生成 & 手作業マッピング (codegen 互換) \\
+\texttt{.aipl} 生成 & 21 KB / 641 行、parse OK、smoke +
+本番ともに完走 \\
+AIPL 本番ラン & 33 分 / \$0.269 / 950 calls / 38 個体 /
+silent\_death=0 \\
+\textbf{進化計算が選んだ言語} & \textbf{PhiLang} ---
+\texttt{Bounded\ burst\ ×\ Mandatory\ retry\ ×\ Generous\ drain\ ×\ Forced\ checkpoint}
+を\textbf{言語の意味論}で強制 \\
+副次成果 & reviewer 設計の弱点 (weight 不足 / 不在 coherence) を 3
+点同定 \\
+\end{longtable}
+}
+
+本実験は
+\textbf{「メタ計算問題からプログラミング言語を進化計算で生み出す」}
+という仮説を、PiLang (π 数値計算問題) と同じ
+\texttt{.aice\ →\ .ga.json\ →\ .aipl}
+パイプライン上で\textbf{端から端まで動作させた第 2 の実証}である。
+
+PiLang
+が「\textbf{特定の数値計算}を最短に書く言語」だったのに対し、PhiLang
+は「\textbf{自分自身の進化計算実行}を最も安全に書く言語」である点で対照的だが、両者とも
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{MAP-Elites の個体群から共通する設計原理を抽出}し、
+\item
+  \textbf{その原理を意味論レベルで強制する 3〜4 行の最小構文}
+  に結晶化する、
+\end{itemize}
+
+という同じ方法論を踏襲している。\texttt{aice-evolution-v2}
+パイプラインは\textbf{問題ドメインに依存しない}普遍的な「言語設計支援ツール」として機能することが、今回
+PiLang 以外のドメイン (メタ層) で初めて検証された。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{参考: 主要ファイル
+(このディレクトリ内)}\label{ux53c2ux8003-ux4e3bux8981ux30d5ux30a1ux30a4ux30eb-ux3053ux306eux30c7ux30a3ux30ecux30afux30c8ux30eaux5185}
+
+\begin{itemize}
+\tightlist
+\item
+  問題定義: \texttt{Pi\_Phase1\_Robustness.aice} (YAML),
+  \texttt{Pi\_Phase1\_Robustness.math.aice} (数理 参考)
+\item
+  スキーマ: \texttt{robustness\_paradigm.schema.json}
+\item
+  中間 IR: \texttt{Pi\_Phase1\_Robustness.ga.json}
+\item
+  AIPL プログラム: \texttt{Pi\_Phase1\_Robustness.aipl}
+\item
+  実行結果 lineage: \texttt{Pi\_Phase1\_Robustness.aipl\_lineage.json}
+\item
+  課金記録: \texttt{ai\_usage.json}
+\item
+  実行ログ: \texttt{Pi\_Phase1\_Robustness.log}
+\end{itemize}
+
+\subsection{参考: 親実験}\label{ux53c2ux8003-ux89aaux5b9fux9a13}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{aice-pi-evolution/REPORT\_JA.md} --- 2026-05-15 の PiLang
+  探索報告。本実験はその「同じ方法論を別ドメインに適用した第 2
+  例」に相当する。
+\end{itemize}
+
+\end{document}

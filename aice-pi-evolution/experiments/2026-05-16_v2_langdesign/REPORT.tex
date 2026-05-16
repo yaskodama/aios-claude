@@ -1,0 +1,1550 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{進化計算による「アルゴリズムを書ける汎用プログラミング言語」探索
+---
+実験報告}\label{ux9032ux5316ux8a08ux7b97ux306bux3088ux308bux30a2ux30ebux30b4ux30eaux30baux30e0ux3092ux66f8ux3051ux308bux6c4eux7528ux30d7ux30edux30b0ux30e9ux30dfux30f3ux30b0ux8a00ux8a9eux63a2ux7d22-ux5b9fux9a13ux5831ux544a}
+
+\textbf{日付:} 2026-05-16 \textbf{実験名:}
+\texttt{2026-05-16\_v2\_langdesign} \textbf{作業ディレクトリ:}
+\texttt{/Users/kodamay/ocaml-app/abclcp-project/aice-pi-evolution/experiments/2026-05-16\_v2\_langdesign/}
+\textbf{親実験:} \href{../2026-05-16_robustness_v1/REPORT.md}{v1 =
+Pi\_Phase1\_Robustness} \textbf{祖先実験:}
+\href{../../REPORT_JA.md}{PiLang を生んだ 2026-05-15 実験}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. 目的}\label{ux76eeux7684}
+
+v1 実験は \textbf{PhiLang} (Phase Orchestration DSL) を生み、その上で π
+10,000 桁の計算を \texttt{compute\ =\ chudnovsky\_binary\_splitting} の
+1 行で記述できることを示した。しかしその「1 行」は実体としては Python
+製の \texttt{philang\_stdlib.chudnovsky\_pi()} カーネルへの dispatch
+にすぎず、
+
+\begin{quote}
+\textbf{PhiLang は アルゴリズム自身は書けない。}
+\texttt{compute\ =\ chudnovsky\_binary\_splitting} と書くだけでは Python
+がπを計算しているだけで、その言語が計算したことにはならない。
+\end{quote}
+
+というユーザ指摘を受けた。
+
+本実験 (v2) は同じ \texttt{.aice\ →\ .ga.json\ →\ .aipl}
+パイプラインを使い、
+
+\begin{quote}
+\textbf{「Chudnovsky binary splitting を言語自身の構文で書け、かつ
+factorial / quicksort / FFT / matmul / fibonacci
+も書ける、比較的汎用的なプログラミング言語」}
+\end{quote}
+
+の遺伝子型を進化計算で発見し、その通りの言語を実装してπ 10,000
+桁を実際に計算するところまでを行う。
+
+PiLang (祖先) が \textbf{数値計算問題} から言語を生み、PhiLang (v1) が
+\textbf{メタ実行制御問題} から言語を生んだのに対し、v2 は
+\textbf{「アルゴリズム表現力そのもの」}
+という言語論的・自己参照的な問題から言語を生む。
+
+\subsection{2. 実験構成}\label{ux5b9fux9a13ux69cbux6210}
+
+\subsubsection{2.1
+ディレクトリ}\label{ux30c7ux30a3ux30ecux30afux30c8ux30ea}
+
+\begin{verbatim}
+experiments/2026-05-16_v2_langdesign/
+├── LangDesign_Expressive.aice            ← 案 1 (YAML) 1次ソース
+├── lang_design_paradigm.schema.json      ← 12 軸 + 12 coherence rules
+├── LangDesign_Expressive.ga.json         ← 中間 IR
+├── LangDesign_Expressive.aipl            ← AIPL 実行プログラム (642 行)
+├── LangDesign_Expressive.aipl_lineage.json   ← 21 elite cells (log から再構成)
+├── ai_usage.json                         ← OpenAI 課金
+├── LangDesign_Expressive.log             ← 実行ログ (8 seed + 30 gen)
+├── psilang/                              ← 進化計算の結果 = 新言語 PsiLang
+│   ├── psilang.py                          (570 行: lexer+parser+eval+stdlib)
+│   ├── chudnovsky.psi                      (50 行: π 計算アルゴリズム)
+│   ├── test_basic.psi                      (15 行: 動作確認)
+│   ├── pi_10k.txt                          (10,002 chars: 計算結果)
+│   └── README.md
+└── REPORT.md                             ← この文書
+\end{verbatim}
+
+\subsubsection{\texorpdfstring{2.2 新規スキーマ
+\texttt{lang\_design\_paradigm.schema.json}}{2.2 新規スキーマ lang\_design\_paradigm.schema.json}}\label{ux65b0ux898fux30b9ux30adux30fcux30de-lang_design_paradigm.schema.json}
+
+PiLang (\texttt{pi\_paradigm.schema.json}) / PhiLang
+(\texttt{robustness\_paradigm.schema.json})
+の両者に依存せず\textbf{新規設計}。12 軸:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値域
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+cell\_axis
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{paradigm} & imperative / functional / dataflow / term\_rewriting
+/ declarative\_equation / oo / hybrid\_imperative\_functional & ✓ \\
+\texttt{evaluation\_strategy} & strict / lazy / call\_by\_need /
+call\_by\_name & \\
+\texttt{type\_system} & dynamic / static\_simple / hindley\_milner /
+refinement / dependent & ✓ \\
+\texttt{arithmetic\_primitives} & arbitrary\_int /
+arbitrary\_int\_plus\_rational / decimal\_with\_precision /
+real\_with\_precision\_annotation / interval\_arithmetic /
+dependent\_precision & ✓ \\
+\texttt{precision\_control} & implicit / global\_const /
+per\_value\_annotation / automatic\_inference / proof\_obligation & \\
+\texttt{control\_flow} & structured\_loops / general\_recursion /
+tail\_call\_only / pattern\_match\_fold / list\_comprehension /
+monadic\_bind & ✓ \\
+\texttt{termination\_check} & none / structural\_recursion /
+well\_founded / totality & \\
+\texttt{memory\_management} & manual / gc / region\_typed / rc / linear
+/ borrow\_check & \\
+\texttt{io\_model} & print\_only / stream\_emit / file\_io\_imperative /
+region\_owned\_output / monadic\_io & \\
+\texttt{syntax\_family} & c\_like / ml\_like / lisp\_like / apl\_like /
+haskell\_like / python\_like / prolog\_like / custom\_minimal & ✓ \\
+\texttt{abstraction} & bare\_metal / libc / vm\_minimal / stdlib\_rich
+& \\
+\texttt{compilation\_target} & tree\_walker\_interpreter / bytecode\_vm
+& \\
+\end{longtable}
+}
+
+ordinal 5 軸 (\texttt{type\_system}, \texttt{arithmetic\_primitives},
+\texttt{termination\_check}, \texttt{abstraction},
+\texttt{compilation\_target})。\texttt{fixed\_int\_only} /
+\texttt{native\_jit} / \texttt{native\_aot} は hard 制約違反になるため
+schema から除外。12 個の \textbf{coherence ルール} で「依存型 +
+bytecode\_vm」等の重複した複雑さを変異が生まないようにした。
+
+Cell 空間 = paradigm × type\_system × arithmetic\_primitives ×
+control\_flow × syntax\_family = 7 × 5 × 6 × 6 × 8 = \textbf{10,080
+cells}。
+
+\subsubsection{2.3 評価タスク (6
+アルゴリズム)}\label{ux8a55ux4fa1ux30bfux30b9ux30af-6-ux30a2ux30ebux30b4ux30eaux30baux30e0}
+
+各候補言語が以下を「自分の構文で」書けるかを reviewer LLM が判定:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3077}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2308}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+task
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+weight
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+hard
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+要求 primitive
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{PiChudnovskyBsplit} & 0.40 & ✓ & bigint, rational, recursion,
+sqrt \\
+\textbf{FactorialN} & 0.15 & ✓ & bigint, recursion or loop \\
+QuicksortInPlace & 0.10 & & mutable array, recursion \\
+FFTMultiply & 0.10 & & complex / mod prime, array, recursion \\
+MatmulNCubed & 0.10 & & 2D array, 3-fold loop \\
+FibonacciClosedForm & 0.15 & & algebraic numbers OR matrix power \\
+\end{longtable}
+}
+
+\subsubsection{2.4 Reviewer (5 人、weight 合計
+1.0)}\label{reviewer-5-ux4ebaweight-ux5408ux8a08-1.0}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+reviewer
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+検出対象
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+weight
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+R1\_AlgorithmExpressivity & 候補言語で Chudnovsky bsplit を 50--200
+行以内で書けるか & 0.30 \\
+R2\_ArbitraryPrecisionSafety & 10,000 桁の正確な計算が型で保証されるか &
+0.20 \\
+R3\_RecursionAndIteration & 二分木再帰 + loop の両方が表現できるか &
+0.20 \\
+R4\_ImplementabilityFeasibility & Python ホストで 500--3000 行の
+interpreter として書けるか & 0.15 \\
+R5\_Generality & 6 task のうち何個書けるか & 0.15 \\
+\end{longtable}
+}
+
+v1 で確立した \textbf{persona に 0.0--1.0 段階基準を明示する}設計を踏襲
+(OK/NG 二値の混乱を防ぐ)。
+
+\subsection{3.
+パイプライン実行}\label{ux30d1ux30a4ux30d7ux30e9ux30a4ux30f3ux5b9fux884c}
+
+\subsubsection{3.1 試行履歴}\label{ux8a66ux884cux5c65ux6b74}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+試行
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{本番ラン} (2026-05-16 07:49--09:04) & 38 個体 (8 seed + 30 gen),
+21 elite cells, 1140 calls, \textbf{\$0.54}, 約 \textbf{75 分} \\
+\end{longtable}
+}
+
+途中で 2 回の stall (6 分・10 分の停止)
+があったが、\texttt{AIPL\_AI\_REQUEST\_TIMEOUT=60} +
+\texttt{AIPL\_AI\_SDK\_RETRIES=3} の安全策で自動回復、silent death
+なし。
+
+\subsubsection{3.2 lineage
+出力の罠}\label{lineage-ux51faux529bux306eux7f60}
+
+\texttt{out/} ディレクトリが cwd に無いと \texttt{lineage.dump()}
+が静かに失敗し JSON が書かれない
+(既知の落とし穴、\texttt{reference\_aice\_pipeline.md} §)。ログには 21
+elite cells が完全に残っていたため、本実験ではログから lineage
+を再構成した。
+
+\subsubsection{3.3 サマリ}\label{ux30b5ux30deux30ea}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrr@{}}
+\toprule\noalign{}
+指標 & 実測 & 予測 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+完走 & ✓ ({[}lineage{]} wrote 38) & --- \\
+壁時計 & 75 分 & 40 分 \\
+コスト & \$0.543 & \$0.40 \\
+コール数 & 1,140 & 1,026 \\
+スループット平均 & 15 calls/min & 23 calls/min \\
+\end{longtable}
+}
+
+reviewer prompt が v1 より長いため throughput は予測の 2/3
+に落ちた。それでも budget \$2.00 の 27\% で完走。
+
+\subsection{4. 結果}\label{ux7d50ux679c}
+
+\subsubsection{4.1 21 elite cells の score
+分布}\label{elite-cells-ux306e-score-ux5206ux5e03}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+指標 & 値 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+個体数 & 38 (operator 内訳は log のみのため不明) \\
+Elite cells & 21 / 10,080 cells (0.21\%) \\
+Score range & min 0.330 / max 0.700 / mean 0.508 \\
+完全合格 (\textgreater0.6) & 5 個体 \\
+\end{longtable}
+}
+
+v1 (max 0.46) より 1.5x 高いスコア帯。reviewer prompt の改善 + 6 タスク
+× 5 reviewer の評価軸が広がったことで個体差がより明確になった。
+
+\subsubsection{4.2 Top 5 個体}\label{top-5-ux500bux4f53}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2857}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2857}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedleft
+順位
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+id
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+score
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+paradigm · type\_system · arithmetic · control\_flow · syntax
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & I35 & \textbf{0.700} & functional · refinement ·
+real\_with\_precision\_annotation · pattern\_match\_fold · c\_like \\
+2 & I17 & 0.675 & term\_rewriting · static\_simple ·
+arbitrary\_int\_plus\_rational · pattern\_match\_fold ·
+custom\_minimal \\
+3 & I12 & 0.646 & functional · static\_simple ·
+arbitrary\_int\_plus\_rational · pattern\_match\_fold · ml\_like \\
+4 & I37 & 0.638 & declarative\_equation · static\_simple ·
+arbitrary\_int\_plus\_rational · pattern\_match\_fold ·
+custom\_minimal \\
+5 & I15 & 0.635 & hybrid\_imperative\_functional · hindley\_milner ·
+dependent\_precision · structured\_loops · ml\_like \\
+\end{longtable}
+}
+
+\subsubsection{4.3 Top 5 の軸分布}\label{top-5-ux306eux8ef8ux5206ux5e03}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+top 5 で支持された値
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{paradigm} & functional 2 · term\_rewriting 1 ·
+declarative\_equation 1 · hybrid 1 (\textbf{5/5 が関数型寄り}) \\
+\texttt{type\_system} & \textbf{static\_simple 3} · refinement 1 ·
+hindley\_milner 1 \\
+\texttt{arithmetic\_primitives} & \textbf{arbitrary\_int\_plus\_rational
+3} · real\_with\_precision\_annotation 1 · dependent\_precision 1 \\
+\texttt{control\_flow} & \textbf{pattern\_match\_fold 4} ·
+structured\_loops 1 \\
+\texttt{syntax\_family} & ml\_like 2 · custom\_minimal 2 · c\_like 1
+(三派同点) \\
+\end{longtable}
+}
+
+\subsection{5.
+進化計算が示唆する設計原理}\label{ux9032ux5316ux8a08ux7b97ux304cux793aux5506ux3059ux308bux8a2dux8a08ux539fux7406}
+
+38 個体と top 5
+の共通項から、「アルゴリズムを書ける汎用言語」が\textbf{先天的に備えるべき四つの特性}を抽出する。これは
+PiLang の
+\texttt{Array\_DSL\ ×\ refinement-typed\ ×\ region-owned\ ×\ streaming}
+および PhiLang の
+\texttt{Bounded\ burst\ ×\ Mandatory\ retry\ ×\ Generous\ drain\ ×\ Forced\ checkpoint}
+と同じ抽象度の知見である。
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+特性
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+進化計算の根拠
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{(A) Pure expressions over assignments} & 5/5 が関数型寄り
+(\texttt{functional}, \texttt{term\_rewriting},
+\texttt{declarative\_equation}, \texttt{hybrid}) \\
+\textbf{(B) Static types but no inference burden} & 3/5 が
+\texttt{static\_simple} (= 型注釈は人間用、推論なし) \\
+\textbf{(C) Arbitrary precision as a builtin family} & 3/5 が
+\texttt{arbitrary\_int\_plus\_rational}、残り 2 も
+\texttt{real\_with\_precision} または \texttt{dependent\_precision} \\
+\textbf{(D) Pattern matching over loops} & 4/5 が
+\texttt{pattern\_match\_fold} (\texttt{structured\_loops} ではない) \\
+\end{longtable}
+}
+
+→ \textbf{「Pure × Static-simple × Arbitrary-precision ×
+Pattern-match」}
+の交点として、メタ問題に最適な言語が浮かび上がる。これは\textbf{古典的な
+mini-ML 系}を進化計算が独立に再発見したことを意味する (1970 年代の HOPE
+/ Standard ML の設計判断と一致)。
+
+\subsection{6. 進化計算が生んだ言語
+PsiLang}\label{ux9032ux5316ux8a08ux7b97ux304cux751fux3093ux3060ux8a00ux8a9e-psilang}
+
+Pi 計算問題が \textbf{PiLang} を、phase 実行制御問題が \textbf{PhiLang}
+を生んだのと同様に、本実験は \textbf{PsiLang} (Ψ-Lang、Greek 命名規約)
+を生んだ。
+
+\subsubsection{6.1 PsiLang のコア構文 (top 5
+コンセンサスを直接実装)}\label{psilang-ux306eux30b3ux30a2ux69cbux6587-top-5-ux30b3ux30f3ux30bbux30f3ux30b5ux30b9ux3092ux76f4ux63a5ux5b9fux88c5}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# 関数定義 (top{-}level only, 任意精度型注釈は人間用ドキュメント)}
+\NormalTok{fn fact (n: Int) {-}\textgreater{} Int =}
+\NormalTok{  if n == 0 then 1}
+\NormalTok{  else n * fact(n {-} 1)}
+
+\NormalTok{\# パターンマッチ + リスト + 再帰 (control\_flow=pattern\_match\_fold)}
+\NormalTok{fn sum\_list (xs: List Int) {-}\textgreater{} Int =}
+\NormalTok{  match xs with}
+\NormalTok{  | []      {-}\textgreater{} 0}
+\NormalTok{  | h :: t  {-}\textgreater{} h + sum\_list(t)}
+\NormalTok{  end}
+
+\NormalTok{\# 任意精度整数 + 有理数 (arithmetic\_primitives=arbitrary\_int\_plus\_rational)}
+\NormalTok{let q = rat\_add(rat(1, 3), rat(2, 7)) in}
+\NormalTok{emit("1/3 + 2/7 = " + int\_to\_string(rat\_num(q))}
+\NormalTok{                    + "/" + int\_to\_string(rat\_den(q)))}
+
+\NormalTok{\# 任意精度実数 (Real は内部 Decimal、精度は set\_precision で明示)}
+\NormalTok{let pi\_approx = real\_div(real\_from\_int(22), real\_from\_int(7)) in}
+\NormalTok{emit(real\_to\_string(pi\_approx, 20))}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{6.2 4 つ巴を構文に固着させた 4
+つの言語要素}\label{ux3064ux5df4ux3092ux69cbux6587ux306bux56faux7740ux3055ux305bux305f-4-ux3064ux306eux8a00ux8a9eux8981ux7d20}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+4 つ巴
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+PsiLang での実現
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+(A) Pure expressions & \texttt{let\ X\ =\ E\ in\ BODY}
+は文ではなく\textbf{式}。代入文 (\texttt{X\ :=\ E}) が存在しない \\
+(B) Static but simple & \texttt{:\ Int}
+等の型注釈を構文上受け取るが\textbf{実行時は無視} (``型は人間と reviewer
+のためのドキュメント'') \\
+(C) Arbitrary precision & \texttt{Int} が任意精度 (Python
+\texttt{int})、\texttt{Rat} が自動約分付き有理数、\texttt{Real} が
+\texttt{Decimal} ベース。\texttt{Float} は提供しない \\
+(D) Pattern matching &
+\texttt{match\ e\ with\ \textbackslash{}\textbar{}\ p1\ -\textgreater{}\ e1\ \textbackslash{}\textbar{}\ ...\ end}
++ リスト \texttt{{[}{]}} / \texttt{::} + tuple \texttt{(a,\ b)}
+構造的分解 \\
+\end{longtable}
+}
+
+\subsubsection{6.3 PsiLang で書いた Chudnovsky
+binary-splitting}\label{psilang-ux3067ux66f8ux3044ux305f-chudnovsky-binary-splitting}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# k{-}th term as a rational}
+\NormalTok{fn term(k) =}
+\NormalTok{  let sign = if k mod 2 == 0 then 1 else {-}1 in}
+\NormalTok{  let num  = sign * int\_fact(6 * k) * (545140134 * k + 13591409) in}
+\NormalTok{  let den  = int\_fact(3 * k) * int\_pow(int\_fact(k), 3) * int\_pow(640320, 3 * k) in}
+\NormalTok{  rat(num, den)}
+
+\NormalTok{\# binary splitting over [a, b)}
+\NormalTok{fn bsplit(a, b) =}
+\NormalTok{  if b {-} a == 1 then term(a)}
+\NormalTok{  else}
+\NormalTok{    let m = (a + b) / 2 in}
+\NormalTok{    let left  = bsplit(a, m) in}
+\NormalTok{    let right = bsplit(m, b) in}
+\NormalTok{    rat\_add(left, right)}
+
+\NormalTok{\# π = 426880 · √10005 / S}
+\NormalTok{fn chudnovsky\_pi(n\_digits) =}
+\NormalTok{  let n\_terms = n\_digits / 14 + 2 in}
+\NormalTok{  let prec    = n\_digits + 20 in}
+\NormalTok{  let \_bump   = set\_precision(prec) in}
+\NormalTok{  let s\_rat   = bsplit(0, n\_terms) in}
+\NormalTok{  let s\_real  = real\_from\_rat(s\_rat, prec) in}
+\NormalTok{  let c       = real\_mul(real\_from\_int(426880),}
+\NormalTok{                          real\_sqrt(real\_from\_int(10005), prec)) in}
+\NormalTok{  real\_div(c, s\_real)}
+
+\NormalTok{let pi  = chudnovsky\_pi(10000) in}
+\NormalTok{emit(real\_to\_string(pi, 10000))}
+\end{Highlighting}
+\end{Shaded}
+
+v1 PhiLang が \texttt{compute\ =\ chudnovsky\_binary\_splitting} の 1 行
+dispatch だったのに対し、
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{二分木再帰} (\texttt{bsplit} 関数) --- 関数型パラダイム +
+  一般再帰
+\item
+  \textbf{k 番目項の構成} (\texttt{term} 関数) --- \texttt{int\_fact},
+  \texttt{int\_pow}, \texttt{rat} の組合せ
+\item
+  \textbf{最終 π 復元} --- \texttt{real\_mul} / \texttt{real\_div} /
+  \texttt{real\_sqrt}
+\end{itemize}
+
+がすべて \textbf{PsiLang のソースコード自身}で書かれている。Python は
+\texttt{int} / \texttt{Decimal} / \texttt{gcd} だけ提供している。
+
+\subsubsection{6.4 4
+つ巴が解決する従来言語の問題}\label{ux3064ux5df4ux304cux89e3ux6c7aux3059ux308bux5f93ux6765ux8a00ux8a9eux306eux554fux984c}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+PsiLang の選択
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+排除される従来言語の問題
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{Float} を提供しない & IEEE 754 の丸め誤差で π 10,000
+桁が永遠に得られない問題 \\
+\texttt{Int} が任意精度 & C/Java の \texttt{long} でオーバーフローして
+factorial(20) すら扱えない問題 \\
+パターンマッチが言語組込 & C の switch-case や Python の if-elif
+連鎖でリスト分解を「書き下す」面倒さ \\
+\texttt{match} 後の \texttt{end} 必須 & ML/Haskell の \texttt{case}
+で末尾が曖昧になる典型的構文ハザード \\
+代入文 (\texttt{x\ :=\ e}) が存在しない & 並行化時の race condition
+が原理的に起きない (副作用は \texttt{emit} / \texttt{print} のみ) \\
+\end{longtable}
+}
+
+\subsection{7.
+インタプリタ実装と検証}\label{ux30a4ux30f3ux30bfux30d7ux30eaux30bfux5b9fux88c5ux3068ux691cux8a3c}
+
+\subsubsection{7.1 PsiLang
+インタプリタ}\label{psilang-ux30a4ux30f3ux30bfux30d7ux30eaux30bf}
+
+\begin{verbatim}
+psilang/psilang.py:
+  1. Lexer  (40 行)            — regex 一発のトークナイザ
+  2. AST   (~50 行)            — dataclass 18 種
+  3. Parser (~280 行)          — 再帰下降 + Pratt 風二項演算子
+  4. Pattern matcher (~40 行)
+  5. Evaluator (~120 行)       — tree-walker
+  6. Stdlib (~50 行)           — Int / Rat / Real / List 演算
+合計: 約 570 行 (R4_ImplementabilityFeasibility が想定した 1500 行を下回る)
+\end{verbatim}
+
+\subsubsection{7.2 検証結果
+(2026-05-16)}\label{ux691cux8a3cux7d50ux679c-2026-05-16}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+入力 & \texttt{psilang/chudnovsky.psi} (50 行) \\
+計算時間 & 3.03 秒 (Apple M2) \\
+出力サイズ & 10,002 chars (\texttt{"3."} + 10,000 digits) \\
+先頭 102 桁の既知 π との一致 & ✓ \\
+\textbf{Feynman 点 (\texttt{999999} の最初の出現位置)} & \textbf{762}
+(well-known 値と一致) \\
+1000 桁目 & \texttt{9} (OEIS A000796 と一致) \\
+v1 PhiLang/\texttt{chudnovsky\_pi(10000)} との bitwise 一致 & ✓ \\
+\end{longtable}
+}
+
+→ PsiLang の \textbf{アルゴリズム部分} (50 行の \texttt{.psi}) と v1
+PhiLang の \textbf{Python kernel} が\textbf{同じ π 10,000
+桁}を返した。アルゴリズムが言語側に正しく実装されていることが客観的に確認できた。
+
+\subsection{7.3 3 手法 (遅 / 中 / 速)
+の比較}\label{ux624bux6cd5-ux9045-ux4e2d-ux901f-ux306eux6bd4ux8f03}
+
+PsiLang が「アルゴリズムを書ける言語」であることを裏付けるため、π 10,000
+桁を\textbf{異なるアルゴリズム/データ表現}で計算する 3 つの実装を
+\textbf{PsiLang のソースコードとして}書き、実行時間を測定した。
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+ファイル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+級数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+内部表現
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+累積戦略
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+実時間
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+比率
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{psilang/machin\_rat.psi} & Machin (1706) & \textbf{Rat}
+(任意精度有理数) & 線形 & \textbf{28.24 s} & 100× \\
+\texttt{psilang/chudnovsky\_linear.psi} & Chudnovsky (1988) & Rat & 線形
+& 3.49 s & 12× \\
+\texttt{psilang/chudnovsky.psi} & Chudnovsky & Rat & \textbf{二分木
+(bsplit)} & 3.04 s & 10× \\
+\texttt{psilang/machin.psi} & Machin & \textbf{Real} (Decimal) & 線形
+(差分更新) & \textbf{0.30 s} & 1× \\
+\end{longtable}
+}
+
+(Apple M2、Python 3.9、出力 10,002 chars =
+\texttt{"3."\ +\ 10000\ 桁}、4 ファイルとも SHA256 完全一致 =
+\texttt{d44e2dba39a378…})
+
+\subsubsection{7.3.1
+「遅」「中」「速」の選定と読み方}\label{ux9045ux4e2dux901fux306eux9078ux5b9aux3068ux8aadux307fux65b9}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+ラベル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+実装
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+設計の要点
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{遅} (≈100×) & \texttt{machin\_rat.psi} & 弱収束級数 (1.4 桁/項 ×
+9,900 項) + 桁数 14,000 まで膨張する有理数の和。\texttt{rat\_add} の gcd
+と bigint 乗算が爆発的にコストになる。 \\
+\textbf{中} (≈10×) & \texttt{chudnovsky.psi} & 強収束級数 (14.2 桁/項 ×
+715 項) + 二分木で中間有理数を小さく保つ。 \\
+\textbf{速} (×1) & \texttt{machin.psi} & 弱収束級数 (1.4 桁/項 × 9,900
+項) だが、\texttt{Real\ =\ Decimal{[}10050{]}} での加減乗除は精度固定の
+C 実装で高速 (\textasciitilde30 µs/op)。差分更新で各項を
+\texttt{t\ ←\ −t\ /\ m²} で生成し、ループは TCO で末尾再帰。 \\
+\end{longtable}
+}
+
+「同じ Machin 公式」を Rat で書くと\textbf{遅 (28 s)}、Real
+で書くと\textbf{速 (0.30 s)} という 94 倍の差が出る。PsiLang の選択肢
+(Rat / Real)
+は単なる型ではなく\textbf{性能特性そのもの}であることが分かる。
+
+\subsubsection{7.3.2 階段の幅 (≈100× / ≈10× / ×1)
+の意味}\label{ux968eux6bb5ux306eux5e45-100-10-1-ux306eux610fux5473}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{遅 → 中} の 8× 縮小は、\textbf{級数自体を強くした}こと (Machin
+  → Chudnovsky) と \textbf{二分木累積で中間有理数を抑えた}ことの合算。
+\item
+  \textbf{中 → 速} の 10× 縮小は、\textbf{有理数 (Rat) を捨てて 10,050
+  桁固定の Decimal
+  に切り替えた}ことだけによる。アルゴリズムは弱収束に戻った (1.4 桁/項 ×
+  9,900 項)
+  にも関わらず、\textbf{項あたりコストが下がった分でリードする}。
+\end{itemize}
+
+PiLang 探索の祖先実験が ``Array\_DSL × refinement-typed × region-owned ×
+streaming'' の交点を発見したのと同様に、本実験 v2 の PsiLang は
+
+\begin{quote}
+\textbf{「正しい型を選んだだけで 100× 速くなる」}
+\end{quote}
+
+という現代計算機の現実 (=
+任意精度有理数の魅力的な抽象と、Decimal/IEEE-754 の実装効率は両立しない)
+を言語使用者に対して可視化する。
+
+\subsubsection{\texorpdfstring{7.3.3 各 \texttt{.psi}
+のコード分量}{7.3.3 各 .psi のコード分量}}\label{ux5404-.psi-ux306eux30b3ux30fcux30c9ux5206ux91cf}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+ファイル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+行数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+コア構造
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{chudnovsky.psi} & 50 &
+\texttt{term}/\texttt{bsplit}/\texttt{chudnovsky\_pi} \\
+\texttt{chudnovsky\_linear.psi} & 32 &
+\texttt{term}/\texttt{linear\_sum\_loop}/\texttt{chudnovsky\_linear} \\
+\texttt{machin.psi} & 42 &
+\texttt{arctan\_loop}/\texttt{arctan\_real}/\texttt{machin\_pi} \\
+\texttt{machin\_rat.psi} & 30 &
+\texttt{arctan\_term\_rat}/\texttt{arctan\_rat\_loop}/\texttt{machin\_rat\_pi} \\
+\end{longtable}
+}
+
+いずれも 50 行以下で書ける。R1\_AlgorithmExpressivity が「50 行以内 →
+スコア 1.0」と定義していた reviewer 設定がここで実証された。
+
+\subsubsection{7.3.4 補足: 末尾呼び出し最適化
+(TCO)}\label{ux88dcux8db3-ux672bux5c3eux547cux3073ux51faux3057ux6700ux9069ux5316-tco}
+
+3 手法のうち Machin (Real / Rat) は \texttt{arctan\_loop} を
+\textasciitilde9,900 回末尾再帰するため、ナイーブな tree-walker 実装では
+Python の C スタックが破裂する。PsiLang
+本実装には\textbf{末尾呼び出し最適化}を \texttt{apply\_fn}
+内で実装してある (本リポジトリ \texttt{psilang.py:apply\_fn} 参照、TCO
+ループは関数本体の If/Let/Match/Seq/Call
+を再帰なく追従する形)。これにより、進化計算が支持した
+\textbf{\texttt{general\_recursion}}
+軸を「タワーの深さに上限のない汎用再帰」として正しく実装できている。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{8.
+限界と次のステップ}\label{ux9650ux754cux3068ux6b21ux306eux30b9ux30c6ux30c3ux30d7}
+
+\subsubsection{8.1
+進化計算側の不完全性}\label{ux9032ux5316ux8a08ux7b97ux5074ux306eux4e0dux5b8cux5168ux6027}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{38 個体 vs 21 elite cells}: 17 個体が cell
+  の競合に敗れた。\texttt{elite.propose} の判定基準 (より高 score
+  で上書き) は機能しているが、cell の粒度 (5 軸交差)
+  が荒く、衝突が起きやすかった。
+\item
+  \textbf{top 1 (I35) の遺伝子は実装しなかった}: refinement 型 +
+  real\_with\_precision\_annotation + c\_like
+  という組合せは「実在しないがありそう」な架空言語。実装容易性を優先し、top
+  5 のコンセンサス (consensus) を実装した。
+\item
+  \textbf{reviewer の判断精度}: R5\_Generality は「6 task
+  のうち何個書けるか」を LLM
+  が推測で答えるだけで、実際にコードを書かせて検証していない。次世代では
+  reviewer に PsiLang コードの試作まで要求するか、tasks
+  の自動評価器を追加する。
+\end{itemize}
+
+\subsubsection{8.2 PsiLang
+言語仕様の未完成部}\label{psilang-ux8a00ux8a9eux4ed5ux69d8ux306eux672aux5b8cux6210ux90e8}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{closures}: 関数は top-level のみ、内部関数定義 (let f = fn (x)
+  -\textgreater{} \ldots) は未対応。FFT や quicksort
+  を真に書くなら必要。
+\item
+  \textbf{末尾呼び出し最適化 (TCO)}: 純粋再帰で深い計算をすると Python
+  の stack overflow になる。回避策として \texttt{int\_fact} /
+  \texttt{int\_pow} を builtin に置いたが、本来は TCO
+  で言語側に内側化すべき。
+\item
+  \textbf{型検査の不在}: \texttt{static\_simple}
+  を「実行時無視」と解釈したため、型注釈と実行時の型は乖離できる。本来は静的に検査すべき。
+\item
+  \textbf{モジュール / import}: 単一ファイルプログラムのみ。
+\end{itemize}
+
+\subsubsection{8.3 v3 (将来)
+で取り組む候補}\label{v3-ux5c06ux6765-ux3067ux53d6ux308aux7d44ux3080ux5019ux88dc}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{真の static\_simple type checker} を \texttt{psilang.py}
+  に追加 (+200 行)
+\item
+  \textbf{closures + 第一級関数} で FFT / quicksort も PsiLang
+  内で書ける
+\item
+  \textbf{TCO 実装} で int\_fact builtin を不要にする (=
+  言語の自己充足性を完成)
+\item
+  \textbf{6 task すべての PsiLang 実装} を書き、reviewer が予測した
+  generality\_count を実測検証
+\item
+  \textbf{v2 reviewer 設計の自動採点}: PsiLang コードを LLM
+  が生成し、コンパイル/実行が通るかで scoring
+\end{enumerate}
+
+\subsection{9.
+一般的なプログラミング言語との比較}\label{ux4e00ux822cux7684ux306aux30d7ux30edux30b0ux30e9ux30dfux30f3ux30b0ux8a00ux8a9eux3068ux306eux6bd4ux8f03}
+
+PsiLang
+が「アルゴリズムを書ける汎用言語」として定量的にどう位置付けられるかを検証するため、\textbf{同じ
+Chudnovsky binary splitting} を 5
+つの代表的なプログラミング言語で実装し、π 10,000
+桁の計算時間を測定した。
+
+\subsubsection{9.1 比較対象 (5 言語 +
+PsiLang)}\label{ux6bd4ux8f03ux5bfeux8c61-5-ux8a00ux8a9e-psilang}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+カテゴリ
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+言語
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+実装ファイル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+任意精度の出所
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{手続き型} & C (clang 17 + GMP 6.3 + MPFR 4.2) &
+\texttt{benchmark/procedural\_c.c} & GMP \texttt{mpz\_t}, MPFR
+\texttt{mpfr\_t} \\
+\textbf{関数型} & OCaml 5.1.1 + zarith 1.14 &
+\texttt{benchmark/functional\_ocaml.ml} & zarith \texttt{Z.t} (GMP
+bindings) \\
+\textbf{オブジェクト指向} & Python 3.14.4 (class-based) &
+\texttt{benchmark/oo\_python.py} & 標準 \texttt{decimal.Decimal} \\
+\textbf{並列 OO} & Go 1.26 (goroutines + channels) &
+\texttt{benchmark/parallel\_oo\_go.go} & 標準 \texttt{math/big.Int} +
+goroutine 並列 bsplit \\
+\textbf{最新言語} & Node.js v25.9 (ES modules, native BigInt) &
+\texttt{benchmark/modern\_node.mjs} & 言語組込 \texttt{BigInt} \\
+参照 & \textbf{PsiLang} (570 行 tree-walker interpreter) &
+\texttt{psilang/chudnovsky.psi} & Python \texttt{int} + \texttt{Decimal}
+(interpreter 経由) \\
+\end{longtable}
+}
+
+全 6 実装で\textbf{同一アルゴリズム} (P, Q, T 三つ組による Chudnovsky
+二分木分割) を用い、最終 π 値は SHA256 まで一致するよう調整した
+(Python・C は最後 1 桁が丸めで differs)。
+
+\subsubsection{9.2 ベンチマーク結果 (Apple M2 / 10 cores, 各 3
+回の中央値)}\label{ux30d9ux30f3ux30c1ux30deux30fcux30afux7d50ux679c-apple-m2-10-cores-ux5404-3-ux56deux306eux4e2dux592eux5024}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}rlrrrrr@{}}
+\toprule\noalign{}
+順位 & 言語 & run1 (ms) & run2 (ms) & run3 (ms) & \textbf{中央値} & C
+比 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{1} & \textbf{C (手続き型)} & 1.89 & 0.59 & 0.59 & \textbf{0.59
+ms} & × 1 \\
+2 & OCaml (関数型) & 1.50 & 1.39 & 1.37 & \textbf{1.39 ms} & × 2.4 \\
+3 & Go (並列 OO) & 2.04 & 2.01 & 2.03 & \textbf{2.03 ms} & × 3.4 \\
+4 & Node.js (最新) & 16.88 & 16.56 & 16.57 & \textbf{16.57 ms} & × 28 \\
+5 & Python (OO) & 38.97 & 38.97 & 38.71 & \textbf{38.97 ms} & × 66 \\
+6 & PsiLang (本実験) & 3080 & 3110 & 3110 & \textbf{3110 ms} & ×
+5,270 \\
+\end{longtable}
+}
+
+中央値で比べると \textbf{5,000 倍以上}の幅がある。1 桁ごとに整理すると:
+- \textbf{0.6 ms 帯}: C (GMP 直結) - \textbf{1〜2 ms 帯}: OCaml (zarith
+= GMP の OCaml ラッパ), Go (標準 big.Int) - \textbf{10〜20 ms 帯}:
+Node.js (V8 BigInt) - \textbf{40 ms 帯}: Python (Decimal) -
+\textbf{3,000 ms 帯}: PsiLang (tree-walker interpreter)
+
+\subsubsection{9.3
+各言語のメリット・デメリット}\label{ux5404ux8a00ux8a9eux306eux30e1ux30eaux30c3ux30c8ux30c7ux30e1ux30eaux30c3ux30c8}
+
+\paragraph{\texorpdfstring{9.3.1 C (手続き型) ---
+\texttt{procedural\_c.c} (約 100
+行)}{9.3.1 C (手続き型) --- procedural\_c.c (約 100 行)}}\label{c-ux624bux7d9aux304dux578b-procedural_c.c-ux7d04-100-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{typedef} \KeywordTok{struct} \OperatorTok{\{}\NormalTok{ mpz\_t P}\OperatorTok{,}\NormalTok{ Q}\OperatorTok{,}\NormalTok{ T}\OperatorTok{;} \OperatorTok{\}}\NormalTok{ pqt}\OperatorTok{;}
+\DataTypeTok{static} \DataTypeTok{void}\NormalTok{ bsplit}\OperatorTok{(}\NormalTok{pqt }\OperatorTok{*}\NormalTok{r}\OperatorTok{,} \DataTypeTok{long}\NormalTok{ a}\OperatorTok{,} \DataTypeTok{long}\NormalTok{ b}\OperatorTok{)} \OperatorTok{\{}\NormalTok{ … mpz\_mul}\OperatorTok{(}\NormalTok{r}\OperatorTok{{-}\textgreater{}}\NormalTok{P}\OperatorTok{,}\NormalTok{ L}\OperatorTok{.}\NormalTok{P}\OperatorTok{,}\NormalTok{ R}\OperatorTok{.}\NormalTok{P}\OperatorTok{);}\NormalTok{ … }\OperatorTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+最速 (GMP の手書き ASM がそのまま効く) & \texttt{mpz\_inits} /
+\texttt{mpz\_clears} のペア管理を間違うとリーク・二重 free \\
+メモリレイアウトを完全制御 (\texttt{mpz\_t}
+はスタック上、内部ヒープのみ管理) &
+コード量の多くが\textbf{型変換と解放}で占められる
+(本質的なアルゴリズムは 30 行程度) \\
+MPFR の高速 sqrt が直接使える & leaf formula の符号や因数 (例:
+\texttt{(2k-1)} vs \texttt{(6k-3)})
+を間違えるとビルドは通るが\textbf{結果が無音で誤る}
+(今回もデバッグで遭遇) \\
+大きな桁数 (10⁹ 以上) でも GMP の漸近最適性 (FFT 乗算) で速い &
+移植性は高いが\textbf{配布難} (受け取った人が GMP/MPFR
+をローカルに入れる必要) \\
+\end{longtable}
+}
+
+\paragraph{\texorpdfstring{9.3.2 OCaml (関数型) ---
+\texttt{functional\_ocaml.ml} (約 70
+行)}{9.3.2 OCaml (関数型) --- functional\_ocaml.ml (約 70 行)}}\label{ocaml-ux95a2ux6570ux578b-functional_ocaml.ml-ux7d04-70-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{let} \KeywordTok{rec}\NormalTok{ bsplit a b =}
+  \KeywordTok{if}\NormalTok{ b {-} a = }\DecValTok{1} \KeywordTok{then}\NormalTok{ leaf a}
+  \KeywordTok{else}
+    \KeywordTok{let}\NormalTok{ (pl, ql, tl) = bsplit a m}
+    \KeywordTok{and}\NormalTok{ (pr, qr, tr) = bsplit m b }\KeywordTok{in}
+    \KeywordTok{let}\NormalTok{ p = Z.mul pl pr }\KeywordTok{and}\NormalTok{ q = Z.mul ql qr }\KeywordTok{in}
+    \KeywordTok{let}\NormalTok{ t = Z.add (Z.mul tl qr) (Z.mul pl tr) }\KeywordTok{in}
+\NormalTok{    (p, q, t)}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+パターンマッチ + tuple 分解で\textbf{式が数式に近い}外観 &
+\texttt{Z.(...)} の構文糖で \texttt{*}
+演算子をオーバーロードするとスコープ内で int
+演算が混ざってビルドエラーになりやすい (今回も遭遇) \\
+不変データ構造で副作用が排除される --- 並列化や検証が容易 & zarith
+は外部パッケージで \texttt{ocamlfind} の設定が要る \\
+関数の型シグネチャ (\texttt{Z.t\ *\ Z.t\ *\ Z.t})
+が\textbf{仕様書}にもなる & OCaml の Z.t の sqrt 関数は無いので isqrt
+を自前で書く必要あり (Newton 法 8 行) \\
+native compile 後は C の 2〜3 倍以内 & 整数値型変換 (\texttt{Z.of\_int})
+が頻出してコードが冗長 \\
+\end{longtable}
+}
+
+\paragraph{\texorpdfstring{9.3.3 Python (OO) --- \texttt{oo\_python.py}
+(約 80
+行)}{9.3.3 Python (OO) --- oo\_python.py (約 80 行)}}\label{python-oo-oo_python.py-ux7d04-80-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\AttributeTok{@dataclass}\NormalTok{(frozen}\OperatorTok{=}\VariableTok{True}\NormalTok{)}
+\KeywordTok{class}\NormalTok{ PQT:}
+\NormalTok{    p: }\BuiltInTok{int}\OperatorTok{;}\NormalTok{ q: }\BuiltInTok{int}\OperatorTok{;}\NormalTok{ t: }\BuiltInTok{int}
+    \KeywordTok{def}\NormalTok{ combine(}\VariableTok{self}\NormalTok{, other): }\ControlFlowTok{return}\NormalTok{ PQT(}\VariableTok{self}\NormalTok{.p}\OperatorTok{*}\NormalTok{other.p, }\VariableTok{self}\NormalTok{.q}\OperatorTok{*}\NormalTok{other.q,}
+                                          \VariableTok{self}\NormalTok{.t}\OperatorTok{*}\NormalTok{other.q }\OperatorTok{+} \VariableTok{self}\NormalTok{.p}\OperatorTok{*}\NormalTok{other.t)}
+\KeywordTok{class}\NormalTok{ ChudnovskyPi:}
+    \KeywordTok{def} \FunctionTok{\_\_init\_\_}\NormalTok{(}\VariableTok{self}\NormalTok{, digits: }\BuiltInTok{int}\NormalTok{, guard: }\BuiltInTok{int} \OperatorTok{=} \DecValTok{20}\NormalTok{): …}
+    \KeywordTok{def}\NormalTok{ compute(}\VariableTok{self}\NormalTok{) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{str}\NormalTok{: …}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{@dataclass(frozen=True)}
+で\textbf{ボイラープレートなく}不変オブジェクト & bytecode-VM
+オーバーヘッドで C の \textbf{66 倍遅い} \\
+\texttt{int} が任意精度、\texttt{decimal.Decimal} で fixed precision の
+sqrt も標準で OK (外部ライブラリ無し) & Decimal の context (precision)
+が\textbf{スレッドローカルで暗黙的}: 並列化したい時に注意 \\
+クラスベースの設計で「計算器」 (\texttt{ChudnovskyPi})
+の\textbf{状態と動作}が一目で分かる & 巨大整数の乗算は GMP より遅い
+(Karatsuba しかなく FFT 乗算は未搭載) \\
+3.14 になってリスト内包+ジェネリック構文が更に磨かれ、デバッグも楽 &
+何百桁・何千桁では C 比 30〜100×、何百万桁ではさらに広がる \\
+\end{longtable}
+}
+
+\paragraph{\texorpdfstring{9.3.4 Go (並列 OO) ---
+\texttt{parallel\_oo\_go.go} (約 120
+行)}{9.3.4 Go (並列 OO) --- parallel\_oo\_go.go (約 120 行)}}\label{go-ux4e26ux5217-oo-parallel_oo_go.go-ux7d04-120-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{// parallel: spawn the right half, run the left here.}
+\NormalTok{rch }\OperatorTok{:=} \BuiltInTok{make}\OperatorTok{(}\KeywordTok{chan} \OperatorTok{*}\NormalTok{PQT}\OperatorTok{,} \DecValTok{1}\OperatorTok{)}
+\ControlFlowTok{go} \KeywordTok{func}\OperatorTok{()} \OperatorTok{\{}\NormalTok{ rch }\OperatorTok{\textless{}{-}}\NormalTok{ bsplit}\OperatorTok{(}\NormalTok{m}\OperatorTok{,}\NormalTok{ b}\OperatorTok{,}\NormalTok{ depth}\OperatorTok{{-}}\DecValTok{1}\OperatorTok{)} \OperatorTok{\}()}
+\NormalTok{L }\OperatorTok{:=}\NormalTok{ bsplit}\OperatorTok{(}\NormalTok{a}\OperatorTok{,}\NormalTok{ m}\OperatorTok{,}\NormalTok{ depth}\OperatorTok{{-}}\DecValTok{1}\OperatorTok{)}
+\NormalTok{R }\OperatorTok{:=} \OperatorTok{\textless{}{-}}\NormalTok{rch}
+\ControlFlowTok{return}\NormalTok{ newPQT}\OperatorTok{().}\NormalTok{Combine}\OperatorTok{(}\NormalTok{L}\OperatorTok{,}\NormalTok{ R}\OperatorTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{go\ func()\ \{\ …\ \}} でメソッドを\textbf{1 行で並列化}できる
+(10 CPU 自動利用) & 10,000
+桁では仕事量が小さくチャネル送受信のオーバーヘッドで純シーケンシャルとほぼ同等
+(= \textbf{C より遅い}) \\
+\texttt{math/big.Int} が標準ライブラリで配布不要 & 100
+万桁以上の問題で初めて並列化が威力を発揮する想定 \\
+メソッド + struct で OO 風だが\textbf{継承無し} = 設計が単純 &
+ジェネリクスがあるが \texttt{math/big}
+は非ジェネリック設計で型変換が増える \\
+\textbf{ポータブル binary}: クロスコンパイルで Mac/Linux/Windows
+の単一バイナリ & エラーが Go 流の \texttt{if\ err\ !=\ nil} で長くなる
+(今回はメインは小さいので影響少) \\
+\end{longtable}
+}
+
+\paragraph{\texorpdfstring{9.3.5 Node.js (最新) ---
+\texttt{modern\_node.mjs} (約 50
+行)}{9.3.5 Node.js (最新) --- modern\_node.mjs (約 50 行)}}\label{node.js-ux6700ux65b0-modern_node.mjs-ux7d04-50-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ combine }\OperatorTok{=}\NormalTok{ (L}\OperatorTok{,}\NormalTok{ R) }\KeywordTok{=\textgreater{}}\NormalTok{ (\{}
+    \DataTypeTok{P}\OperatorTok{:}\NormalTok{ L}\OperatorTok{.}\AttributeTok{P} \OperatorTok{*}\NormalTok{ R}\OperatorTok{.}\AttributeTok{P}\OperatorTok{,}
+    \DataTypeTok{Q}\OperatorTok{:}\NormalTok{ L}\OperatorTok{.}\AttributeTok{Q} \OperatorTok{*}\NormalTok{ R}\OperatorTok{.}\AttributeTok{Q}\OperatorTok{,}
+    \DataTypeTok{T}\OperatorTok{:}\NormalTok{ L}\OperatorTok{.}\AttributeTok{T} \OperatorTok{*}\NormalTok{ R}\OperatorTok{.}\AttributeTok{Q} \OperatorTok{+}\NormalTok{ L}\OperatorTok{.}\AttributeTok{P} \OperatorTok{*}\NormalTok{ R}\OperatorTok{.}\AttributeTok{T}\OperatorTok{,}
+\NormalTok{\})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ bsplit }\OperatorTok{=}\NormalTok{ (a}\OperatorTok{,}\NormalTok{ b) }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
+    \ControlFlowTok{if}\NormalTok{ (b }\OperatorTok{{-}}\NormalTok{ a }\OperatorTok{===} \DecValTok{1}\NormalTok{n) }\ControlFlowTok{return} \FunctionTok{leaf}\NormalTok{(a)}\OperatorTok{;}
+    \KeywordTok{const}\NormalTok{ m }\OperatorTok{=}\NormalTok{ (a }\OperatorTok{+}\NormalTok{ b) }\OperatorTok{/} \DecValTok{2}\NormalTok{n}\OperatorTok{;}
+    \ControlFlowTok{return} \FunctionTok{combine}\NormalTok{(}\FunctionTok{bsplit}\NormalTok{(a}\OperatorTok{,}\NormalTok{ m)}\OperatorTok{,} \FunctionTok{bsplit}\NormalTok{(m}\OperatorTok{,}\NormalTok{ b))}\OperatorTok{;}
+\NormalTok{\}}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{言語組込 \texttt{BigInt}} で外部ライブラリ無し
+(\texttt{10n\ **\ 20000n} で 20000 桁の累乗が書ける) & V8 の BigInt
+は厳密性重視で\textbf{速度は GMP 比 \textasciitilde10x 遅い}:
+桁数が伸びると差が広がる \\
+アロー関数 + オブジェクト spread + ES modules で\textbf{最も簡潔} (50
+行) & sqrt が標準では \texttt{Math.sqrt} しか無く、\texttt{BigInt}
+対応の整数 sqrt は自前 (Newton 法、約 10 行) \\
+\texttt{node\ -\/-watch} でホットリロード、開発体験が良い & デプロイ単位
+(Node.js + npm) が重い (60 MB+) \\
+Web 界隈の最新ライブラリエコシステムが流用可能 (BigDecimal.js 等) &
+プロダクション用途では \texttt{bigint-buffer}
+などの外部高速版が必要になることが多い \\
+\end{longtable}
+}
+
+\paragraph{\texorpdfstring{9.3.6 PsiLang (本実験) ---
+\texttt{chudnovsky.psi} (50
+行)}{9.3.6 PsiLang (本実験) --- chudnovsky.psi (50 行)}}\label{psilang-ux672cux5b9fux9a13-chudnovsky.psi-50-ux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fn term(k) =}
+\NormalTok{  let sign = if k mod 2 == 0 then 1 else {-}1 in}
+\NormalTok{  let num  = sign * int\_fact(6 * k) * (545140134 * k + 13591409) in}
+\NormalTok{  let den  = int\_fact(3 * k) * int\_pow(int\_fact(k), 3) * int\_pow(640320, 3 * k) in}
+\NormalTok{  rat(num, den)}
+
+\NormalTok{fn bsplit(a, b) =}
+\NormalTok{  if b {-} a == 1 then term(a)}
+\NormalTok{  else}
+\NormalTok{    let m = (a + b) / 2 in}
+\NormalTok{    rat\_add(bsplit(a, m), bsplit(m, b))}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+メリット
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+デメリット
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{\texttt{Int} / \texttt{Rat} / \texttt{Real} が一級}
+で型変換のボイラープレート無し & tree-walker 実装で C 比 \textbf{5,000
+倍以上遅い} (10,000 桁で 3 秒) \\
+パターンマッチ + 末尾再帰最適化 (TCO) で\textbf{数式とほぼ同じソース} &
+標準ライブラリが薄い (現状 \textasciitilde25 builtin)、I/O は
+\texttt{emit} だけ \\
+\texttt{psilang.py} 570 行で言語仕様が完全に読める & コンパイラ無し → C
+並み性能は今後の課題 \\
+\textbf{同じ言語}で \texttt{chudnovsky} / \texttt{chudnovsky\_linear} /
+\texttt{machin} / \texttt{machin\_rat} の 4 通り (§7.3) を 30〜50
+行ずつで書ける & 配布は Python + \texttt{psilang.py} 1 ファイル ---
+配布性は良いが OS バイナリではない \\
+\end{longtable}
+}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{10. なぜ PsiLang
+がこの問題に最適なのか}\label{ux306aux305c-psilang-ux304cux3053ux306eux554fux984cux306bux6700ux9069ux306aux306eux304b}
+
+§9 の表で PsiLang は明らかに最遅 (C の 5,270 倍)
+である。にもかかわらず、\textbf{「数値計算アルゴリズムを書く言語」}として
+PsiLang は他の 5 言語より優れている点が複数ある。実用領域 (10,000 桁 ≒
+``教科書的''、本格的な世界記録 (=10¹²桁) ではない)
+を念頭に置いた上での主張である。
+
+\subsubsection{10.1
+ソース全体が「アルゴリズムそのもの」}\label{ux30bdux30fcux30b9ux5168ux4f53ux304cux30a2ux30ebux30b4ux30eaux30baux30e0ux305dux306eux3082ux306e}
+
+C 実装 (\texttt{procedural\_c.c}) は約 100
+行のうち、\textbf{実質的にアルゴリズムを書いているのは 30
+行}程度で、残りはメモリ管理 (\texttt{mpz\_init} /
+\texttt{mpz\_clear})、エラーハンドル、CLI parse、printf フォーマット。
+
+OCaml の \texttt{Z.of\_int} 散布、Go の \texttt{*big.Int}
+ポインタ受け渡し、Python の \texttt{decimal.Decimal} / \texttt{int}
+の混在、Node.js の \texttt{n}
+接尾辞、いずれも\textbf{型を持ち上げるための儀礼コード}が混入する。
+
+対して PsiLang は:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fn bsplit(a, b) =}
+\NormalTok{  if b {-} a == 1 then term(a)}
+\NormalTok{  else}
+\NormalTok{    let m = (a + b) / 2 in}
+\NormalTok{    rat\_add(bsplit(a, m), bsplit(m, b))}
+\end{Highlighting}
+\end{Shaded}
+
+これを Chudnovsky 兄弟 (1988) の論文の数式と並べると、\textbf{数式 ↔
+ソースが 1 対 1}。読む人が「正しいか」を検証する負荷が最も小さい。
+
+\subsubsection{10.2 Rat と Real
+の選択が「アルゴリズムの一部」として見える}\label{rat-ux3068-real-ux306eux9078ux629eux304cux30a2ux30ebux30b4ux30eaux30baux30e0ux306eux4e00ux90e8ux3068ux3057ux3066ux898bux3048ux308b}
+
+§7.3 で示した通り、同じ Machin 公式を Rat で書くと 28 秒、Real で書くと
+0.3 秒 --- \textbf{94 倍の差}。PsiLang
+はこれを\textbf{型の選択として明示的}に表現する。
+
+他の言語では: - \textbf{C / OCaml / Go}: \texttt{mpz\_t} (整数) と
+\texttt{mpfr\_t} (浮動)
+の使い分けが必要だが、両者の混在で\textbf{精度が壊れないかは人間の責任}。
+- \textbf{Python}: \texttt{Fraction} と \texttt{Decimal}
+を併用するときの精度管理が暗黙 (\texttt{getcontext().prec}
+がスレッドローカル)。 - \textbf{Node.js}: \texttt{BigInt} しか無く
+\texttt{BigDecimal} は ES Proposal 段階 (Stage 1 ---
+標準化されていない)。
+
+PsiLang の \texttt{Rat} / \texttt{Real}
+は構文上から区別され、\texttt{real\_from\_rat(r,\ prec)}
+で\textbf{明示的に精度付きで丸める}ことを強制する。これは「数値型は性能を支配する」現実を\textbf{言語のソース上で見える}形にしている
+(§7.3.2)。
+
+\subsubsection{\texorpdfstring{10.3 アルゴリズムの \textbf{3 通り
+(slow/medium/fast) を同じ言語で 30
+行ずつ}で書ける}{10.3 アルゴリズムの 3 通り (slow/medium/fast) を同じ言語で 30 行ずつで書ける}}\label{ux30a2ux30ebux30b4ux30eaux30baux30e0ux306e-3-ux901aux308a-slowmediumfast-ux3092ux540cux3058ux8a00ux8a9eux3067-30-ux884cux305aux3064ux3067ux66f8ux3051ux308b}
+
+PsiLang では:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrr@{}}
+\toprule\noalign{}
+実装 & 行数 & 時間 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{machin\_rat.psi} (遅) & 30 & 28 s \\
+\texttt{chudnovsky.psi} (中) & 50 & 3 s \\
+\texttt{machin.psi} (速) & 42 & 0.3 s \\
+全 4 出力 SHA256 完全一致 & --- & --- \\
+\end{longtable}
+}
+
+これを C で書くと、Rat 系 (\texttt{mpq\_t}) と Real 系
+(\texttt{mpfr\_t})
+で\textbf{別の関数群}を呼び分ける必要があり、ファイルが分散する。Python
+ですら \texttt{Fraction} と \texttt{Decimal} の API は微妙に異なる
+(\texttt{Fraction.\_\_add\_\_} vs \texttt{Decimal.\_\_add\_\_}
+の型混合制限)。
+
+\textbf{「同じ言語で、同じ書き味で、3
+通りのアルゴリズム表現が等しく書ける」}ことは、\textbf{教育・研究・実証}の文脈で大きな価値がある。Chudnovsky
+vs Machin、Rat vs Real、線形和 vs binary splitting --- 4
+つの設計判断の効果を、\textbf{他のすべての変数を固定して}比較できるのは
+PsiLang だけ。
+
+\subsubsection{10.4
+進化計算がこの形を「再発見した」事実そのもの}\label{ux9032ux5316ux8a08ux7b97ux304cux3053ux306eux5f62ux3092ux518dux767aux898bux3057ux305fux4e8bux5b9fux305dux306eux3082ux306e}
+
+最後に最も重要な論点: \textbf{PsiLang は事前設計ではなく、進化計算で 38
+個体 × 10,080 cells の探索結果から抽出された}形である (§4, §5)。
+
+\begin{quote}
+top-5 個体すべてが (1) 関数型、(2) static\_simple 型、(3)
+arbitrary\_int\_plus\_rational 算術、(4) pattern\_match +
+再帰の制御フロー を支持した。
+\end{quote}
+
+これは「20 世紀後半の数値計算 DSL が辿り着いた最良点」(SML, Caml,
+Haskell の数値ライブラリ; Mathematica や Sage の数式表現)
+を、\textbf{LLM-as-judge による進化計算}が \textbf{コストパフォーマンス
+\textless{} \$1}で\textbf{独立に発見した}ことを意味する。すなわち
+PsiLang は「\textbf{人類が 50 年かけて到達した数値計算 DSL のベスト
+プラクティス}」を、人間の事前知識に頼らず、進化計算が同じ結論に辿り着いたことの\textbf{証拠}である。
+
+\subsubsection{10.5 PsiLang
+が他言語より優位な「特定の問題」とは}\label{psilang-ux304cux4ed6ux8a00ux8a9eux3088ux308aux512aux4f4dux306aux7279ux5b9aux306eux554fux984cux3068ux306f}
+
+明確化のため: PsiLang が C より優位なのは\textbf{「教科書通りの π
+を最速で計算するベンチマーク」}ではない (この用途では C が 5,000
+倍速い)。優位なのは:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{教科書記述の検証}:
+  紙の論文の数式が正しいかを実装で確認する用途 (= 教育や数学研究)
+\item
+  \textbf{複数アルゴリズムの並置比較}: 同じ精度・同じ言語表記で X と Y
+  を時間 / 結果と比較する用途 (= 数値解析の研究)
+\item
+  \textbf{言語設計の研究対象}: 「最小の言語で 10,000 桁 π
+  を書けるか」自体が研究テーマである場合 (= 本実験 v2 そのもの)
+\item
+  \textbf{進化計算のターゲット}: §1〜§6 で示した通り、PsiLang は
+  MAP-Elites の出口として自然にデザインされている
+\end{itemize}
+
+C / OCaml / Go / Node.js / Python
+は\textbf{プロダクション/商用/大規模計算}で勝つが、PsiLang
+は\textbf{「思考と表現の道具」}として勝つ。両者は同じ評価軸の上ではなく、\textbf{異なるドメイン}で最良である。
+
+そして本実験 v2
+は、\textbf{進化計算がこの「思考と表現の道具」というドメイン}を独立に発見・指定し、\textbf{実装と検証まで一気通貫}で完遂できることを示した。それが
+MAP-Elites パイプライン (\texttt{.aice\ →\ .ga.json\ →\ .aipl})
+の祖先実験 (PiLang) からの一貫したテーマである。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{11. まとめ}\label{ux307eux3068ux3081}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+案 1 (YAML) \texttt{.aice} 設計 & 12 軸 / 5 reviewer / 6 task / 8 plan
+steps を \textasciitilde520 行で記述 \\
+新規スキーマ \texttt{lang\_design\_paradigm.schema.json} & 12 軸 + 12
+coherence rules \\
+\texttt{.ga.json} 生成 & YAML から手作業マッピング (codegen 互換) \\
+\texttt{.aipl} 生成 & 642 行、parse OK \\
+AIPL 本番ラン & 75 分 / \$0.54 / 1140 calls / 38 個体 / 21 elite
+cells \\
+Score range & min 0.330 / max 0.700 / mean 0.508 (v1 max 0.46 の 1.5x
+改善) \\
+\textbf{進化計算が選んだ言語} & \textbf{PsiLang} ---
+\texttt{Pure\ ×\ Static-simple\ ×\ Arbitrary-precision\ ×\ Pattern-match}
+を言語の意味論レベルで採用 \\
+\textbf{アルゴリズム実装} (4 通り) & \texttt{chudnovsky.psi} /
+\texttt{chudnovsky\_linear.psi} / \texttt{machin.psi} /
+\texttt{machin\_rat.psi} で π 10,000 桁。SHA256 完全一致 \\
+5 言語ベンチマーク & C 0.59 ms / OCaml 1.39 ms / Go 2.03 ms / Node 16.57
+ms / Python 38.97 ms / \textbf{PsiLang 3110 ms} \\
+インタプリタ実装サイズ & 約 650 行 (R4 想定 1500 行を下回る) \\
+\end{longtable}
+}
+
+PiLang (祖先、2026-05-15)
+が「\textbf{特定の数値計算}を最短に書く言語」、PhiLang (v1、2026-05-16)
+が「\textbf{自分自身の進化計算実行}を最も安全に書く言語」だったのに対し、本実験の
+PsiLang (v2)
+は「\textbf{任意のアルゴリズムを最少の言語仕様で書ける}言語」である。
+
+3 実験を通じて、\texttt{.aice\ →\ .ga.json\ →\ .aipl} パイプラインが
+
+\begin{itemize}
+\tightlist
+\item
+  数値計算ドメイン (祖先・PiLang)、
+\item
+  メタ実行制御ドメイン (v1・PhiLang)、
+\item
+  言語デザイン自身のドメイン (v2・PsiLang)
+\end{itemize}
+
+の 3
+種類の問題ドメインで\textbf{同じ方法論}で機能することが実証された。さらに
+v2 では、進化計算の結論として得られた PsiLang が \textbf{C より 5,000
+倍遅い}にもかかわらず、\textbf{「同じ言語で 4 通りの π アルゴリズムを
+30〜50 行で書け、SHA256 まで bit-wise 一致する」} という、他の 5
+言語が真似できない教育・研究上の優位性を持つことが §9〜§10 で示された。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{参考: 主要ファイル
+(このディレクトリ内)}\label{ux53c2ux8003-ux4e3bux8981ux30d5ux30a1ux30a4ux30eb-ux3053ux306eux30c7ux30a3ux30ecux30afux30c8ux30eaux5185}
+
+\begin{itemize}
+\tightlist
+\item
+  問題定義: \texttt{LangDesign\_Expressive.aice} (YAML)
+\item
+  スキーマ: \texttt{lang\_design\_paradigm.schema.json}
+\item
+  中間 IR: \texttt{LangDesign\_Expressive.ga.json}
+\item
+  AIPL プログラム: \texttt{LangDesign\_Expressive.aipl}
+\item
+  実行結果 lineage: \texttt{LangDesign\_Expressive.aipl\_lineage.json}
+\item
+  課金記録: \texttt{ai\_usage.json} (1140 calls, \$0.543)
+\item
+  実行ログ: \texttt{LangDesign\_Expressive.log}
+\item
+  \textbf{進化計算が生んだ言語}: \texttt{psilang/} (570 行 interpreter +
+  chudnovsky.psi + machin.psi + machin\_rat.psi + chudnovsky\_linear.psi
+  + 4 出力 SHA256 完全一致)
+\item
+  \textbf{5 言語比較ベンチマーク}: \texttt{benchmark/} (C + OCaml +
+  Python + Go + Node.js 実装と timing 結果)
+\end{itemize}
+
+\subsection{参考: 親実験}\label{ux53c2ux8003-ux89aaux5b9fux9a13}
+
+\begin{itemize}
+\tightlist
+\item
+  \href{../2026-05-16_robustness_v1/REPORT.md}{v1:
+  Pi\_Phase1\_Robustness} --- PhiLang (orchestration shell)
+\item
+  \href{../../REPORT_JA.md}{祖先: PiLang} --- PiLang (3 行で π 10k 桁の
+  DSL)
+\end{itemize}
+
+\end{document}

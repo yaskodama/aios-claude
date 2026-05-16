@@ -1,0 +1,45 @@
+# machin.psi — π via Machin's formula  π = 16·arctan(1/5) − 4·arctan(1/239)
+#
+# Slow method (1706, John Machin):
+#   arctan(1/m) = Σ_{k=0..∞} (-1)^k / ((2k+1) · m^(2k+1))
+#   convergence: log10(m²) digits per term
+#     m=5   → 1.40 digits/term  → ≈7150 terms for 10000 digits
+#     m=239 → 4.76 digits/term  → ≈2100 terms for 10000 digits
+#
+# Computed in Real (Decimal) with set_precision(prec).  Each iteration
+# reduces the current term by ÷m² and divides by (2k+1) for the series.
+#
+# Demonstrates: PsiLang general recursion + TCO + Real arithmetic.
+
+# acc accumulates the arctan partial sum.
+# t   = (-1)^k / m^(2k+1)
+# msq = m * m
+fn arctan_loop(k, n_terms, t, msq, acc) =
+  if k == n_terms then acc
+  else
+    let contrib = real_div(t, real_from_int(2 * k + 1)) in
+    let new_acc = real_add(acc, contrib) in
+    let next_t  = real_neg(real_div(t, msq)) in
+    arctan_loop(k + 1, n_terms, next_t, msq, new_acc)
+
+fn arctan_real(m, n_terms) =
+  let m_real = real_from_int(m) in
+  let msq    = real_mul(m_real, m_real) in
+  let t_init = real_div(real_from_int(1), m_real) in
+  arctan_loop(0, n_terms, t_init, msq, real_from_int(0))
+
+# π = 16·arctan(1/5) − 4·arctan(1/239)
+# Series truncation: last term ~ 1/m^(2N+1).  Need 2N+1 > n_digits·log2(10)/log2(m)
+# i.e. N > n_digits / (2 · log10(m)).  Add a guard of ~30 terms.
+fn machin_pi(n_digits) =
+  let n5    = n_digits * 10 / 13 + 30 in       # ≈ 7723 for 10000 digits (guard incl.)
+  let n239  = n_digits * 100 / 470 + 30 in     # ≈ 2158 for 10000 digits
+  let prec  = n_digits + 50 in
+  let _bump = set_precision(prec) in
+  let a5    = arctan_real(5,   n5) in
+  let a239  = arctan_real(239, n239) in
+  real_sub(real_mul(real_from_int(16), a5),
+            real_mul(real_from_int(4),  a239))
+
+let pi = machin_pi(10000) in
+emit(real_to_string(pi, 10000))

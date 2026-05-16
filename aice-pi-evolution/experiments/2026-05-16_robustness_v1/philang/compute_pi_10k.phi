@@ -1,0 +1,29 @@
+# compute_pi_10k.phi — PhiLang program: compute π to 10,000 digits.
+#
+# This program demonstrates that PhiLang's 4 safety contracts
+# (within / drains / after every / guarantees) apply equally to
+# LLM-driven phases and to pure-compute phases.  The Chudnovsky
+# binary-splitting kernel runs locally (no LLM cost), but PhiLang
+# still enforces wall-time bound, checkpoint cadence, and post-hoc
+# correctness verification.
+
+phase ComputePi10k
+  within   60 s   and   $0.00
+  drains   for 5 min   idle 2 s
+  caffeine if duration > 5 min
+{
+  compute  = chudnovsky_binary_splitting
+  digits   = 10_000
+  output   = "pi_10k.txt"
+
+  after every 1000 digits {
+    checkpoint partial to "pi_10k.partial.txt"
+  }
+}
+guarantees {
+  digit_count    = 10_000
+  starts_with    = "3.14159265358979323846264338327950288"
+  no_silent_death
+  bounded_wall   = 60 s
+  partial_resume_on_kill
+}

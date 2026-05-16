@@ -1,0 +1,423 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{PsiLang --- Minimal ML-like Functional Language for
+Algorithms}\label{psilang-minimal-ml-like-functional-language-for-algorithms}
+
+進化計算 (本ディレクトリ親 \texttt{../REPORT.md} 参照) の top-5
+個体から抽出した\textbf{コンセンサス遺伝子}を実装したもの。v1 の PhiLang
+が orchestration shell (\texttt{compute\ =\ X} の 1 行 dispatch)
+だったのに対し、PsiLang
+は\textbf{アルゴリズムを言語自身の構文で書ける}汎用 mini-ML である。
+
+\subsection{構成}\label{ux69cbux6210}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.4000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+ファイル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+役割
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+行数
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{psilang.py} & Lexer + Parser + AST + Tree-walker Evaluator +
+Stdlib (単一ファイル) & \textasciitilde570 \\
+\texttt{test\_basic.psi} & 動作確認: factorial / list / pattern match /
+Rat & 15 \\
+\texttt{chudnovsky.psi} & \textbf{π 10,000 桁を binary splitting で計算}
+& 50 \\
+\texttt{pi\_10k.txt} & 実行結果 (3 + 10,000 digits) & --- \\
+\texttt{README.md} & この文書 & --- \\
+\end{longtable}
+}
+
+\subsection{言語仕様
+(概要)}\label{ux8a00ux8a9eux4ed5ux69d8-ux6982ux8981}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{paradigm:} functional (純粋関数ではない --- 副作用は
+  \texttt{emit}/\texttt{print} に限定)
+\item
+  \textbf{type\_system:} static\_simple
+  (型注釈は構文上受け取るが実行時は無視)
+\item
+  \textbf{arithmetic\_primitives:} \texttt{Int} (任意精度) +
+  \texttt{Rat} (有理数、自動約分) + \texttt{Real}
+  (任意精度小数、\texttt{Decimal} 由来)
+\item
+  \textbf{control\_flow:} \texttt{if} / \texttt{match} /
+  general\_recursion (no loops; iteration はパターンマッチ + 再帰)
+\item
+  \textbf{syntax\_family:} ml\_like (let / fn / match / \textbar)
+\end{itemize}
+
+\subsubsection{文法 (要約)}\label{ux6587ux6cd5-ux8981ux7d04}
+
+\begin{verbatim}
+fn name (p1: T1, p2: T2) -> Ret = body
+
+let x = expr in body
+let (a, b) = expr in body
+
+if cond then a else b
+match x with | pat1 -> e1 | pat2 -> e2 end
+
+(a, b)         # 2-tuple
+[1, 2, 3]      # list
+x :: xs        # list cons, []  empty list
+\end{verbatim}
+
+\subsubsection{Builtin (一部)}\label{builtin-ux4e00ux90e8}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Int:} \texttt{+\ -\ *\ /\ mod\ ==}, \texttt{int\_fact},
+  \texttt{int\_pow}, \texttt{int\_abs}, \texttt{int\_sign},
+  \texttt{int\_to\_string}
+\item
+  \textbf{Rat:} \texttt{rat(n,\ d)}, \texttt{rat\_add},
+  \texttt{rat\_sub}, \texttt{rat\_mul}, \texttt{rat\_div},
+  \texttt{rat\_neg}, \texttt{rat\_inv}, \texttt{rat\_num},
+  \texttt{rat\_den}, \texttt{rat\_from\_int}
+\item
+  \textbf{Real:} \texttt{real\_from\_int},
+  \texttt{real\_from\_rat(r,\ prec)}, \texttt{real\_sqrt(r,\ prec)},
+  \texttt{real\_mul}, \texttt{real\_div},
+  \texttt{real\_to\_string(r,\ n)}, \texttt{set\_precision}
+\item
+  \textbf{Misc:} \texttt{fst}, \texttt{snd}, \texttt{length},
+  \texttt{emit}, \texttt{print}
+\end{itemize}
+
+\subsection{動作確認}\label{ux52d5ux4f5cux78baux8a8d}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{/usr/bin/python3}\NormalTok{ psilang.py test\_basic.psi}
+\CommentTok{\# fact(20) = 2432902008176640000}
+\CommentTok{\# sum([1..5]) = 15}
+\CommentTok{\# 1+1/2+1/3+1/4 = 25/12}
+\CommentTok{\# int\_fact(15) = 1307674368000}
+\CommentTok{\# int\_pow(2, 10) = 1024}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{π 10,000
+桁の計算}\label{ux3c0-10000-ux6841ux306eux8a08ux7b97}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{/usr/bin/python3}\NormalTok{ psilang.py chudnovsky.psi }\OperatorTok{\textgreater{}}\NormalTok{ pi\_10k.txt}
+\CommentTok{\# 実時間: 3.03 秒 (Apple M2)}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{\texttt{chudnovsky.psi} の中身} (50 行) は
+\textbf{アルゴリズムそのもの} を PsiLang で書いている:
+
+\begin{verbatim}
+fn term(k) =
+  let sign = if k mod 2 == 0 then 1 else -1 in
+  let num  = sign * int_fact(6 * k) * (545140134 * k + 13591409) in
+  let den  = int_fact(3 * k) * int_pow(int_fact(k), 3) * int_pow(640320, 3 * k) in
+  rat(num, den)
+
+fn bsplit(a, b) =
+  if b - a == 1 then term(a)
+  else
+    let m = (a + b) / 2 in
+    let left  = bsplit(a, m) in
+    let right = bsplit(m, b) in
+    rat_add(left, right)
+
+fn chudnovsky_pi(n_digits) =
+  let n_terms = n_digits / 14 + 2 in
+  let prec    = n_digits + 20 in
+  let _bump   = set_precision(prec) in
+  let s_rat   = bsplit(0, n_terms) in
+  let s_real  = real_from_rat(s_rat, prec) in
+  let c       = real_mul(real_from_int(426880),
+                          real_sqrt(real_from_int(10005), prec)) in
+  real_div(c, s_real)
+
+let pi  = chudnovsky_pi(10000) in
+emit(real_to_string(pi, 10000))
+\end{verbatim}
+
+v1 の PhiLang のように
+\texttt{compute\ =\ chudnovsky\_binary\_splitting} で逃げず、
+
+\begin{itemize}
+\tightlist
+\item
+  二分木再帰 (\texttt{bsplit})
+\item
+  Chudnovsky 級数の k 番目項 (\texttt{term})
+\item
+  最終的な π 復元 (426880 · √10005 / S)
+\end{itemize}
+
+をすべて \textbf{PsiLang のソースコード自身が書いている}。実行は
+tree-walker interpreter (\texttt{psilang.py}) が Python の
+bigint・\texttt{Decimal} を上から借りるだけ。
+
+\subsection{検証結果
+(2026-05-16)}\label{ux691cux8a3cux7d50ux679c-2026-05-16}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+検査項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+出力サイズ & 10,002 chars = \texttt{"3."} + 10,000 digits \\
+先頭 102 桁の既知 π との一致 & ✓ \\
+Feynman point (\texttt{999999} の最初の出現位置) & 762 (well-known
+値と一致) \\
+1000 桁目 & \texttt{9} (OEIS A000796 と一致) \\
+v1 PhiLang/\texttt{chudnovsky\_pi(10000)} との bitwise 一致 & ✓ \\
+計算時間 & 3.03 秒 (Apple M2) \\
+Python interpreter 行数 & 約 650 行 (R4 想定 1500 行を下回る) \\
+\end{longtable}
+}
+
+\subsection{3 手法の比較 (遅 / 中 /
+速)}\label{ux624bux6cd5ux306eux6bd4ux8f03-ux9045-ux4e2d-ux901f}
+
+PsiLang のソースコード\textbf{だけ}で π 10,000 桁を 3 通り (+1 補助)
+に計算した時間:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1500}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\texttt{.psi} ファイル
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+級数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+内部表現
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+累積
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+\textbf{実時間}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+比率
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{machin\_rat.psi} & Machin (1.4 桁/項) & \textbf{Rat} & 線形 &
+\textbf{28.24 s} & 100× \\
+\texttt{chudnovsky\_linear.psi} & Chudnovsky (14 桁/項) & Rat & 線形 &
+3.49 s & 12× \\
+\texttt{chudnovsky.psi} & Chudnovsky & Rat & \textbf{二分木} & 3.04 s &
+10× \\
+\texttt{machin.psi} & Machin & \textbf{Real (Decimal)} & 線形 &
+\textbf{0.30 s} & 1× \\
+\end{longtable}
+}
+
+4 出力すべて \textbf{SHA256 が完全一致}
+(\texttt{d44e2dba39a378…})、つまり 10,000 桁すべて bit-wise
+に同じ値。詳細は親 \texttt{../REPORT.md} §7.3 を参照。
+
+主な知見: - \textbf{同じ Machin 公式}を Rat で書くと 28 秒、Real
+で書くと 0.3 秒 --- 94 倍の差。 - 級数の収束速度より、\textbf{型の選択
+(Rat vs Real) が性能を支配}することが PsiLang で可視化される。 -
+いずれの \texttt{.psi} も 50 行以下で書ける (R1\_AlgorithmExpressivity
+の閾値内)。
+
+\subsection{v1 PhiLang
+との対比}\label{v1-philang-ux3068ux306eux5bfeux6bd4}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+観点
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v1 PhiLang
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v2 PsiLang
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+役割 & Phase orchestration (timeout/retry/checkpoint) & Algorithm
+description (recursion/pattern/arithmetic) \\
+π 計算ソース & \texttt{compute\ =\ chudnovsky\_binary\_splitting} (1 行
+dispatch) & \texttt{chudnovsky.psi} (50 行の真のアルゴリズム) \\
+ホスト依存 & Python kernel \texttt{philang\_stdlib.chudnovsky\_pi()}
+がすべての仕事 & Python は \texttt{int}, \texttt{Decimal}, gcd
+を提供するだけ。algorithm は PsiLang 内 \\
+パラダイム & YAML-ish DSL & ML 系関数型 \\
+評価モデル & 4 ブロック
+(\texttt{phase\ /\ every\ /\ after\ /\ guarantees}) & tree-walker + 再帰
++ パターンマッチ \\
+進化計算の根拠 & top 5 共通の 4 つ巴 (bounded burst × mandatory retry ×
+\ldots) & top 5 コンセンサス (functional × static\_simple × bigint+rat ×
+pattern\_match\_fold × ml\_like) \\
+\end{longtable}
+}
+
+\subsection{限界}\label{ux9650ux754c}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Closures はサポートしない}: 局所 \texttt{let}
+  で定義した関数は環境を捕捉しない (\texttt{fn}
+  宣言はトップレベルのみ)。Chudnovsky には不要なので問題なし。
+\item
+  \textbf{型検査なし}: 型注釈は構文上受け取るが実行時は無視
+  (\texttt{static\_simple} を「型注釈は人間用ドキュメント」と解釈)。
+\item
+  \textbf{末尾呼び出し最適化なし}: 深い線形再帰 (例:
+  \texttt{factorial(4000)} を PsiLang 内で純粋再帰で書く) は Python 側で
+  stack overflow になる。回避策として \texttt{int\_fact} を builtin
+  に置いた。
+\item
+  \textbf{lambdas (匿名関数) なし}: \texttt{fn}
+  は宣言文のみ。FFT/quicksort を書くなら追加が必要。
+\item
+  \textbf{モジュール / import なし}: 単一ファイルプログラムのみ。
+\end{itemize}
+
+\end{document}

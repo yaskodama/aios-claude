@@ -1,9 +1,291 @@
 # aice-pi-evolution — NEXT_SESSION ハンドオフ
 
-**最終更新:** 2026-05-15
-**前セッションの最後の状態:** 全 4 phase が mock provider で完走、報告書 `REPORT_JA.md` 保存済、`aipl_codegen.py` の arity バグ修正済。
+**最終更新:** 2026-05-16 (Phase-1 を gen 11/40 で中断、性能問題を整理してから再起動する方針)
+**前セッションの最後の状態:** OpenAI gpt-4o-mini で Phase-1 を 3 回試行し、3 回目で gen 11/40 まで進んだ時点でユーザが手動中断。23 個体分の lineage と非ゼロスコア (0.16〜0.58, mean 0.32) を保存済。原因はスループット低 (実効並列 1〜2、理論 8 の 1/4〜1/8)。
 
 このファイルだけで前回セッションを再現/継続できることを目標にしている。
+
+---
+
+## 0. 進行中タスク: OpenAI gpt-4o-mini で Phase-1 を real-LLM 実行 (2026-05-16〜)
+
+### 0.0 セッション 2026-05-16 で起きたこと (3回の試行ログ)
+
+| 試行 | 結果 | 教訓 (修正済) |
+|---|---|---|
+| #1 | 5秒で死亡 (1 call) | `--timeout 2.0` / `--idle-ms 120` の既定値が短すぎ。real LLM 用には不適 |
+| #2 | gen 38/40 (1267 calls, $0.44) で silent death | OpenAI SDK の HTTPS request にタイムアウト無 → ハング後プロセス消滅。lineage を 1 回もダンプしていなかった |
+| #3 | gen 11/40 (23 個体, $0.20) で **ユーザが手動中断**。理由: スループットが遅すぎる (~23 calls/min, 理論 240+/min) | 並列化が orchestrator 構造上効いていない (§0.4 参照) |
+
+**3 回の試行から確定した修正 (このセッションでコミット):**
+
+1. `aipl_ai.py` の Anthropic/OpenAI クライアント初期化に **per-request timeout (60s) + SDK max_retries (3)** を追加 (`AIPL_AI_REQUEST_TIMEOUT`, `AIPL_AI_SDK_RETRIES` で上書き可)。
+2. `aipl_ai.py` の Vertex backend 経路 (`_get_anthropic_client()` + `AIPL_ANTHROPIC_BACKEND=vertex`) を追加 (使っていないが温存、§0.A 参照)。
+3. `aipl_ai.py` の `_price_for()` がバージョン付きモデル ID (`claude-haiku-4-5@20251019` 等) も base 名 lookup する。
+4. `aipl_ai.py` の `_get_openai_client()` ヘルパに集約。
+5. `Pi_Phase1_OpenSearch.aipl` に **毎世代の `lineage.dump()` チェックポイント** (`[ckpt gen=N] flushed M individuals` 行を出す) を追加。silent death 時も保存済み個体だけは残る。
+
+### 0.1 中断時点の状態 (2026-05-16 05:42)
+
+- AI usage: 599 calls, 382k in tokens, 239k out tokens, **$0.20 課金**
+- Lineage: `out/Pi_Phase1_OpenSearch.aipl_lineage.json` に **23 個体** (gen 0〜11)
+  - スコア: 全 23 個非ゼロ、min=0.16, max=0.58, mean=0.32
+  - operators: seed=12, uniform_crossover=3, axis_resample=8
+- Python プロセス: 中断済 (kill -TERM)
+- Monitor / watcher: 全て停止
+
+### 0.2 セッション再開時に最初に決める分岐
+
+**A) この lineage (23 個体, gen 0–11) で完了とみなして REPORT を更新する**
+   - 短期成果が欲しいならこちら。スコア分布を REPORT_JA.md に追記、Phase-2 をこの lineage を seed_from に使って始める。
+   - 追加コスト $0、所要時間 5 分。
+
+**B) Phase-1 を最初から再実行し 40 世代完走させる (現状構造)**
+   - 推定: ~60 分, ~$0.4。
+   - リスクは前回と同じ「実効並列度 1〜2 で遅い」だけ。silent death は §0.0-修正 で潰れている。
+
+**C) Phase-1 のパラメータを縮めて再実行 (推奨、未試行)**
+   - `Pi_Phase1_OpenSearch.aipl` の `seed_count = 12` → 8, `generations = 40` → 20 に変更。
+   - 推定: ~25 分, ~$0.2。探索深さは半分だが選択圧の有無を確かめる分には十分。
+   - 編集箇所: `aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl:552-553`。
+
+**D) Phase-1 の真の並列化を実装する (大改修、未試行)**
+   - 現状: `Coordinator.run()` の `while gen <= generations { ... now worker.compute_score(...) ... }` が世代を完全直列に回している (§0.4)。
+   - 改修案: generation 内の evaluator fan-out を `send` (fire-and-forget) で投げ、後で `gather` する形に書き換え。理論 5x 速。
+   - 工数: aipl_codegen.py の `Evaluator` クラスと Coordinator template を書き換え。再生成すると Pi_Phase1_OpenSearch.aipl も更新される。
+   - リスク: codegen 全体の影響範囲が大きいので Phase-0/2/Final も再テスト必要。
+
+### 0.3 推奨手順 (再開時)
+
+1. 状態を確認:
+   ```bash
+   cat out/ai_usage.json
+   /usr/bin/python3 -c "
+   import json
+   d = json.load(open('out/Pi_Phase1_OpenSearch.aipl_lineage.json'))
+   print('n=', len(d))
+   scores = [x.get('score', 0) for x in d]
+   print('min=', min(scores), 'max=', max(scores), 'mean=', sum(scores)/len(scores))
+   "
+   ```
+
+2. 分岐 A/B/C/D をユーザと確認。
+
+3. C を選んだ場合の編集と起動コマンド:
+   ```bash
+   # aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl
+   #   line 552:  var seed_count = 12;    → 8
+   #   line 553:  var generations = 40;   → 20
+
+   rm -f out/ai_usage.json out/Pi_Phase1_OpenSearch.aipl_lineage.json out/Pi_Phase1.log
+   mkdir -p out
+   nohup env \
+     AIPL_AI_PROVIDER=openai \
+     ABCL_AI_MAX_CONCURRENT=8 \
+     AIPL_AI_TOKEN_BUDGET=5000000 \
+     AIPL_AI_USAGE_FILE=out/ai_usage.json \
+     AIPL_AI_REQUEST_TIMEOUT=60 \
+     AIPL_AI_SDK_RETRIES=3 \
+     PYTHONUNBUFFERED=1 \
+     /usr/bin/python3 src/python-aipl/aipl_main.py \
+       aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl \
+       --timeout 7200 --idle-ms 60000 \
+     > out/Pi_Phase1.log 2>&1 &
+   disown
+   ```
+
+4. 進捗監視:
+   ```bash
+   tail -F out/Pi_Phase1.log | grep --line-buffered -E "ckpt gen=|seed\] elite|done\] cells|lineage\] wrote"
+   ```
+
+### 0.4 スループット問題の根本原因 (2026-05-16 試行 #3 で判明)
+
+実測: 555 calls / 24 min = **23 calls/min ≈ 0.4 calls/sec**。
+理論最大 (concurrency=8, latency=1.5s): **4〜8 calls/sec = 240〜480 calls/min**。
+**実効並列度は 1〜2** (理論の 5〜10%)。
+
+**主因は `Pi_Phase1_OpenSearch.aipl:587-612` の構造:**
+```aipl
+while (gen <= generations) do {
+  var parent = now elite.sample_random_genome();  // sync
+  var child  = now generator.mutate(parent);      // sync, 1 LLM call
+  var ccell  = now worker.compute_cell(child, ...);  // sync, 1 LLM call
+  var cscore = now worker.compute_score(child, ...); // sync, 25 LLM calls
+  send lineage.add(...);
+  send elite.propose(...);
+  var np = now lineage.dump(...);
+  gen = gen + 1;
+}
+```
+- `now` はブロッキング await。世代間の重なりがゼロ。
+- 1 世代 ~27 calls × ~2s ÷ 並列度 1〜2 ≈ 30〜60s/gen → 40 世代で 20〜40 分。
+- `compute_score` 内部の 5 reviewer × 5 task が真に並列なら 27 calls/gen → 5s/gen で済むはず。実測は ~60s/gen なので reviewer fan-out も大半が直列。
+
+→ **真の高速化には §0.2-D (codegen 改修) が必要**。短期スコープなら §0.2-C (パラメータ縮小) で凌ぐ。
+
+### 0.5 想定コスト (gpt-4o-mini)
+
+| Phase | コール数 | 想定 in | 想定 out | 想定コスト |
+|---|---:|---:|---:|---:|
+| Phase-0 | 15 | ~30k | ~5k | ~$0.01 |
+| Phase-1 (現状 12 seed / 40 gen) | ~1,300 | ~2.5M | ~0.4M | **~$0.6〜$1.2** |
+| Phase-1 (縮小 8 seed / 20 gen, 案 C) | ~600 | ~1.2M | ~0.2M | **~$0.3** |
+| Phase-2 | ~950 | ~1.8M | ~0.3M | ~$0.5 |
+| Final | 2 | ~5k | ~1k | <$0.01 |
+| **合計 (現状)** | ~2,267 | ~4.3M | ~0.7M | **~$1.5〜$2** |
+| **合計 (案 C)** | ~1,567 | ~3.0M | ~0.5M | **~$0.8〜$1** |
+
+実績 (試行 #3 中断時): 599 calls / 11 世代 → 54 calls/gen (推定より 2x 高い)。reviewer×task の組合せが想定より多いか、retry が含まれている。
+
+### 0.6 詰まる可能性 (再開時のチェックリスト)
+
+- **`AIPL_AI_MODEL` env は無効**: 試行で確認済。`aipl_main.py` は env からモデル名を読まない。`aipl_ai.py:75` の `DEFAULT_OPENAI_MODEL = "gpt-4o-mini"` が効くだけ。別モデルにするときはこの定数を書き換え。
+- **`--timeout` / `--idle-ms` の既定値は real LLM では NG**: 試行 #1 で確認 (2秒/120msで死亡)。最低 `--timeout 7200 --idle-ms 60000` を付ける。
+- **OpenAI SDK のハング**: 試行 #2 で発生。修正済 (`AIPL_AI_REQUEST_TIMEOUT=60`, `AIPL_AI_SDK_RETRIES=3`)。これらの env を必ず付ける。
+- **Rate limit (429)**: 試行中に出てない (tier 1 で RPM=500, TPM=200k に届かない)。`_is_retryable` がバックオフを掛ける。
+- **`max_tokens` 既定 4096**: Reviewer 返答は 1-2 行なので過剰。コスト圧縮したいなら `aipl_ai.py:79` の `DEFAULT_MAX_TOKENS` を 512 程度に。今回試行では未調整。
+- **silent death**: 試行 #2 で原因不明 (sample で全スレッド cond_wait)。`AIPL_AI_REQUEST_TIMEOUT=60` で再現性は消えたが、長時間 (>1h) 走らせるなら毎世代の checkpoint dump 必須 (試行 #3 で適用済、Pi_Phase1_OpenSearch.aipl:611-614)。
+- **Mac の sleep**: 試行 #2 が放置中に死亡した可能性あり。長時間 run の前に Caffeinate を:
+  ```bash
+  caffeinate -i &  # claude code セッション内で起動した python のスリープ防止
+  ```
+
+### 0.A (postponed) Google Vertex AI 経由 — 後日復活用にメモを残す
+
+**postpone した理由 (2026-05-16):** GCP Console での Vertex AI API 有効化と Model Garden の Claude Enable が完了できず、ブラウザ作業で時間を要したため。OPENAI_API_KEY は既に手元にあるので OpenAI に切替えた。再開する場合は以下の §0.A.1〜0.A.7 をそのまま使える (gcloud CLI は 568.0.0 がインストール済になっている)。
+
+#### 0.A.1 経緯と狙い (Vertex 案、postponed)
+- mock provider ではスコアが全 0 で MAP-Elites の選択圧がかからない (§6.1)
+- 真の選択圧で Phase-1 を回したい → **Anthropic 公式 API は日本のクレカが Stripe 決済を通らない**ため断念
+- 代替経路として **Google Vertex AI** を採用 (anthropic SDK は `AnthropicVertex` クライアントを既にサポート、anthropic 0.97.0 で確認済)
+- 副次効果: GCP 新規アカウントの **$300 / 90日無料クレジット**で Phase-1 (Opus 4.7 で $28 想定) も実質無料で試せる
+
+#### 0.A.2 現時点の到達点 (Vertex 案、postponed)
+| 項目 | 状態 |
+|---|---|
+| anthropic Python SDK | 0.97.0 インストール済、`AnthropicVertex` import 可 |
+| gcloud CLI | **2026-05-16 時点で 568.0.0 インストール済 (auth/project は未設定)** |
+| GCP アカウント | あり (Google アカウント `yaskodama@gmail.com`) |
+| GCP プロジェクト | **作成済 (詳細はユーザのブラウザ側で確認)** |
+| Billing アカウント | **未確認** (Vertex AI API 有効化前に必要な可能性あり) |
+| Vertex AI API 有効化 | **未完了** (ユーザのブラウザ作業で停止中) |
+| Model Garden で Claude Enable | 未着手 |
+| `aipl_ai.py` の Vertex 経路パッチ | **2026-05-16 完了** (`_get_anthropic_client` + `AIPL_ANTHROPIC_BACKEND=vertex`) |
+
+#### 0.A.3 ユーザが次に踏むステップ (ブラウザ作業、postponed)
+
+1. **Vertex AI API を有効化**:
+   - `https://console.cloud.google.com/apis/library/aiplatform.googleapis.com` を開く
+   - 上部でプロジェクトを確認
+   - 青い **ENABLE** ボタンを押す (30秒〜1分)
+   - 詰まる主因: Billing アカウント未リンクなら左メニュー → Billing → アカウントリンク
+
+2. **Model Garden で Claude を Enable**:
+   - `https://console.cloud.google.com/vertex-ai/model-garden`
+   - 検索バーで `Claude` → 使うモデル (推奨: **Claude Haiku 4.5** で疎通テスト→ Opus 4.7 で本実行)
+   - 各モデルカードで **Enable** ボタンを押す
+   - **対応リージョン**をメモ (Claude は `us-east5` が主流)
+   - **正式モデル ID** をメモ (例: `claude-haiku-4-5@<version>`, `claude-opus-4-7@<version>`)
+
+3. **gcloud CLI インストール + 認証** (ターミナルで):
+   ```bash
+   brew install --cask google-cloud-sdk
+   # シェル再起動後
+   gcloud init                                # アカウント + プロジェクト紐付け
+   gcloud auth application-default login      # ADC (SDK が読む認証)
+   ```
+
+4. **動作確認**:
+   ```bash
+   gcloud config get-value project    # プロジェクト ID
+   gcloud auth application-default print-access-token | head -c 20
+   ```
+
+#### 0.A.4 セッション再開時に Claude (アシスタント) が踏むステップ (Vertex 案)
+
+1. ユーザに「Vertex AI API 有効化と Model Garden で Claude Enable は済んだか」を確認
+2. ユーザに以下を聞き出す:
+   - **GCP プロジェクト ID** (例: `aipl-pi-evolution-123456`)
+   - **リージョン** (例: `us-east5`)
+   - **Claude モデルの正式 ID** (Vertex の Model Garden に表示されているバージョン付き ID)
+3. `aipl_ai.py` をパッチして Vertex 経路を追加 (§0.5 参照)
+4. 疎通テスト → Phase-1 本実行
+
+#### 0.A.5 `aipl_ai.py` パッチ (2026-05-16 実装済)
+
+**実装済の関数:** `_get_anthropic_client()` (`src/python-aipl/aipl_ai.py:42-71`)。`AIPL_ANTHROPIC_BACKEND=vertex` で `AnthropicVertex(project_id, region)` を返す。`AIPL_VERTEX_PROJECT_ID` / `AIPL_VERTEX_REGION` を読む。`_price_for()` はバージョン付き ID (`claude-haiku-4-5@20251019` 等) も base 名で lookup する。
+
+旧設計メモ (参考のみ):
+
+**目的**: 既存の `ANTHROPIC_API_KEY` 直接経路を壊さず、env で backend を切替可能にする。
+
+**追加する環境変数**:
+```bash
+export AIPL_AI_PROVIDER=anthropic
+export AIPL_ANTHROPIC_BACKEND=vertex       # 'direct' (default) | 'vertex' | 'bedrock'
+export AIPL_VERTEX_PROJECT_ID=<gcp-project-id>
+export AIPL_VERTEX_REGION=us-east5
+export AIPL_AI_MODEL=claude-haiku-4-5@<version>   # Vertex 用バージョン付きID
+```
+
+**修正対象ファイル**: `src/python-aipl/aipl_ai.py`
+
+**修正箇所**:
+- 現在 `_anthropic_client = anthropic.Anthropic()` が 3 箇所 (lines 617, 712, 766) に重複
+- これらを **`_get_anthropic_client()` ヘルパに集約**
+- ヘルパ内で `AIPL_ANTHROPIC_BACKEND=vertex` なら `anthropic.AnthropicVertex(project_id=..., region=...)` を返す
+- それ以外 (`direct` または未指定) なら従来通り `anthropic.Anthropic()`
+
+**疎通テストコマンド** (パッチ後):
+```bash
+AIPL_AI_PROVIDER=anthropic \
+AIPL_ANTHROPIC_BACKEND=vertex \
+AIPL_VERTEX_PROJECT_ID=<project-id> \
+AIPL_VERTEX_REGION=us-east5 \
+AIPL_AI_MODEL=claude-haiku-4-5@<version> \
+/usr/bin/python3 -c "
+import sys; sys.path.insert(0, 'src/python-aipl')
+from aipl_ai import call_ai
+print(call_ai('say ok in one word'))
+"
+```
+→ `ok` 等が返れば疎通成功。
+
+**Phase-1 本実行**:
+```bash
+mkdir -p out
+AIPL_AI_PROVIDER=anthropic \
+AIPL_ANTHROPIC_BACKEND=vertex \
+AIPL_VERTEX_PROJECT_ID=<project-id> \
+AIPL_VERTEX_REGION=us-east5 \
+AIPL_AI_MODEL=claude-haiku-4-5@<version> \
+AIPL_AI_MAX_CONCURRENT=4 \
+AIPL_AI_TOKEN_BUDGET=5000000 \
+AIPL_AI_USAGE_FILE=out/ai_usage.json \
+/usr/bin/python3 src/python-aipl/aipl_main.py \
+  aice-pi-evolution/examples/Pi_Phase1_OpenSearch.aipl
+```
+
+#### 0.A.6 想定コスト (Vertex 価格は Anthropic 直と同等)
+
+| Phase | コール数 | Haiku 4.5 | Opus 4.7 |
+|---|---:|---:|---:|
+| Phase-0 | 15 | ~$0.05 | ~$0.30 |
+| Phase-1 | ~1,300 | ~$6 | ~$28 |
+| Phase-2 | ~950 | ~$5 | ~$21 |
+| Final | 2 | <$0.01 | ~$0.05 |
+| **合計** | ~2,267 | **~$11** | **~$50** |
+
+→ **$300 無料クレジット**内に余裕で収まる。最初は Haiku で疎通、本番のみ Opus 推奨。
+
+#### 0.A.7 詰まる可能性のある箇所 (Vertex 案のチェックリスト)
+
+- **Billing アカウント未リンク**: Vertex AI API ENABLE が押せない / グレーアウト → Console の Billing メニューから請求先アカウントをリンク
+- **Model Garden で Claude が Enable できない**: リージョン制限の可能性 → `us-east5` を明示選択
+- **ADC が読まれない**: `GOOGLE_APPLICATION_CREDENTIALS` が古い値で残っていると優先される → `unset GOOGLE_APPLICATION_CREDENTIALS` で gcloud ADC に戻す
+- **モデル ID 不一致**: Vertex は `claude-opus-4-7@20251019` のようなバージョン付き ID が必須。直接 API の `claude-opus-4-7` だと 404 → Model Garden の表示通りにコピー
+- **`aipl_ai.py` の `_record_usage`**: `claude-opus-4-7@20251019` のような ID は pricing table (line 138〜) に無いので `(0,0)` 扱いになる。コストトラッキングだけは Anthropic 直の場合と数字がズレることに注意 (実際の課金は GCP 側で正確に計測される)
 
 ---
 

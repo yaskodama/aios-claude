@@ -1,0 +1,113 @@
+{
+  "name": "lang_design_paradigm",
+  "extends": null,
+  "_comment": "LangDesign_Expressive.aice (YAML, v2) から派生した『汎用言語の遺伝子型』スキーマ。v1 の robustness_paradigm.schema.json がランタイム設定 (prefix エンコード) だったのに対し、本スキーマは 値が意味ある名前そのもの (`general_recursion`, `arbitrary_int_plus_rational` 等)。LLM reviewer が解釈しやすいよう接頭辞符号化は廃止した。fixed_int_only / native_jit / native_aot は hard 制約違反となるため schema から除外。",
+
+  "axes": {
+    "paradigm":               ["imperative", "functional", "dataflow", "term_rewriting",
+                                "declarative_equation", "oo", "hybrid_imperative_functional"],
+    "evaluation_strategy":    ["strict", "lazy", "call_by_need", "call_by_name"],
+    "type_system":            ["dynamic", "static_simple", "hindley_milner",
+                                "refinement", "dependent"],
+    "arithmetic_primitives":  ["arbitrary_int",
+                                "arbitrary_int_plus_rational",
+                                "decimal_with_precision",
+                                "real_with_precision_annotation",
+                                "interval_arithmetic",
+                                "dependent_precision"],
+    "precision_control":      ["implicit", "global_const", "per_value_annotation",
+                                "automatic_inference", "proof_obligation"],
+    "control_flow":           ["structured_loops", "general_recursion",
+                                "tail_call_only", "pattern_match_fold",
+                                "list_comprehension", "monadic_bind"],
+    "termination_check":      ["none", "structural_recursion", "well_founded", "totality"],
+    "memory_management":      ["manual", "gc", "region_typed", "rc", "linear", "borrow_check"],
+    "io_model":               ["print_only", "stream_emit", "file_io_imperative",
+                                "region_owned_output", "monadic_io"],
+    "syntax_family":          ["c_like", "ml_like", "lisp_like", "apl_like",
+                                "haskell_like", "python_like", "prolog_like",
+                                "custom_minimal"],
+    "abstraction":            ["bare_metal", "libc", "vm_minimal", "stdlib_rich"],
+    "compilation_target":     ["tree_walker_interpreter", "bytecode_vm"]
+  },
+
+  "ordinal_axes": {
+    "type_system":          ["dynamic", "static_simple", "hindley_milner",
+                              "refinement", "dependent"],
+    "arithmetic_primitives":["arbitrary_int", "arbitrary_int_plus_rational",
+                              "decimal_with_precision", "real_with_precision_annotation",
+                              "interval_arithmetic", "dependent_precision"],
+    "termination_check":    ["none", "structural_recursion", "well_founded", "totality"],
+    "abstraction":          ["bare_metal", "libc", "vm_minimal", "stdlib_rich"],
+    "compilation_target":   ["tree_walker_interpreter", "bytecode_vm"]
+  },
+
+  "coherence": [
+    {
+      "_comment": "依存型は interpreter 実装が重く JIT/AOT には乗らない → tree_walker のみ許可",
+      "if":   {"type_system": "dependent"},
+      "then": {"compilation_target": "tree_walker_interpreter"}
+    },
+    {
+      "_comment": "依存型は ML 系 / Haskell 系 / Lisp 系 と相性が良い (Coq/Agda/Idris/Lean が好例)",
+      "if":      {"type_system": "dependent"},
+      "then_in": {"syntax_family": ["ml_like", "haskell_like", "lisp_like"]}
+    },
+    {
+      "_comment": "全関数性証明は依存型を要求 (Coq / Agda 同等)",
+      "if":   {"termination_check": "totality"},
+      "then": {"type_system": "dependent"}
+    },
+    {
+      "_comment": "imperative は loop / 再帰 のどちらかが必要、fold だけは不自然",
+      "if":      {"paradigm": "imperative"},
+      "then_in": {"control_flow": ["structured_loops", "general_recursion",
+                                    "tail_call_only"]}
+    },
+    {
+      "_comment": "functional + 手動メモリ管理は非現実的 (Haskell/OCaml は GC)",
+      "if":      {"paradigm": "functional"},
+      "then_in": {"memory_management": ["gc", "rc", "region_typed",
+                                         "linear", "borrow_check"]}
+    },
+    {
+      "_comment": "OO は GC / RC が定石 (Java/Smalltalk/Ruby/Swift)",
+      "if":      {"paradigm": "oo"},
+      "then_in": {"memory_management": ["gc", "rc"]}
+    },
+    {
+      "_comment": "dependent_precision は型表現力が必要",
+      "if":      {"arithmetic_primitives": "dependent_precision"},
+      "then_in": {"type_system": ["refinement", "dependent"]}
+    },
+    {
+      "_comment": "monadic bind は関数型 (または hybrid) でのみ意味がある",
+      "if":      {"control_flow": "monadic_bind"},
+      "then_in": {"paradigm": ["functional", "hybrid_imperative_functional"]}
+    },
+    {
+      "_comment": "lazy evaluation は関数型でのみ意味がある (Haskell)",
+      "if":      {"evaluation_strategy": "lazy"},
+      "then_in": {"paradigm": ["functional", "hybrid_imperative_functional"]}
+    },
+    {
+      "_comment": "bytecode_vm を選んだら抽象度は libc 以上",
+      "if":      {"compilation_target": "bytecode_vm"},
+      "then_in": {"abstraction": ["libc", "vm_minimal", "stdlib_rich"]}
+    },
+    {
+      "_comment": "term_rewriting は構文が独特 (Maude/CafeOBJ 等)",
+      "if":      {"paradigm": "term_rewriting"},
+      "then_in": {"syntax_family": ["lisp_like", "ml_like", "custom_minimal"]}
+    },
+    {
+      "_comment": "proof_obligation は実行時より型レベルでの保証 → 強い型システム必要",
+      "if":      {"precision_control": "proof_obligation"},
+      "then_in": {"type_system": ["refinement", "dependent"]}
+    }
+  ],
+
+  "open_axes": false,
+
+  "notes": "LangDesign_Expressive.aice の variables セクション (12 軸) と 1:1 対応。fixed_int_only / native_jit / native_aot は除外済。enum 値は実在の言語デザイン用語 (例: hindley_milner, monadic_bind) を採用し、reviewer (LLM) が知識ベースで解釈できるようにした。coherence rules は 12 個。"
+}

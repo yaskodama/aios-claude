@@ -1,0 +1,288 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{PhiLang --- Minimal
+Interpreter}\label{philang-minimal-interpreter}
+
+進化計算 (本ディレクトリの REPORT.md §6) が示唆した \textbf{Phase
+Orchestration Language} の最小実装。
+
+\subsection{構成}\label{ux69cbux6210}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}llr@{}}
+\toprule\noalign{}
+ファイル & 役割 & 行数 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{philang\_parser.py} & \texttt{.phi} → \texttt{Phase} AST &
+188 \\
+\texttt{philang\_interp.py} & AST 実行 + guarantees 検証 & 207 \\
+\texttt{philang\_stdlib.py} & 数値カーネル (現状 Chudnovsky のみ) &
+60 \\
+\texttt{philang\_main.py} & CLI エントリ & 26 \\
+\texttt{compute\_pi\_10k.phi} & サンプル: π 10,000 桁 & 26 \\
+\end{longtable}
+}
+
+\subsection{実行}\label{ux5b9fux884c}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{/usr/bin/python3}\NormalTok{ philang\_main.py compute\_pi\_10k.phi}
+\end{Highlighting}
+\end{Shaded}
+
+期待出力:
+
+\begin{verbatim}
+[phi] running phase 'ComputePi10k'
+[phi]   compute: chudnovsky_pi(digits=10000, ckpt_every=1000, ckpt_path='.../pi_10k.partial.txt')
+[phi]   wrote 10002 chars → .../pi_10k.txt (1.832s)
+[phi] verifying guarantees...
+[phi]   digit_count: ✓ (10000 ≥ 10000)
+[phi]   starts_with: ✓ (37 char prefix matches)
+[phi]   no_silent_death: ✓ (reached verification phase)
+[phi]   bounded_wall: ✓ (1.83s ≤ 60.0s)
+[phi]   partial_resume_on_kill: ✓ (1 checkpoint clause(s))
+[phi] phase 'ComputePi10k': all guarantees satisfied in 1.83s
+\end{verbatim}
+
+\subsection{言語の意味論}\label{ux8a00ux8a9eux306eux610fux5473ux8ad6}
+
+PhiLang プログラムは \textbf{1 つの phase + 1 つの guarantees
+ブロック}で構成される。
+
+\begin{verbatim}
+phase NAME
+  within   <duration> and <cost>     # ハード予算
+  drains   for <dur> idle <dur>      # actor drain buffer (LLM 用、kernel では未使用)
+  caffeine if <cond>                 # Mac sleep 対策
+  uses     <provider/model>          # 任意
+{
+  <key> = <value>                    # 通常パラメタ
+  every call has policy { ... }      # LLM コール用 (Phase-1 等)
+  after every <N> <unit> { ... }     # チェックポイント / 進捗フック
+}
+guarantees {
+  <predicate>                        # bool 形式
+  <predicate> = <value>              # 値付き形式
+}
+\end{verbatim}
+
+\subsubsection{実装済の compute
+kernel}\label{ux5b9fux88c5ux6e08ux306e-compute-kernel}
+
+\texttt{philang\_stdlib.COMPUTE\_REGISTRY} で参照可能なもの:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+key
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+関数
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+用途
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{chudnovsky\_binary\_splitting} &
+\texttt{chudnovsky\_pi(digits,\ ckpt\_every,\ ckpt\_path)} & π
+を任意桁計算 \\
+\end{longtable}
+}
+
+\subsubsection{実装済の
+guarantee}\label{ux5b9fux88c5ux6e08ux306e-guarantee}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+名前
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+検証内容
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{no\_silent\_death} & guarantees ブロックに到達できたか (=
+プロセス生存) \\
+\texttt{bounded\_wall\ =\ \textless{}dur\textgreater{}} &
+実時間が指定値以下か \\
+\texttt{bounded\_cost\ =\ \textless{}cost\textgreater{}} & (LLM
+用、kernel は常に 0) \\
+\texttt{digit\_count\ =\ \textless{}N\textgreater{}} & 出力の桁数 ≥ N \\
+\texttt{starts\_with\ =\ "\textless{}prefix\textgreater{}"} &
+出力が指定の文字列で始まるか \\
+\texttt{partial\_resume\_on\_kill} &
+\texttt{after\ every\ ...\ checkpoint} 句が phase 内にあるか \\
+\end{longtable}
+}
+
+\subsection{検証実績
+(2026-05-16)}\label{ux691cux8a3cux5b9fux7e3e-2026-05-16}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+計算桁数 & 10,000 \\
+所要時間 & 1.83 秒 \\
+先頭 102 桁の既知 π との一致 & ✓ \\
+Feynman 点 (\texttt{999999} の最初の出現) & 位置 762 (既知値と一致) \\
+1000 桁目 & \texttt{9} (既知 OEIS A000796 と一致) \\
+出力ファイル & \texttt{pi\_10k.txt} (10003 bytes),
+\texttt{pi\_10k.partial.txt} (中間チェックポイント) \\
+\end{longtable}
+}
+
+\subsection{仕様外 /
+既知の限界}\label{ux4ed5ux69d8ux5916-ux65e2ux77e5ux306eux9650ux754c}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\texttt{uses} 句}: 現状は構文上受け取るだけで実際の provider
+  切替は行わない (kernel が local なので)。
+\item
+  \textbf{\texttt{every\ call\ has\ policy}}: LLM コール用の宣言だが、現
+  stdlib に LLM kernel が無いので未テスト。Phase-1 等の AIPL
+  連携を将来追加するときに使う。
+\item
+  \textbf{エラー時の partial\_resume\_on\_kill}:
+  \texttt{after\ every\ ...\ checkpoint} 句があれば guarantee は OK
+  だが、実際に途中で kill されたときの resume ロジックは未実装。
+\item
+  \textbf{並列実行}: なし。Chudnovsky kernel は単一スレッドで decimal
+  を回す。
+\end{itemize}
+
+\end{document}

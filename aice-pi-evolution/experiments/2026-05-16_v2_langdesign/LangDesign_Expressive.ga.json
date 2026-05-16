@@ -1,0 +1,130 @@
+{
+  "_source_aice": "LangDesign_Expressive.aice (案1 YAML)",
+  "_source_dialect": "aice_yaml_v1",
+  "_generated": "2026-05-16 (hand-crafted from YAML)",
+  "_comment": "v2 言語デザイン探索: YAML の variables (12軸) を schema axes に、failure_modes F1〜F5 と evaluation.task_specs を reviewers/tasks に展開した。v1 と異なり cell_axes は 5 軸 (paradigm, type_system, arithmetic_primitives, control_flow, syntax_family) で、これらの組合せ 10,080 cells を MAP-Elites で広域探索する。",
+
+  "name": "LangDesign_Expressive",
+
+  "task": "Chudnovsky binary-splitting を 言語自身の構文 で書ける、かつ factorial / quicksort / FFT / matmul / fibonacci も書ける、比較的汎用的なプログラミング言語の遺伝子型 (paradigm × type_system × arithmetic_primitives × precision_control × control_flow × termination_check × memory_management × io_model × syntax_family × abstraction × compilation_target × evaluation_strategy) を進化計算で発見する。v1 (PhiLang) のように dispatch shell に逃げず、アルゴリズムを言語の primitive で記述できることを必須要件とする。",
+
+  "schema_ref": "lang_design_paradigm.schema.json",
+
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": ["paradigm", "type_system", "arithmetic_primitives", "control_flow", "syntax_family"],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415926
+  },
+
+  "operators": {
+    "mutations": [
+      { "name": "axis_resample",  "kind": "single_axis",            "weight": 0.55 },
+      { "name": "coherent_shift", "kind": "multi_axis_correlated",  "weight": 0.35 },
+      { "name": "llm_proposal",   "kind": "llm_directed",           "weight": 0.10 }
+    ],
+    "crossovers": [
+      { "name": "uniform",   "kind": "axis_uniform",      "weight": 0.6 },
+      { "name": "one_point", "kind": "schema_partition",  "weight": 0.4 }
+    ]
+  },
+
+  "evaluation": {
+    "use_ai": true,
+    "evaluator": "Evaluator",
+
+    "_task_comment": "YAML evaluation.tasks (6 アルゴリズム) を列挙。各 task は『当該言語でこのアルゴリズムを書けるか』を 0.0-1.0 で判定する評価軸。codegen は名前のみ使う。",
+    "tasks": ["PiChudnovskyBsplit", "FactorialN", "QuicksortInPlace",
+              "FFTMultiply", "MatmulNCubed", "FibonacciClosedForm"],
+    "task_specs": {
+      "PiChudnovskyBsplit": {
+        "spec": "指定された桁数 N に対し、Chudnovsky 級数の最初 ceil(N/14)+2 項を binary-splitting で和を取り、最後に sqrt(10005) を 1 度だけ評価して π を N 桁返す関数を当該言語で書く。要求 primitive: arbitrary integer arithmetic, rational or fixed-precision real, 再帰または等価な loop, sqrt 演算。",
+        "weight": 0.40, "hard": true
+      },
+      "FactorialN": {
+        "spec": "n! を任意桁の整数として返す関数を当該言語で書く。要求: 任意精度整数 + 再帰 (または loop)。",
+        "weight": 0.15, "hard": true
+      },
+      "QuicksortInPlace": {
+        "spec": "配列を再帰的にパーティション分割して in-place ソート。要求: 可変配列, 再帰, 比較。",
+        "weight": 0.10
+      },
+      "FFTMultiply": {
+        "spec": "2 つの整数の積を NTT/FFT で求める。要求: 複素数または mod prime 整数, 配列, 再帰。",
+        "weight": 0.10
+      },
+      "MatmulNCubed": {
+        "spec": "N×N 行列の素朴な O(N^3) 乗算。要求: 2D 配列, 3 重 loop, 数値演算。",
+        "weight": 0.10
+      },
+      "FibonacciClosedForm": {
+        "spec": "F(n) = (φ^n - ψ^n)/√5 を真の整数として返す。要求: 代数的数の閉形式評価 OR 行列累乗。",
+        "weight": 0.15
+      }
+    },
+
+    "_reviewer_comment": "v1 で確立したスコア 0.0-1.0 + 明示基準 + エンコーディングキー の persona 設計を踏襲。本スキーマは値名が意味的なのでエンコーディングキーは不要、代わりに『何を評価するか』を明示する。",
+    "reviewers": [
+      {
+        "name": "R1_AlgorithmExpressivity",
+        "persona": "あなたは R1 (アルゴリズム表現力) を判定するレビュアーです。候補言語の遺伝子 (paradigm, control_flow, arithmetic_primitives, precision_control, type_system, syntax_family の 6 軸) を見て、Chudnovsky binary-splitting アルゴリズム (二分木再帰 + 巨大整数の積 + 有理数の和) を 当該言語の構文だけで 実装可能かを判定する。重要: dispatch shell (例: compute=chudnovsky 1 行で済む) は『書けない』とみなす。スコア基準: 1.0 = 50 行以内で書ける (例: arbitrary_int_plus_rational + general_recursion + ml_like)、0.7 = 100 行以内で書ける、0.3 = 書けるが 200 行以上、0.0 = primitive 不足で書けない (例: fixed_int 系、または fold のみ)。半角数字の decimal で答えてください。",
+        "weight": 0.30
+      },
+      {
+        "name": "R2_ArbitraryPrecisionSafety",
+        "persona": "あなたは R2 (任意精度安全性) を判定するレビュアーです。候補言語の arithmetic_primitives と precision_control を見て、Chudnovsky bsplit に必要な『N=10000 桁の正確な計算』が言語の型システムで保証されるかを判定する。スコア基準: 1.0 = arbitrary_int_plus_rational または上位 + per_value_annotation 以上の精度制御で型レベルで桁数を持てる、0.7 = arbitrary 系はあるが精度は実行時の責任 (implicit / global_const)、0.3 = decimal_with_precision のみ、0.0 = 上記いずれにも該当しない。半角数字の decimal で答えてください。",
+        "weight": 0.20
+      },
+      {
+        "name": "R3_RecursionAndIteration",
+        "persona": "あなたは R3 (制御フロー充実度) を判定するレビュアーです。candidate の control_flow と termination_check の組合せが、二分木再帰 (binary splitting) と loop (FFT, matmul) の両方を表現できるかを判定する。スコア基準: 1.0 = general_recursion または structured_loops + 等価な再帰が表現可能 (paradigm が functional ならパターンマッチ + 再帰で OK)、0.7 = tail_call_only など制約はあるが両方できる、0.3 = pattern_match_fold のみ (binary tree は書けるが loop は不自然)、0.0 = どちらも書けない (list_comprehension のみなど)。半角数字の decimal で答えてください。",
+        "weight": 0.20
+      },
+      {
+        "name": "R4_ImplementabilityFeasibility",
+        "persona": "あなたは R4 (ホスト実装の実現可能性) を判定するレビュアーです。compilation_target, syntax_family, type_system, paradigm の組合せが、Python ホストで 500〜3000 行の interpreter として書けるかを判定する。基準: 1.0 = tree_walker_interpreter + ml_like/c_like/python_like + dynamic/static_simple/hindley_milner (1500 行以内が現実的)、0.7 = bytecode_vm を選んだが型は単純 (3000 行以内)、0.3 = dependent 型 (4500 行程度) または lisp_like + 強い型システム、0.0 = bytecode_vm + dependent 型のような重複した複雑さ。半角数字の decimal で答えてください。",
+        "weight": 0.15
+      },
+      {
+        "name": "R5_Generality",
+        "persona": "あなたは R5 (汎用性) を判定するレビュアーです。当該言語が 6 タスク (PiChudnovskyBsplit, FactorialN, QuicksortInPlace, FFTMultiply, MatmulNCubed, FibonacciClosedForm) のうち何個を書けるかを推定する。各タスクの要求: PiChudnovskyBsplit と FactorialN は arbitrary 系算術 + 再帰/loop、Quicksort は可変配列 + 再帰、FFTMultiply は配列 + 複素数 (または mod prime)、MatmulNCubed は 2D 配列 + 3 重 loop、FibonacciClosedForm は代数的数 or 行列累乗。スコア基準: 1.0 = 5-6 個書ける、0.7 = 3-4 個、0.3 = 1-2 個、0.0 = 0 個 (PiChudnovskyBsplit すら書けない)。半角数字の decimal で答えてください。",
+        "weight": 0.15
+      }
+    ]
+  },
+
+  "meta_fitness": {
+    "_comment": "YAML の goal.scalar_fitness の重みを meta_fitness に展開。aipl_codegen が見るのはこの dict のみ。",
+    "algorithm_expressivity":  0.30,
+    "generality_breadth":      0.30,
+    "minimality":              0.15,
+    "implementability":        0.15,
+    "concision":               0.10
+  },
+
+  "ranking": {
+    "strategy": "scalar_with_pareto_tiebreak",
+    "scenarios": ["balanced", "expressivity_first", "minimality_first"],
+    "scenario_weights": {
+      "balanced":            { "algorithm_expressivity": 0.30, "generality_breadth": 0.30, "minimality": 0.15, "implementability": 0.15, "concision": 0.10 },
+      "expressivity_first":  { "algorithm_expressivity": 0.50, "generality_breadth": 0.30, "minimality": 0.05, "implementability": 0.10, "concision": 0.05 },
+      "minimality_first":    { "algorithm_expressivity": 0.20, "generality_breadth": 0.15, "minimality": 0.40, "implementability": 0.20, "concision": 0.05 }
+    },
+    "top_k": 5
+  },
+
+  "extensions": {
+    "_note": "codegen には届かない (NEXT_SESSION.md §6.2 参照)。YAML 1 次ソースへの逆参照のみ。",
+    "source_yaml_v1_inherited_runtime": {
+      "provider": "openai", "model": "gpt-4o-mini", "concurrency": 8,
+      "request_timeout_s": 60, "sdk_retries": 3,
+      "drain_timeout_s": 7200, "idle_ms": 60000,
+      "checkpoint_per_gen": "on", "caffeinate": "on"
+    },
+    "source_yaml_plan_step_5_estimate": {
+      "wall_min": 40, "cost_usd": 0.40, "expected_individuals": 38
+    }
+  }
+}
