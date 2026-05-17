@@ -1,0 +1,1324 @@
+[
+  {
+    "id": "I0001",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.195,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.23500000000000001,
+      "paradigm_match": 0.255
+    },
+    "composite": 0.42774999999999996,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0002",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_provider_fallback",
+      "actor_placement": "multi_node_via_remote",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_provider_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.33499999999999996,
+      "task::SustainedThroughput": 0.455,
+      "task::BackwardCompatPsiLang2": 0.455,
+      "task::MultiProviderFailover": 0.315,
+      "task::LineageDurability": 0.315,
+      "task::ImplCostEstimate": 0.395,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.37833333333333335,
+      "paradigm_match": 0.455
+    },
+    "composite": 0.5350833333333334,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0003",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "same_provider_retry",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "checkpoint_and_resume",
+      "message_serialization": "json_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=same_provider_retry|actor_placement=local_thread_pool|supervisor_strategy=checkpoint_and_resume|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.375,
+      "task::SustainedThroughput": 0.32999999999999996,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.255,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.375,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.3475,
+      "paradigm_match": 0.375
+    },
+    "composite": 0.50275,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0004",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "zmq_with_msgpack",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "single_select_via_env",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.27,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.39499999999999996,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.21,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.2833333333333333,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.4820833333333333,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0005",
+    "genome": {
+      "scheduler_model": "latency_aware",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=latency_aware|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.515,
+      "task::SustainedThroughput": 0.455,
+      "task::BackwardCompatPsiLang2": 0.455,
+      "task::MultiProviderFailover": 0.455,
+      "task::LineageDurability": 0.455,
+      "task::ImplCostEstimate": 0.515,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.47500000000000003,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.58875,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0006",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "none",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.375,
+      "task::SustainedThroughput": 0.375,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.375,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.345,
+      "paradigm_match": 0.375
+    },
+    "composite": 0.50175,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0007",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "print_only",
+      "ai_provider_abstraction": "single_select_via_env",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.375,
+      "task::SustainedThroughput": 0.45499999999999996,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.315,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.3516666666666666,
+      "paradigm_match": 0.45499999999999996
+    },
+    "composite": 0.5244166666666666,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0008",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_provider_fallback",
+      "actor_placement": "single_process",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "attribute_decorator",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_latency_spike"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_provider_fallback|actor_placement=single_process|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=attribute_decorator",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.39499999999999996,
+      "task::SustainedThroughput": 0.5349999999999999,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.5349999999999999,
+      "task::LineageDurability": 0.515,
+      "task::ImplCostEstimate": 0.45499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4583333333333333,
+      "paradigm_match": 0.5349999999999999
+    },
+    "composite": 0.5870833333333333,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0009",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "print_only",
+      "ai_provider_abstraction": "single_select_via_env",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.33499999999999996,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.31166666666666665,
+      "paradigm_match": 0.375
+    },
+    "composite": 0.4884166666666666,
+    "generation": 1,
+    "parents": [
+      "I0007"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0010",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.455,
+      "task::SustainedThroughput": 0.455,
+      "task::BackwardCompatPsiLang2": 0.41000000000000003,
+      "task::MultiProviderFailover": 0.515,
+      "task::LineageDurability": 0.455,
+      "task::ImplCostEstimate": 0.455,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4575,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.58175,
+    "generation": 2,
+    "parents": [
+      "I0005"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0011",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.39499999999999996,
+      "task::SustainedThroughput": 0.45499999999999996,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.425,
+      "task::LineageDurability": 0.515,
+      "task::ImplCostEstimate": 0.375,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.42333333333333334,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.5680833333333334,
+    "generation": 3,
+    "parents": [
+      "I0006"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0012",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.195,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.23500000000000001,
+      "paradigm_match": 0.255
+    },
+    "composite": 0.42774999999999996,
+    "generation": 4,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0013",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.515,
+      "task::SustainedThroughput": 0.375,
+      "task::BackwardCompatPsiLang2": 0.45499999999999996,
+      "task::MultiProviderFailover": 0.475,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.435,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4383333333333333,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.5740833333333334,
+    "generation": 5,
+    "parents": [
+      "I0011"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0014",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.195,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.245,
+      "paradigm_match": 0.315
+    },
+    "composite": 0.44675,
+    "generation": 6,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:llm_proposal"
+  },
+  {
+    "id": "I0015",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.195,
+      "task::ImplCostEstimate": 0.195,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.245,
+      "paradigm_match": 0.315
+    },
+    "composite": 0.44675,
+    "generation": 7,
+    "parents": [
+      "I0014"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0016",
+    "genome": {
+      "scheduler_model": "latency_aware",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=latency_aware|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.455,
+      "task::SustainedThroughput": 0.35,
+      "task::BackwardCompatPsiLang2": 0.35,
+      "task::MultiProviderFailover": 0.395,
+      "task::LineageDurability": 0.41000000000000003,
+      "task::ImplCostEstimate": 0.515,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.41250000000000003,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.5637500000000001,
+    "generation": 8,
+    "parents": [
+      "I0005",
+      "I0010"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0017",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "none",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.435,
+      "task::MultiProviderFailover": 0.315,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.375,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.355,
+      "paradigm_match": 0.435
+    },
+    "composite": 0.5207499999999999,
+    "generation": 9,
+    "parents": [
+      "I0006"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0018",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "zmq_with_msgpack",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "single_select_via_env",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.29,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.315,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.15,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.26333333333333336,
+      "paradigm_match": 0.315
+    },
+    "composite": 0.4540833333333334,
+    "generation": 10,
+    "parents": [
+      "I0004"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0019",
+    "genome": {
+      "scheduler_model": "latency_aware",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=latency_aware|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.455,
+      "task::SustainedThroughput": 0.455,
+      "task::BackwardCompatPsiLang2": 0.515,
+      "task::MultiProviderFailover": 0.455,
+      "task::LineageDurability": 0.455,
+      "task::ImplCostEstimate": 0.455,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.465,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.58475,
+    "generation": 11,
+    "parents": [
+      "I0005"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0020",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "none",
+      "message_serialization": "msgpack_over_tcp",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.375,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.315,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.39499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.35833333333333334,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.5120833333333333,
+    "generation": 12,
+    "parents": [
+      "I0017"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0021",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "multi_node_via_remote",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.33499999999999996,
+      "task::ImplCostEstimate": 0.33499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.305,
+      "paradigm_match": 0.33499999999999996
+    },
+    "composite": 0.47575,
+    "generation": 13,
+    "parents": [
+      "I0018",
+      "I0002"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0022",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.45499999999999996,
+      "task::SustainedThroughput": 0.5349999999999999,
+      "task::BackwardCompatPsiLang2": 0.515,
+      "task::MultiProviderFailover": 0.375,
+      "task::LineageDurability": 0.45499999999999996,
+      "task::ImplCostEstimate": 0.45499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.465,
+      "paradigm_match": 0.5349999999999999
+    },
+    "composite": 0.58975,
+    "generation": 14,
+    "parents": [
+      "I0013"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0023",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.21,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.33499999999999996,
+      "task::ImplCostEstimate": 0.375,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.31416666666666665,
+      "paradigm_match": 0.375
+    },
+    "composite": 0.4894166666666667,
+    "generation": 15,
+    "parents": [
+      "I0018",
+      "I0002"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0024",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "multi_node_via_remote",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "zmq_with_msgpack",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.39499999999999996,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.315,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.3016666666666667,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.4894166666666667,
+    "generation": 16,
+    "parents": [
+      "I0018",
+      "I0002"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0025",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "zmq_with_msgpack",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "single_select_via_env",
+      "rebalancing_trigger": "on_latency_spike"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.33499999999999996,
+      "task::LineageDurability": 0.315,
+      "task::ImplCostEstimate": 0.33499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.32166666666666666,
+      "paradigm_match": 0.33499999999999996
+    },
+    "composite": 0.4824166666666667,
+    "generation": 17,
+    "parents": [
+      "I0018"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0026",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.39499999999999996,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.315,
+      "task::MultiProviderFailover": 0.255,
+      "task::LineageDurability": 0.39499999999999996,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.33166666666666667,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.5014166666666666,
+    "generation": 18,
+    "parents": [
+      "I0023"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0027",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "none",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.27499999999999997,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.27499999999999997,
+      "task::LineageDurability": 0.195,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.25166666666666665,
+      "paradigm_match": 0.27499999999999997
+    },
+    "composite": 0.4394166666666667,
+    "generation": 19,
+    "parents": [
+      "I0026"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0028",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_provider_fallback",
+      "actor_placement": "single_process",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "attribute_decorator",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_latency_spike"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_provider_fallback|actor_placement=single_process|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=attribute_decorator",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.45499999999999996,
+      "task::SustainedThroughput": 0.475,
+      "task::BackwardCompatPsiLang2": 0.39499999999999996,
+      "task::MultiProviderFailover": 0.5349999999999999,
+      "task::LineageDurability": 0.39499999999999996,
+      "task::ImplCostEstimate": 0.45499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.45166666666666666,
+      "paradigm_match": 0.5349999999999999
+    },
+    "composite": 0.5844166666666667,
+    "generation": 20,
+    "parents": [
+      "I0008"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0029",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.195,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.39499999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.2683333333333333,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.4760833333333333,
+    "generation": 21,
+    "parents": [
+      "I0015"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0030",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "single_process",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=single_process|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.335,
+      "task::SustainedThroughput": 0.395,
+      "task::BackwardCompatPsiLang2": 0.395,
+      "task::MultiProviderFailover": 0.27499999999999997,
+      "task::LineageDurability": 0.335,
+      "task::ImplCostEstimate": 0.395,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.355,
+      "paradigm_match": 0.395
+    },
+    "composite": 0.51075,
+    "generation": 22,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0031",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "single_process",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "structured_log",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=single_process|supervisor_strategy=none|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.27499999999999997,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.33499999999999996,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.27499999999999997,
+      "task::ImplCostEstimate": 0.195,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.26499999999999996,
+      "paradigm_match": 0.33499999999999996
+    },
+    "composite": 0.45975,
+    "generation": 23,
+    "parents": [
+      "I0030",
+      "I0014"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0032",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "single_node_fs",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.375,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.375,
+      "task::LineageDurability": 0.375,
+      "task::ImplCostEstimate": 0.315,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.355,
+      "paradigm_match": 0.375
+    },
+    "composite": 0.50575,
+    "generation": 24,
+    "parents": [
+      "I0022"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0033",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "local_thread_pool",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "checkpoint_and_resume",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=checkpoint_and_resume|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.435,
+      "task::SustainedThroughput": 0.515,
+      "task::BackwardCompatPsiLang2": 0.435,
+      "task::MultiProviderFailover": 0.515,
+      "task::LineageDurability": 0.435,
+      "task::ImplCostEstimate": 0.435,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.46166666666666667,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.5834166666666667,
+    "generation": 25,
+    "parents": [
+      "I0022"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0034",
+    "genome": {
+      "scheduler_model": "cost_weighted_routing",
+      "failover_policy": "none",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "actor_id_with_resolver",
+      "lineage_replication": "append_only_distributed_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "attribute_decorator",
+      "observability_layer": "prometheus_metrics",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_latency_spike"
+    },
+    "cell": "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=attribute_decorator",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.255,
+      "task::SustainedThroughput": 0.255,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.255,
+      "task::LineageDurability": 0.195,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.245,
+      "paradigm_match": 0.255
+    },
+    "composite": 0.43174999999999997,
+    "generation": 26,
+    "parents": [
+      "I0027",
+      "I0008"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0035",
+    "genome": {
+      "scheduler_model": "rate_limit_aware_per_provider",
+      "failover_policy": "none",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "actor_url",
+      "lineage_replication": "eventual_consistency_log",
+      "supervisor_strategy": "none",
+      "message_serialization": "in_memory_pyobj",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "print_only",
+      "ai_provider_abstraction": "tier_aware_router",
+      "rebalancing_trigger": "continuous_periodic"
+    },
+    "cell": "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.27499999999999997,
+      "task::SustainedThroughput": 0.315,
+      "task::BackwardCompatPsiLang2": 0.255,
+      "task::MultiProviderFailover": 0.195,
+      "task::LineageDurability": 0.255,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.25833333333333336,
+      "paradigm_match": 0.315
+    },
+    "composite": 0.4520833333333334,
+    "generation": 27,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:llm_proposal"
+  },
+  {
+    "id": "I0036",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_process_local",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "env_var_routing",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "on_quota_threshold"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=env_var_routing",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.515,
+      "task::SustainedThroughput": 0.56,
+      "task::BackwardCompatPsiLang2": 0.515,
+      "task::MultiProviderFailover": 0.5,
+      "task::LineageDurability": 0.455,
+      "task::ImplCostEstimate": 0.395,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.49,
+      "paradigm_match": 0.56
+    },
+    "composite": 0.606,
+    "generation": 28,
+    "parents": [
+      "I0022",
+      "I0010"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0037",
+    "genome": {
+      "scheduler_model": "token_budget_aware",
+      "failover_policy": "multi_model_fallback",
+      "actor_placement": "cluster_with_scheduler",
+      "actor_addressing": "global_var_only",
+      "lineage_replication": "dual_node_mirror",
+      "supervisor_strategy": "quarantine_and_skip",
+      "message_serialization": "zmq_with_msgpack",
+      "opt_in_annotation_style": "no_annotation_runtime_only",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=no_annotation_runtime_only",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.315,
+      "task::SustainedThroughput": 0.39499999999999996,
+      "task::BackwardCompatPsiLang2": 0.375,
+      "task::MultiProviderFailover": 0.315,
+      "task::LineageDurability": 0.33499999999999996,
+      "task::ImplCostEstimate": 0.255,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.33166666666666667,
+      "paradigm_match": 0.39499999999999996
+    },
+    "composite": 0.5014166666666666,
+    "generation": 29,
+    "parents": [
+      "I0004",
+      "I0023"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0038",
+    "genome": {
+      "scheduler_model": "single_priority_gate",
+      "failover_policy": "quorum_replicate",
+      "actor_placement": "multi_node_via_remote",
+      "actor_addressing": "pid_with_supervisor",
+      "lineage_replication": "quorum_replication",
+      "supervisor_strategy": "restart_subtree",
+      "message_serialization": "grpc_streaming",
+      "opt_in_annotation_style": "config_file_external",
+      "observability_layer": "opentelemetry_traces",
+      "ai_provider_abstraction": "cost_aware_provider_router",
+      "rebalancing_trigger": "never"
+    },
+    "cell": "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_node_via_remote|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external",
+    "fitness_components": {
+      "task::SurviveSilentHang": 0.395,
+      "task::SustainedThroughput": 0.515,
+      "task::BackwardCompatPsiLang2": 0.29000000000000004,
+      "task::MultiProviderFailover": 0.395,
+      "task::LineageDurability": 0.47,
+      "task::ImplCostEstimate": 0.47,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.42250000000000004,
+      "paradigm_match": 0.515
+    },
+    "composite": 0.5677500000000001,
+    "generation": 30,
+    "parents": [
+      "I0010"
+    ],
+    "operator": "mutation:axis_resample"
+  }
+]
