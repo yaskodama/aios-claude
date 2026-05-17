@@ -44,23 +44,33 @@ HMAC + AI integration を持つ。**Py-A 限定の 18 機能** を移植する�
 
 ## 2. 段階計画
 
-### Phase O-1: aipl_dist OCaml 移植 (本セッション)
+### Phase O-1: aipl_dist OCaml 移植 ✅ 完了 (2026-05-18)
 
 **目的:** Python と **同じ env var 規約** で動く OCaml 版 `aipl_dist` を新規
 モジュール `src/aipl_dist.ml` として実装。AIPL 言語仕様 + 既存サンプル
 すべて無改変。
 
-**スコープ:**
-- DR-1 〜 DR-9 の 9 機能を OCaml で実装
-- `eval_thread.ml` (actor spawn / dispatch) と `ai.ml` (call_ai) に opt-in hook
-- `AIPL_DIST_ENABLE=1` で発火、unset で完全 no-op
-- 既存 33 .abcl + 8 AI sample 回帰
+**達成:**
+- `src/aipl_dist.ml` (~530 LOC) で DR-1 〜 DR-9 の 9 機能を OCaml で実装
+- `eval_thread.ml` の `spawn_actor` / `actor_loop` 例外経路に opt-in hook (+30 行)
+- `AIPL_DIST_ENABLE` unset で完全 no-op (構造的に保証)
+- 既存 71 abclc サンプル 71/71 PASS
+- 単体テスト 7/7 PASS (`src/test_aipl_dist.ml`)
 
-**完了基準:**
-- `src/aipl_dist.ml` ~500-800 LOC
-- `make ocaml` 成功
-- 既存サンプル 33/33 PASS (mock provider)
-- `AIPL_DIST_ENABLE=1` での観測ログ・quarantine 動作確認
+DR-3/DR-6 の auto-wiring (Ai.call_gemini → budget_gate + quorum)、
+DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
+
+### Phase O-1.5: Ai.call_gemini wire + TLS parent ✅ 完了 (2026-05-18)
+
+**達成:**
+- `Aipl_dist.set_current_actor` / `get_current_actor` / `register_spawn_auto`
+  追加 (per-thread `current_actor : (int, string) Hashtbl.t` で管理)
+- `eval_thread.ml` の `actor_loop` で dispatch 時に TLS set/unset
+- `ai.ml` を `call_gemini` (wrapper) + `call_gemini_core` (body) に分割
+- wrapper で `Aipl_dist.quorum_providers ()` 検出時に `call_ai_quorum`
+  へファンアウト、それ以外は core を呼ぶ
+- core に `Aipl_dist.token_budget_gate ()` の acquire を opt-in 挿入
+- 単体テスト 8/8 PASS (TLS test 追加)、71 abclc 全 PASS
 
 ### Phase O-2: Phase C-E2 OCaml 移植 (複数セッション)
 

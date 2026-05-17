@@ -337,13 +337,13 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
 
   DR-1 & I-1 \texttt{env\_var\_routing} (\texttt{AIPL\_ROUTE})       & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-2 & I-2 \texttt{structured\_log} (\texttt{AIPL\_DIST\_LOG\_FILE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
-  DR-3 & I-3 \texttt{token\_budget\_aware} (\texttt{AIPL\_DIST\_RPM} / \texttt{TPM}) & \Yes & \No & \Yes\textsuperscript{1} & \Yes\textsuperscript{1} & \No & \No & \No \\
+  DR-3 & I-3 \texttt{token\_budget\_aware} (\texttt{AIPL\_DIST\_RPM} / \texttt{TPM}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-4 & I-4 \texttt{checkpoint\_and\_resume} (\texttt{AIPL\_DIST\_CHECKPOINT\_DIR}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-5 & IQ \texttt{quarantine\_and\_skip} (\texttt{AIPL\_DIST\_QUARANTINE\_TTL}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
-  DR-6 & IM-1 \texttt{quorum\_replicate} (\texttt{AIPL\_DIST\_QUORUM\_PROVIDERS}) & \Yes & \No & \Yes\textsuperscript{1} & \Yes\textsuperscript{1} & \No & \No & \No \\
+  DR-6 & IM-1 \texttt{quorum\_replicate} (\texttt{AIPL\_DIST\_QUORUM\_PROVIDERS}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
-  DR-8 & spawn-tree tracking (parent inference)                   & \Yes & \No & \Part\textsuperscript{2} & \Part\textsuperscript{2} & \No & \No & \No \\
-  DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \Part\textsuperscript{3} & \Part\textsuperscript{3} & \No & \No & \No \\
+  DR-8 & spawn-tree tracking (TLS-auto parent)                    & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 
@@ -360,13 +360,9 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
 \textasciitilde{} \texttt{IMPL\_I0036\_REPORT.md} 参照。
 
 \smallskip
-\noindent\textsuperscript{1} OCaml は API surface (\texttt{Aipl\_dist.call\_ai\_quorum},
-\texttt{Aipl\_dist.token\_budget\_gate}) を提供するが \texttt{Ai.call\_ai} への
-auto-wiring は次フェーズ (O-1.5).
-\textsuperscript{2} 親追跡は \texttt{Aipl\_dist.register\_spawn} 明示呼出しに依存,
-TLS 経由の暗黙親はまだ.
-\textsuperscript{3} \texttt{spawn\_actor} と \texttt{actor\_loop} の except 経路は
-hook 済,\texttt{call\_ai} 経路は O-1.5 で接続.
+\noindent OCaml は Phase O-1 + O-1.5 で全 9 機能 \Yes 達成.DR-3/DR-6 は
+\texttt{Ai.call\_gemini} へ自動 wire 済,DR-8 は per-thread
+\texttt{current\_actor} TLS で parent を自動取得.
 
 \clearpage
 
@@ -626,7 +622,7 @@ HM-style polymorphic inference --- a different research axis
 領域 & Py-A 達成 & 他ランタイム & 関連 ID \\
 \midrule
 Phase C--E2 型推論 (HM + Z3 refinement) & 9/9 & 0/9 & CE-1 $\sim$ CE-9 \\
-AIPL v2 Distributed (\texttt{aipl\_dist}) & 9/9 & 0/9 & DR-1 $\sim$ DR-9 \\
+AIPL v2 Distributed (\texttt{aipl\_dist}) & 9/9 & \textbf{OCaml 9/9} (= JS-O) & DR-1 $\sim$ DR-9 \\
 \bottomrule
 \end{tabular}
 \end{center}

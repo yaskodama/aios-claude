@@ -1514,6 +1514,11 @@ and actor_loop actor = (
     actor.last_sender <- msg.from;
     set_current_actor_name (Some actor.name);
     set_current_msg_id msg.msg_id;
+    (* O-1.5 (aipl_dist): record current actor in thread-local so any
+       spawn_actor / call_ai issued from within this dispatch picks up
+       this actor as its parent / caller without explicit parameter
+       passing.  No-op unless AIPL_DIST_ENABLE=1. *)
+    (try Aipl_dist.set_current_actor (Some actor.name) with _ -> ());
     (* IQ (aipl_dist): skip dispatch if the actor is currently
        quarantined.  Drops the message; the caller is responsible for
        timeout handling.  No-op unless AIPL_DIST_ENABLE=1. *)
@@ -1553,6 +1558,7 @@ and actor_loop actor = (
     );
     set_current_msg_id None;
     set_current_actor_name None;
+    (try Aipl_dist.set_current_actor None with _ -> ());
     done)
 and resolve_actor_from_term env recv_term =
   match recv_term with
@@ -1657,10 +1663,11 @@ let spawn_actor ?(init_args : value list = []) ~(class_name:string) ~(actor_name
                    ("cls", Aipl_dist.LStr class_name);
                    ("tag", Aipl_dist.LStr tag)] in ()
             | None -> ()));
-      (* Parent inference: use the thread's name if we set one (we don't
-         currently), or fall back to actor_table introspection.  For the
-         OCaml port a richer parent track is added when we wire dispatch. *)
-      Aipl_dist.register_spawn actor_name None
+      (* Parent inference: read the per-thread current-actor TLS that
+         actor_loop sets while dispatching.  If the spawning thread is
+         itself an actor, that becomes the parent; otherwise None
+         (top-level spawn). *)
+      Aipl_dist.register_spawn_auto actor_name
     with _ -> ());
 
     (* init を送る。init_args が空なら無引数で、そうでなければ値を式化して渡す *)

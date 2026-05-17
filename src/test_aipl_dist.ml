@@ -129,6 +129,23 @@ let test_subtree () =
     ["a"; "b"; "c"; "d"];
   pass "subtree_quarantine"
 
+let test_tls_auto_parent () =
+  unset_all ();
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  (* Simulate the actor-loop setting the current actor TLS, then
+     spawning a child. *)
+  Aipl_dist.set_current_actor (Some "parent_actor");
+  Aipl_dist.register_spawn_auto "child_actor";
+  let desc = Aipl_dist.descendants_of "parent_actor" in
+  assert (desc = ["child_actor"]);
+  (* When no current actor, register_spawn_auto is a no-op
+     (parent=None). *)
+  Aipl_dist.set_current_actor None;
+  Aipl_dist.register_spawn_auto "orphan_actor";
+  let parents = Aipl_dist.descendants_of "anything" in
+  assert (not (List.mem "orphan_actor" parents));
+  pass "TLS-based spawn parent auto-tracking"
+
 let test_quorum () =
   unset_all ();
   Unix.putenv "AIPL_DIST_ENABLE" "1";
@@ -164,5 +181,6 @@ let () =
   test_checkpoint ();
   test_quarantine ();
   test_subtree ();
+  test_tls_auto_parent ();
   test_quorum ();
-  Printf.printf "\n7/7 passing\n%!"
+  Printf.printf "\n8/8 passing\n%!"

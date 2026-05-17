@@ -228,26 +228,17 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | ----- | ---------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :-: | --------------------------------------------- |
 | DR-1  | I-1 `env_var_routing` (actor → tag table)            |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_ROUTE="Name:tag,..."`                   |
 | DR-2  | I-2 `structured_log` (ND-JSON / event)               |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_LOG_FILE=/path`                    |
-| DR-3  | I-3 `token_budget_aware` (sliding RPM/TPM gate)      |  ✅  |  ❌  |  ✅¹  |  ✅¹ |  ❌  |  ❌  | ❌  | `AIPL_DIST_RPM` / `AIPL_DIST_TPM`             |
+| DR-3  | I-3 `token_budget_aware` (sliding RPM/TPM gate)      |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_RPM` / `AIPL_DIST_TPM`             |
 | DR-4  | I-4 `checkpoint_and_resume` (atomic save/restore)    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_CHECKPOINT_DIR`                    |
 | DR-5  | IQ `quarantine_and_skip` (auto-isolate failures)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_QUARANTINE_TTL=60`                 |
-| DR-6  | IM-1 `quorum_replicate` (parallel multi-provider)    |  ✅  |  ❌  |  ✅¹  |  ✅¹ |  ❌  |  ❌  | ❌  | `AIPL_DIST_QUORUM_PROVIDERS="o,a,g"`          |
+| DR-6  | IM-1 `quorum_replicate` (parallel multi-provider)    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_QUORUM_PROVIDERS="o,a,g"`          |
 | DR-7  | IM-2 `subtree_quarantine` (Erlang OTP blast-radius)  |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_SUBTREE_QUARANTINE=1`              |
-| DR-8  | spawn-tree tracking (parent inference)               |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
-| DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  🟡³  |  🟡³ |  ❌  |  ❌  | ❌  | (auto)                                        |
+| DR-8  | spawn-tree tracking (parent inference, TLS-auto)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
+| DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
 
-¹ OCaml ports the API surface but the wrapper isn't yet wired into
-  `ai.ml` `call_ai` — caller must invoke `Aipl_dist.call_ai_quorum`
-  explicitly.  Same for `token_budget_gate` acquire (callers can use
-  it manually).  Auto-wiring is Phase O-1.5 (next sub-session).
-² Parent inference via thread name needs explicit `Aipl_dist.register_spawn`
-  calls; the OCaml `spawn_actor` currently registers with parent=None.
-  Tighten to use a per-thread current-actor TLS in Phase O-1.5.
-³ The interp `spawn_actor` and the `actor_loop` exception path are
-  wired (log_event + quarantine_actor + subtree_quarantine).
-  `call_ai` hook (DR-3 budget integration) is the remaining piece.
-
-JS-O inherits these from OCaml automatically.
+OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
+into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
+で parent を自動取得).  JS-O はこれを継承.
 
 **実装位置**:
 - `src/python-aipl/aipl_dist.py` (591 LOC, 新規)
@@ -476,10 +467,11 @@ schemes the same way.
 | 領域 | Py-A 達成 | 他ランタイム | 関連セクション |
 |---|---|---|---|
 | Phase C–E2 型推論 (HM + Z3 refinement) | 9/9 | 0/9 | CE-1 〜 CE-9 |
-| AIPL v2 Distributed (`aipl_dist`) | 9/9 | **OCaml 7/9 + 2 部分達成** (= JS-O も同等) | DR-1 〜 DR-9 |
+| AIPL v2 Distributed (`aipl_dist`) | 9/9 | **OCaml 9/9 完全達成** (= JS-O も同等) | DR-1 〜 DR-9 |
 
-OCaml への移植は Phase O-1 で 7 完全 + 2 部分。詳細は
-[`docs/OCAML_PORT_ROADMAP.md`](./OCAML_PORT_ROADMAP.md) §2.
+OCaml は Phase O-1 + O-1.5 で 9/9 完了。詳細は
+[`docs/OCAML_PORT_ROADMAP.md`](./OCAML_PORT_ROADMAP.md) §2. 残るは
+Phase C-E2 (CE-1〜9, O-2.a〜O-2.f, ~5 セッション想定).
 
 **Py-A 単独で進化計算由来の 18 機能が opt-in 利用可能** (両方とも
 `AIPL_DIST_ENABLE=1` または `--check` / `--infer` で発火、デフォルトは

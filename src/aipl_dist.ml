@@ -412,6 +412,37 @@ let register_spawn (child : string) (parent : string option) : unit =
         Hashtbl.replace spawn_parent child p;
         Mutex.unlock spawn_lock
 
+(* O-1.5: thread-local current actor.  Used by the runtime to thread
+   the parent name automatically through `register_spawn`.  Mirrors the
+   Python `threading.current_thread().name == "actor-<name>"` trick. *)
+let current_actor : (int, string) Hashtbl.t = Hashtbl.create 16
+let current_actor_lock = Mutex.create ()
+
+let thread_id () : int = Thread.id (Thread.self ())
+
+let set_current_actor (name : string option) : unit =
+  Mutex.lock current_actor_lock;
+  let tid = thread_id () in
+  (match name with
+   | None -> Hashtbl.remove current_actor tid
+   | Some n -> Hashtbl.replace current_actor tid n);
+  Mutex.unlock current_actor_lock
+
+let get_current_actor () : string option =
+  Mutex.lock current_actor_lock;
+  let r = Hashtbl.find_opt current_actor (thread_id ()) in
+  Mutex.unlock current_actor_lock;
+  r
+
+(* Register a spawn with the parent picked automatically from the
+   per-thread current-actor TLS.  No-op when disabled or when the
+   calling thread isn't itself an actor (= top-level spawn). *)
+let register_spawn_auto (child : string) : unit =
+  if not (is_enabled ()) then ()
+  else
+    let parent = get_current_actor () in
+    register_spawn child parent
+
 let descendants_of (root : string) : string list =
   if not (is_enabled ()) then []
   else begin

@@ -521,12 +521,34 @@ let provider_of_int (n : int) : provider option =
   | 3 -> Some OpenAI
   | _ -> None
 
-let call_gemini ?(provider_override : provider option = None)
+(* The "core" call_gemini that bypasses the aipl_dist quorum so it can
+   be invoked recursively from inside the quorum worker without going
+   in a loop.  Holds the implementation; the public `call_gemini`
+   wraps this with quorum + budget hooks. *)
+let rec call_gemini_core ?(provider_override : provider option = None)
                 ?(system : string option = None) ?(model : string = "")
                 ?(max_tokens : int = default_max_tokens) (prompt : string) : string =
   check_budget ();
   let sem = get_concurrency_sem () in
   (match sem with Some s -> Sem.acquire s | None -> ());
+  (* O-1.5 (aipl_dist DR-3 budget gate): if a sliding RPM/TPM window is
+     configured, acquire from it.  No-op unless AIPL_DIST_ENABLE=1 and
+     a budget env var is set.  Failures never bubble up. *)
+  (try
+    match Aipl_dist.token_budget_gate () with
+    | None -> ()
+    | Some g ->
+        let est = max 1 (String.length prompt / 4 + max_tokens) in
+        Aipl_dist.gate_acquire g ~est_tokens:est ();
+        let (reqs, rpm_lim, toks, tpm_lim) = Aipl_dist.gate_stats g in
+        let _ = Aipl_dist.log_event "call_ai_budget_acquire"
+          [("est_tokens", Aipl_dist.LInt est);
+           ("rpm_used", Aipl_dist.LInt reqs);
+           ("rpm_limit", Aipl_dist.LInt rpm_lim);
+           ("tpm_used", Aipl_dist.LInt toks);
+           ("tpm_limit", Aipl_dist.LInt tpm_lim)] in
+        ()
+  with _ -> ());
   let result_or_exn =
     try
       (* Mirror Python: ABCL_AI_PROVIDER=mock wins even over an
@@ -583,6 +605,38 @@ let call_gemini ?(provider_override : provider option = None)
       let model_used = default_for_provider actual_p (Some model) in
       record_usage ~model:model_used in_t out_t;
       text
+
+(* O-1.5: aipl_dist DR-6 quorum_replicate wrapper.
+
+   When AIPL_DIST_ENABLE=1 and AIPL_DIST_QUORUM_PROVIDERS is set, fan
+   the same prompt out to every listed provider in parallel and
+   return whichever finishes first.  Callers that pass an explicit
+   `provider_override` bypass the quorum so the recursive worker
+   doesn't loop.  All other knobs are forwarded to call_gemini_core. *)
+let provider_of_string s =
+  match String.lowercase_ascii (String.trim s) with
+  | "openai"    -> OpenAI
+  | "anthropic" -> Anthropic
+  | "gemini"    -> Gemini
+  | "mock"      -> Mock
+  | _           -> Mock
+
+let call_gemini ?(provider_override : provider option = None)
+                ?(system : string option = None) ?(model : string = "")
+                ?(max_tokens : int = default_max_tokens) (prompt : string) : string =
+  let quorum =
+    match provider_override with
+    | Some _ -> []     (* explicit caller -> skip quorum *)
+    | None -> (try Aipl_dist.quorum_providers () with _ -> [])
+  in
+  if quorum <> [] then
+    let call_fn (p_str : string) : string =
+      let p = provider_of_string p_str in
+      call_gemini_core ~provider_override:(Some p) ~system ~model ~max_tokens prompt
+    in
+    Aipl_dist.call_ai_quorum ~providers:quorum ~call_ai_fn:call_fn
+  else
+    call_gemini_core ~provider_override ~system ~model ~max_tokens prompt
 
 (* Same-model retry (different from fallback chain which switches
    models).  Used by the ai_call_retry primitive. *)
