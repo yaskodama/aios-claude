@@ -1,0 +1,398 @@
+% !TEX program = xelatex
+% AIPL Overview — bird's-eye index of the project
+% Generated from AIPL_OVERVIEW.md, 2026-05-18.
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.85]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!60!black,
+  citecolor=black,
+  pdftitle={AIPL Overview},
+  pdfauthor={Yasushi Kodama}
+}
+
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\definecolor{codestr}{RGB}{160,40,40}
+
+\lstdefinelanguage{aipl}{
+  keywords={class, method, function, return, var, float, int, new, send, call, become,
+            if, else, while, do, self, sender, now, future, await, true, false, pub, linear,
+            scope, where, and, or, not},
+  morekeywords={[2]match, with, otherwise, where},
+  sensitive=true,
+  comment=[l]{//},
+  morestring=[b]",
+  showstringspaces=false,
+}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecmt}\itshape,
+  stringstyle=\color{codestr},
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{codebg!60!black},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+}
+
+\title{\textbf{AIPL Overview}\\
+\large Actor-based Intelligent Parallel Language --- bird's-eye index}
+\author{Yasushi Kodama}
+\date{2026-05-18}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent AIPL は以下の 3 要素を組合せた研究プラットフォーム:
+(1) マルチランタイム actor 言語 (OCaml + Python + Browser-JS),
+(2) MAP-Elites 進化計算による次世代言語予測器 (\texttt{aice-evolution-v2}),
+(3) AIPL 自身による型検査・評価系の self-hosting (\texttt{aipl-self-host}).
+本ドキュメントはプロジェクト全体の俯瞰索引であり,各アーティファクトと
+それらの繋がりを名指しで示す.
+\end{abstract}
+
+\tableofcontents
+\vspace{8pt}
+
+% ============================================================
+\section{プロジェクト構成}
+% ============================================================
+
+AIPL は 3 つの柱で構成される:
+
+\begin{enumerate}\setlength{\itemsep}{2pt}
+\item \textbf{マルチランタイム actor 言語}
+   (OCaml ネイティブ / Python / Browser-JS).
+\item \textbf{次世代言語予測器} (\texttt{aice-evolution-v2}): GA で
+   言語設計の普遍軸を経験的に発見する.
+\item \textbf{Self-host}: AIPL のパース・型検査・評価・スケジューラを
+   AIPL 自身で実装したもの (\texttt{aipl-self-host/}).
+\end{enumerate}
+
+3 ランタイムは HTTP \texttt{/api/json/call} で相互運用可能で,
+\texttt{docker/cross/} に Python $\leftrightarrow$ OCaml の cross-language
+remote-actor デモが収録されている.
+
+% ============================================================
+\section{アーキテクチャ図}
+% ============================================================
+
+\begin{lstlisting}
+[aice-evolution-v2 (next-gen prediction)]
+   .aice spec  ---->  MAP-Elites GA  ---->  elite_map / lineage / report
+
+[src/python-aipl (research runtime)]
+   lexer (Lark grammar)  -->  parser -> AST  -->  aipl_typeck (Phase 11-16)
+                                                        |
+                                                        v
+                                          aipl_interp (actor + scheduler + builtins)
+
+[src/ (OCaml runtime)]
+   lexer.mll  -->  parser.mly  -->  infer.ml (HM-style)  -->  eval_thread.ml
+
+[aipl-self-host (AIPL in AIPL)]
+   Level A: metacircular eval
+     -->  B-1 typeck  -->  B-2 effects  -->  B-3 channels
+     -->  B-4 linear  -->  B-5 owned
+     -->  C lexer+parser  -->  C-2 actor scheduler  -->  C-3 now/Reply
+
+[docker/cross (cross-language remote actors)]
+   aipl-python:cross  <-->  aipl-ocaml:cross  via /api/json/call
+
+[aipl_dist (AIPL v2 Distributed runtime, Phase E後)]
+   AIPL_DIST_ENABLE=1 で 8 opt-in 機能を重ね合わせ
+   既存 .aipl / .abcl は無改変
+\end{lstlisting}
+
+% ============================================================
+\section{Phase 11--17: ランタイム機能}
+% ============================================================
+
+Python ランタイムの主要 Phase と対応サンプル:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+phase & feature & source / sample \\
+\midrule
+11a--e & typed annotations / unions / generics / length-arrays & \texttt{Typecheck*.abcl} \\
+12 & capability effects \texttt{!\{fs,ai,net,mut\}} & \texttt{Effects.abcl} \\
+13 & CSP channels & \texttt{Channels.abcl} \\
+14 & linear / use-after-move & \texttt{Linear.abcl} \\
+15 & owned (\texttt{pub} field visibility) & \texttt{Owned.abcl} \\
+16 & transient cast at any-boundary & \texttt{Transient.abcl} \\
+17 & structured concurrency (\texttt{scope \{ future ... \}}) & \texttt{Phase17\_StructuredConc.abcl} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+各 Phase に \texttt{\_test\_*.py} 単体テスト (\texttt{src/python-aipl/}) が付属.
+
+% ============================================================
+\section{Phase C--E2: HM 型推論 + 分散ランタイム (2026-05-17 以降)}
+% ============================================================
+
+Phase 11 系の gradual 静的型検査に加え,Python 版 AIPL は Phase C 以降で
+\textbf{constraint-based Hindley--Milner 型推論 + Z3 refinement} を備えるよう
+進化した.実装ファイル \texttt{src/python-aipl/aipl\_inference.py} (約 1255 LOC).
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+phase & feature & 関連レポート \\
+\midrule
+C & 基本 HM + Z3 refinement (Int) & \texttt{PHASE\_C\_REPORT.md} \\
+D-1 & Cross-class 推論 & \texttt{PHASE\_D\_REPORT.md} \\
+E-$\alpha$ & \texttt{where} 句を AIPL 表層に追加 & \texttt{PHASE\_E\_REPORT.md} \\
+E-$\beta$ & Actor field 共有 (method 横断) & \texttt{PHASE\_E\_BETA\_REPORT.md} \\
+E-$\gamma$ & Record structural typing & \texttt{PHASE\_E\_GAMMA\_REPORT.md} \\
+E-$\gamma$-R & Real/Rat refinement (Z3 Real 理論) & \texttt{PHASE\_E\_GAMMA\_R\_REPORT.md} \\
+E-2 & typeck $\times$ inference 統合 CLI \texttt{--check} & \texttt{PHASE\_E\_2\_REPORT.md} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+これと並行して,進化計算 (Run 1 + Run 2) で発見された分散ランタイム設計を
+\texttt{aipl\_dist.py} (591 LOC) として実装:
+
+\begin{center}
+\begin{tabular}{p{2.6cm}p{5.5cm}p{6cm}}
+\toprule
+機能 & env var & 説明 \\
+\midrule
+I-1 routing & \texttt{AIPL\_ROUTE} & actor 名 $\to$ tag テーブル \\
+I-2 structured\_log & \texttt{AIPL\_DIST\_LOG\_FILE} & ND-JSON 1 行 / event \\
+I-3 token\_budget & \texttt{AIPL\_DIST\_RPM} / \texttt{TPM} & 60 秒スライディング窓 \\
+I-4 checkpoint & \texttt{AIPL\_DIST\_CHECKPOINT\_DIR} & atomic save/restore \\
+IQ quarantine & \texttt{AIPL\_DIST\_QUARANTINE\_TTL} & 自動隔離 \\
+IM-1 quorum & \texttt{AIPL\_DIST\_QUORUM\_PROVIDERS} & 並列 multi-provider \\
+IM-2 subtree & \texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE} & Erlang OTP blast-radius \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+詳細は \texttt{USER\_MANUAL.md} §6 / §7 (PDF: \texttt{docs/AIPL\_User\_Manual.pdf}) を参照.
+
+% ============================================================
+\section{Self-host (\texttt{aipl-self-host/})}
+% ============================================================
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Level & AIPL 自身が何をするか & smoke \\
+\midrule
+A & \texttt{eval(ast, env)} metacircular & 4/4 \\
+B-1 & Phase 11 型検査器 & 6/6 \\
+B-2 & Phase 12 capability-effects 検査器 & 4/4 \\
+B-3 & Phase 13 channel element-type 検査器 & 5/5 \\
+B-4 & Phase 14 linear / use-after-move & 4/4 \\
+B-5 & Phase 15 owned (pub 可視性) & 4/4 \\
+C & lexer + parser + eval pipeline & 3/3 \\
+C-2 & actor scheduler + mailbox & 6/6 \\
+C-3 & + \texttt{now} / Reply 同期返信 & 1/1 \\
+\midrule
+\multicolumn{2}{l}{\textbf{合計}} & \textbf{37/37 smoke} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+各 Level B-N の検査器は \texttt{SampleSelfConsistency.abcl} で
+自身にも適用済 — phase monotonicity を実証.
+
+% ============================================================
+\section{aice-evolution-v2 --- 次世代言語予測}
+% ============================================================
+
+\texttt{aice-evolution-v2/} の MAP-Elites GA は \texttt{.aice} 仕様を入力に取り,
+cross-task 評価 + LLM-directed mutation で言語設計の普遍軸を経験的に導出する.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+.aice & 予測内容 \\
+\midrule
+\texttt{NextLanguagePrediction.aice} & Phase 9 baseline (5 普遍軸) \\
+\texttt{AIPLSelfHost\_A\_Metacircular.aice} 他 & self-host 設計空間 (Level 別) \\
+\texttt{AIPLPostC2\_NextGen.aice} & Phase 17 候補 (post-Level-C-2 seed) \\
+\texttt{AIPLPhase17\_Structured.aice} & Phase 17 structured-concurrency 精緻化 \\
+\texttt{AIPL\_v2\_TypeInference.aice} & Phase C-E2 (型推論強化) \\
+\texttt{AIPL\_v2\_Distributed.aice} & I0003/I0023/I0036 (ランタイム層分散化) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Phase 9 予測 (実装済)}
+5 軸すべて Phase 11--15 として実装:
+
+\begin{lstlisting}
+type_safety          = high / dependent     -> Phase 11
+effect_handling      = capability           -> Phase 12
+concurrency_model    = csp_channels         -> Phase 13
+ownership_model      = linear               -> Phase 14
+state_representation = symbol_owned         -> Phase 15
+\end{lstlisting}
+
+\paragraph{Phase 17 予測 (実装済)}
+post-Level-C-2 seed で再走した時の trend top 3:
+
+\begin{lstlisting}
+concurrency_model       +0.50    <- 最強 (= structured)
+type_safety             +0.25
+ownership_model         +0.25
+\end{lstlisting}
+
+elite は \texttt{concurrency\_model = structured + ownership\_model = linear +
+type\_safety = dependent} で,これがそのまま Phase 17 (\texttt{scope \{ future ... \}}
+linear future) として実装された.
+
+\paragraph{Phase E-2 後 (Distributed 設計探索)}
+\texttt{AIPL\_v2\_Distributed.aice} を Run 1 + Run 2 (各 24 min,1400+ LLM calls)
+で探索した結果:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item Run 2 throughput\_first 勝者: I0036 (Erlang OTP コア,
+       \texttt{restart\_subtree + quorum\_replicate + multi\_process\_local}).
+\item Run 2 hang\_resilience 勝者: I0023 (\texttt{quarantine\_and\_skip +
+       cluster\_with\_scheduler}).
+\item Run 2 balanced 勝者: I0003 (低コスト変種,
+       \texttt{token\_budget\_aware + same\_provider\_retry}).
+\end{itemize}
+
+3 候補のうち I0003 + IQ + IM-1 + IM-2 が \texttt{aipl\_dist.py} として
+実装済 (上記 Phase C-E2 セクション参照).
+
+\paragraph{可視化}
+\texttt{aice-evolution-v2/viz/} 下:
+\texttt{index.html} (サマリ),
+\texttt{level\_\{A,B1,B2,C\}.html} (Chart.js ダッシュボード),
+\texttt{level\_\{A,B1,B2,C\}\_tree.html} (SVG 系統樹),
+\texttt{postC2.html} / \texttt{phase17.html} (post-C2 + 精緻化 run).
+
+% ============================================================
+\section{型ソウンドネスの境界}
+% ============================================================
+
+\texttt{docs/AIPL\_Type\_Soundness\_Report.\{tex,pdf\}} は AIPL の gradual
+型システムが何を健全に保証し,どの境界で実行時検査に gracefully
+退化するかを論じる.Phase 16 で最優先 unsoundness gap (any $\to$ T 境界)
+を transient cast で塞いだ.
+
+% ============================================================
+\section{クロス言語 remote actors}
+% ============================================================
+
+\texttt{docker/cross/} は 2 つの Docker image
+(\texttt{aipl-python:cross} と \texttt{aipl-ocaml:cross}),
+\texttt{docker-compose.yml},および fallback の \texttt{docker run} ドライバを
+収録.両 image は同一の HTTP wire format (\texttt{POST /api/json/call}) を
+話すので,Python actor から OCaml actor を呼べる (逆も同様).
+
+% ============================================================
+\section{推奨読書順}
+% ============================================================
+
+新規 reader に推奨する path:
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item \texttt{USER\_MANUAL.md} (PDF: \texttt{docs/AIPL\_User\_Manual.pdf}) ---
+       言語リファレンス.§6 (Phase C--E2 型推論) と §7 (AIPL v2 Distributed
+       Runtime / \texttt{aipl\_dist}) が post-Phase-11 の新規部分.
+\item \texttt{docs/AIPL\_Type\_Soundness\_Report.pdf} --- 型システムの
+       証明と未解決部.
+\item \texttt{aipl-self-host/level-a/README.md} $\to$ \texttt{level-b\{1,2,3,4,5\}} ---
+       AIPL 自身の型システム実装.
+\item \texttt{aipl-self-host/level-c\{,2,3\}/README.md} --- パーサと
+       スケジューラの self-host.
+\item \texttt{aice-evolution-v2/README.md} $\to$ \texttt{docs/AIPL\_Phase17\_Prediction.md} ---
+       次世代軸予測器の中身と現在の推奨.
+\item \texttt{docker/cross/README.md} --- 言語間相互運用デモ.
+\end{enumerate}
+
+% ============================================================
+\section{リポジトリ配置}
+% ============================================================
+
+\begin{lstlisting}
+abclcp-project/
+  AIPL_OVERVIEW.md            this overview (markdown)
+  USER_MANUAL.md              language reference
+  README.md                   build instructions
+  Makefile                    OCaml + JS build targets
+  docs/
+    AIPL_Overview.{tex,pdf}                this file's PDF
+    AIPL_User_Manual.{tex,pdf}             reference PDF
+    AIPL_Type_Soundness_Report.{tex,pdf}
+    AIPL_Phase17_Prediction.md
+    ...
+  src/
+    *.ml / *.mll / *.mly      OCaml runtime
+    python-aipl/              research runtime
+      aipl_inference.py       Phase C-E2 HM + Z3
+      aipl_dist.py            AIPL v2 Distributed (8 features)
+      aipl_typeck.py          Phase 11-16 gradual checker
+      aipl_interp.py          interp (+ I-5/I-6 hooks)
+      aipl_runtime.py         actor runtime (+ IQ/IM hooks)
+    browser-abcl/             browser-side runtime
+  abclc/                      OCaml-side .abcl samples
+  aice-evolution-v2/          next-gen-axis predictor
+    examples/*.aice           GA specs
+    src/                      GA implementation
+    viz/                      HTML visualisations
+  aice-pi-evolution/
+    experiments/2026-05-17_aipl_v2_type_inference/
+      PHASE_*_REPORT.md       all Phase C-E2 reports
+      AIPL_v2_Distributed.{aice,ga.json}
+      IMPL_I0003_MVP/         I0003 + IQ + IM impl, tests, samples
+  aipl-self-host/             AIPL in AIPL (Levels A -> C-3)
+  docker/cross/               cross-language Docker demo
+\end{lstlisting}
+
+% ============================================================
+\section{現状サマリ}
+% ============================================================
+
+2026-05-18 時点で全体スモーク:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item OCaml runtime: 52/52 sample tests (REPL + aipl2c + cc/SDL2)
+\item Browser JS: 7/7 syntax + 4/4 parse
+\item Python runtime: 33/33 \texttt{.abcl} + 21/21 \texttt{.aipl} (Phase A-G)
+\item Distributed cross-language: 8/8 (3-node mock)
+\item Self-host: 37/37 (Level A $\to$ C-3)
+\item \texttt{aipl\_dist} 単体テスト: 27/27
+\item Distributed MVP デモ: 24/24 (8 feature $\times$ 3)
+\end{itemize}
+
+\textbf{合計 213+ テスト + デモがクリーン}.進化計算 (24 min $\times$ 2 run)
+$\to$ I-MVP 実装 (710 LOC) $\to$ feature 別 24 sample で実演,という一連が
+完走している.
+
+\end{document}
