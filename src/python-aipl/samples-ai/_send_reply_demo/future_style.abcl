@@ -1,0 +1,23 @@
+// (2) FUTURE + AWAIT — two parallel ai_calls, joined later.
+//
+//   ABCL_AI_PROVIDER=mock python3 src/python-aipl/aipl_main.py \
+//     src/python-aipl/samples-ai/_send_reply_demo/future_style.abcl
+
+class Helper {
+  method ask(q) {
+    var resp = ai_call(q);
+    reply(resp);
+  }
+}
+
+var a = new Helper();
+var b = new Helper();
+
+var fa = future a.ask("first question");
+var fb = future b.ask("second question");
+
+var ra = await(fa);
+var rb = await(fb);
+
+print("[future] a: " + ra);
+print("[future] b: " + rb);

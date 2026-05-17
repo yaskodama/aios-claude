@@ -978,14 +978,24 @@ def _b_reply(args, frame, interp):
     """ABCL reply(x).
 
     For now-/future-type sends, fulfils the caller's Future so it can
-    unblock with `x` as the value.  For plain past-type sends (no
-    reply_future on the frame chain), prints [REPLY] x as before so
-    debugging output stays visible.
+    unblock with `x` as the value.  For plain past-type sends, deliver
+    the value back to the sender's mailbox as a `reply(x)` message so
+    the sender's actor can pick it up via a user-defined `reply`
+    method (the Erlang-actor-OOP analog of OCaml's `select { case
+    reply(r) -> ... }`).  Mirrors OCaml runtime fix in commit 590e3aa.
+    Falls back to `[REPLY] x` on stdout when there is no sender (e.g.
+    a top-level `send`), to keep existing debug output intact.
     """
     val = args[0] if args else None
     fut = frame.get_reply_future()
     if fut is not None:
         fut.set(val)
+        return None
+    if isinstance(frame.sender, Actor):
+        # Send `reply(val)` back to the original sender.  Filtering
+        # by isinstance(..., Actor) handles the pseudo-sender cases
+        # (top-level send, init/spawn) — those have sender=None.
+        frame.sender.send_method("reply", [val], sender=frame.actor)
         return None
     print(f"[REPLY] {_to_str(val)}")
     sys.stdout.flush()

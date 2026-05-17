@@ -189,9 +189,15 @@ class Scheduler:
             if self._outstanding <= 0:
                 self._cond.notify_all()
 
-    def wait_idle(self, idle_ms: int = 80, timeout_s: float = 2.0) -> bool:
+    def wait_idle(self, idle_ms: int = 120, timeout_s: float = 5.0) -> bool:
         """Return True once outstanding==0 has held continuously for idle_ms,
-        or False on timeout."""
+        or False on timeout.
+
+        Defaults bumped (idle_ms 80 -> 120, timeout_s 2.0 -> 5.0) to give
+        send+reply chains and real-provider AI calls room to drain
+        before the script-mode entry point returns.  Matches OCaml's
+        wait_actors_quiesce (~100ms stable window, 5s cap) — see
+        commit 590e3aa fix (3)."""
         import time
         deadline = time.monotonic() + timeout_s
         idle_since = None
