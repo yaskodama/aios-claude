@@ -38,6 +38,11 @@ type actor = {
   env   : (string, value) Hashtbl.t;
   methods : (string, method_decl) Hashtbl.t;
   mutable last_sender : string;
+  (* True while actor_loop is in the middle of processing a message
+     (between Queue.pop and the end of eval_stmt).  Used by REPL
+     script-mode `wait_quiesce` to know when the actor system has
+     finished — "queue empty" alone misses the in-flight case. *)
+  mutable busy : bool;
 }
 
 let actor_table : (string, actor) Hashtbl.t = Hashtbl.create 32
@@ -704,6 +709,7 @@ let create_actor name cls =
     env = Hashtbl.create 32;
     methods = Hashtbl.create 32;
     last_sender = "";
+    busy = false;
   }
 
 (* ---------------- in-process reply slots for now/future/await ---------------- *)
@@ -1156,7 +1162,7 @@ let rec eval_expr (actor:actor) (e : expr) =
              else
                (match Hashtbl.find_opt actor.env tgt with
                 | Some (VString s) when s <> "" -> s
-                | Some (VActor (n, _)) -> n
+                | Some (VActor _) -> tgt
                 | _ -> tgt)
            in
            let (slot_id, _) = new_reply_slot () in
@@ -1182,7 +1188,7 @@ let rec eval_expr (actor:actor) (e : expr) =
              else
                (match Hashtbl.find_opt actor.env tgt with
                 | Some (VString s) when s <> "" -> s
-                | Some (VActor (n, _)) -> n
+                | Some (VActor _) -> tgt
                 | _ -> tgt)
            in
            let (slot_id, _) = new_reply_slot () in
@@ -1280,7 +1286,12 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
     let cobj = find_class_exn cls in
       register_instance_source name cobj;
       let obj  = { cobj with cname = cls } in
-      let actor_inst = create_actor obj.cname cls in
+      (* Use the VAR name (`name`) as the actor instance name so it
+         matches the `actor_table` key.  Previously `obj.cname` (= the
+         class name) was used, which broke `send var.method()` —
+         `actor.name` then didn't match the table key.  Top-level New
+         already uses var name (see repl_thread.ml:494). *)
+      let actor_inst = create_actor name cls in
         List.iter
         (fun (st:Ast.stmt) ->
           match st.sdesc with
@@ -1426,7 +1437,7 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
             (* If tgt is a local variable holding an actor name, resolve it *)
             (match Hashtbl.find_opt actor.env tgt with
              | Some (VString s) when s <> "" -> s
-             | Some (VActor (n, _)) -> n
+             | Some (VActor _) -> tgt
              | _ -> tgt)
         in
         send_message ~from:actor.name actual_target
@@ -1451,7 +1462,7 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
           else
             (match Hashtbl.find_opt actor.env tgt with
              | Some (VString s) when s <> "" -> s
-             | Some (VActor (n, _)) -> n
+             | Some (VActor _) -> tgt
              | _ -> tgt)
         in
         send_message ~from:actor.name actual_target
@@ -1507,6 +1518,7 @@ and actor_loop actor = (
       Condition.wait actor.cond actor.mutex
     done;
     let msg = Queue.pop actor.queue in
+    actor.busy <- true;
     Mutex.unlock actor.mutex;
     (* Bind sender identity from the dequeued message, not a pre-set field.
        This makes `sender` correct even when multiple actors enqueue
@@ -1559,6 +1571,7 @@ and actor_loop actor = (
     set_current_msg_id None;
     set_current_actor_name None;
     (try Aipl_dist.set_current_actor None with _ -> ());
+    actor.busy <- false;
     done)
 and resolve_actor_from_term env recv_term =
   match recv_term with
@@ -1615,7 +1628,44 @@ and pop_matching_message actor (cases:select_case list)
             scan (m :: acc) rest
   in
   scan [] msgs
-  
+
+(* Block until every actor's queue is empty AND no actor is in the
+   middle of processing a message (busy=false), continuously for
+   `stable_window_s` seconds.  Returns when the system quiesces, or
+   when `max_wait_s` elapses (whichever comes first).  Used by the
+   REPL script-mode (`-f`) so a top-level `send d.run(...)` has time
+   to drain before the process exits. *)
+let wait_actors_quiesce ?(max_wait_s = 5.0) ?(stable_window_s = 0.1) () : unit =
+  let start = Unix.gettimeofday () in
+  let last_busy = ref start in
+  let rec loop () =
+    let now = Unix.gettimeofday () in
+    if now -. start > max_wait_s then ()
+    else begin
+      let any_pending =
+        Hashtbl.fold (fun _ a acc ->
+          if acc then acc
+          else begin
+            Mutex.lock a.mutex;
+            let r = not (Queue.is_empty a.queue) || a.busy in
+            Mutex.unlock a.mutex;
+            r
+          end) actor_table false
+      in
+      if any_pending then begin
+        last_busy := now;
+        Thread.delay 0.02;
+        loop ()
+      end
+      else if now -. !last_busy < stable_window_s then begin
+        Thread.delay 0.02;
+        loop ()
+      end
+      else ()
+    end
+  in
+  loop ()
+
 let actor_exists (name:string) : bool =
   Hashtbl.mem actor_table name
 

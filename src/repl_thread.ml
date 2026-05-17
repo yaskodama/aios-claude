@@ -544,7 +544,11 @@ let rec process_command line =
             | LocalTarget t -> (
                 match Hashtbl.find_opt top_actor.env t with
                 | Some (Eval_thread.VString s) when s <> "" -> s
-                | Some (Eval_thread.VActor (n, _)) -> n
+                (* VActor's first field stores the class name, NOT the
+                   actor instance name.  The instance name = the var
+                   name (`t`), so fall back to it.  See:
+                   https://github.com/.../#new-in-method-body fix. *)
+                | Some (Eval_thread.VActor _) -> t
                 | _ -> tgt_name)
             | RemoteTarget _ -> tgt_name
           in
@@ -562,7 +566,11 @@ let rec process_command line =
             | LocalTarget t -> (
                 match Hashtbl.find_opt top_actor.env t with
                 | Some (Eval_thread.VString s) when s <> "" -> s
-                | Some (Eval_thread.VActor (n, _)) -> n
+                (* VActor's first field stores the class name, NOT the
+                   actor instance name.  The instance name = the var
+                   name (`t`), so fall back to it.  See:
+                   https://github.com/.../#new-in-method-body fix. *)
+                | Some (Eval_thread.VActor _) -> t
                 | _ -> tgt_name)
             | RemoteTarget _ -> tgt_name
           in
@@ -678,6 +686,12 @@ let rec process_command line =
           with End_of_file ->
             close_in ic;
             restore_cwd ();
+            (* Wait for any in-flight actor messages to drain before the
+               REPL exits.  Without this, `send d.run(...)` at the top
+               level races against process shutdown and the receiver
+               never gets to run.  Bounded by a 5s wall-clock cap so a
+               truly stuck system doesn't hang the script. *)
+            (try Eval_thread.wait_actors_quiesce () with _ -> ());
             repl_logln "[Script execution completed]"
       with Sys_error msg ->
         repl_logln (Printf.sprintf "[Error] Could not open script file: %s" msg)
@@ -992,7 +1006,29 @@ let () =
            (* Also resolve any /api/json/call HTTP slot waiting on the same id. *)
            ignore (Web_gateway.try_resolve_reply_slot id json_val);
            push_web_evt (Printf.sprintf "[REPLY] id=%s value=%s" id s)
-       | None    -> push_web_evt (Printf.sprintf "[REPLY] value=%s" s));
+       | None ->
+           (* No reply-slot — the caller used `send` (fire-and-forget),
+              not `now` / `future + await`.  Mirror the value back to
+              the sender's mailbox as a `reply(v)` message so the
+              sender can pick it up with `select { case reply(r) -> ... }`.
+              No-op if we have no current actor or no recorded sender. *)
+           (match Eval_thread.get_current_actor_name () with
+            | Some self_name ->
+                (match Hashtbl.find_opt Eval_thread.actor_table self_name with
+                 | Some self_actor
+                   when self_actor.Eval_thread.last_sender <> ""
+                        && self_actor.Eval_thread.last_sender <> "<top>"
+                        && self_actor.Eval_thread.last_sender <> "<new>"
+                        && self_actor.Eval_thread.last_sender <> "<spawn>" ->
+                     let stmt =
+                       mk_stmt (Ast.CallStmt ("reply",
+                         [mk_expr (Eval_thread.expr_of_value v)])) in
+                     Eval_thread.send_message
+                       ~from:self_actor.Eval_thread.name
+                       self_actor.Eval_thread.last_sender stmt
+                 | _ -> ())
+            | None -> ());
+           push_web_evt (Printf.sprintf "[REPLY] value=%s" s));
       VUnit
   | _ -> failwith "reply(x): arity 1 expected");
 
