@@ -257,6 +257,57 @@ def test_checkpoint_restore_returns_none_for_missing():
 
 
 # ──────────────────────────────────────────────────────────────────────
+# IQ (I0023): quarantine_and_skip
+# ──────────────────────────────────────────────────────────────────────
+
+def test_quarantine_disabled_returns_false():
+    _clean_env()
+    d = reload_dist()
+    assert d.quarantine_actor("X") is False
+    assert d.is_quarantined("X") is False
+    assert d.clear_quarantine("X") is False
+    assert d.quarantine_status() == {}
+
+
+def test_quarantine_marks_and_clears():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUARANTINE_TTL"] = "10"
+    d = reload_dist()
+    assert d.is_quarantined("A") is False
+    assert d.quarantine_actor("A") is True
+    assert d.is_quarantined("A") is True
+    st = d.quarantine_status()
+    assert "A" in st and st["A"] > time.time()
+    assert d.clear_quarantine("A") is True
+    assert d.is_quarantined("A") is False
+
+
+def test_quarantine_expires_after_ttl():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUARANTINE_TTL"] = "60"
+    d = reload_dist()
+    # ttl override = 0.05s
+    d.quarantine_actor("Fast", ttl=0.05)
+    assert d.is_quarantined("Fast") is True
+    time.sleep(0.10)
+    assert d.is_quarantined("Fast") is False
+
+
+def test_quarantine_custom_ttl_override():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUARANTINE_TTL"] = "0"   # default would be 0 = no-op
+    d = reload_dist()
+    # Without override, ttl=0 -> no-op:
+    assert d.quarantine_actor("X") is False
+    # With explicit ttl, gets marked:
+    assert d.quarantine_actor("X", ttl=5.0) is True
+    assert d.is_quarantined("X") is True
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Runner
 # ──────────────────────────────────────────────────────────────────────
 
@@ -277,6 +328,10 @@ def _run():
         ("checkpoint save+restore roundtrip", test_checkpoint_save_and_restore_roundtrip),
         ("checkpoint list states", test_checkpoint_list_states),
         ("checkpoint restore missing", test_checkpoint_restore_returns_none_for_missing),
+        ("quarantine disabled returns False", test_quarantine_disabled_returns_false),
+        ("quarantine marks and clears", test_quarantine_marks_and_clears),
+        ("quarantine expires after TTL", test_quarantine_expires_after_ttl),
+        ("quarantine custom ttl override", test_quarantine_custom_ttl_override),
     ]
     failed = []
     for name, fn in tests:

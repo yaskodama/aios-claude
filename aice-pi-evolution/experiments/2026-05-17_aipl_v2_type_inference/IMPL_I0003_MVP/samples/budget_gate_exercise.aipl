@@ -1,0 +1,23 @@
+// I-7 exercise: token_budget gate fires on every ai_call.
+//
+// Uses AIPL_AI_PROVIDER=mock so no real API tokens are spent.
+// With AIPL_DIST_RPM=3, the budget gate logs one
+// `call_ai_budget_acquire` event per ai_call.
+//
+// Run:
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_RPM=3 AIPL_DIST_LOG_FILE=/tmp/budget.log \
+//   python3 src/python-aipl/aipl_main.py budget_gate_exercise.aipl
+
+class Caller {
+  method ask_three() {
+    var r1 = ai_call("hello world");
+    var r2 = ai_call("how are you");
+    var r3 = ai_call("goodbye");
+    println("done 3 calls");
+    reply(r3);
+  }
+}
+
+var c = new Caller();
+var done = now c.ask_three();

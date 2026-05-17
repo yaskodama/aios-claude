@@ -45,6 +45,12 @@ __all__ = [
     "save_actor_state",
     "restore_actor_state",
     "list_actor_states",
+    # IQ (I0023 hang resilience):
+    "quarantine_actor",
+    "is_quarantined",
+    "clear_quarantine",
+    "quarantine_status",
+    "quarantine_ttl",
 ]
 
 
@@ -328,4 +334,96 @@ def list_actor_states() -> Dict[str, str]:
     for entry in os.listdir(d):
         if entry.endswith(".json") and not entry.endswith(".tmp.json"):
             out[entry[:-5]] = os.path.join(d, entry)
+    return out
+
+
+# ════════════════════════════════════════════════════════════════════════
+# IQ (I0023 hang resilience): quarantine_and_skip
+# ════════════════════════════════════════════════════════════════════════
+#
+# When an actor raises an exception, mark it "quarantined" for a TTL
+# (default 60 s).  Subsequent messages to that actor get skipped
+# (logged + reply_future set to None) until the TTL expires, then the
+# actor is allowed to retry.  This contains "silent hang" failures to
+# a single actor rather than letting them stall the whole pipeline —
+# the exact problem PsiLang v3 hit when one OpenAI SDK call deadlocked
+# and took 35/38 individuals with it.
+#
+# Activation: AIPL_DIST_ENABLE=1 + AIPL_DIST_QUARANTINE_TTL=<seconds>.
+# If only AIPL_DIST_ENABLE is set, defaults to TTL=60 s.
+
+_QUARANTINE: Dict[str, float] = {}   # actor_name -> expires_at_epoch
+_QUARANTINE_LOCK = threading.Lock()
+
+
+def quarantine_ttl() -> float:
+    """Read AIPL_DIST_QUARANTINE_TTL (seconds).  Defaults to 60 s when
+    aipl_dist is enabled, or 0 (= feature off) when not."""
+    if not is_enabled():
+        return 0.0
+    raw = os.environ.get("AIPL_DIST_QUARANTINE_TTL", "60")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 60.0
+
+
+def quarantine_actor(name: str, ttl: Optional[float] = None) -> bool:
+    """Mark `name` as quarantined for `ttl` seconds (default = quarantine_ttl()).
+    Returns False on no-op (aipl_dist disabled or ttl<=0)."""
+    if not is_enabled():
+        return False
+    actual_ttl = ttl if ttl is not None else quarantine_ttl()
+    if actual_ttl <= 0:
+        return False
+    expires = time.time() + actual_ttl
+    with _QUARANTINE_LOCK:
+        _QUARANTINE[name] = expires
+    log_event("actor_quarantined", actor=name, ttl=actual_ttl, expires=expires)
+    return True
+
+
+def is_quarantined(name: str) -> bool:
+    """True if the actor is currently quarantined.  Expired entries are
+    pruned on the way out."""
+    if not is_enabled():
+        return False
+    with _QUARANTINE_LOCK:
+        exp = _QUARANTINE.get(name)
+        if exp is None:
+            return False
+        if exp > time.time():
+            return True
+        # expired — prune and report a release
+        del _QUARANTINE[name]
+    log_event("actor_quarantine_expired", actor=name)
+    return False
+
+
+def clear_quarantine(name: str) -> bool:
+    """Explicitly release `name` from quarantine (e.g., after a manual fix).
+    Returns True if an entry was removed."""
+    if not is_enabled():
+        return False
+    with _QUARANTINE_LOCK:
+        had = _QUARANTINE.pop(name, None)
+    if had is not None:
+        log_event("actor_quarantine_cleared", actor=name)
+        return True
+    return False
+
+
+def quarantine_status() -> Dict[str, float]:
+    """Snapshot: {actor_name: expires_at_epoch} for currently-quarantined
+    actors.  Pruned-as-of-call."""
+    if not is_enabled():
+        return {}
+    now = time.time()
+    out: Dict[str, float] = {}
+    with _QUARANTINE_LOCK:
+        for n, exp in list(_QUARANTINE.items()):
+            if exp > now:
+                out[n] = exp
+            else:
+                del _QUARANTINE[n]
     return out

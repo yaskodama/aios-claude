@@ -1,0 +1,41 @@
+// IQ (I0023) sample: quarantine_and_skip.
+//
+// `Flaky` always throws on `boom`.  Without quarantine, every send
+// would print an "[actor flaky.boom] error: ..." line forever.  With
+// AIPL_DIST_QUARANTINE_TTL set, the first failure marks the actor
+// quarantined for TTL seconds; subsequent sends are silently skipped
+// (reply_future set to None) — saving downstream callers from
+// hanging on a known-bad actor.
+//
+// Run:
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_QUARANTINE_TTL=2 \
+//   AIPL_DIST_LOG_FILE=/tmp/qlog.ndjson \
+//   python3 src/python-aipl/aipl_main.py quarantine_demo.aipl
+//
+// Expect:
+//   - exactly ONE "[actor flaky.boom] error: ..." line on stderr
+//   - "done" on stdout (the loop completes despite 4 broken sends)
+//   - NDJSON log has 1 actor_quarantined + 3 actor_skip_quarantined events
+
+class Flaky {
+  method boom() {
+    var x = 1 / 0;
+    reply(x);
+  }
+}
+
+class Driver {
+  method run() {
+    var f = new Flaky();
+    var a = now f.boom();      // 1st: fails, quarantine fires
+    var b = now f.boom();      // 2nd-4th: skipped via quarantine
+    var c = now f.boom();
+    var d = now f.boom();
+    println("done");
+    reply(0);
+  }
+}
+
+var dr = new Driver();
+var rc = now dr.run();

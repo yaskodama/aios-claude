@@ -545,6 +545,22 @@ class Interpreter:
         sender: Optional[Actor],
         reply_future: Optional[Future] = None,
     ):
+        # IQ (aipl_dist hang resilience): if the actor is currently
+        # quarantined, skip the dispatch.  reply_future (if any) gets
+        # None so callers unblock instead of hanging.  Disabled when
+        # AIPL_DIST_ENABLE != 1.
+        try:
+            import aipl_dist
+            if aipl_dist.is_quarantined(actor.name):
+                aipl_dist.log_event(
+                    "actor_skip_quarantined",
+                    actor=actor.name, method=method_name,
+                )
+                if reply_future is not None:
+                    reply_future.set(None)
+                return
+        except Exception:
+            pass
         # Per-actor instance methods (added via add_method on a specific actor)
         # win over class-level methods so a single instance can be patched
         # without affecting siblings.

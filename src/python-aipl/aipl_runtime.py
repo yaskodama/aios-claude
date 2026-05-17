@@ -114,6 +114,15 @@ class Actor:
                 print(f"[actor {self.name}.{method_name}] error: {e}", flush=True)
                 if reply_future is not None:
                     reply_future.set(None)
+                # IQ (aipl_dist hang resilience): auto-quarantine the
+                # failing actor for AIPL_DIST_QUARANTINE_TTL seconds so
+                # subsequent messages don't repeatedly hit the same
+                # error.  No-op unless AIPL_DIST_ENABLE=1.
+                try:
+                    import aipl_dist
+                    aipl_dist.quarantine_actor(self.name)
+                except Exception:
+                    pass
             finally:
                 self.scheduler.message_done()
 
