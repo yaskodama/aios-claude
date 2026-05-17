@@ -141,14 +141,19 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
 
 実測 LOC: 約 90 行 (推定 100-200 内).
 
-#### O-2.d (1 session, medium): Cross-class inference + actor field 共有 (CE-2, CE-4)
+#### O-2.d (1 session, medium): Cross-class inference + actor field 共有 (CE-2, CE-4) ✅ 完了 (2026-05-18)
 
-- OCaml `infer.ml` は class type を持つが、method の return / param TVars を
-  cross-class で逆推論する path が弱い
-- Python と同様に `class_sigs` を pre-pass で構築
-- Actor field を `class_fields[cls][name]` で method 横断共有
+実装結果 (調査の結果、想定より小規模で済んだ):
+- 既存 `check_decl` で actor field 共有は **既に動いていた** — class-local env で field を generalize → 各 method が同じ scheme を見る. Int/String 混在テストで type error が出ることを確認.
+- バグ修正: `check_stmt` に `TypedVarDecl` ケースが欠落 → 追加. ついでに annotation 不一致を `Type_error` 化.
+- 主修正: `preinfer_all_classes` で method 戻り型を **ハードコード `TUnit`** ではなく declared `-> T` (annotation 有) または fresh tvar に変更 (~10 行).
+- 主修正: `infer_expr` の `Now` / `Future` ケースが **常に `TAny`** を返していた path を、`class_method_schemes` から actual return 型を取得して返すよう変更 (~30 行).
+- 検証: `src/test_o2d_inference.ml` (5 test) で
+  cross-class basic / actor field consistent / actor field conflict /
+  method return flows back / method return type mismatch — **5/5 PASS**.
+- 既存 74 abclc + 18 aipl_dist smoke 完全無回帰.
 
-推定: 200-400 LOC
+実測 LOC: 約 60 行 (推定 200-400 行と比べて大幅減).
 
 #### O-2.e (1 session, easy): Record structural (CE-5)
 

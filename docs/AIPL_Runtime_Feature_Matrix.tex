@@ -302,9 +302,9 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   \endhead
 
   CE-1 & Phase C: constraint-based HM + Z3 refinement (Int)      & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
-  CE-2 & Phase D-1: cross-class inference                        & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-2 & Phase D-1: cross-class inference                        & \Yes & \No & \Yes\textsuperscript{\#} & \Yes\textsuperscript{\#} & \No & \No & \No \\
   CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \Part\textsuperscript{*} & \Part\textsuperscript{*} & \No & \No & \No \\
-  CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \Yes\textsuperscript{\#} & \Yes\textsuperscript{\#} & \No & \No & \No \\
   CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
   CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \No & \No & \No & \No & \No \\
@@ -332,6 +332,14 @@ Phase O-2.c (同日) で Real 理論にも対応.
 vacuously-false な refinement に \texttt{[refine warning]} を吐く.
 z3 不在時は \texttt{Deferred} で graceful fallback.
 サンプル: \texttt{abclc/WhereVacuous.abcl} (Int), \texttt{abclc/WhereVacuousReal.abcl} (Real).
+
+\smallskip
+\noindent\textsuperscript{\#} CE-2 / CE-4: OCaml は Phase O-2.d (2026-05-18) で
+cross-class 推論を強化.\texttt{preinfer\_all\_classes} が declared
+return-type を尊重し,\texttt{Now} / \texttt{Future} expression が
+\texttt{class\_method\_schemes} 越しに actual ret 型を返すよう変更.
+\texttt{TypedVarDecl} の unify 失敗を Type\_error 化.
+actor field の cross-method 一貫性 (Int/String mix 検出) も自動取得.
 
 OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),その他の refinement
 機能 (CE-1, CE-6, CE-9) と record structural typing (CE-5) は今後の課題.

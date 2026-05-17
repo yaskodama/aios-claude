@@ -203,9 +203,9 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | ID    | Feature                                            | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C   | 関連レポート                          |
 | ----- | -------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :-: | ------------------------------------- |
 | CE-1  | Phase C: constraint-based HM + Z3 refinement (Int) |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | `PHASE_C_REPORT.md`                   |
-| CE-2  | Phase D-1: cross-class inference                   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_D_REPORT.md`                   |
+| CE-2  | Phase D-1: cross-class inference                   |  ✅  |  ❌  |  ✅³  |  ✅³ |  ❌  |  ❌  | ❌  | `PHASE_D_REPORT.md`                   |
 | CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  🟡¹  |  🟡¹ |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
-| CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
+| CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ✅³  |  ✅³ |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
 | CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
 | CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
@@ -230,7 +230,16 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   x < 1.0` のような decimal 述語、`/` の real division、int リテラル
   の自動 promote (例: `float where x > 0 and x < 100`) が動く。
   サンプル: `abclc/WhereVacuousReal.abcl`。
-  通常推論への統合 (CE-7) と CLI 統合 (CE-8) は Phase O-2.d / O-2.f 以降。
+
+³ OCaml は Phase O-2.d (2026-05-18) で cross-class 推論を強化:
+  `preinfer_all_classes` が method の declared return type (`-> T`)
+  を尊重するようにし、`Now`/`Future` expression が
+  `class_method_schemes` を引いて actual ret type を返すよう変更。
+  これで `var v: int = now s.value()` で `value` の declared
+  return が `int` と異なるとき type error が出る。同時に
+  `TypedVarDecl` (`var x: T = e`) の unify 失敗を Type_error 化、
+  actor field の cross-method 一貫性チェックも自動的に効くように
+  なった (e.g., `s = x:int` と `s = y:string` の混在を検出)。
 
 OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
 Z3 backend には対応していない。OCaml への移植は今後の課題。

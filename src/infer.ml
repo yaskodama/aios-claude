@@ -243,12 +243,42 @@ let rec infer_expr (env:env) (e:expr) : ty =
         List.iter (fun e -> unify ~loc:e.loc (infer_expr env e) t1) rest;
         TArray t1
     end
-  | Now (_target, _meth, args)
-  | Future (_target, _meth, args) ->
-      (* now/future はメソッド呼び出しだが、reply の値型は静的に追えないため
-         permissive に TAny で扱う (引数だけは型推論を回す) *)
-      List.iter (fun e -> ignore (infer_expr env e)) args;
-      TAny
+  | Now (target, meth, args)
+  | Future (target, meth, args) ->
+      (* O-2.d: cross-class inference.  Resolve the receiver's class
+         and consult `class_method_schemes` so the call's static type
+         is the method's declared return rather than a blanket TAny.
+         Falls back to TAny when the receiver isn't statically known
+         to be a class actor (preserves gradual behaviour). *)
+      let arg_tys = List.map (infer_expr env) args in
+      let resolved_cls : string option =
+        match target with
+        | LocalTarget vname ->
+            (match Hashtbl.find_opt env vname with
+             | Some (sch :: _) ->
+                 (match repr (instantiate sch) with
+                  | TActor (cls, _) -> Some cls
+                  | _ -> None)
+             | _ -> None)
+        | _ -> None
+      in
+      (match resolved_cls with
+       | Some cls ->
+           (match Types.lookup_class_method_scheme cls meth with
+            | Some sch ->
+                (match repr (instantiate sch) with
+                 | TFun (param_tys, ret_ty) when
+                     List.length param_tys = List.length arg_tys ->
+                     (* Unify each arg with the declared param type so
+                        param-type errors surface (and so that fresh
+                        return-type tvars get pinned). *)
+                     List.iter2 (fun pt at ->
+                       ignore (unify_at e.loc pt at)
+                     ) param_tys arg_tys;
+                     repr ret_ty
+                 | _ -> TAny)
+            | None -> TAny)
+       | None -> TAny)
   | Await fe ->
       ignore (infer_expr env fe);
       TAny
@@ -318,6 +348,19 @@ let rec check_stmt (env:env) (s:stmt) : unit =
      | Some _ ->
          raise (Type_error (s.sloc,("cannot assign to overloaded name: " ^ x))));
     ()
+  | TypedVarDecl (name, te, rhs) ->
+      (* var name: T = rhs;  — explicit annotation.  Unify the RHS's
+         inferred type with the declared T; on mismatch raise so the
+         caller sees a Type_error.  TAny / TVar slots absorb without
+         complaint, mirroring the gradual behaviour everywhere else. *)
+      let declared = ty_of_type_expr te in
+      let t_rhs = infer_expr env rhs in
+      if not (unify_at s.sloc declared t_rhs) then
+        Types.type_error ~loc:s.sloc
+          (Printf.sprintf "var %s: declared type does not match initializer"
+             name);
+      let sch = Types.generalize (ftv_env env) declared in
+      set_var_scheme env name sch
   | VarDecl (name, rhs) ->
       let t = infer_expr env rhs in
       (* Honor any `var name: T = ...` annotation recorded by the
@@ -648,12 +691,19 @@ let preinfer_all_classes (p : Ast.program) (g0 : Types.tenv) : unit =
            ty)
         m.Ast.params
     in
-      (* ★ 1パス目ではメソッド本体は見ない設計なので、check_stmt は呼ばない ★ *)
-      (* check_stmt env_m m.Ast.body; *)
-
-      (* ps の repr だけを見て関数型を作る *)
+      (* O-2.d: take the declared return-type annotation seriously
+         when present.  Without this every method's return was hard-
+         coded to TUnit, so cross-class call-site checks like
+         `var v: int = now s.value()` silently passed even when
+         `value : () -> int` was declared.  When there's no `-> T`
+         annotation we fall back to a fresh tvar so HM can pin the
+         return type later (during the main check_decl pass). *)
+      let ret_ty = match m.Ast.ret_ty with
+        | Some te -> ty_of_type_expr te
+        | None -> Types.TVar (Types.fresh_tvar ())
+      in
       let ps' = List.map Types.repr ps in
-      let tfun = Types.TFun (ps', Types.TUnit) in
+      let tfun = Types.TFun (ps', ret_ty) in
       let sch  = generalize (ftv_env env_m) tfun in
         (m.Ast.mname, sch)
 (*

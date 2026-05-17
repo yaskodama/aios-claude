@@ -61,3 +61,9 @@
  (modules test_refine_check)
  (flags (:standard -w -a))
  (libraries abcllib unix))
+
+(executable
+ (name test_o2d_inference)
+ (modules test_o2d_inference)
+ (flags (:standard -w -a))
+ (libraries abcllib))
