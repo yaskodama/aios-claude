@@ -1,0 +1,100 @@
+{
+  "_source_aice": "AIPL_v2_EvolveBlock.aice",
+  "_source_dialect": "aice_yaml_v1",
+  "_generated": "2026-05-17 (hand-crafted from YAML)",
+  "_comment": "AIPL bootstrap v2 (1): AIPL に first-class evolve block を追加する設計探索。12 軸、6 reviewer、hard_floor=R6_RealWorldPrecedent。PsiLang シリーズ v4 で確立した codegen 基盤 (coherence rejection + hard floor + per-gen checkpoint) を使う。",
+
+  "name": "AIPL_v2_EvolveBlock",
+  "task": "AIPL に進化計算を first-class 構文として組み込む設計を進化計算で探す。同じ概念を .aice (YAML) / .ga.json / Python codegen の 3 箇所に分散していたものを AIPL の evolve { } ブロックに集約し、既存 .ga.json と 1:1 双方向変換できる設計を発見する。既存 AIPL プログラム (PsiLang2 等) は破壊しない backward 互換が要求される。",
+  "schema_ref": "aipl_evolve_block.schema.json",
+
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": ["evolve_syntax_style", "reviewer_declaration", "genome_representation",
+                   "backward_compat_strategy", "aice_dialect_compat"],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415929
+  },
+
+  "operators": {
+    "mutations": [
+      { "name": "axis_resample",  "kind": "single_axis",           "weight": 0.55 },
+      { "name": "coherent_shift", "kind": "multi_axis_correlated", "weight": 0.35 },
+      { "name": "llm_proposal",   "kind": "llm_directed",          "weight": 0.10 }
+    ],
+    "crossovers": [
+      { "name": "uniform",   "kind": "axis_uniform",     "weight": 0.6 },
+      { "name": "one_point", "kind": "schema_partition", "weight": 0.4 }
+    ]
+  },
+
+  "evaluation": {
+    "use_ai": true,
+    "evaluator": "Evaluator",
+    "hard_floor_reviewer": "R6_RealWorldPrecedent",
+    "tasks": ["RewritePiPhase1", "RewriteLangDesign", "RoundTripGaJson",
+              "BackwardCompatPsiLang2", "CodegenImplCost"],
+    "task_specs": {
+      "RewritePiPhase1":         { "weight": 0.25, "hard": true },
+      "RewriteLangDesign":       { "weight": 0.20, "hard": true },
+      "RoundTripGaJson":         { "weight": 0.20, "hard": true },
+      "BackwardCompatPsiLang2":  { "weight": 0.20 },
+      "CodegenImplCost":         { "weight": 0.15 }
+    },
+
+    "reviewers": [
+      {
+        "name": "R1_Expressivity",
+        "weight": 0.20,
+        "persona": "あなたは R1 (表現力) を判定するレビュアーです。候補の evolve_syntax_style と reviewer_declaration と mutators_declaration を見て、v2 PsiLang を生んだ Pi_Phase1_OpenSearch.ga.json (12 axes, 5 reviewers, 2 mutators, 1 crossover) と同等の内容を新 evolve block で何行で書けるかを判定。1.0 = 30 行以下、0.7 = 60 行以下、0.3 = 100 行以下、0.0 = 書けないか 100 行超。0.0-1.0 の decimal を半角数字 1 つで答えてください。"
+      },
+      {
+        "name": "R2_RoundTripGaJson",
+        "weight": 0.15,
+        "persona": "あなたは R2 (双方向変換) を判定するレビュアーです。候補の ga_emission_mode, genome_representation, schema_source を見て、AIPL evolve block と既存 .ga.json が情報落ちなく 1:1 で双方向変換できるかを判定。1.0 = lossless 双方向 (JSON-AIPL-JSON で同じ JSON が返る)、0.7 = 一方向 lossless、0.3 = 多くの情報が失われる、0.0 = round-trip 不能。半角数字 1 つで。"
+      },
+      {
+        "name": "R3_BackwardCompat",
+        "weight": 0.15,
+        "persona": "あなたは R3 (後方互換) を判定するレビュアーです。候補の backward_compat_strategy, parser_impact, aice_dialect_compat を見て、PsiLang2 chudnovsky.psi 等の既存 AIPL プログラムが新 evolve syntax 導入後も動くかを判定。1.0 = 完全互換 (opt-in, no breaking)、0.7 = ほぼ互換 (1-2 deprecated)、0.3 = 互換性破壊あり、0.0 = 大破壊。半角数字 1 つで。"
+      },
+      {
+        "name": "R4_ImplementabilityCodegen",
+        "weight": 0.20,
+        "persona": "あなたは R4 (実装可能性) を判定するレビュアーです。候補の parser_impact, evolve_syntax_style, reviewer_evaluator_style を見て、aipl_codegen.py (現在 1200 行) + aipl_parser.py + aipl_interp.py に追加実装が必要な行数を判定。1.0 = ≤ 200 行 (sugar layer のみ)、0.7 = ≤ 500 行 (template 追加)、0.3 = ≤ 1000 行、0.0 = 1000 行超 or 既存変更大。半角数字 1 つで。"
+      },
+      {
+        "name": "R5_DistributedHooks",
+        "weight": 0.15,
+        "persona": "あなたは R5 (分散準備) を判定するレビュアーです。候補の reviewer_evaluator_style, lineage_persistence, genome_representation を見て、将来 AIPL v2 (2) で分散ランタイムを追加するときにこの設計が邪魔をしないかを判定。1.0 = actor 分散しやすい (message_passing/actor_per_reviewer)、0.7 = 普通、0.3 = 単一プロセス前提、0.0 = 分散と非互換。半角数字 1 つで。"
+      },
+      {
+        "name": "R6_RealWorldPrecedent",
+        "weight": 0.15,
+        "persona": "あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する進化計算 DSL / ライブラリとどれだけ近いかを判定する。先例: (1) DEAP = Python toolbox + decorator (declarative), (2) nevergrad = functional API + optimizer registry, (3) pyribs = MAP-Elites lib + Archive/Emitter, (4) NEAT-Python = INI/XML config + Python plugins, (5) inspyred = OO-style + observers, (6) DREAM/EvoFlow = block-DSL embedded in host language. スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (これは hard floor として最終 fitness を 0 にクランプ)。半角数字 1 つで。"
+      }
+    ]
+  },
+
+  "meta_fitness": {
+    "expressivity":         0.25,
+    "round_trip_quality":   0.20,
+    "backward_compat":      0.20,
+    "implementability":     0.15,
+    "real_world_precedent": 0.10,
+    "concision":            0.10
+  },
+
+  "ranking": {
+    "strategy": "scalar_with_pareto_tiebreak",
+    "scenarios": ["balanced", "expressivity_first", "compat_first"],
+    "scenario_weights": {
+      "balanced":            { "expressivity": 0.25, "round_trip_quality": 0.20, "backward_compat": 0.20, "implementability": 0.15, "real_world_precedent": 0.10, "concision": 0.10 },
+      "expressivity_first":  { "expressivity": 0.45, "round_trip_quality": 0.25, "backward_compat": 0.10, "implementability": 0.05, "real_world_precedent": 0.10, "concision": 0.05 },
+      "compat_first":        { "expressivity": 0.15, "round_trip_quality": 0.15, "backward_compat": 0.40, "implementability": 0.20, "real_world_precedent": 0.05, "concision": 0.05 }
+    },
+    "top_k": 5
+  }
+}

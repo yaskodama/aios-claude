@@ -1,0 +1,249 @@
+# ─────────────────────────────────────────────────────────────────────
+#  AIPL_v2_EvolveBlock.aice  (案1 YAML)
+#  Series: AIPL bootstrap v2, sub-experiment (1)
+#
+#  AIPL の進化計算系列:
+#    v1 = aice-evolution-v2 (既存の AIPL ブートストラップ pipeline)
+#    v2 = 本実験 (AIPL を更に進化させる)
+#       (1) evolve-block を first-class 構文に (本ファイル)
+#       (2) 分散ランタイム / 負荷分散 (sibling experiment)
+#
+#  なお PsiLang 系列 (v1-v4) は数値計算用言語デザインの探索で、
+#  本実験 (AIPL bootstrap v2) とは独立。
+#
+#  目標: 同じ進化計算記述を .aice (YAML), .ga.json, aipl_codegen.py の
+#  3 箇所に分散していたものを、AIPL の `evolve { reviewers: …
+#  mutators: …  cell_axes: … }` ブロックに集約する設計を発見する。
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: AIPL_v2_EvolveBlock
+  parent: aice-evolution-v2 (= AIPL bootstrap v1)
+  series: AIPL_bootstrap
+  series_number: 2
+  sub_experiment: 1_evolve_block
+  version: 0.1.0
+  created: 2026-05-17
+  description: |
+    AIPL に first-class な evolve ブロックを追加するための設計遺伝子を
+    進化計算で発見する。設計目標:
+      (a) 同じ進化計算記述を .aice / .ga.json / .aipl で 1:1 対応可能
+      (b) 既存 AIPL プログラム (PsiLang2 等) を破壊しない backward 互換
+      (c) 過去 4 つの .ga.json (Pi_Phase0/1/2/Final, LangDesign v2-v4)
+          をすべて新構文で書き直せる
+      (d) aipl_codegen.py への追加実装が ≤ 500 行
+
+context:
+  motivation: |
+    v3 で「.aice で hard floor 宣言したが .ga.json に届かなかった」事故
+    が起きた根本原因は、同じ概念を 3 箇所 (YAML/.ga/Python codegen) に
+    別言語で書いていたこと。AIPL に evolve { } を入れれば、.aice はその
+    具象構文の sugar layer に、.ga.json は永続化フォーマットに退かせる。
+  existing_distributed:
+    - "aipl_remote (部分的に存在)"
+    - "_PriorityGate (concurrency limit、aipl_ai.py 内)"
+    - "ABCL_AI_MAX_CONCURRENT env"
+
+goal:
+  maximize:
+    - expressivity         # v1-v4 の 4 .ga を 30 行以下で書けるか
+    - round_trip_quality   # .ga.json ↔ AIPL evolve block の lossless 度
+    - backward_compat      # 既存 AIPL コードがそのまま走るか
+    - real_world_precedent # 既存進化計算ライブラリ (DEAP/nevergrad/pyribs) に類似 API があるか
+  minimize:
+    - aipl_codegen_added_loc
+    - lines_per_existing_ga
+
+  scalar_fitness:
+    formula: |
+      real_world_floor *
+      (0.25 * normalize(expressivity, [0.0, 1.0])
+       + 0.20 * normalize(round_trip_quality, [0.0, 1.0])
+       + 0.20 * normalize(backward_compat, [0.0, 1.0])
+       + 0.15 * (1 - normalize(aipl_codegen_added_loc, [50, 1000]))
+       + 0.10 * (1 - normalize(lines_per_existing_ga, [10, 100]))
+       + 0.10 * normalize(real_world_precedent, [0.0, 1.0]))
+    bounds: [0.0, 1.0]
+
+constraints:
+  must_round_trip_existing_ga: true
+  must_compile_to_current_aipl: true
+  aipl_codegen_added_loc:      {max: 800}
+  must_have_real_world_precedent: true
+
+variables:
+  # ----- 構文形式 -----
+  evolve_syntax_style:
+    type: enum
+    values: [native_block_curly, native_block_indent, yaml_embed_in_code,
+             json_literal_in_code, decorator_style, no_native_only_io]
+    default: native_block_curly
+    cell_axis: true
+
+  reviewer_declaration:
+    type: enum
+    values: [inline_function, block_declaration_with_persona, separate_actor_class,
+             external_yaml_ref, ai_call_inline]
+    default: block_declaration_with_persona
+    cell_axis: true
+
+  mutators_declaration:
+    type: enum
+    values: [inline_lambdas, builtin_only, plugin_system, declarative_axes_only]
+    default: declarative_axes_only
+
+  # ----- データ表現 -----
+  genome_representation:
+    type: enum
+    values: [csv_string, json_record, typed_record, plain_object_with_axes]
+    default: typed_record
+    cell_axis: true
+
+  cell_axes_specification:
+    type: enum
+    values: [csv_in_block, list_literal, separate_var, attribute_annotations]
+    default: list_literal
+
+  # ----- 永続化 -----
+  ga_emission_mode:
+    type: enum
+    values: [always_on_compile, opt_in, debug_flag, never]
+    default: always_on_compile
+
+  lineage_persistence:
+    type: enum
+    values: [per_generation, per_evaluation, on_demand_block, none]
+    default: per_generation
+
+  schema_source:
+    type: enum
+    values: [external_json_ref, inline_axes_with_coherence,
+             ga_json_inline, hybrid]
+    default: inline_axes_with_coherence
+
+  # ----- 互換性 -----
+  backward_compat_strategy:
+    type: enum
+    values: [strict_no_change_to_existing, opt_in_new_syntax,
+             deprecate_old_emit, breaking_change]
+    default: opt_in_new_syntax
+    cell_axis: true
+
+  aice_dialect_compat:
+    type: enum
+    values: [yaml_v1_only, curly_brace_only, both_via_codegen,
+             unified_grammar_with_yaml]
+    default: both_via_codegen
+    cell_axis: true
+
+  # ----- 評価モデル -----
+  reviewer_evaluator_style:
+    type: enum
+    values: [future_fanout_current, async_block, message_passing,
+             actor_per_reviewer, builtin_evaluate]
+    default: future_fanout_current
+
+  # ----- 実装複雑度 -----
+  parser_impact:
+    type: enum
+    values: [no_parser_change, new_keywords_only,
+             new_grammar_productions, full_dsl_subset]
+    default: new_grammar_productions
+
+evaluation:
+  use_ai: true
+  evaluator: Evaluator
+  hard_floor_reviewer: R6_RealWorldPrecedent
+  tasks:
+    - RewritePiPhase1
+    - RewriteLangDesign
+    - RoundTripGaJson
+    - BackwardCompatPsiLang2
+    - CodegenImplCost
+  task_specs:
+    RewritePiPhase1: { weight: 0.25, hard: true,
+      spec: "既存 Pi_Phase1_OpenSearch.ga.json を新 evolve block で 30 行以下に書ける" }
+    RewriteLangDesign: { weight: 0.20, hard: true,
+      spec: "v4 LangDesign_Expressive_v4.ga.json (12 axes, 6 reviewers, coherence) を新構文で書ける" }
+    RoundTripGaJson: { weight: 0.20, hard: true,
+      spec: "AIPL evolve block ⇄ .ga.json の 1:1 双方向変換が可能" }
+    BackwardCompatPsiLang2: { weight: 0.20,
+      spec: "PsiLang2 chudnovsky.psi を含む既存 AIPL プログラムが新構文導入後も動く" }
+    CodegenImplCost: { weight: 0.15,
+      spec: "aipl_codegen.py + aipl_parser.py + aipl_interp.py の追加実装が 500 行以下" }
+
+  reviewers:
+    - name: R1_Expressivity
+      weight: 0.20
+      persona: |
+        あなたは R1 (表現力) を判定するレビュアーです。候補の evolve_syntax_style と reviewer_declaration と
+        mutators_declaration を見て、v2 PsiLang を生んだ Pi_Phase1_OpenSearch.ga.json (12 axes, 5 reviewers,
+        2 mutators, 1 crossover) と同等の内容を 新 evolve block で何行で書けるかを判定。1.0 = 30 行以下、
+        0.7 = 60 行以下、0.3 = 100 行以下、0.0 = 書けないか 100 行超。0.0-1.0 の decimal を半角で。
+
+    - name: R2_RoundTripGaJson
+      weight: 0.15
+      persona: |
+        あなたは R2 (双方向変換) を判定するレビュアーです。候補の ga_emission_mode と genome_representation と
+        schema_source を見て、AIPL evolve block と既存 .ga.json が情報落ちなく 1:1 で双方向変換できるかを判定。
+        1.0 = lossless 双方向 (ja-en-ja で同じ JSON)、0.7 = 一方向は lossless、0.3 = 多くの情報が失われる、
+        0.0 = round-trip 不能。半角数字 1 つで。
+
+    - name: R3_BackwardCompat
+      weight: 0.15
+      persona: |
+        あなたは R3 (後方互換) を判定するレビュアーです。候補の backward_compat_strategy と parser_impact と
+        aice_dialect_compat を見て、PsiLang2 chudnovsky.psi など既存の AIPL プログラムが新 evolve syntax 導入
+        後も動くかを判定。1.0 = 完全互換 (opt-in, no breaking)、0.7 = ほぼ互換 (1-2 deprecated)、0.3 =
+        互換性破壊あり、0.0 = 大破壊。半角数字 1 つで。
+
+    - name: R4_ImplementabilityCodegen
+      weight: 0.20
+      persona: |
+        あなたは R4 (実装可能性) を判定するレビュアーです。候補の parser_impact と evolve_syntax_style と
+        reviewer_evaluator_style を見て、aipl_codegen.py (現在 1200 行) + aipl_parser.py + aipl_interp.py
+        に追加実装が必要な行数を判定。1.0 = ≤ 200 行 (sugar layer のみ)、0.7 = ≤ 500 行 (template 追加)、
+        0.3 = ≤ 1000 行、0.0 = 1000 行超 or 既存変更大。半角数字 1 つで。
+
+    - name: R5_DistributedHooks
+      weight: 0.15
+      persona: |
+        あなたは R5 (分散準備) を判定するレビュアーです。候補の reviewer_evaluator_style と
+        lineage_persistence と genome_representation を見て、将来 v5 (2) で分散ランタイムを追加するときに
+        この設計が邪魔をしないかを判定。1.0 = actor 分散しやすい (message_passing/actor_per_reviewer)、
+        0.7 = 普通、0.3 = 単一プロセス前提、0.0 = 分散と非互換。半角数字 1 つで。
+
+    - name: R6_RealWorldPrecedent
+      weight: 0.15
+      persona: |
+        あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する進化計算 DSL / ライブラリと
+        どれだけ近いかを判定する。先例: DEAP (Python, declarative toolbox), nevergrad (Facebook,
+        functional API), pyribs (MAP-Elites lib), NEAT-Python (XML config + Python), inspyred,
+        Cuckoo-search frameworks。スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor)。
+        半角数字 1 つで。
+
+ranking:
+  strategy: scalar_with_pareto_tiebreak
+  scenarios: [balanced, expressivity_first, compat_first]
+  top_k: 5
+
+search_params:
+  algorithm: map_elites
+  seed_count: 8
+  generations: 30
+  cell_axes: [evolve_syntax_style, reviewer_declaration, genome_representation,
+              backward_compat_strategy, aice_dialect_compat]
+  open_axes: false
+  rng_seed: 31415929
+
+runtime:
+  provider: openai
+  model: gpt-4o-mini
+  concurrency: 8
+  request_timeout_s: 60
+  sdk_retries: 3
+  drain_timeout_s: 7200
+  idle_ms: 60000
+  checkpoint_per_gen: on
+  caffeinate: on

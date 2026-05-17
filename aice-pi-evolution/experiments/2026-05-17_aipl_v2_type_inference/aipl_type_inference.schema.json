@@ -1,0 +1,126 @@
+{
+  "name": "aipl_type_inference_paradigm",
+  "extends": null,
+  "_comment": "AIPL v2 (2) Python AIPL の型推論強化のための設計遺伝子。12 軸。coherence で『実装不可能な組合せ』を排除する。",
+
+  "axes": {
+    "inference_algorithm":        ["no_inference", "local_only", "hindley_milner",
+                                    "bidirectional", "constraint_based_global"],
+    "inference_scope":            ["function_local", "module_local",
+                                    "whole_program", "incremental_per_method"],
+    "type_system_strength":       ["dynamic_only", "static_simple", "hindley_milner",
+                                    "bidirectional_w_refinement", "dependent"],
+    "generics_model":             ["monomorphic_only", "parametric",
+                                    "ad_hoc_polymorphism", "higher_kinded",
+                                    "bounded_quantification"],
+    "subtyping":                  ["none", "nominal", "structural",
+                                    "row_polymorphism", "gradual"],
+    "annotation_requirement":     ["none_inferred", "optional_with_fallback_dyn",
+                                    "optional_strict", "mandatory_for_public",
+                                    "mandatory_for_all"],
+    "default_inference_target":   ["any_aka_dyn", "never_type",
+                                    "error_node_for_recovery", "union_of_candidates",
+                                    "principal_type_from_use"],
+    "error_recovery":             ["stop_on_first", "collect_all_continue",
+                                    "suggestion_with_did_you_mean",
+                                    "interactive_repair", "unification_trace"],
+    "error_message_style":        ["terse_one_line", "elm_style_with_pointer",
+                                    "rust_style_with_help", "ocaml_style_with_path",
+                                    "prose_with_examples"],
+    "effect_system":              ["none", "monadic_io", "algebraic_effects",
+                                    "capability_based", "linear_resources"],
+    "recursive_types":            ["none", "simple_rec", "iso_recursive",
+                                    "equi_recursive_with_mu"],
+    "implementation_strategy":    ["extend_aipl_typeck_inline",
+                                    "new_aipl_inference_module",
+                                    "rewrite_typeck_full",
+                                    "external_z3_smt",
+                                    "external_zarith_solver"]
+  },
+
+  "ordinal_axes": {
+    "inference_algorithm":     ["no_inference", "local_only", "hindley_milner",
+                                 "bidirectional", "constraint_based_global"],
+    "type_system_strength":    ["dynamic_only", "static_simple", "hindley_milner",
+                                 "bidirectional_w_refinement", "dependent"],
+    "annotation_requirement":  ["mandatory_for_all", "mandatory_for_public",
+                                 "optional_strict", "optional_with_fallback_dyn",
+                                 "none_inferred"],
+    "implementation_strategy": ["extend_aipl_typeck_inline",
+                                 "new_aipl_inference_module",
+                                 "rewrite_typeck_full",
+                                 "external_z3_smt",
+                                 "external_zarith_solver"]
+  },
+
+  "coherence": [
+    {
+      "_comment": "no_inference は static_simple 以下と整合 (推論なしで強い型は破綻)",
+      "if": {"inference_algorithm": "no_inference"},
+      "then_in": {"type_system_strength": ["dynamic_only", "static_simple"]}
+    },
+    {
+      "_comment": "dependent 型は constraint-based 推論または bidirectional が必須",
+      "if": {"type_system_strength": "dependent"},
+      "then_in": {"inference_algorithm": ["bidirectional", "constraint_based_global"]}
+    },
+    {
+      "_comment": "bidirectional_w_refinement も bidirectional 推論前提",
+      "if": {"type_system_strength": "bidirectional_w_refinement"},
+      "then_in": {"inference_algorithm": ["bidirectional", "constraint_based_global"]}
+    },
+    {
+      "_comment": "higher_kinded generics は HM 以上の表現力が必要",
+      "if": {"generics_model": "higher_kinded"},
+      "then_in": {"inference_algorithm": ["hindley_milner", "bidirectional",
+                                            "constraint_based_global"]}
+    },
+    {
+      "_comment": "external_z3_smt / external_zarith_solver は dependent 型のときのみ妥当",
+      "if": {"implementation_strategy": "external_z3_smt"},
+      "then_in": {"type_system_strength": ["bidirectional_w_refinement", "dependent"]}
+    },
+    {
+      "_comment": "extend_aipl_typeck_inline は単純な型システム向け (HM 以下)",
+      "if": {"implementation_strategy": "extend_aipl_typeck_inline"},
+      "then_in": {"type_system_strength": ["dynamic_only", "static_simple",
+                                             "hindley_milner"]}
+    },
+    {
+      "_comment": "row_polymorphism は HM+ 必要",
+      "if": {"subtyping": "row_polymorphism"},
+      "then_in": {"inference_algorithm": ["hindley_milner", "bidirectional",
+                                           "constraint_based_global"]}
+    },
+    {
+      "_comment": "ad_hoc_polymorphism (type classes) は HM 以上必須",
+      "if": {"generics_model": "ad_hoc_polymorphism"},
+      "then_in": {"inference_algorithm": ["hindley_milner", "constraint_based_global"]}
+    },
+    {
+      "_comment": "mandatory_for_all は推論を実質潰すので no_inference との組合せが自然",
+      "if": {"annotation_requirement": "mandatory_for_all"},
+      "then_in": {"inference_algorithm": ["no_inference", "local_only"]}
+    },
+    {
+      "_comment": "none_inferred (注釈ゼロで全部推論) は constraint_based_global か HM 必要",
+      "if": {"annotation_requirement": "none_inferred"},
+      "then_in": {"inference_algorithm": ["hindley_milner", "bidirectional",
+                                            "constraint_based_global"]}
+    },
+    {
+      "_comment": "linear_resources / capability_based は dependent 級の表現力が要る",
+      "if": {"effect_system": "linear_resources"},
+      "then_in": {"type_system_strength": ["bidirectional_w_refinement", "dependent"]}
+    },
+    {
+      "_comment": "rewrite_typeck_full は大改修なので dependent も視野に入る場合のみ",
+      "if": {"implementation_strategy": "rewrite_typeck_full"},
+      "then_in": {"type_system_strength": ["hindley_milner",
+                                             "bidirectional_w_refinement", "dependent"]}
+    }
+  ],
+
+  "open_axes": false,
+  "notes": "AIPL v2 (2): Python AIPL に型推論を追加するための設計探索。12 軸 + 12 coherence rule。R6 で mypy/Pyre/Pyright/pytype 等の現実先例とマッチング、hard floor で実在しない組合せを排除。"
+}

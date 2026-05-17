@@ -1,0 +1,99 @@
+{
+  "name": "aipl_evolve_block_paradigm",
+  "extends": null,
+  "_comment": "v5 (1): AIPL に first-class evolve { } を追加するための設計遺伝子。12 軸。coherence で「実装不可能 / 既存破壊」な組合せを排除。",
+
+  "axes": {
+    "evolve_syntax_style":      ["native_block_curly", "native_block_indent",
+                                  "yaml_embed_in_code", "json_literal_in_code",
+                                  "decorator_style", "no_native_only_io"],
+    "reviewer_declaration":     ["inline_function", "block_declaration_with_persona",
+                                  "separate_actor_class", "external_yaml_ref",
+                                  "ai_call_inline"],
+    "mutators_declaration":     ["inline_lambdas", "builtin_only", "plugin_system",
+                                  "declarative_axes_only"],
+    "genome_representation":    ["csv_string", "json_record", "typed_record",
+                                  "plain_object_with_axes"],
+    "cell_axes_specification":  ["csv_in_block", "list_literal", "separate_var",
+                                  "attribute_annotations"],
+    "ga_emission_mode":         ["always_on_compile", "opt_in", "debug_flag", "never"],
+    "lineage_persistence":      ["per_generation", "per_evaluation",
+                                  "on_demand_block", "none"],
+    "schema_source":            ["external_json_ref", "inline_axes_with_coherence",
+                                  "ga_json_inline", "hybrid"],
+    "backward_compat_strategy": ["strict_no_change_to_existing", "opt_in_new_syntax",
+                                  "deprecate_old_emit", "breaking_change"],
+    "aice_dialect_compat":      ["yaml_v1_only", "curly_brace_only",
+                                  "both_via_codegen", "unified_grammar_with_yaml"],
+    "reviewer_evaluator_style": ["future_fanout_current", "async_block",
+                                  "message_passing", "actor_per_reviewer",
+                                  "builtin_evaluate"],
+    "parser_impact":            ["no_parser_change", "new_keywords_only",
+                                  "new_grammar_productions", "full_dsl_subset"]
+  },
+
+  "ordinal_axes": {
+    "ga_emission_mode":      ["never", "debug_flag", "opt_in", "always_on_compile"],
+    "lineage_persistence":   ["none", "on_demand_block", "per_evaluation", "per_generation"],
+    "backward_compat_strategy": ["breaking_change", "deprecate_old_emit",
+                                  "opt_in_new_syntax", "strict_no_change_to_existing"],
+    "parser_impact":         ["full_dsl_subset", "new_grammar_productions",
+                              "new_keywords_only", "no_parser_change"]
+  },
+
+  "coherence": [
+    {
+      "_comment": "no_native_only_io は既存外部ファイル経由 = AIPL 構文変化なし",
+      "if": {"evolve_syntax_style": "no_native_only_io"},
+      "then": {"parser_impact": "no_parser_change"}
+    },
+    {
+      "_comment": "decorator_style は Python のみ; ml-like AIPL では既存 grammar 改造が要る",
+      "if": {"evolve_syntax_style": "decorator_style"},
+      "then_in": {"parser_impact": ["new_grammar_productions", "full_dsl_subset"]}
+    },
+    {
+      "_comment": "breaking_change は強い設計判断 — full_dsl_subset 等の大改造でないと妥当性なし",
+      "if": {"backward_compat_strategy": "breaking_change"},
+      "then_in": {"parser_impact": ["new_grammar_productions", "full_dsl_subset"]}
+    },
+    {
+      "_comment": "strict_no_change は no_parser_change と組合せ (sugar layer のみ)",
+      "if": {"backward_compat_strategy": "strict_no_change_to_existing"},
+      "then_in": {"parser_impact": ["no_parser_change", "new_keywords_only"]}
+    },
+    {
+      "_comment": "inline_function reviewer は lambda / 第一級関数 が要る → 既存 AIPL には無い",
+      "if": {"reviewer_declaration": "inline_function"},
+      "then_in": {"parser_impact": ["new_grammar_productions", "full_dsl_subset"]}
+    },
+    {
+      "_comment": "external_yaml_ref reviewer は no_native_only_io と整合",
+      "if": {"reviewer_declaration": "external_yaml_ref"},
+      "then_in": {"evolve_syntax_style": ["no_native_only_io", "yaml_embed_in_code"]}
+    },
+    {
+      "_comment": "actor_per_reviewer は分散準備に向く; 既存 future_fanout を破壊するわけではない",
+      "if": {"reviewer_evaluator_style": "actor_per_reviewer"},
+      "then_in": {"backward_compat_strategy": ["opt_in_new_syntax", "deprecate_old_emit"]}
+    },
+    {
+      "_comment": "json_literal_in_code は JSON syntax のサブセットをパーサに足す必要",
+      "if": {"evolve_syntax_style": "json_literal_in_code"},
+      "then_in": {"parser_impact": ["new_grammar_productions", "full_dsl_subset"]}
+    },
+    {
+      "_comment": "yaml_embed_in_code は AIPL 文字列リテラル内に YAML を抱えるだけなので grammar 変更なし",
+      "if": {"evolve_syntax_style": "yaml_embed_in_code"},
+      "then_in": {"parser_impact": ["no_parser_change", "new_keywords_only"]}
+    },
+    {
+      "_comment": "native_block_curly / indent は中括弧 / インデント の新 grammar が要る",
+      "if": {"evolve_syntax_style": "native_block_curly"},
+      "then_in": {"parser_impact": ["new_grammar_productions", "full_dsl_subset"]}
+    }
+  ],
+
+  "open_axes": false,
+  "notes": "v5 (1) で AIPL に進化計算ブロックを first-class 化する設計探索。12 axes, 10 coherence rules. coherence 主軸は『parser_impact (実装複雑度) と evolve_syntax_style の整合性』『backward_compat と breaking_change の境界』。"
+}

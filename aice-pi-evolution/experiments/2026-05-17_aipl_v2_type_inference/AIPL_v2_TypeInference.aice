@@ -1,0 +1,311 @@
+# ─────────────────────────────────────────────────────────────────────
+#  AIPL_v2_TypeInference.aice  (案1 YAML)
+#  Series: AIPL bootstrap v2, sub-experiment (2) — **most important**
+#
+#  Python AIPL (src/python-aipl/) の型システムを進化計算で発見する。
+#  現状:
+#    - aipl_typeck.py 877 LOC (基本的な type checker)
+#    - 型注釈は optional、推論は弱い (signature ベース)
+#    - 推論失敗時は警告のみ (--strict で error)
+#  v2 (2) の狙い:
+#    - 型推論を**強化**し、注釈が無くても多くの式に型を付ける
+#    - PsiLang2 chudnovsky.psi の `Int / Rat / Real` を推論できる
+#    - 既存 AIPL プログラムは無変更で動く (gradual typing)
+#  本実験は v2 (1) evolve-block と並ぶ、AIPL bootstrap v2 の**最優先**
+#  サブ実験 (ユーザ指定: 「型推論は一番重要」)。分散ランタイムは v2 (3)
+#  に retarded。
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: AIPL_v2_TypeInference
+  parent: aice-evolution-v2 (= AIPL bootstrap v1)
+  series: AIPL_bootstrap
+  series_number: 2
+  sub_experiment: 2_type_inference
+  priority: highest
+  version: 0.1.0
+  created: 2026-05-17
+  description: |
+    Python 版 AIPL (src/python-aipl/) の型システム / 型推論を進化計算で
+    強化する。設計目標:
+      (a) 大半の式が**注釈なしでも型推論される** (gradual typing)
+      (b) PsiLang2 chudnovsky.psi の Int/Rat/Real が自動的に推論される
+      (c) PsiLang v2 chudnovsky.psi の動的型から static_simple へ自然に
+          移行できる
+      (d) 既存 AIPL プログラム (Pi_Phase1_*.aipl 等) は無変更で型検査が
+          通る (zero-annotation backward compat)
+      (e) aipl_typeck.py への拡張が 1500 行以内 (現在 877 → ≤ 2400)
+
+context:
+  existing_typecheck:
+    file: src/python-aipl/aipl_typeck.py
+    loc:  877
+    capabilities:
+      - "_compatible(expected, actual): nominal type compatibility check"
+      - "_parse_signature: method signature parsing"
+      - "_typevars_in / _substitute: type variable substitution"
+      - "_stmt_terminates: termination check (Phase 15)"
+      - "TypeIssue: error reporting"
+    gaps:
+      - "局所変数の自動推論なし (`var x = 10` → x の型未推定)"
+      - "ジェネリック関数の type variable 一般化なし"
+      - "戻り値型推論なし (annotation 必須)"
+      - "actor method call の戻り値型推論弱い"
+
+  pain_points:
+    - "PsiLang2 で refinement 注釈を書いても実行時検査されない"
+    - "AIPL の `var x = expr` で expr の型が int でも x: any 扱い"
+    - "Reviewer.score() のような共通 method の型推論が薄い"
+
+goal:
+  maximize:
+    - inference_coverage          # 注釈なし式の型推論成功率
+    - psilang2_inferrable         # chudnovsky.psi が型注釈なしで通る度
+    - error_message_quality       # 推論失敗時のエラー文の役立ち度
+    - backward_compat             # 既存 .aipl が無変更で型検査通る度
+    - real_world_precedent        # OCaml/Haskell/TypeScript/Rust 等の先例度
+  minimize:
+    - typeck_added_loc            # aipl_typeck.py 拡張行数
+    - annotation_burden           # 型を通すために手書き注釈が要る行数
+
+  scalar_fitness:
+    formula: |
+      real_world_floor *
+      (0.25 * normalize(inference_coverage, [0.0, 1.0])
+       + 0.20 * normalize(psilang2_inferrable, [0.0, 1.0])
+       + 0.15 * normalize(backward_compat, [0.0, 1.0])
+       + 0.15 * normalize(real_world_precedent, [0.0, 1.0])
+       + 0.10 * normalize(error_message_quality, [0.0, 1.0])
+       + 0.10 * (1 - normalize(typeck_added_loc, [200, 2500]))
+       + 0.05 * (1 - normalize(annotation_burden, [0, 100])))
+    bounds: [0.0, 1.0]
+
+constraints:
+  must_have_real_world_precedent: true
+  must_be_backward_compatible:    true     # 既存 .aipl はゼロ変更で動く
+  typeck_added_loc:        {max: 2500}     # aipl_typeck.py + サポート
+
+variables:
+  # ----- 推論アルゴリズム -----
+  inference_algorithm:
+    type: enum
+    values: [no_inference,                       # 現状 (annotation only)
+             local_only,                         # let x = e の e から x:τ 推定
+             hindley_milner,                     # 関数全体で τ 変数を unify
+             bidirectional,                      # check / synthesize の双方向
+             constraint_based_global]            # whole-program constraint solve
+    default: hindley_milner
+    cell_axis: true
+
+  inference_scope:
+    type: enum
+    values: [function_local,                     # 関数内で閉じる
+             module_local,                       # ファイル内全体
+             whole_program,                      # 全 .aipl をまたぐ
+             incremental_per_method]             # actor method ごと
+    default: module_local
+    cell_axis: true
+
+  # ----- 型システム表現力 -----
+  type_system_strength:
+    type: enum
+    values: [dynamic_only,                       # 現状
+             static_simple,                      # PsiLang v2 と同じ
+             hindley_milner,                     # ML / OCaml
+             bidirectional_w_refinement,         # Liquid Haskell / F*
+             dependent]                          # Idris / Coq
+    default: hindley_milner
+    cell_axis: true
+
+  generics_model:
+    type: enum
+    values: [monomorphic_only,                   # 型変数なし
+             parametric,                         # ∀α. α → α
+             ad_hoc_polymorphism,                # type classes
+             higher_kinded,                      # `f : * → *`
+             bounded_quantification]             # `∀α extends T. ...`
+    default: parametric
+
+  subtyping:
+    type: enum
+    values: [none,                               # 不変
+             nominal,                            # class hierarchy
+             structural,                         # record shape compat
+             row_polymorphism,                   # {x: Int | r}
+             gradual]                            # any ⊑ τ for all τ
+    default: gradual
+    cell_axis: true
+
+  # ----- 型注釈ポリシー -----
+  annotation_requirement:
+    type: enum
+    values: [none_inferred,                      # 注釈なしで全部推論
+             optional_with_fallback_dyn,         # 推論失敗時 any
+             optional_strict,                    # 推論失敗時 error
+             mandatory_for_public,               # public 関数は要、内部は推論
+             mandatory_for_all]                  # 注釈必須
+    default: optional_with_fallback_dyn
+    cell_axis: true
+
+  default_inference_target:
+    type: enum
+    values: [any_aka_dyn,                        # 失敗時 dynamic
+             never_type,                         # 失敗時 ⊥ (error)
+             error_node_for_recovery,
+             union_of_candidates,                # `Int | Rat | Real`
+             principal_type_from_use]            # 使われ方から逆算
+    default: any_aka_dyn
+
+  # ----- エラー処理 -----
+  error_recovery:
+    type: enum
+    values: [stop_on_first,                      # 現状
+             collect_all_continue,
+             suggestion_with_did_you_mean,
+             interactive_repair,                 # IDE hint
+             unification_trace]                  # 失敗 chain 全表示
+    default: collect_all_continue
+
+  error_message_style:
+    type: enum
+    values: [terse_one_line,
+             elm_style_with_pointer,             # Elm の親切な指差し
+             rust_style_with_help,
+             ocaml_style_with_path,
+             prose_with_examples]
+    default: elm_style_with_pointer
+
+  # ----- 高度な機能 -----
+  effect_system:
+    type: enum
+    values: [none,                               # 現状
+             monadic_io,
+             algebraic_effects,                  # Koka
+             capability_based,                   # Pony
+             linear_resources]                   # Rust borrow
+    default: none
+
+  recursive_types:
+    type: enum
+    values: [none,                               # 現状: not supported
+             simple_rec,                         # `type T = Cons of T | Nil`
+             iso_recursive,
+             equi_recursive_with_mu]
+    default: simple_rec
+
+  # ----- 実装複雑度 -----
+  implementation_strategy:
+    type: enum
+    values: [extend_aipl_typeck_inline,          # 現状ファイルに追加 (≤ +500 LOC)
+             new_aipl_inference_module,          # 新 aipl_inference.py
+             rewrite_typeck_full,                # 1500-2500 LOC 書き直し
+             external_z3_smt,                    # Z3 SMT 連携
+             external_zarith_solver]
+    default: new_aipl_inference_module
+    cell_axis: true
+
+evaluation:
+  use_ai: true
+  evaluator: Evaluator
+  hard_floor_reviewer: R6_RealWorldPrecedent
+  tasks:
+    - InferPsiLang2Chudnovsky
+    - InferPiPhase1Aipl
+    - BackwardCompatExisting
+    - ErrorMsgQuality
+    - ImplCostOnTypeck
+  task_specs:
+    InferPsiLang2Chudnovsky: { weight: 0.30, hard: true,
+      spec: "PsiLang2 chudnovsky.psi (現在 refinement 注釈付き) を、注釈ナシで Int/Rat/Real を推論できる" }
+    InferPiPhase1Aipl: { weight: 0.20, hard: true,
+      spec: "Pi_Phase1_OpenSearch.aipl の Reviewer.score / Evaluator.score_for_task の戻り値型を自動推論" }
+    BackwardCompatExisting: { weight: 0.20, hard: true,
+      spec: "既存 AIPL プログラム (4 つの Pi_Phase*.aipl + chudnovsky.psi 各種) が無変更で型検査を通る" }
+    ErrorMsgQuality: { weight: 0.15,
+      spec: "型エラー時のメッセージが行番号+期待型+実際型+候補修正を含む" }
+    ImplCostOnTypeck: { weight: 0.15,
+      spec: "aipl_typeck.py (現 877 行) + 新モジュールで +1500 LOC 以内" }
+
+  reviewers:
+    - name: R1_InferenceCoverage
+      weight: 0.25
+      persona: |
+        あなたは R1 (推論カバレッジ) を判定するレビュアーです。候補の inference_algorithm,
+        inference_scope, type_system_strength を見て、注釈なしの式のうち何%に型を付け
+        られるかを判定。1.0 = ≥90% (Hindley-Milner レベル)、0.7 = 60-90%、0.3 = 30-60%、
+        0.0 = no_inference。半角数字 1 つで。
+
+    - name: R2_PsiLang2Recovery
+      weight: 0.20
+      persona: |
+        あなたは R2 (PsiLang2 推論可能性) を判定するレビュアーです。候補が PsiLang2
+        chudnovsky.psi の `let sign = if k mod 2 == 0 then 1 else -1 in ...` のような
+        条件分岐を含む式から `sign: Int` を推論できるかを判定。candidate の
+        inference_algorithm, subtyping, default_inference_target を主に見る。1.0 = 余裕、
+        0.7 = 大半、0.3 = 一部のみ、0.0 = 全く。半角数字 1 つで。
+
+    - name: R3_BackwardCompat
+      weight: 0.15
+      persona: |
+        あなたは R3 (後方互換) を判定するレビュアーです。candidate の annotation_requirement,
+        default_inference_target, error_recovery を見て、既存 4 つの Pi_Phase*.aipl が
+        注釈なしのまま型検査を通るかを判定。1.0 = optional_with_fallback_dyn 等で 100%
+        通る、0.7 = 1-2 警告、0.3 = 半分要 annotation、0.0 = 大破壊。半角数字 1 つで。
+
+    - name: R4_ImplementabilityTypeck
+      weight: 0.15
+      persona: |
+        あなたは R4 (実装可能性) を判定するレビュアーです。candidate の inference_algorithm,
+        implementation_strategy, generics_model, recursive_types を見て、aipl_typeck.py
+        (現 877 行) + 新コードの拡張行数を判定。1.0 = +500 行 (Algorithm W シンプル版)、
+        0.7 = +1000 行、0.3 = +2000 行、0.0 = +2500 行超 or external solver 必須。
+        半角数字 1 つで。
+
+    - name: R5_ErrorMessageQuality
+      weight: 0.10
+      persona: |
+        あなたは R5 (エラー品質) を判定するレビュアーです。candidate の error_message_style,
+        error_recovery が、初心者にも分かりやすい型エラーを出すかを判定。1.0 = Elm/Rust 風
+        親切メッセージ、0.7 = OCaml 風 (パス + 期待型)、0.3 = 1 行短い、0.0 = "type error"
+        のみ。半角数字 1 つで。
+
+    - name: R6_RealWorldPrecedent
+      weight: 0.15
+      persona: |
+        あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する Python ホスト
+        の型システムにどれだけ近いかを判定する。先例:
+        (1) mypy = gradual typing + structural + parametric + bidirectional
+        (2) Pyre = gradual + flow-sensitive
+        (3) Pyright = bidirectional + strict mode
+        (4) pytype = whole-program inference + Google scale
+        (5) OCaml typer = HM + nominal + collect_all
+        (6) Hindley-Damas-Milner = pure HM
+        (7) TypeScript-style structural + union types
+        スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (これは hard floor で
+        最終 fitness を 0 にクランプ)。半角数字 1 つで。
+
+ranking:
+  strategy: scalar_with_pareto_tiebreak
+  scenarios: [balanced, inference_first, backward_compat_first]
+  top_k: 5
+
+search_params:
+  algorithm: map_elites
+  seed_count: 8
+  generations: 30
+  cell_axes: [inference_algorithm, inference_scope, type_system_strength,
+              subtyping, annotation_requirement, implementation_strategy]
+  open_axes: false
+  rng_seed: 31415931
+
+runtime:
+  provider: openai
+  model: gpt-4o-mini
+  concurrency: 8
+  request_timeout_s: 60
+  sdk_retries: 3
+  drain_timeout_s: 7200
+  idle_ms: 60000
+  checkpoint_per_gen: on
+  caffeinate: on

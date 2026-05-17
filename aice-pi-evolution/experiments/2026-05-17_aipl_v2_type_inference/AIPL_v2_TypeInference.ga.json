@@ -1,0 +1,100 @@
+{
+  "_source_aice": "AIPL_v2_TypeInference.aice",
+  "_source_dialect": "aice_yaml_v1",
+  "_generated": "2026-05-17 (hand-crafted from YAML)",
+  "_comment": "AIPL bootstrap v2 (2) [highest priority]: Python AIPL 型推論の設計探索。12 axes, 6 reviewer, hard_floor=R6_RealWorldPrecedent, v4 codegen (coherence rejection + hard floor + per-gen checkpoint) を使用。",
+
+  "name": "AIPL_v2_TypeInference",
+  "task": "Python 版 AIPL (src/python-aipl/) の型推論を強化する設計を進化計算で発見する。目標: (a) 大半の式が注釈なしで型推論される (b) PsiLang2 chudnovsky.psi の Int/Rat/Real が自動推論 (c) 既存 AIPL プログラム (4 つの Pi_Phase*.aipl + 各 chudnovsky.psi) が無変更で型検査を通る gradual typing (d) aipl_typeck.py (現 877 行) の拡張を 2500 行以下に抑える。R6 hard floor で実在する mypy/Pyre/Pyright/pytype/OCaml/HM などの先例にマッチしない設計を排除。",
+  "schema_ref": "aipl_type_inference.schema.json",
+
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": ["inference_algorithm", "inference_scope", "type_system_strength",
+                   "subtyping", "annotation_requirement", "implementation_strategy"],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415931
+  },
+
+  "operators": {
+    "mutations": [
+      { "name": "axis_resample",  "kind": "single_axis",           "weight": 0.55 },
+      { "name": "coherent_shift", "kind": "multi_axis_correlated", "weight": 0.35 },
+      { "name": "llm_proposal",   "kind": "llm_directed",          "weight": 0.10 }
+    ],
+    "crossovers": [
+      { "name": "uniform",   "kind": "axis_uniform",     "weight": 0.6 },
+      { "name": "one_point", "kind": "schema_partition", "weight": 0.4 }
+    ]
+  },
+
+  "evaluation": {
+    "use_ai": true,
+    "evaluator": "Evaluator",
+    "hard_floor_reviewer": "R6_RealWorldPrecedent",
+    "tasks": ["InferPsiLang2Chudnovsky", "InferPiPhase1Aipl",
+              "BackwardCompatExisting", "ErrorMsgQuality", "ImplCostOnTypeck"],
+    "task_specs": {
+      "InferPsiLang2Chudnovsky": { "weight": 0.30, "hard": true },
+      "InferPiPhase1Aipl":       { "weight": 0.20, "hard": true },
+      "BackwardCompatExisting":  { "weight": 0.20, "hard": true },
+      "ErrorMsgQuality":         { "weight": 0.15 },
+      "ImplCostOnTypeck":        { "weight": 0.15 }
+    },
+    "reviewers": [
+      {
+        "name": "R1_InferenceCoverage",
+        "weight": 0.25,
+        "persona": "あなたは R1 (推論カバレッジ) を判定するレビュアーです。候補の inference_algorithm, inference_scope, type_system_strength を見て、注釈なしの式のうち何%に型を付けられるかを判定。1.0 = ≥90% (Hindley-Milner レベル)、0.7 = 60-90%、0.3 = 30-60%、0.0 = no_inference。半角数字 1 つで。"
+      },
+      {
+        "name": "R2_PsiLang2Recovery",
+        "weight": 0.20,
+        "persona": "あなたは R2 (PsiLang2 推論可能性) を判定するレビュアーです。候補が PsiLang2 chudnovsky.psi の `let sign = if k mod 2 == 0 then 1 else -1 in ...` のような条件分岐を含む式から `sign: Int` を推論できるかを判定。candidate の inference_algorithm, subtyping, default_inference_target を主に見る。1.0 = 余裕、0.7 = 大半、0.3 = 一部のみ、0.0 = 全く。半角数字 1 つで。"
+      },
+      {
+        "name": "R3_BackwardCompat",
+        "weight": 0.15,
+        "persona": "あなたは R3 (後方互換) を判定するレビュアーです。candidate の annotation_requirement, default_inference_target, error_recovery を見て、既存 4 つの Pi_Phase*.aipl が注釈なしのまま型検査を通るかを判定。1.0 = optional_with_fallback_dyn 等で 100% 通る、0.7 = 1-2 警告、0.3 = 半分要 annotation、0.0 = 大破壊。半角数字 1 つで。"
+      },
+      {
+        "name": "R4_ImplementabilityTypeck",
+        "weight": 0.15,
+        "persona": "あなたは R4 (実装可能性) を判定するレビュアーです。candidate の inference_algorithm, implementation_strategy, generics_model, recursive_types を見て、aipl_typeck.py (現 877 行) + 新コードの拡張行数を判定。1.0 = +500 行 (Algorithm W シンプル版)、0.7 = +1000 行、0.3 = +2000 行、0.0 = +2500 行超 or external solver 必須。半角数字 1 つで。"
+      },
+      {
+        "name": "R5_ErrorMessageQuality",
+        "weight": 0.10,
+        "persona": "あなたは R5 (エラー品質) を判定するレビュアーです。candidate の error_message_style, error_recovery が、初心者にも分かりやすい型エラーを出すかを判定。1.0 = Elm/Rust 風親切メッセージ、0.7 = OCaml 風 (パス + 期待型)、0.3 = 1 行短い、0.0 = 'type error' のみ。半角数字 1 つで。"
+      },
+      {
+        "name": "R6_RealWorldPrecedent",
+        "weight": 0.15,
+        "persona": "あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する Python ホストの型システムにどれだけ近いかを判定する。先例: (1) mypy = gradual typing + structural + parametric + bidirectional, (2) Pyre = gradual + flow-sensitive, (3) Pyright = bidirectional + strict mode, (4) pytype = whole-program inference + Google scale, (5) OCaml typer = HM + nominal + collect_all, (6) Hindley-Damas-Milner = pure HM, (7) TypeScript = structural + union types。スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor で fitness=0)。半角数字 1 つで。"
+      }
+    ]
+  },
+
+  "meta_fitness": {
+    "inference_coverage":    0.25,
+    "psilang2_inferrable":   0.20,
+    "backward_compat":       0.15,
+    "real_world_precedent":  0.15,
+    "implementability":      0.10,
+    "error_message_quality": 0.10,
+    "concision":             0.05
+  },
+
+  "ranking": {
+    "strategy": "scalar_with_pareto_tiebreak",
+    "scenarios": ["balanced", "inference_first", "backward_compat_first"],
+    "scenario_weights": {
+      "balanced":               { "inference_coverage": 0.25, "psilang2_inferrable": 0.20, "backward_compat": 0.15, "real_world_precedent": 0.15, "implementability": 0.10, "error_message_quality": 0.10, "concision": 0.05 },
+      "inference_first":        { "inference_coverage": 0.45, "psilang2_inferrable": 0.25, "backward_compat": 0.05, "real_world_precedent": 0.15, "implementability": 0.05, "error_message_quality": 0.05, "concision": 0.00 },
+      "backward_compat_first":  { "inference_coverage": 0.15, "psilang2_inferrable": 0.10, "backward_compat": 0.40, "real_world_precedent": 0.15, "implementability": 0.15, "error_message_quality": 0.05, "concision": 0.00 }
+    },
+    "top_k": 5
+  }
+}
