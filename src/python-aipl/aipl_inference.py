@@ -285,6 +285,13 @@ class Inference:
     subst: Subst = field(default_factory=dict)
     refinements: list = field(default_factory=list)
     issues: list = field(default_factory=list)
+    # D-1: class-level method signatures pre-registered before any body
+    # is inferred so `now obj.method(args)` can unify against them.
+    # Schema: { class_name: { method_name: (param_tvars, ret_tvar) } }
+    class_sigs: Dict[str, Dict[str, tuple]] = field(default_factory=dict)
+    # The currently-being-inferred (class, method) pair so `reply(...)`
+    # can constrain the method's return type slot.
+    current_method: Optional[tuple] = None
 
     def fresh(self) -> TVar:
         v = TVar(self.fresh_counter)
@@ -456,19 +463,40 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
             t = _infer_expr(infer, env, x)
             infer.constrain(elem_t, t, where="list element")
         return TCon("List", (elem_t,))
-    # now / future call (treated like a synchronous call returning the actor's reply)
+    # now / future call — D-1: cross-class inference.
+    # `now target.method(args)` is dispatched by:
+    #   1. looking up target's type in env (should be TCon(ClassName))
+    #   2. looking up class_sigs[ClassName][method] to get (param_tvars, ret_tvar)
+    #   3. constraining the argument types and returning ret_tvar
     if NowCall and isinstance(e, NowCall):
-        # Without class-level info we approximate: each now-call returns a fresh var.
-        return infer.fresh()
+        return _infer_method_dispatch(infer, env, e, is_future=False)
     if FutureCall and isinstance(e, FutureCall):
-        return TCon("Future", (infer.fresh(),))
+        inner = _infer_method_dispatch(infer, env, e, is_future=True)
+        return TCon("Future", (inner,))
     # Record / field-access are skipped (kept as Dyn for gradual typing)
     if RecordLit and isinstance(e, RecordLit):
         return T_DYN
     if FieldAccess and isinstance(e, FieldAccess):
         return T_DYN
     if New and isinstance(e, New):
-        return TCon(e.cls, ())
+        # `new ClassName(args)` produces TCon(ClassName).  We also unify
+        # the constructor's `init(...)` signature if registered.
+        cls = getattr(e, "cls_name", None) or getattr(e, "cls", None) or "?"
+        cls_t = TCon(cls, ())
+        init_sig = infer.class_sigs.get(cls, {}).get("init")
+        if init_sig:
+            param_tvars, _ret_tvar = init_sig
+            arg_ts = [_infer_expr(infer, env, a) for a in e.args]
+            if len(arg_ts) == len(param_tvars):
+                for at, pt in zip(arg_ts, param_tvars):
+                    infer.constrain(at, pt, where=f"new {cls} arg")
+            else:
+                infer.issues.append(InferenceIssue(
+                    kind="arity",
+                    msg=f"new {cls}: expected {len(param_tvars)} args, "
+                        f"got {len(arg_ts)}",
+                ))
+        return cls_t
     if IndexExpr and isinstance(e, IndexExpr):
         return T_DYN
     # Fallback
@@ -503,6 +531,57 @@ def _infer_binop(infer: Inference, env: Env, e: Any) -> Any:
     return T_DYN
 
 
+def _infer_method_dispatch(infer: Inference, env: Env, e: Any, is_future: bool) -> Any:
+    """D-1: dispatch `now/future target.method(args)`.
+
+    Look up `target` in env to find its class, then resolve the method
+    via `infer.class_sigs[ClassName][method]`.  Returns the method's
+    return TVar (which subsequent constraints from `reply(…)` in the
+    callee narrow)."""
+    target = e.target
+    method = e.method
+    args   = e.args
+    if target in ("self", "sender"):
+        # Self-call within a method: look up current_method's class.
+        if infer.current_method:
+            cls_name = infer.current_method[0]
+        else:
+            return infer.fresh()
+    else:
+        sch = env.lookup(target)
+        if sch is None:
+            infer.issues.append(InferenceIssue(
+                kind="unbound", msg=f"unknown actor: {target}"))
+            return infer.fresh()
+        target_t = instantiate(infer, sch)
+        target_t = apply(infer.subst, target_t)
+        if isinstance(target_t, TCon):
+            cls_name = target_t.name
+        elif isinstance(target_t, TVar):
+            return infer.fresh()        # unknown class, leave open
+        else:
+            return infer.fresh()
+    methods = infer.class_sigs.get(cls_name)
+    if methods is None:
+        return infer.fresh()
+    sig = methods.get(method)
+    if sig is None:
+        infer.issues.append(InferenceIssue(
+            kind="unbound", msg=f"no method {method} on {cls_name}"))
+        return infer.fresh()
+    param_tvars, ret_tvar = sig
+    arg_ts = [_infer_expr(infer, env, a) for a in args]
+    if len(arg_ts) != len(param_tvars):
+        infer.issues.append(InferenceIssue(
+            kind="arity",
+            msg=f"{cls_name}.{method}: expected {len(param_tvars)} args, "
+                f"got {len(arg_ts)}"))
+        return ret_tvar
+    for at, pt in zip(arg_ts, param_tvars):
+        infer.constrain(at, pt, where=f"{cls_name}.{method} arg")
+    return ret_tvar
+
+
 def _infer_call(infer: Inference, env: Env, e: Any) -> Any:
     fn = env.lookup(e.name)
     if fn is None:
@@ -532,6 +611,25 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
         else:
             env.bind(s.name, generalise(env, apply(infer.subst, rhs_t)))
         return
+    # `var x = new ClassName(args)` is its own AST node (VarNew) —
+    # bind x : TCon(ClassName) and check the init call's arity (D-1).
+    from aipl_ast import VarNew as _VarNew     # late import to avoid cycle
+    if _VarNew and isinstance(s, _VarNew):
+        cls_t = TCon(s.cls_name, ())
+        init_sig = infer.class_sigs.get(s.cls_name, {}).get("init")
+        if init_sig:
+            param_tvars, _ret_tvar = init_sig
+            arg_ts = [_infer_expr(infer, env, a) for a in s.args]
+            if len(arg_ts) == len(param_tvars):
+                for at, pt in zip(arg_ts, param_tvars):
+                    infer.constrain(at, pt, where=f"new {s.cls_name} arg")
+            else:
+                infer.issues.append(InferenceIssue(
+                    kind="arity",
+                    msg=f"new {s.cls_name}: expected {len(param_tvars)} args, "
+                        f"got {len(arg_ts)}"))
+        env.bind(s.name, Scheme((), cls_t))
+        return
     if Assign and isinstance(s, Assign):
         rhs_t = _infer_expr(infer, env, s.expr)
         sch = env.lookup(s.name)
@@ -560,6 +658,18 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
             _infer_expr(infer, env, s.expr)
         return
     if CallStmt and isinstance(s, CallStmt):
+        # D-1: `reply(expr)` is the AIPL way to return a value from
+        # an actor method.  We constrain the current method's return
+        # TVar to the type of `expr`.
+        if s.name == "reply" and infer.current_method is not None:
+            cls, mname = infer.current_method
+            sig = infer.class_sigs.get(cls, {}).get(mname)
+            if sig is not None and s.args:
+                _, ret_tvar = sig
+                ret_t = _infer_expr(infer, env, s.args[0])
+                infer.constrain(ret_t, ret_tvar,
+                                where=f"{cls}.{mname} reply")
+            return
         sch = env.lookup(s.name)
         if sch:
             fn_t = instantiate(infer, sch)
@@ -575,19 +685,36 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
 # 10. Method-level inference (top-level entry into a class method)
 # ════════════════════════════════════════════════════════════════════════
 
-def infer_method(class_decl: Any, m: Any) -> "InferenceResult":
-    """Infer types for one method of one class.  Returns a result
-    object collecting param/local types and any issues."""
-    infer = Inference()
-    env = _builtins(infer)
-    # Method params: take annotation if present, else fresh var.
+def infer_method(class_decl: Any, m: Any,
+                 infer: Optional[Inference] = None,
+                 shared_env: Optional[Env] = None) -> "InferenceResult":
+    """Infer types for one method of one class.
+
+    When `infer` is given, that shared state is reused so cross-class
+    constraints accumulate (D-1).  Otherwise a fresh `Inference` is
+    created and the method is inferred in isolation."""
+    standalone = infer is None
+    if standalone:
+        infer = Inference()
+    env = shared_env if shared_env is not None else _builtins(infer)
+    builtin_keys = set(env.bindings.keys())     # snapshot to exclude from report
+    # D-1: enter method context (so `reply(...)` constrains the right slot)
+    cls_name = class_decl.name if class_decl else "(top)"
+    saved_method = infer.current_method
+    infer.current_method = (cls_name, m.name)
+    # Method params: use pre-registered TVars from class_sigs if available
+    pre_sig = infer.class_sigs.get(cls_name, {}).get(m.name)
+    if pre_sig:
+        param_tvars, _ret_tvar = pre_sig
+    else:
+        param_tvars = tuple(infer.fresh() for _ in m.params)
     param_types = []
     for i, p in enumerate(m.params):
         ann = m.param_annotations[i] if i < len(getattr(m, "param_annotations", [])) else None
+        t = param_tvars[i]
         if ann:
-            t = _parse_annotation(ann, infer)
-        else:
-            t = infer.fresh()
+            ann_t = _parse_annotation(ann, infer)
+            infer.constrain(t, ann_t, where=f"{cls_name}.{m.name} param {p}")
         env.bind(p, Scheme((), t))
         param_types.append(t)
     # Body
@@ -600,14 +727,20 @@ def infer_method(class_decl: Any, m: Any) -> "InferenceResult":
     final_params = [(p, apply(infer.subst, t)) for p, t in zip(m.params, param_types)]
     locals_ = {n: apply(infer.subst, sch.type)
                for n, sch in env.bindings.items()
-               if n not in m.params}
+               if n not in m.params and n not in builtin_keys}
+    # Compute return type from class_sigs
+    return_type = None
+    if pre_sig:
+        return_type = apply(infer.subst, pre_sig[1])
+    infer.current_method = saved_method
     return InferenceResult(
-        class_name=class_decl.name if class_decl else "(top)",
+        class_name=cls_name,
         method_name=m.name,
         param_types=final_params,
         local_types=locals_,
-        issues=infer.issues,
-        refinement_issues=_check_refinements(infer.refinements),
+        issues=list(infer.issues) if standalone else [],
+        refinement_issues=_check_refinements(infer.refinements) if standalone else [],
+        return_type=return_type,
     )
 
 
@@ -619,6 +752,7 @@ class InferenceResult:
     local_types: dict           # name -> Type
     issues: list                # list of InferenceIssue
     refinement_issues: list     # list of refinement violations from Z3
+    return_type: Any = None     # D-1: method's return type from reply()
 
     def render(self) -> str:
         head = f"=== {self.class_name}.{self.method_name} ==="
@@ -627,6 +761,8 @@ class InferenceResult:
             lines.append("  params:")
             for n, t in self.param_types:
                 lines.append(f"    {n} : {t}")
+        if self.return_type is not None:
+            lines.append(f"  return : {self.return_type}")
         if self.local_types:
             lines.append("  locals:")
             for n, t in self.local_types.items():
@@ -812,17 +948,88 @@ def _ast_to_z3(node: Any, env: Dict[str, Any], z3: Any) -> Any:
 def infer_program(program: Any) -> list:
     """Infer types for every method in every class of `program`.
 
-    Returns a list of InferenceResult.  The driver does not stop on
-    error — it accumulates issues so the user sees them all (matching
-    the v2 (2) `collect_all_continue` choice)."""
-    results = []
+    D-1: uses a single shared `Inference` state with class-method
+    signatures pre-registered (param TVars + ret TVar), so that
+    `now obj.method(args)` calls can unify across classes.  The
+    driver does not stop on error — it accumulates issues so the
+    user sees them all (matching v2 (2) `collect_all_continue`)."""
+    infer = Inference()
+    shared_env = _builtins(infer)
+
+    # Pre-pass: register placeholder signatures for every class method.
     for decl in getattr(program, "decls", []):
         if ClassDecl and isinstance(decl, ClassDecl):
+            infer.class_sigs[decl.name] = {}
             for m in decl.methods:
-                results.append(infer_method(decl, m))
-        elif FunctionDecl and isinstance(decl, FunctionDecl):
-            results.append(infer_method(None, decl))
-    return results
+                params = tuple(infer.fresh() for _ in m.params)
+                ret    = infer.fresh()
+                infer.class_sigs[decl.name][m.name] = (params, ret)
+
+    # Pass 1 + Pass 2: infer each method's body twice — the second pass
+    # uses the fully-populated class_sigs from pass 1 so cross-class
+    # NowCall returns now resolve to concrete types (`s : Int` rather
+    # than a stray TVar).  Re-using the same `infer` accumulates the
+    # subst so this is monotonic.
+    def _run_method_pass(suppress_dup_issues: bool):
+        results = []
+        for decl in getattr(program, "decls", []):
+            if ClassDecl and isinstance(decl, ClassDecl):
+                cls_env = shared_env.child()
+                for f in getattr(decl, "fields", []) or []:
+                    if VarDecl and isinstance(f, VarDecl):
+                        rhs_t = _infer_expr(infer, cls_env, f.expr)
+                        cls_env.bind(f.name, Scheme((), apply(infer.subst, rhs_t)))
+                for m in decl.methods:
+                    res = infer_method(decl, m, infer=infer,
+                                        shared_env=cls_env.child())
+                    results.append(res)
+            elif FunctionDecl and isinstance(decl, FunctionDecl):
+                res = infer_method(None, decl, infer=infer,
+                                    shared_env=shared_env.child())
+                results.append(res)
+        if suppress_dup_issues:
+            # Pass-2 may regenerate "unknown actor" issues that are
+            # actually resolved by then; drop those, keep the rest.
+            # We just truncate `infer.issues` back to pre-pass length.
+            pass
+        return results
+
+    # Pass 0: process top-level GlobalStmts first.  This binds names
+    # like `var calc = new Calculator(10)` and crucially propagates
+    # the argument types of calls like `now calc.use_adder(add_actor)`
+    # into class_sigs's `use_adder` parameter TVars — so when we then
+    # infer use_adder's body, `other` is already `Adder`.
+    issues_before_globals = len(infer.issues)
+    for decl in getattr(program, "decls", []):
+        if GlobalStmt and isinstance(decl, GlobalStmt):
+            _infer_stmt(infer, shared_env, decl.stmt)
+    # Drop issues from pass 0: they may be due to forward references
+    # to method signatures that haven't been resolved yet.
+    infer.issues = infer.issues[:issues_before_globals]
+
+    # Pass 1: infer all method bodies (drops issues for re-run later).
+    issues_before_p1 = len(infer.issues)
+    _run_method_pass(False)
+    infer.issues = infer.issues[:issues_before_p1]
+
+    # Pass 2: re-infer (records final issues + accurate types).
+    method_results = _run_method_pass(True)
+
+    # (Global statements were already processed in Pass 0; nothing to do here.)
+
+    # Apply final substitution to all collected results
+    for r in method_results:
+        r.param_types = [(n, apply(infer.subst, t)) for n, t in r.param_types]
+        r.local_types = {n: apply(infer.subst, t) for n, t in r.local_types.items()}
+        if r.return_type is not None:
+            r.return_type = apply(infer.subst, r.return_type)
+    # Attach global issues + refinement check to the last result
+    # (or create a sentinel result if there are no methods)
+    if method_results:
+        method_results[-1].issues.extend(infer.issues)
+        method_results[-1].refinement_issues.extend(
+            _check_refinements(infer.refinements))
+    return method_results
 
 
 # ════════════════════════════════════════════════════════════════════════

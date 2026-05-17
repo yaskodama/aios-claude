@@ -34,6 +34,11 @@ def main():
                     help="(Phase 16) insert runtime type checks at every "
                          "annotated boundary (call args, var-decl rhs); "
                          "raise TransientCastError on any -> T mismatch")
+    ap.add_argument("--infer", action="store_true",
+                    help="(Phase C/D) run aipl_inference.py — constraint-based "
+                         "Hindley-Milner inference with Z3 refinement check; "
+                         "print inferred types per method to stderr and exit "
+                         "(does not run the program)")
     ap.add_argument("--dashboard", type=int, default=0, metavar="PORT",
                     help="serve a live AI-OS usage dashboard on http://127.0.0.1:PORT/")
     args = ap.parse_args()
@@ -72,6 +77,22 @@ def main():
                 sys.exit(2)
         else:
             print("[type] no issues.", file=sys.stderr)
+
+    if args.infer:
+        from aipl_inference import infer_program
+        results = infer_program(program)
+        total_issues = 0
+        total_refs   = 0
+        for r in results:
+            print(r.render(), file=sys.stderr)
+            print(file=sys.stderr)
+            total_issues += len(r.issues)
+            total_refs   += len(r.refinement_issues)
+        print(f"[infer] {len(results)} method(s), {total_issues} unify issue(s), "
+              f"{total_refs} refinement issue(s)", file=sys.stderr)
+        if args.strict and (total_issues or total_refs):
+            sys.exit(3)
+        return                              # --infer does not run the program
 
     interp = Interpreter(program, transient_checks=args.transient)
     try:
