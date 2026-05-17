@@ -1,0 +1,25 @@
+// Feature G (Phase E-2: typeck × inference integration) — Sample 1.
+// Annotated nominal types that typeck flags before inference even
+// runs.  These checks use builtin signatures + linearity + effects
+// which inference doesn't cover on its own.
+//
+//   - `var n: int = "hi"` — literal-vs-annotation mismatch
+//   - `write_file(path:int)` — wrong builtin-arg shape
+//   - `function f(a: int) -> int { return "x"; }` — return-type mismatch
+//
+// Run:  python3 aipl_main.py <this> --check
+// Expect: --type-check section reports 3 issues; --infer section
+//         reports 1 issue (the return-type mismatch flows through HM).
+
+function f(a: int) -> int { return "x"; }
+
+class T {
+  method demo() {
+    var n: int = "hi";
+    var rc = write_file(42, "x");
+    var z  = f(7);
+    reply(z);
+  }
+}
+
+var t = new T();

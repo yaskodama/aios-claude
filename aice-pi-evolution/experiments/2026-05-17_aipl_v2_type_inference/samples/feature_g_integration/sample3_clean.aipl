@@ -1,0 +1,29 @@
+// Feature G (Phase E-2) — Sample 3: clean program — both passes happy.
+// Realistic actor that exercises every integrated check at once:
+//   - builtin signatures   (write_file, str_upper)
+//   - cross-class typing   (Logger -> Writer)
+//   - actor field sharing  (Writer.path : Str)
+//   - record literal flow  (rec : {who, what, sev})
+//   - refinement that holds (level >= 0 and level <= 9)
+// Both `--type-check` and `--infer` should report 0 issues.
+
+class Writer {
+  var path = "out.txt";
+  method dump(content) {
+    var rc = write_file(path, content);
+    reply(rc);
+  }
+}
+
+class Logger {
+  var w     = new Writer();
+  var label = "log: ";
+  method log(message, level: Int where level >= 0 and level <= 9) {
+    var loud = str_upper(message);
+    var rec  = {who: label, what: loud, sev: level};
+    reply(now w.dump(loud));
+  }
+}
+
+var lg = new Logger();
+var rc = now lg.log("disk full", 7);

@@ -1,0 +1,18 @@
+// Feature G (Phase E-2) — Sample 2: typeck passes clean, inference catches.
+// No `: type` annotations and no builtin misuses, so the typeck
+// gradual checker has nothing to report.  But the HM inference
+// + Phase E-α refinements + Phase E-β actor fields detect deeper
+// problems:
+//   - `bumped` is Int (init's `n = initial` + reply path) and the
+//     `where k >= 5 and k <= 3` refinement on `narrow` is UNSAT.
+
+class Counter {
+  var n = 0;
+  method init(initial)  { n = initial; }
+  method bump(delta)    { n = n + delta; reply(n); }
+  method narrow(k: Int where k >= 5 and k <= 3) -> Int { reply(k); }
+}
+
+var c   = new Counter(100);
+var v   = now c.bump(7);
+var bad = now c.narrow(4);

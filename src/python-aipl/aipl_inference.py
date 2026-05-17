@@ -646,6 +646,12 @@ def _infer_method_dispatch(infer: Inference, env: Env, e: Any, is_future: bool) 
 def _infer_call(infer: Inference, env: Env, e: Any) -> Any:
     fn = env.lookup(e.name)
     if fn is None:
+        # E-2: consult aipl_typeck's BUILTIN_SIGNATURES so calls to
+        # `read_file`, `str_len`, etc. flow through real type checks
+        # instead of becoming spurious "unknown function" errors.
+        bsig = _lookup_builtin_signature(e.name)
+        if bsig is not None:
+            return _check_builtin_call(infer, env, e, bsig)
         infer.issues.append(InferenceIssue(
             kind="unbound", msg=f"unknown function: {e.name}",
             location=getattr(e, "loc", "")))
@@ -655,6 +661,88 @@ def _infer_call(infer: Inference, env: Env, e: Any) -> Any:
     ret_t = infer.fresh()
     expected_arrow = TArrow(tuple(arg_ts), ret_t)
     infer.constrain(fn_t, expected_arrow, where=f"call to {e.name}")
+    return ret_t
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Phase E-2: integration with aipl_typeck's BUILTIN_SIGNATURES.
+# ────────────────────────────────────────────────────────────────────────
+_BUILTIN_SIG_CACHE: Optional[dict] = None
+
+def _lookup_builtin_signature(name: str) -> Optional[str]:
+    global _BUILTIN_SIG_CACHE
+    if _BUILTIN_SIG_CACHE is None:
+        try:
+            from aipl_interp import BUILTIN_SIGNATURES
+            _BUILTIN_SIG_CACHE = BUILTIN_SIGNATURES
+        except Exception:
+            _BUILTIN_SIG_CACHE = {}
+    return _BUILTIN_SIG_CACHE.get(name)
+
+
+_TYPECK_NAME_MAP = {
+    "int": T_INT, "string": T_STR, "str": T_STR, "bool": T_BOOL,
+    "float": T_REAL, "real": T_REAL, "rat": T_RAT,
+    "unit": T_UNIT, "any": T_DYN, "void": T_UNIT,
+}
+
+def _typeck_type_to_inference(s: str, infer: Inference) -> Any:
+    """Convert a typeck-style type string ('int', 'string', 'array[int]',
+    'int | float', 'any', …) into an inference Type.  Unknown forms
+    fall back to a fresh TVar so they unify with whatever shows up."""
+    s = s.strip()
+    if not s or s == "?": return infer.fresh()
+    low = s.lower()
+    if low in _TYPECK_NAME_MAP:
+        return _TYPECK_NAME_MAP[low]
+    # Unions => first satisfiable choice; inference can't enumerate,
+    # so we widen to Dyn (gradual).
+    if "|" in s:
+        return T_DYN
+    # array[T]
+    m = re.match(r"^array\s*\[\s*(.+?)\s*\]$", s, re.IGNORECASE)
+    if m:
+        return TCon("List", (_typeck_type_to_inference(m.group(1), infer),))
+    return T_DYN
+
+def _parse_typeck_signature(sig: str, infer: Inference) -> Optional[tuple]:
+    """Parse 'function(p1:T1, p2:T2) -> R' into ([T1, T2, ...], R).
+    Returns None if the signature has variadic/optional markers we
+    don't fully handle yet (we then fall back to gradual)."""
+    m = re.match(r"^function\s*\((.*?)\)\s*->\s*(.+)$", sig.strip())
+    if not m: return None
+    params_src, ret_src = m.group(1), m.group(2)
+    if "+" in params_src or "[" in params_src:
+        # variadic (`name:T+`) or optional (`[name:T]`) — stay gradual,
+        # only check the return type for now.
+        return None
+    param_types = []
+    if params_src.strip():
+        for part in _split_top(params_src, ","):
+            part = part.strip()
+            if ":" in part:
+                _, t = part.split(":", 1)
+            else:
+                t = part
+            param_types.append(_typeck_type_to_inference(t, infer))
+    ret_t = _typeck_type_to_inference(ret_src, infer)
+    return (param_types, ret_t)
+
+def _check_builtin_call(infer: Inference, env: Env, e: Any, sig: str) -> Any:
+    parsed = _parse_typeck_signature(sig, infer)
+    arg_ts = [_infer_expr(infer, env, a) for a in e.args]
+    if parsed is None:
+        return T_DYN     # gradual fallback for variadic/optional
+    param_types, ret_t = parsed
+    if len(arg_ts) != len(param_types):
+        infer.issues.append(InferenceIssue(
+            kind="arity",
+            msg=f"builtin {e.name}: expected {len(param_types)} args, "
+                f"got {len(arg_ts)}",
+            location=getattr(e, "loc", "")))
+        return ret_t
+    for i, (at, pt) in enumerate(zip(arg_ts, param_types)):
+        infer.constrain(at, pt, where=f"{e.name} arg {i+1}")
     return ret_t
 
 
@@ -743,6 +831,11 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
             ret_t = infer.fresh()
             infer.constrain(fn_t, TArrow(tuple(arg_ts), ret_t),
                             where=f"call {s.name}")
+            return
+        # E-2: same builtin-signature path as CallExpr.
+        bsig = _lookup_builtin_signature(s.name)
+        if bsig is not None:
+            _check_builtin_call(infer, env, s, bsig)
         return
     # E-3: `obj.f = v` — resolve obj's class and constrain the
     # corresponding field TVar with v's type.  Stays gradual for

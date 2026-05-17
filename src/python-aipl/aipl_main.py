@@ -39,6 +39,10 @@ def main():
                          "Hindley-Milner inference with Z3 refinement check; "
                          "print inferred types per method to stderr and exit "
                          "(does not run the program)")
+    ap.add_argument("--check", action="store_true",
+                    help="(Phase E-2) run both --type-check and --infer in "
+                         "one go and print a unified summary; exits without "
+                         "running the program")
     ap.add_argument("--dashboard", type=int, default=0, metavar="PORT",
                     help="serve a live AI-OS usage dashboard on http://127.0.0.1:PORT/")
     args = ap.parse_args()
@@ -65,21 +69,33 @@ def main():
         pprint(program)
         return
 
-    if args.type_check:
+    # Phase E-2: `--check` is a superset of `--type-check` + `--infer`.
+    do_typeck = args.type_check or args.check
+    do_infer  = args.infer       or args.check
+
+    if do_typeck:
         from aipl_typeck import check as _typeck
         from aipl_interp import BUILTIN_SIGNATURES
+        if args.check:
+            print("=== --type-check (nominal + signature + effects) ===",
+                  file=sys.stderr)
         issues = _typeck(program, BUILTIN_SIGNATURES)
         if issues:
             for i in issues:
                 print(i.render(), file=sys.stderr)
             print(f"[type] {len(issues)} issue(s).", file=sys.stderr)
-            if args.strict:
+            if args.strict and not args.check:
                 sys.exit(2)
         else:
             print("[type] no issues.", file=sys.stderr)
+        if args.check:
+            print(file=sys.stderr)
 
-    if args.infer:
+    if do_infer:
         from aipl_inference import infer_program, apply
+        if args.check:
+            print("=== --infer (HM + refinement + structural) ===",
+                  file=sys.stderr)
         results = infer_program(program)
         total_issues = 0
         total_refs   = 0
@@ -104,7 +120,10 @@ def main():
               f"{total_refs} refinement issue(s)", file=sys.stderr)
         if args.strict and (total_issues or total_refs):
             sys.exit(3)
-        return                              # --infer does not run the program
+        return                              # --infer / --check does not run the program
+
+    if do_typeck:                           # --type-check alone: exit here
+        return
 
     interp = Interpreter(program, transient_checks=args.transient)
     try:
