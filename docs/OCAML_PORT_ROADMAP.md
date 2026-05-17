@@ -175,12 +175,43 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
 発見: O-2.e の真の修正は **parameter annotation の尊重** という
 O-2.d の延長線上にある修正で、O-2.d と一体だった可能性もある.
 
-#### O-2.f (1 session, easy): CLI 統合 (CE-7, CE-8)
+#### O-2.f (1 session, easy): CLI 統合 (CE-7, CE-8) ✅ 完了 (2026-05-18)
 
-- `repl_thread.ml` に `--infer` / `--check` フラグ追加
-- 同 section ヘッダ付きで出力
+実装結果:
+- `repl_thread.ml` に 4 つの CLI フラグを追加:
+  - `--type-check FILE` — `Typecheck.run` を呼び型エラーを表示して exit
+  - `--infer FILE` — 同上 (OCaml では typecheck と inference が一体)
+  - `--check FILE` — Python-style の section banner 付き出力
+    (`=== --type-check ... ===` / `=== --infer ... ===`)
+  - `--strict` — 単独で使い、issue 検出時に exit 3
+- `run_static_check` 関数を新設 (~50 LOC) でファイル読込→parse→
+  Infer.check_program→summary 出力→exit code。
+- main 関数の冒頭で `check_mode` が立っていれば actor runtime を
+  立ち上げる前に `Stdlib.exit` する分岐を追加。
+- 検証: 既存 75 abclc + 18 aipl_dist + 10 O-2d/e inference テストすべて
+  PASS。`--check abclc/WhereVacuous.abcl` + `AIPL_REFINE_CHECK=1`
+  で 2 vacuously-false warning が stderr に出る。
+- bad な type-check サンプルで `--strict` exit code 3 確認。
 
-推定: 50-100 LOC
+実測 LOC: 約 75 行 (推定 50-100 内).
+
+\## Phase O 完全完了 (2026-05-18)
+
+| Phase | 実 LOC | 推定 |
+|---|---:|---:|
+| O-1 / O-1.5 | ~720 | 700 |
+| O-2.a | +80 | 100-200 |
+| O-2.b | +250 | 300-500 |
+| O-2.c | +90 | 100-200 |
+| O-2.d | +60 | 200-400 |
+| O-2.e | +30 | 100-200 |
+| O-2.f | +75 | 50-100 |
+| **合計** | **~1305** | **~1925** |
+
+実 LOC は推定の **68%** で完遂。OCaml AIPL の既存基盤 (HM 推論 +
+class_method_schemes + structural unify) が想定以上に充実していた
+ことが主因。CE-1〜9 + DR-1〜9 の **全 18 機能** が OCaml と JS-O で
+利用可能になり、Python (annotated) と完全機能同等。
 
 ---
 

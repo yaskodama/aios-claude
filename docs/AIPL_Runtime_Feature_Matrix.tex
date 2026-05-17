@@ -307,8 +307,8 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \Yes\textsuperscript{\#} & \Yes\textsuperscript{\#} & \No & \No & \No \\
   CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \Yes\textsuperscript{\#\#} & \Yes\textsuperscript{\#\#} & \No & \No & \No \\
   CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
-  CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \No & \No & \No & \No & \No \\
-  CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
+  CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
   \bottomrule
 \end{longtable}
@@ -350,6 +350,15 @@ record structural typing を完成.\texttt{Types.unify} の \texttt{TRecord}
 parameter annotation を尊重するよう修正後,\texttt{method f(p:\{a:int,b:int\})}
 に shape 不一致の record literal を渡すと count / label / field-type
 の全てで type error.サンプル: \texttt{abclc/RecordStructural.abcl}.
+
+\smallskip
+\noindent\textsuperscript{\$} CE-7 / CE-8: OCaml は Phase O-2.f
+(2026-05-18) で CLI 統合.\texttt{repl\_thread.exe} に
+\texttt{--type-check FILE} / \texttt{--infer FILE} / \texttt{--check FILE} / \texttt{--strict}
+を追加.\texttt{--check} は Python-style の section banner 付き
+出力,\texttt{--strict} で issue 時に exit 3.
+Z3 refinement は \texttt{AIPL\_REFINE\_CHECK=1} を併用すると
+\texttt{[refine warning] vacuously-false ...} が stderr に発火.
 
 OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),その他の refinement
 機能 (CE-1, CE-6, CE-9) と record structural typing (CE-5) は今後の課題.

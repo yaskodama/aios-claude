@@ -208,8 +208,8 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ✅³  |  ✅³ |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
 | CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ✅⁴  |  ✅⁴ |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
 | CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
-| CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
-| CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
+| CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
+| CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
@@ -240,6 +240,14 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   `TypedVarDecl` (`var x: T = e`) の unify 失敗を Type_error 化、
   actor field の cross-method 一貫性チェックも自動的に効くように
   なった (e.g., `s = x:int` と `s = y:string` の混在を検出)。
+
+⁵ OCaml は Phase O-2.f (2026-05-18) で CLI 統合: `repl_thread.exe
+  --type-check FILE` / `--infer FILE` / `--check FILE` / `--strict`
+  を追加。`--check` は Python-style の section banner 付き出力
+  (`=== --type-check (nominal + HM + refinement) ===` /
+  `=== --infer (refinement Z3 ...) ===`)。`--strict` で issue 検出
+  時に exit 3。Z3 refinement は `AIPL_REFINE_CHECK=1` 併用で
+  `[refine warning] vacuously-false ...` を stderr に発火。
 
 ⁴ OCaml は Phase O-2.e (2026-05-18) で record structural typing
   を完成: `Types.unify` 内の `TRecord` ケースは既に

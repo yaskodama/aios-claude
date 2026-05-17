@@ -211,9 +211,71 @@ let parse_args_list (inside_paren : string) : Ast.expr list =
 
 let script_file = ref None
 
+(* O-2.f: static-analysis CLI flags, mirroring Python AIPL's
+   `--type-check / --infer / --check / --strict` from Phase E-2.
+   When any of these is set we run Typecheck.run on the named file
+   and exit without entering the REPL or running the actor system. *)
+let check_file : string option ref = ref None
+let check_mode : [`TypeCheck | `Infer | `Check] option ref = ref None
+let check_strict : bool ref = ref false
+
+let set_check mode f =
+  check_mode := Some mode;
+  check_file := Some f
+
 let speclist = [
   ("-f", Arg.String (fun s -> script_file := Some s), "Script file to execute at startup");
+  ("--type-check", Arg.String (set_check `TypeCheck),
+   " FILE   run Typecheck.run on FILE and exit (nominal + HM)");
+  ("--infer", Arg.String (set_check `Infer),
+   " FILE   alias for --type-check (HM inference is built into Typecheck.run)");
+  ("--check", Arg.String (set_check `Check),
+   " FILE   like --type-check / --infer but with Python-style section headers");
+  ("--strict", Arg.Set check_strict,
+   " exit non-zero when --check / --infer / --type-check report issues");
 ]
+
+(* Read entire file (used by the static-analysis flags). *)
+let slurp (path : string) : string =
+  let ic = open_in path in
+  let n = in_channel_length ic in
+  let buf = Bytes.create n in
+  really_input ic buf 0 n;
+  close_in ic;
+  Bytes.unsafe_to_string buf
+
+(* Run the static-analysis pass and return an exit code (0 = clean,
+   3 = issues + --strict).  Output mirrors Python's --check format
+   when mode = Check (section banner + summary line). *)
+let run_static_check (mode : [`TypeCheck | `Infer | `Check]) (path : string)
+                     (strict : bool) : int =
+  let src = slurp path in
+  let lb = Lexing.from_string src in
+  lb.Lexing.lex_curr_p <- { lb.Lexing.lex_curr_p with Lexing.pos_fname = path };
+  let prog =
+    try Parser.program token lb
+    with exn ->
+      Printf.eprintf "[parse error] %s: %s\n%!" path (Printexc.to_string exn);
+      Stdlib.exit 1
+  in
+  let want_banner = (mode = `Check) in
+  if want_banner then
+    Printf.printf "=== --type-check (nominal + HM + refinement) ===\n%!";
+  let result = Infer.check_program prog in
+  let issues =
+    match result with
+    | Ok _ -> 0
+    | Error msg -> Printf.eprintf "[type] %s\n%!" msg; 1
+  in
+  if issues = 0 then
+    Printf.printf "[type] no issues.\n%!"
+  else
+    Printf.printf "[type] %d issue(s).\n%!" issues;
+  if want_banner then begin
+    Printf.printf "\n=== --infer (refinement Z3 — set AIPL_REFINE_CHECK=1) ===\n%!";
+    Printf.printf "(refinement warnings, if any, are emitted on stderr)\n%!"
+  end;
+  if strict && issues > 0 then 3 else 0
 
 let parse_input (s : string) : Ast.program =
   let lb = Lexing.from_string s in
@@ -867,6 +929,12 @@ let prim_reply (args : value list) : value =
 
 let () =
   Arg.parse speclist (fun _ -> ()) "Usage: abclrepl_thread [-f script_file]";
+
+  (* O-2.f: if a --type-check / --infer / --check flag was given, run
+     the static analysis and exit before booting the actor runtime. *)
+  (match !check_mode, !check_file with
+   | Some mode, Some f -> Stdlib.exit (run_static_check mode f !check_strict)
+   | _ -> ());
 
   (match !script_file with
    | Some f -> Printf.printf "[info] -f: %s\n%!" f
