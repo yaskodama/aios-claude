@@ -1,0 +1,31 @@
+// IM-2 sample 3: two parallel subtrees.  Tree A crashes, Tree B is
+// completely untouched — quarantine has Erlang-OTP blast-radius
+// containment semantics.
+//
+// Run:
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub3.ndjson python3 src/python-aipl/aipl_main.py sample3_unrelated_unaffected.aipl
+
+class Worker {
+  method id_self(label) { println("worker ", label, " alive"); reply(0); }
+  method blow_up() { var x = 1/0; reply(x); }
+}
+
+class Trunk {
+  method live(label) {
+    var w = new Worker();
+    var r = now w.id_self(label);
+    reply(r);
+  }
+  method die() {
+    var w = new Worker();
+    var r = now w.blow_up();
+    reply(r);
+  }
+}
+
+var ta = new Trunk();
+var tb = new Trunk();
+var r1 = now ta.die();           // Tree A actors get quarantined
+var r2 = now tb.live("B");       // Tree B keeps running
+println("driver done");

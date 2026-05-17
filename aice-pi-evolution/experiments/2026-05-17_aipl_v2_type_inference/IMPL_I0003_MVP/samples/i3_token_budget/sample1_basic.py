@@ -13,7 +13,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PYABCL = os.path.normpath(
-    os.path.join(HERE, "..", "..", "..", "..", "..", "src", "python-aipl"))
+    os.path.join(HERE, "..", "..", "..", "..", "..", "..", "src", "python-aipl"))
 sys.path.insert(0, PYABCL)
 
 import aipl_dist  # noqa: E402

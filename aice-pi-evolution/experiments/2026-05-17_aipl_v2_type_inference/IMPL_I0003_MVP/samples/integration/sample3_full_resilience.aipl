@@ -1,0 +1,44 @@
+// Integration sample 3: all 4 I0003 pieces + IQ quarantine + IM
+// subtree quarantine + token budget active simultaneously.  One
+// actor is intentionally flaky to exercise the quarantine path.
+//
+// Run:
+//   rm -rf /tmp/ck_full && mkdir /tmp/ck_full
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/log_full.ndjson \
+//   AIPL_DIST_RPM=100 AIPL_DIST_TPM=10000 \
+//   AIPL_DIST_QUARANTINE_TTL=10 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_ROUTE="Stable:cpu,Flaky:isolated" \
+//   AIPL_DIST_CHECKPOINT_DIR=/tmp/ck_full \
+//   python3 src/python-aipl/aipl_main.py sample3_full_resilience.aipl
+//
+// Expect 1 [actor flaky.boom] error, 1 actor_quarantined for flaky,
+// and the stable side keeps responding.
+
+class Flaky {
+  method boom() { var x = 1/0; reply(x); }
+}
+
+class Stable {
+  var pings = 0;
+  method ping() {
+    pings = pings + 1;
+    reply(pings);
+  }
+}
+
+class Supervisor {
+  method drive() {
+    var f = new Flaky();
+    var s = new Stable();
+    var bad = now f.boom();   // flaky fails -> quarantined
+    var p1  = now s.ping();
+    var p2  = now s.ping();
+    var p3  = now s.ping();
+    println("stable pings = ", p3);
+    reply(p3);
+  }
+}
+
+var sup = new Supervisor();
+var rc  = now sup.drive();

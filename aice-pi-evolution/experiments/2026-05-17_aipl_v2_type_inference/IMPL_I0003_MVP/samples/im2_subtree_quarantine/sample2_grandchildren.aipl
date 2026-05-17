@@ -1,0 +1,36 @@
+// IM-2 sample 2: 3-level spawn tree.  Root → Mid → Leaf.
+// Root crashes, both Mid and Leaf get cascaded into quarantine.
+//
+// Run:
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub2.ndjson python3 src/python-aipl/aipl_main.py sample2_grandchildren.aipl
+//   grep subtree /tmp/sub2.ndjson
+//
+// Expect a single subtree_quarantined event with 3 members
+// (root, mid, leaf), and 0 actor_skip events because the demo
+// doesn't try to re-call them.
+
+class Leaf {
+  method ping() { println("leaf alive"); reply(0); }
+}
+
+class Mid {
+  method spawn_leaf() {
+    var leaf = new Leaf();
+    var rc = now leaf.ping();
+    reply(rc);
+  }
+}
+
+class Root {
+  method build_and_crash() {
+    var mid = new Mid();
+    var ok  = now mid.spawn_leaf();   // mid spawns leaf
+    var bad = 1 / 0;                  // root crashes -> quarantine mid + leaf
+    reply(bad);
+  }
+}
+
+var root = new Root();
+var rc   = now root.build_and_crash();
+println("driver done");

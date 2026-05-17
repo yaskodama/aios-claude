@@ -1,0 +1,30 @@
+// Integration sample 2: routing + checkpoint + structured_log
+// active simultaneously.  No quarantine, no quorum — just the
+// 4 "everyday observability + persistence" pieces from I0003 MVP.
+//
+// Run:
+//   rm -rf /tmp/ck_combined
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/log_combined.ndjson \
+//   AIPL_ROUTE="Worker:cpu_pool,Cache:memory_pool" \
+//   AIPL_DIST_CHECKPOINT_DIR=/tmp/ck_combined \
+//   python3 src/python-aipl/aipl_main.py sample2_combined_logging.aipl
+
+class Cache {
+  var hits = 0;
+  method hit() { hits = hits + 1; reply(hits); }
+}
+
+class Worker {
+  method tick(c) {
+    var n = now c.hit();
+    reply(n);
+  }
+}
+
+var cache  = new Cache();
+var worker = new Worker();
+var a = now worker.tick(cache);
+var b = now worker.tick(cache);
+var c = now worker.tick(cache);
+println("tick count = ", c);
