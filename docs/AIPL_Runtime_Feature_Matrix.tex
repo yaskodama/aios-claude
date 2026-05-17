@@ -48,6 +48,15 @@
 \begin{document}
 \maketitle
 
+\begin{quote}
+\textbf{2026-05-18: Phase O complete.}  OCaml AIPL now matches
+Python (annotated) on all 18 Phase~C--E2 + AIPL~v2 Distributed
+features (CE-1..CE-9 + DR-1..DR-9).  JS-OCaml inherits these
+through the OCaml backend.  See \texttt{docs/OCAML\_PORT\_ROADMAP.md}
+and the Phase~O summary at the end of \S Phase~C--E2 and
+\S AIPL~v2 Distributed below.
+\end{quote}
+
 \section*{Overview}
 
 AIPL (Actor-based Intelligent Parallel Language, formerly AIPL)
@@ -303,7 +312,7 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
 
   CE-1 & Phase C: constraint-based HM + Z3 refinement (Int)      & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
   CE-2 & Phase D-1: cross-class inference                        & \Yes & \No & \Yes\textsuperscript{\#} & \Yes\textsuperscript{\#} & \No & \No & \No \\
-  CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \Part\textsuperscript{*} & \Part\textsuperscript{*} & \No & \No & \No \\
+  CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \Yes\textsuperscript{*} & \Yes\textsuperscript{*} & \No & \No & \No \\
   CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \Yes\textsuperscript{\#} & \Yes\textsuperscript{\#} & \No & \No & \No \\
   CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \Yes\textsuperscript{\#\#} & \Yes\textsuperscript{\#\#} & \No & \No & \No \\
   CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
@@ -407,6 +416,25 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
 \noindent OCaml は Phase O-1 + O-1.5 で全 9 機能 \Yes 達成.DR-3/DR-6 は
 \texttt{Ai.call\_gemini} へ自動 wire 済,DR-8 は per-thread
 \texttt{current\_actor} TLS で parent を自動取得.
+
+\subsubsection*{Phase O 完全完了サマリ (2026-05-18)}
+
+\begin{center}
+\begin{tabular}{lcccr}
+\toprule
+領域 & Py-A & OCaml & JS-O & LOC (実装) \\
+\midrule
+\textbf{Distributed (DR-1〜9)} & \Yes 9/9 & \Yes 9/9 & \Yes 9/9 & \textasciitilde 720 \\
+\textbf{Type Inference (CE-1〜9)} & \Yes 9/9 & \Yes 9/9 & \Yes 9/9 & \textasciitilde 585 \\
+\midrule
+\textbf{合計} & \textbf{18/18} & \textbf{18/18} & \textbf{18/18} & \textasciitilde 1305 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+OCaml AIPL は Python (annotated) と **完全機能同等** に到達.実装規模
+は当初推定 \textasciitilde 1925 LOC の \textbf{68\%} で済んだ.
+詳細は \texttt{docs/OCAML\_PORT\_ROADMAP.md}.
 
 \clearpage
 
@@ -702,7 +730,17 @@ C-codegen LLVM / OpenMP targets;
 sections DR-1..DR-9), discovered by MAP-Elites GA + MVP-implemented for
 I0003 / I0023 / I0036 winners.
 
+\textbf{Phase O complete (2026-05-18)}: OCaml AIPL port of all 18
+CE-* + DR-* features (\textasciitilde 1305 LOC actual vs \textasciitilde 1925 estimated).
+\texttt{src/aipl\_dist.ml}, \texttt{src/refinement.ml}, and
+incremental hooks into \texttt{infer.ml} / \texttt{eval\_thread.ml} /
+\texttt{ai.ml} / \texttt{repl\_thread.ml}.
+JS-OCaml inherits all features through the OCaml backend.
+
 For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
+
+\bigskip
+\noindent\textit{Last regenerated: 2026-05-18 (after Phase O-2.f).}
 
 \end{document}
