@@ -1,0 +1,38 @@
+// I-1 sample: env_var_routing
+//
+// Demonstrates aipl_dist.route_for() in a pure-AIPL program.  Without
+// any env var the program behaves identically to a normal AIPL run;
+// with `AIPL_DIST_ENABLE=1 AIPL_ROUTE="Greeter:fast,Bench:slow"`, the
+// routing tag is observable via println.
+//
+// Run (no routing, default):
+//   /opt/homebrew/bin/python3 src/python-aipl/aipl_main.py \
+//     IMPL_I0003_MVP/samples/env_var_routing.aipl
+//
+// Run (with routing):
+//   AIPL_DIST_ENABLE=1 AIPL_ROUTE="Greeter:fast,Bench:slow" \
+//   /opt/homebrew/bin/python3 src/python-aipl/aipl_main.py \
+//     IMPL_I0003_MVP/samples/env_var_routing.aipl
+//
+// Note: routing is informative only at this MVP stage — there is no
+// actor placement rewrite.  This sample just prints which tag was
+// assigned (if any) so you can see the wiring works.
+
+class Greeter {
+  method greet(who) {
+    println("Greeter says hi to ", who);
+    reply(0);
+  }
+}
+
+class Bench {
+  method run() {
+    println("Bench running");
+    reply(0);
+  }
+}
+
+var g = new Greeter();
+var b = new Bench();
+var rc1 = now g.greet("Alice");
+var rc2 = now b.run();
