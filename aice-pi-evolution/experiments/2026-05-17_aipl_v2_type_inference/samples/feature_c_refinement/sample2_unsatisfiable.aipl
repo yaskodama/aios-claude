@@ -1,0 +1,21 @@
+// Feature C (refinement types) — Sample 2: unsatisfiable predicates.
+// The Z3 backend should flag every method below — no Int can make
+// these predicates true, so the refinement is *vacuously false*.
+// Each declaration produces one `refinement issue`.
+
+class Unsat {
+  method bad_range(k: Int where k >= 5 and k <= 3) -> Int {
+    reply(k);
+  }
+  method bad_sign(x: Int where x > 0 and x < 0) -> Int {
+    reply(x);
+  }
+  method bad_century(n: Int where n >= 100 and n <= 10) -> Int {
+    reply(n);
+  }
+  method bad_dual(k: Int where k == 1 and k == 2) -> Int {
+    reply(k);
+  }
+}
+
+var u = new Unsat();

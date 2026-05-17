@@ -289,6 +289,79 @@ class _Builder(Transformer):
         # `linear T` modifier (Phase 14). Stored as "linear T" string.
         return "linear " + str(items[0])
 
+    # ---- Phase E-α: refinement-type (`Int where <pred>`) transformers ----
+    # Each rule rebuilds a Python-syntax string so the result feeds
+    # straight into `aipl_inference._parse_annotation`.
+    @v_args(inline=False)
+    def type_refined(self, items):
+        base, pred = items[0], items[1]
+        return f"{base} where {pred}"
+
+    @v_args(inline=False)
+    def ref_or(self, items):
+        return " or ".join(str(x) for x in items)
+
+    @v_args(inline=False)
+    def ref_and(self, items):
+        return " and ".join(str(x) for x in items)
+
+    @v_args(inline=False)
+    def ref_not(self, items):
+        return "not " + str(items[0])
+
+    @v_args(inline=False)
+    def ref_cmp(self, items):
+        # items: [lhs, op, rhs, op, rhs, ...] with op as raw token.
+        out = [str(items[0])]
+        for i in range(1, len(items), 2):
+            out.append(str(items[i]))
+            out.append(str(items[i + 1]))
+        return " ".join(out)
+
+    @v_args(inline=False)
+    def ref_cmp_op(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
+    def ref_sum(self, items):
+        out = [str(items[0])]
+        for i in range(1, len(items), 2):
+            out.append(str(items[i]))
+            out.append(str(items[i + 1]))
+        return " ".join(out)
+
+    @v_args(inline=False)
+    def ref_add_op(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
+    def ref_mul(self, items):
+        out = [str(items[0])]
+        for i in range(1, len(items), 2):
+            out.append(str(items[i]))
+            out.append(str(items[i + 1]))
+        return " ".join(out)
+
+    @v_args(inline=False)
+    def ref_mul_op(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
+    def ref_neg(self, items):
+        return "-" + str(items[0])
+
+    @v_args(inline=False)
+    def ref_int(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
+    def ref_var(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
+    def ref_paren(self, items):
+        return "(" + str(items[0]) + ")"
+
     @v_args(inline=False)
     def method_decl(self, items):
         # items: [NAME, params, return_anno?, effect_anno?, *body_stmts]

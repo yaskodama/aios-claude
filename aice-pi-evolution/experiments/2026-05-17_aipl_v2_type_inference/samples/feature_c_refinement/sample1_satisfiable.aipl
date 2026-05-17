@@ -1,0 +1,32 @@
+// Feature C (refinement types) — Sample 1: satisfiable predicates,
+// now natively expressible in AIPL surface syntax (Phase E-α).
+//
+// Each method declares a refined parameter type `Int where <pred>`.
+// The Z3 backend verifies that each predicate is satisfiable (i.e.
+// at least one Int makes it true) at declaration time — so an
+// inhabitant exists.  No refinement issues should be reported.
+
+class Sat {
+  method needs_nonneg(k: Int where k >= 0) -> Int {
+    reply(k);
+  }
+  method needs_ge_two(n_terms: Int where n_terms >= 2) -> Int {
+    reply(n_terms);
+  }
+  method needs_unit_sign(sign: Int where sign == 1 or sign == -1) -> Int {
+    reply(sign);
+  }
+  method needs_between(m: Int where m > 0 and m < 100) -> Int {
+    reply(m);
+  }
+  method needs_complex(x: Int where x >= 0 and x <= 100 and x != 50) -> Int {
+    reply(x);
+  }
+}
+
+var s = new Sat();
+var r1 = now s.needs_nonneg(7);
+var r2 = now s.needs_ge_two(3);
+var r3 = now s.needs_unit_sign(-1);
+var r4 = now s.needs_between(50);
+var r5 = now s.needs_complex(25);

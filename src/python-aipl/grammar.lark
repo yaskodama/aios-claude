@@ -60,6 +60,29 @@ param: NAME type_anno?
           | NAME "[" type_arg ("," type_arg)* "]"                -> type_param
           | "tuple" "(" (type_expr ("," type_expr)* ","?)? ")"   -> type_tuple
           | "record" "{" (type_record_field ("," type_record_field)* ","?)? "}" -> type_record
+          | type_term "where" refinement                          -> type_refined
+
+// Phase E-α: refinement predicate sub-grammar.  Kept separate from the
+// general `expr` grammar so the keywords `and`/`or`/`not` only act as
+// boolean operators inside a `where`-clause body.  The transformer
+// renders each rule back to a Python-syntax string so the existing
+// `aipl_inference._parse_annotation` can pick it up unchanged.
+?refinement: ref_or
+ref_or:  ref_and  ("or"  ref_and)*
+ref_and: ref_not  ("and" ref_not)*
+?ref_not: "not" ref_not                                          -> ref_not
+        | ref_cmp
+ref_cmp: ref_sum  (ref_cmp_op ref_sum)*
+!ref_cmp_op: "==" | "!=" | "<=" | ">=" | "<" | ">"
+ref_sum: ref_mul  (ref_add_op ref_mul)*
+!ref_add_op: "+" | "-"
+ref_mul: ref_unary (ref_mul_op ref_unary)*
+!ref_mul_op: "*" | "/"
+?ref_unary: "-" ref_unary                                        -> ref_neg
+          | ref_atom
+?ref_atom: INT                                                   -> ref_int
+         | NAME                                                  -> ref_var
+         | "(" refinement ")"                                    -> ref_paren
 
 // A type argument inside [...] is either a type or an INT literal
 // (used as a length parameter for fixed-length arrays).
@@ -166,7 +189,7 @@ args: (expr ("," expr)*)?
 record_fields: record_field ("," record_field)* ","?
 record_field:  NAME ":" expr
 
-NAME: /(?!(class|method|function|return|var|float|int|new|send|call|become|if|else|while|do|self|sender|now|future|await|true|false|pub|linear|scope)\b)[a-zA-Z_][a-zA-Z0-9_]*/
+NAME: /(?!(class|method|function|return|var|float|int|new|send|call|become|if|else|while|do|self|sender|now|future|await|true|false|pub|linear|scope|where|and|or|not)\b)[a-zA-Z_][a-zA-Z0-9_]*/
 INT: /[0-9]+(?!\.)/
 FLOAT: /[0-9]+\.[0-9]*|\.[0-9]+/
 STRING: /"([^"\\]|\\.)*"/

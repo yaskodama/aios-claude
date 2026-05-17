@@ -284,6 +284,11 @@ class Inference:
     fresh_counter: int = 0
     subst: Subst = field(default_factory=dict)
     refinements: list = field(default_factory=list)
+    # Phase E-α: every TRefined produced by `_parse_annotation` is also
+    # registered here so a declaration-time satisfiability check can run
+    # at the end of inference.  Entries are TRefined instances (binder
+    # already specialized to a concrete name where possible).
+    refined_decls: list = field(default_factory=list)
     issues: list = field(default_factory=list)
     # D-1: class-level method signatures pre-registered before any body
     # is inferred so `now obj.method(args)` can unify against them.
@@ -709,12 +714,21 @@ def infer_method(class_decl: Any, m: Any,
     else:
         param_tvars = tuple(infer.fresh() for _ in m.params)
     param_types = []
+    # Phase E-α: keep the parsed refined annotation per position so it
+    # can be re-injected at the end (unify drops refinements once the
+    # underlying TVar has already been bound to a concrete base by a
+    # caller in Pass 0).
+    refined_ann_by_pos: Dict[int, Any] = {}
     for i, p in enumerate(m.params):
         ann = m.param_annotations[i] if i < len(getattr(m, "param_annotations", [])) else None
         t = param_tvars[i]
         if ann:
             ann_t = _parse_annotation(ann, infer)
             infer.constrain(t, ann_t, where=f"{cls_name}.{m.name} param {p}")
+            if isinstance(ann_t, TRefined):
+                refined_ann_by_pos[i] = TRefined(
+                    ann_t.base, p, ann_t.pred_src, ann_t.pred_ast,
+                )
         env.bind(p, Scheme((), t))
         param_types.append(t)
     # Body
@@ -724,7 +738,18 @@ def infer_method(class_decl: Any, m: Any,
     else:
         _infer_stmt(infer, env, m.body)
     # Resolve param types after constraints settled
-    final_params = [(p, apply(infer.subst, t)) for p, t in zip(m.params, param_types)]
+    final_params = []
+    for i, (p, t) in enumerate(zip(m.params, param_types)):
+        resolved = apply(infer.subst, t)
+        if i in refined_ann_by_pos:
+            ann_t = refined_ann_by_pos[i]
+            if isinstance(resolved, TRefined):
+                # Refine with the proper binder (parser used "_").
+                resolved = TRefined(resolved.base, p, resolved.pred_src, resolved.pred_ast)
+            elif resolved == ann_t.base or isinstance(resolved, TCon):
+                # unify dropped the refinement (TVar already bound to base) — re-attach.
+                resolved = TRefined(resolved, p, ann_t.pred_src, ann_t.pred_ast)
+        final_params.append((p, resolved))
     locals_ = {n: apply(infer.subst, sch.type)
                for n, sch in env.bindings.items()
                if n not in m.params and n not in builtin_keys}
@@ -739,7 +764,9 @@ def infer_method(class_decl: Any, m: Any,
         param_types=final_params,
         local_types=locals_,
         issues=list(infer.issues) if standalone else [],
-        refinement_issues=_check_refinements(infer.refinements) if standalone else [],
+        refinement_issues=(_check_refinements(infer.refinements)
+                          + _check_refined_decls(infer.refined_decls))
+                          if standalone else [],
         return_type=return_type,
     )
 
@@ -805,7 +832,12 @@ def _parse_annotation(ann: str, infer: Inference) -> Any:
     if m:
         base = _parse_annotation(m.group(1), infer)
         # binder placeholder; real binder comes from the variable name
-        return TRefined(base, "_", m.group(2), pred_ast=None)
+        rt = TRefined(base, "_", m.group(2), pred_ast=None)
+        # Phase E-α: register every refined annotation so the
+        # satisfiability check at the end of inference can flag
+        # declarations whose predicate is vacuously false.
+        infer.refined_decls.append(rt)
+        return rt
     # Tuple
     if s.startswith("(") and s.endswith(")"):
         inner = s[1:-1]
@@ -860,6 +892,26 @@ def _check_refinements(refs: list) -> list:
         ok, why = _z3_check(z3, rt, expr_src)
         if not ok:
             out.append(f"refinement violation at {loc}: {rt}  ({why})")
+    return out
+
+
+def _check_refined_decls(decls: list) -> list:
+    """Phase E-α: discharge each declared refined type on its own.
+    Flags any predicate that is vacuously false (UNSAT for every
+    possible value of the binder)."""
+    try:
+        import z3
+    except Exception:
+        return []
+    seen, out = set(), []
+    for rt in decls:
+        if not isinstance(rt, TRefined): continue
+        key = (str(rt.base), rt.pred_src)
+        if key in seen: continue
+        seen.add(key)
+        ok, why = _z3_check(z3, rt, expr_src="")
+        if not ok:
+            out.append(f"refinement is vacuously false: {rt}  ({why})")
     return out
 
 
@@ -1029,6 +1081,8 @@ def infer_program(program: Any) -> list:
         method_results[-1].issues.extend(infer.issues)
         method_results[-1].refinement_issues.extend(
             _check_refinements(infer.refinements))
+        method_results[-1].refinement_issues.extend(
+            _check_refined_decls(infer.refined_decls))
     return method_results
 
 
