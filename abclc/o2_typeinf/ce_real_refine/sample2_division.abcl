@@ -1,0 +1,18 @@
+// CE-6 / O-2.c: Real refinement with division and arithmetic.
+//
+// Z3 Real theory handles real division (`/`) cleanly.  Int literals
+// inside a Real predicate auto-promote.
+
+class Reals {
+  // Sat: y / 2 == 0.5 admits y = 1.0.
+  method half_solve(y: float where y / 2.0 == 0.5) -> float { return y; }
+  // Sat: monotone in the predicate.
+  method monotone(p: float where p == 2.0 * q + 1.0) -> float { return p; }
+  // Sat: int literals are auto-promoted to Real.
+  method mixed_lits(x: float where x > 0 and x < 100) -> float { return x; }
+  // UNSAT: vacuous self-reference.
+  method bad(y: float where y > y + 1.0) -> float { return y; }
+}
+
+var r = new Reals();
+print("declared");

@@ -1,0 +1,18 @@
+// CE-1 / O-2.b: arithmetic in Int refinement predicates.
+//
+// Z3 backend renders `+ - * div` to SMT-LIB so linear arithmetic
+// works natively.  Two sat / two unsat cases:
+
+class Arith {
+  // Sat: x = 3.
+  method linear(x: int where 2 * x + 1 == 7) -> int { return x; }
+  // Sat: any non-zero (x = 0 means 2x+1 = 1).
+  method positive_linear(x: int where 2 * x + 1 > 0) -> int { return x; }
+  // UNSAT: x + 1 == x admits no Int (vacuously false).
+  method bad_succ(x: int where x + 1 == x) -> int { return x; }
+  // UNSAT: x > 5 and not (x > 1) — contradictory.
+  method bad_window(x: int where x > 5 and not (x > 1)) -> int { return x; }
+}
+
+var a = new Arith();
+print("declared");

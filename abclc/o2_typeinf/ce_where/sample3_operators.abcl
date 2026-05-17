@@ -1,0 +1,28 @@
+// CE-3 / O-2.a: refinement-predicate operator coverage.
+//
+// Exercises every refinement operator that the OCaml `refine_*`
+// sub-grammar parses: comparisons (== != < > <= >=), arithmetic
+// (+ - * /), unary -, paren, and boolean keywords and/or/not.
+
+class Ops {
+  // OR
+  method sign(s: int where s == 1 or s == -1) -> int { return s; }
+  // NOT
+  method not_zero(n: int where not (n == 0)) -> int { return n; }
+  // Mixed arithmetic in predicate (`2 * x + 1 == 7` ⇒ x = 3).
+  method solve(x: int where 2 * x + 1 == 7) -> int { return x; }
+  // Unary minus.
+  method neg_band(y: int where -10 <= y and y <= 10) -> int { return y; }
+  // Nested paren / disjunction with conjunction.
+  method holed(z: int where (z == 0) or (z > 5 and z < 10)) -> int { return z; }
+}
+
+var o = new Ops();
+// Parser has no unary `-` in expression position; use `0 - N` for negatives
+// when calling.  (Refinement predicates above DO allow `-`.)
+var a = now o.sign(0 - 1);
+var b = now o.not_zero(42);
+var c = now o.solve(3);
+var d = now o.neg_band(0 - 5);
+var e = now o.holed(7);
+print(a); print(b); print(c); print(d); print(e);

@@ -1,0 +1,17 @@
+// CE-5 / O-2.e: nested records (record-in-record).
+//
+// Structural unify is recursive — each field's type is unified
+// pointwise, so a record whose field is itself a record drives the
+// algorithm through more than one level.
+
+class Geometry {
+  // Param is a `{p, q}` whose fields are themselves records.
+  method dx(box: {p: {x: int, y: int}, q: {x: int, y: int}}) -> int {
+    return box.q.x - box.p.x;
+  }
+}
+
+var g = new Geometry();
+var b = {p: {x: 3, y: 4}, q: {x: 10, y: 20}};
+var d: int = now g.dx(b);
+print(d);

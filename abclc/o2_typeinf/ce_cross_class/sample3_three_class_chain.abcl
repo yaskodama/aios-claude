@@ -1,0 +1,30 @@
+// CE-2 / O-2.d: cross-class chain through three actors.
+//
+// `Producer` returns an Int.  `Filter` takes that Int and returns
+// Int.  `Pipeline.run` calls both, threading the value through.
+// The static type-checker resolves every `now` site via the
+// receiver's class, so the final assignment `var result: int`
+// catches any inconsistency in the chain.
+
+class Producer {
+  method make() -> int { return 42; }
+}
+class Filter {
+  method positive(n: int) -> int {
+    if (n > 0) { return n; } else { return 0; }
+    return 0;
+  }
+}
+class Pipeline {
+  method run(p: any, f: any) -> int {
+    var v = now p.make();          // v : int
+    var r = now f.positive(v);     // r : int (Filter.positive : int -> int)
+    return r;
+  }
+}
+
+var p = new Producer();
+var f = new Filter();
+var pipe = new Pipeline();
+var result: int = now pipe.run(p, f);
+print(result);

@@ -1,0 +1,19 @@
+// CE-6 / O-2.c: Real refinement with open/closed/holed intervals.
+//
+// Highlights the Real theory's ability to reason about open vs closed
+// boundaries (a difference Int can't see).
+
+class Intervals {
+  // Sat: (0, 1) open interval.
+  method open_unit(x: float where x > 0.0 and x < 1.0) -> float { return x; }
+  // Sat: [0, 1] closed.
+  method closed_unit(x: float where x >= 0.0 and x <= 1.0) -> float { return x; }
+  // Sat: holed — union of two windows.
+  method holed(x: float where (x > 0.0 and x < 0.4) or (x > 0.6 and x < 1.0))
+       -> float { return x; }
+  // UNSAT in Int but SAT in Real (the rationals between 1.0 and 0.5 are empty).
+  method bad_window(x: float where x > 1.0 and x < 0.5) -> float { return x; }
+}
+
+var i = new Intervals();
+print("declared");

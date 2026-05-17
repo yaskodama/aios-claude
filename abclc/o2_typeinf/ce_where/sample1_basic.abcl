@@ -31,7 +31,9 @@ var n: int where n > 0 = 7;
 
 var e = new Engine();
 var a = now e.process(50);
-var b = now e.sign(-1);
+// Negative literal in expr position: parser has no unary `-`, so use `0 - 1`.
+// (Negative literals ARE allowed *inside* a `where` predicate via refine_unary.)
+var b = now e.sign(0 - 1);
 var c = now e.nonzero(42);
 print(a);
 print(b);

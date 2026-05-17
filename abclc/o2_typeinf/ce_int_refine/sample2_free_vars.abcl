@@ -1,0 +1,19 @@
+// CE-1 / O-2.b: Int refinement with free variables in the predicate.
+//
+// The Z3 backend declares each free name in the predicate as a fresh
+// Int and asks Z3 whether the conjunction is satisfiable.  In this
+// sample the binder is `m` and the predicate references the also-free
+// `a` and `b`, which Z3 picks values for.
+//
+// Vacuously-false variants (e.g. `m > b and m < a`) would surface as
+// a `[refine warning]` when run with `AIPL_REFINE_CHECK=1`.
+
+class Window {
+  // Sat: pick a < b < m.
+  method between(m: int where m > a and m < b) -> int { return m; }
+  // Sat: m must equal both endpoints (a = b case).
+  method coincide(m: int where m == a and m == b) -> int { return m; }
+}
+
+var w = new Window();
+print("ok");

@@ -1,0 +1,19 @@
+// CE-3 / O-2.a: where-clause grammar in `var ... : T where ...` position.
+//
+// Demonstrates that the refinement-type syntax works in every type
+// position the OCaml grammar supports: var declarations, method
+// parameters, method return types.
+
+class Demo {
+  method process(r: int where 0 <= r and r <= 100) -> int where r > 0 {
+    return r * 2;
+  }
+}
+
+// var-decl with `where` (parses; not Z3-checked unless AIPL_REFINE_CHECK=1).
+var counter: int where counter >= 0 = 5;
+var scale: float where scale > 0.0 = 2.5;
+
+var d = new Demo();
+var out: int = now d.process(counter);
+print(out);

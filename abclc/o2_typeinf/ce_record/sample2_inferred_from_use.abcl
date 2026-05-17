@@ -1,0 +1,19 @@
+// CE-5 / O-2.e: record param shape inferred from method body.
+//
+// `Reader.first(r)` only touches `r.head`, so an annotation `{head:
+// int, tail: int}` is more specific than required.  The point of this
+// sample: even with the explicit annotation, the structural unify
+// accepts any record literal with EXACTLY those two fields and types
+// — field order doesn't matter (sorted internally).
+
+class Reader {
+  method first(r: {head: int, tail: int}) -> int { return r.head; }
+  method second(r: {head: int, tail: int}) -> int { return r.tail; }
+}
+
+var rd = new Reader();
+// Field order swapped from the annotation — still unifies.
+var rec = {tail: 100, head: 7};
+var x: int = now rd.first(rec);
+var y: int = now rd.second(rec);
+print(x); print(y);
