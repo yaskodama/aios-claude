@@ -1,0 +1,27 @@
+// Feature B (cross-class inference) — Sample 2: a chain of three classes
+// where the type of the first param flows all the way through three
+// method bodies.
+
+class Producer {
+  method make_value() { reply(42); }
+}
+
+class Filter {
+  method positive(n) {
+    if (n > 0) { reply(n); }
+    else       { reply(0); }
+  }
+}
+
+class Pipeline {
+  method run(prod, filt) {
+    var v = now prod.make_value();           // v : Int (Producer.make_value -> Int)
+    var p = now filt.positive(v);            // p : Int (Filter.positive : Int -> Int)
+    reply(p);                                  // Pipeline.run : (Producer, Filter) -> Int
+  }
+}
+
+var p = new Producer();
+var f = new Filter();
+var pipe = new Pipeline();
+var result = now pipe.run(p, f);

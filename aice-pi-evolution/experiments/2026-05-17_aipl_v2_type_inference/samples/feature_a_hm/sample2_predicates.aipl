@@ -1,0 +1,26 @@
+// Feature A (HM inference) — Sample 2: predicate functions returning Bool.
+// Each comparison forces its operands to Int and returns Bool, which is
+// then propagated through the method's reply.  Branching with if/else
+// keeps both arms at the same return type — the inference engine unifies
+// them automatically.
+
+class Predicates {
+  method is_zero(n)     { reply(n == 0); }
+  method is_positive(n) { reply(n > 0); }
+  method is_negative(n) { reply(n < 0); }
+  method in_range(n, lo, hi) {
+    var lo_ok = lo <= n;
+    if (lo_ok) { reply(n <= hi); }
+    else       { reply(0 == 1); }    // canonical "false"
+  }
+  method same_sign(a, b) {
+    var ap = a > 0;
+    var bp = b > 0;
+    reply(ap == bp);
+  }
+}
+
+var p  = new Predicates();
+var t1 = now p.is_zero(0);
+var t2 = now p.in_range(5, 0, 10);
+var t3 = now p.same_sign(-3, -4);

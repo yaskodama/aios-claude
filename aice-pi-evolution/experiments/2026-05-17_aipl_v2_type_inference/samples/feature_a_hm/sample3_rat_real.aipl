@@ -1,0 +1,30 @@
+// Feature A (HM inference) — Sample 3: Rat / Real mixed arithmetic.
+// Builtin signatures (rat_add, real_mul, real_from_rat, …) drive
+// type inference of arguments and locals.
+
+class Numerics {
+  method half_plus_third() {
+    var a = rat(1, 2);
+    var b = rat(1, 3);
+    reply(rat_add(a, b));            // -> Rat
+  }
+  method ratio_to_real(r, prec) {
+    var x = real_from_rat(r, prec);
+    reply(x);                         // -> Real
+  }
+  method pi_approx(prec) {
+    var pi_num = rat(22, 7);          // crude approximation as Rat
+    var pi_real = real_from_rat(pi_num, prec);
+    var two = real_from_int(2);
+    var half_pi = real_div(pi_real, two);
+    reply(half_pi);                   // -> Real
+  }
+  method scale_real(r, factor_int) {
+    var f = real_from_int(factor_int);
+    reply(real_mul(r, f));            // -> Real
+  }
+}
+
+var n = new Numerics();
+var r1 = now n.half_plus_third();
+var r2 = now n.pi_approx(50);

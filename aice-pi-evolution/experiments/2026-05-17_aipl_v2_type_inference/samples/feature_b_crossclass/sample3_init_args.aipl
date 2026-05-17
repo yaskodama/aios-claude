@@ -1,0 +1,24 @@
+// Feature B (cross-class inference) — Sample 3: constructor argument types
+// propagate through the class field to method bodies.
+
+class Counter {
+  var n = 0;
+  method init(initial) { n = initial; }
+  method get()         { reply(n); }
+  method bump(delta) {
+    n = n + delta;
+    reply(n);
+  }
+}
+
+class CounterUser {
+  method exercise(c) {
+    var a = now c.get();          // a : Int  (from Counter.get -> Int)
+    var b = now c.bump(7);        // b : Int  (from Counter.bump : Int -> Int)
+    reply(b);
+  }
+}
+
+var c    = new Counter(100);
+var user = new CounterUser();
+var v    = now user.exercise(c);

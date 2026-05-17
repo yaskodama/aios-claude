@@ -1,0 +1,25 @@
+// Feature A (HM inference) — Sample 1: arithmetic primitives.
+// Demonstrates that param/local/return types are inferred from
+// arithmetic operator usage (no annotations needed).
+
+class Arithmetic {
+  method square(x)        { reply(x * x); }
+  method cube(x)          { reply(x * x * x); }
+  method sum_of_squares(a, b) { reply(a * a + b * b); }
+  method abs_diff(a, b) {
+    if (a > b) { reply(a - b); }
+    else       { reply(b - a); }
+  }
+  method power(base, exp) {
+    if (exp == 0) { reply(1); }
+    else {
+      var rest = base;        // local
+      reply(base * rest);      // simplified
+    }
+  }
+}
+
+var arith = new Arithmetic();
+var s = now arith.square(7);
+var c = now arith.cube(3);
+var d = now arith.abs_diff(10, 3);

@@ -1,0 +1,18 @@
+// Feature B (cross-class inference) — Sample 1: two-class round trip.
+// `other` has no annotation; the call site `bridge.use(adder)` forces
+// the use_x parameter to be Adder.
+
+class Adder {
+  method add(x, y) { reply(x + y); }
+}
+
+class Bridge {
+  method use_adder(other, a, b) {
+    var s = now other.add(a, b);
+    reply(s);
+  }
+}
+
+var adder  = new Adder();
+var bridge = new Bridge();
+var r = now bridge.use_adder(adder, 3, 4);

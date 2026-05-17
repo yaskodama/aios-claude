@@ -182,6 +182,99 @@ Phase D-1 + D-4 で、AIPL の型推論は **actor 越境の constraint-based HM
 
 ---
 
+## 9. サンプル実行手順
+
+Phase C / Phase D-1 / Phase D-4 の **3 機能 × 3 サンプル = 9 ファイル** を `samples/` 配下に置いた。`--infer` (.aipl) または `python3 <test>.py` (refinement) で機能が単独で確認できる。
+
+> `PY=/opt/homebrew/bin/python3` / `AIPL=src/python-aipl/aipl_main.py` を仮定。
+
+### 9.1 Feature A — Hindley-Milner 型推論 (`samples/feature_a_hm/`)
+
+| Sample | 目的 | 実行 |
+|---|---|---|
+| `sample1_arithmetic.aipl` | `Arithmetic` クラス。`square / cube / sum_of_squares / abs_diff / power` — Int → Int の純粋関数 5 つ | `$PY $AIPL samples/feature_a_hm/sample1_arithmetic.aipl --infer` |
+| `sample2_predicates.aipl` | `Predicates` クラス。比較演算 (`==`,`<=`) から Bool 戻り値を伝搬。`if/else` 両分岐 Bool で統一推論 | `$PY $AIPL samples/feature_a_hm/sample2_predicates.aipl --infer` |
+| `sample3_rat_real.aipl` | `Numerics` クラス。`Rat`/`Real`/`Int` の混在計算。`Rat → Real` キャストと小数精度パラメータ | `$PY $AIPL samples/feature_a_hm/sample3_rat_real.aipl --infer` |
+
+期待出力 (`sample1_arithmetic.aipl`):
+
+```
+=== Arithmetic.square ===
+  params:
+    x : Int
+  return : Int
+  ⋮
+[infer] 5 method(s), 0 unify issue(s), 0 refinement issue(s)
+```
+
+`sample2_predicates.aipl` では全メソッドが `return : Bool`、ローカル `lo_ok : Bool` まで推論される。`sample3_rat_real.aipl` では `pi_real : Real`, `pi_num : Rat`, `two : Real` のように Rat と Real が区別されて推論される。
+
+### 9.2 Feature B — クラス越境推論 (`samples/feature_b_crossclass/`)
+
+| Sample | 目的 | 実行 |
+|---|---|---|
+| `sample1_simple.aipl` | `Adder`+`Bridge`。`Bridge.use_adder(other, a, b)` で `other : Adder` を **逆推論** | `$PY $AIPL samples/feature_b_crossclass/sample1_simple.aipl --infer` |
+| `sample2_chained.aipl` | `Producer→Filter→Pipeline` の 3 段。`pipe.run(p, f) : (Producer, Filter) → Int` まで自動 | `$PY $AIPL samples/feature_b_crossclass/sample2_chained.aipl --infer` |
+| `sample3_init_args.aipl` | `Counter` の `init(initial)` で field `n: Int` を確定し、`CounterUser.exercise(c)` で `c : Counter` を逆推論 | `$PY $AIPL samples/feature_b_crossclass/sample3_init_args.aipl --infer` |
+
+期待出力 (`sample1_simple.aipl`):
+
+```
+=== Bridge.use_adder ===
+  params:
+    other : Adder
+    a : Int
+    b : Int
+  return : Int
+  ⋮
+[infer] 2 method(s), 0 unify issue(s), 0 refinement issue(s)
+```
+
+`sample2_chained.aipl` では `Pipeline.run` の `prod : Producer`, `filt : Filter` が中間ローカル `v : Int`, `p : Int` を経由して 3 クラス越境で確定する。
+
+### 9.3 Feature C — Refinement Types + Z3 (`samples/feature_c_refinement/`)
+
+> AIPL 表層文法は現状 `Int where <pred>` 構文を持たない (Phase E 課題)。下記サンプルは Phase C の Python API (`aipl_inference._parse_annotation` + `_z3_check`) を直接呼び、Z3 backend の振る舞いだけを観察する。
+
+| Sample | 目的 | 実行 |
+|---|---|---|
+| `sample1_satisfiable.py` | 5 個の充足可能な refinement (`k >= 0` など) が **すべて受理** | `$PY samples/feature_c_refinement/sample1_satisfiable.py` |
+| `sample2_unsatisfiable.py` | 5 個の不可能な制約 (`k>=5 and k<=3` など) を **すべて UNSAT 検出** | `$PY samples/feature_c_refinement/sample2_unsatisfiable.py` |
+| `sample3_mixed.py` | chained-compare / `not` / `or` / 線形演算 / 矛盾検出 / 未対応構文 (`mod`) のフォールバック 7 ケース | `$PY samples/feature_c_refinement/sample3_mixed.py` |
+
+期待出力 (`sample3_mixed.py`):
+
+```
+=== Feature C Sample 3: mixed refinements (7) ===
+  ✓ Int where 0 <= x and x <= 100         sat=True  (expected=True)
+  ✓ Int where not (x == 0)                sat=True  (expected=True)
+  ✓ Int where (k == 0) or (k > 5 ...)     sat=True  (expected=True)
+  ✓ Int where 2 * x + 1 == 7              sat=True  (expected=True)
+  ✓ Int where (x > 10) and not (x > 5)    sat=False (expected=False)
+  ✓ Int where x + 1 == x                  sat=False (expected=False)
+  ✓ Int where k mod 2 == 0                sat=True  (could not encode...)
+7/7 cases match expectation.
+```
+
+最後の `mod` ケースは Python `ast` が `mod` を予約語として扱わないため SyntaxError でフォールバック (= 保守的に受理) する設計。後段 Phase E で `%` 演算子サポートが入れば落ちる。
+
+### 9.4 全 9 件まとめて回す
+
+```sh
+for f in samples/feature_a_hm/*.aipl samples/feature_b_crossclass/*.aipl; do
+  echo "----- $f -----"
+  $PY $AIPL "$f" --infer
+done
+for f in samples/feature_c_refinement/*.py; do
+  echo "----- $f -----"
+  $PY "$f"
+done
+```
+
+生のログは `sample_outputs/*.log` に保存済み。
+
+---
+
 ## 参考
 
 - [Phase C REPORT](./PHASE_C_REPORT.md)
