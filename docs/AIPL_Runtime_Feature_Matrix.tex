@@ -303,7 +303,7 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
 
   CE-1 & Phase C: constraint-based HM + Z3 refinement (Int)      & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-2 & Phase D-1: cross-class inference                        & \Yes & \No & \No & \No & \No & \No & \No \\
-  CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \Part\textsuperscript{*} & \Part\textsuperscript{*} & \No & \No & \No \\
   CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \No & \No & \No & \No & \No \\
@@ -316,8 +316,16 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
 \textbf{サンプル}: \texttt{aice-pi-evolution/experiments/2026-05-17\_aipl\_v2\_type\_inference/samples/feature\_\{a..g\}/}
 (7 feature $\times$ 3 = 21 demo + 27/27 unit tests).
 
-OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),refinement (\texttt{where} 句) と
-Z3 backend には対応していない。OCaml への移植は今後の課題。
+\smallskip
+\noindent\textsuperscript{*} CE-3: OCaml は Phase O-2.a (2026-05-18) で
+parsing のみ達成.\texttt{lexer.mll} に \texttt{where}/\texttt{and}/\texttt{or}/\texttt{not} キーワード,
+\texttt{parser.mly} に \texttt{type\_expr WHERE refine\_or} 規則,
+\texttt{ast.ml} に \texttt{TyERefined of type\_expr * refine\_pred} を追加.
+Z3 検査 (CE-1/CE-9) は Phase O-2.b で接続予定.
+サンプル: \texttt{abclc/WhereClause.abcl}.
+
+OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),その他の refinement
+機能 (CE-1, CE-6, CE-9) と record structural typing (CE-5) は今後の課題.
 
 \clearpage
 

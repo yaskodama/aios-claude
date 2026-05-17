@@ -74,6 +74,10 @@ rule token = parse
 | "new"        { NEW }
 | "class"      { CLASS }
 | "remote"     { REMOTE }
+| "where"      { WHERE }
+| "and"        { AND_KW }
+| "or"         { OR_KW }
+| "not"        { NOT_KW }
 
   (* --- リテラル/識別子 --- *)
 (* 1. 「100.5」形式（整数部・小数部あり） *)

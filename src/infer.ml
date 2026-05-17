@@ -49,6 +49,13 @@ let rec ty_of_type_expr_with_tbl
                 Hashtbl.replace t n tv;
                 Types.TVar tv)
        | _ -> Types.TAny)
+  (* O-2.a: refinement type `T where <pred>` lowers to its base type
+     for now.  The predicate `_pred` is intentionally discarded here;
+     Phase O-2.b will introduce a Types.ty constructor for refinements
+     and a Z3-based discharge step.  For O-2.a we just want the new
+     surface syntax to parse and round-trip through inference without
+     altering existing behaviour. *)
+  | Ast.TyERefined (base, _pred) -> go base
 
 let ty_of_type_expr ?tvar_table te =
   ty_of_type_expr_with_tbl tvar_table te

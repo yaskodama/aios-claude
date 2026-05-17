@@ -76,15 +76,22 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
 
 依存関係順に分割:
 
-#### O-2.a (1 session, easy): `where` 句 grammar (CE-3)
+#### O-2.a (1 session, easy): `where` 句 grammar (CE-3) ✅ 完了 (2026-05-18)
 
-- `lexer.mll` に `where`/`and`/`or`/`not` キーワード追加
-- `parser.mly` に `type_expr WHERE expr` 規則追加
-- `ast.ml` に `TyRefined of ty * string * expr` 追加
-- まだ Z3 で検査せず、ただ AST に保持するだけ
-- `aipl_typed_*.abcl` でパースが通ることを smoke 確認
+実装結果:
+- `lexer.mll` に `where`/`and`/`or`/`not` の 4 キーワードを追加
+- `parser.mly` に WHERE/AND_KW/OR_KW/NOT_KW トークン宣言 +
+  `type_expr WHERE refine_or` 規則 + `refine_{or,and,not,cmp,sum,mul,unary,atom}`
+  の 7 段 sub-grammar (Python 側の refinement と 1:1)
+- `ast.ml` に `TyERefined of type_expr * refine_pred` と
+  `refine_pred` 型 (RpInt / RpFloat / RpVar / RpUnary / RpBinop / RpParen) 追加
+- `infer.ml` の `ty_of_type_expr_with_tbl` で `TyERefined (base, _)` を
+  base にlower (predicate AST は捨てる; Z3 接続は O-2.b)
+- `abclc/WhereClause.abcl` で parse + script execution 確認
+- 既存 71 abclc サンプル 71/71 PASS
+- `aipl_dist` smoke 8/8 PASS
 
-推定: 100-200 LOC
+実測 LOC: 約 80 行 (推定 100-200 内).
 
 #### O-2.b (1 session, medium): Z3 binding + Int refinement (CE-1, CE-9)
 

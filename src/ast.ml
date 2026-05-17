@@ -14,6 +14,24 @@ type type_expr =
   | TyETuple of type_expr list
   | TyERecord of (string * type_expr) list
   | TyEName of string         (* future: actor / class type names *)
+  | TyERefined of type_expr * refine_pred
+    (* `T where <pred>` — refinement type carrying a predicate that
+       the inference layer (Phase O-2.b) will discharge via Z3.  For
+       O-2.a the predicate is just stored in the AST; no checking. *)
+
+(* Boolean predicate used inside a `where` clause.  Mirrors the
+   subset of `expr` that makes sense in a refinement: comparisons,
+   arithmetic, identifiers (binders), literals, plus the keyword bool
+   ops and / or / not.  Kept as its own AST node so we can later
+   translate it 1:1 to a Z3 formula. *)
+and refine_pred =
+  | RpInt of int
+  | RpFloat of float
+  | RpVar of string
+  | RpUnary of string * refine_pred            (* "-" | "not" *)
+  | RpBinop of string * refine_pred * refine_pred
+                                                (* + - * / == != < > <= >= and or *)
+  | RpParen of refine_pred
 
 type send_target =
   | LocalTarget of string

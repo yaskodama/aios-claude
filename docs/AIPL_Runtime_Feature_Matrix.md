@@ -204,7 +204,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | ----- | -------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :-: | ------------------------------------- |
 | CE-1  | Phase C: constraint-based HM + Z3 refinement (Int) |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_C_REPORT.md`                   |
 | CE-2  | Phase D-1: cross-class inference                   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_D_REPORT.md`                   |
-| CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
+| CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  🟡¹  |  🟡¹ |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
 | CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
 | CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
 | CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
@@ -213,6 +213,12 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
+
+¹ OCaml は Phase O-2.a で **parsing のみ** 達成 (2026-05-18): lexer に
+  `where`/`and`/`or`/`not` キーワード追加、`type_expr WHERE refine_or`
+  の sub-grammar、AST に `TyERefined of type_expr * refine_pred` を保持。
+  Z3 による predicate 検査 (CE-1/CE-9) は Phase O-2.b で接続予定。
+  サンプル: `abclc/WhereClause.abcl`。
 
 OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
 Z3 backend には対応していない。OCaml への移植は今後の課題。

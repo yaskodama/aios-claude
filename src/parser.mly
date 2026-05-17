@@ -23,6 +23,7 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token ARROW /* -> */
 %token EOF NEW
 %token VAR EQ NEQ DOT BECOME FUNCTION RETURN
+%token WHERE AND_KW OR_KW NOT_KW   /* O-2.a: refinement-type predicates */
 /* Precedence and associativity, lowest to highest.
    Aim: keep the grammar at exactly one shift/reduce conflict —
    the canonical "dangling else" (IF ... stmt vs IF ... stmt ELSE stmt).
@@ -124,6 +125,48 @@ type_expr:
                                           else TyEName ($1 ^ "[" ^ "...]") }
   | LPAREN type_expr_tuple RPAREN       { TyETuple $2 }
   | LBRACE type_expr_record RBRACE      { TyERecord $2 }
+  | type_expr WHERE refine_or            { TyERefined ($1, $3) }
+                                          /* O-2.a: T where <pred>
+                                             — refinement, predicate
+                                             stored in AST but not
+                                             checked until O-2.b */
+
+/* Refinement predicate sub-grammar.  Kept separate from `expr` so the
+   AND_KW / OR_KW / NOT_KW tokens only carry boolean meaning when seen
+   inside a `where` clause.  Same shape as Python's `refinement`. */
+refine_or:
+  | refine_and                                          { $1 }
+  | refine_or OR_KW refine_and                          { RpBinop ("or", $1, $3) }
+refine_and:
+  | refine_not                                          { $1 }
+  | refine_and AND_KW refine_not                        { RpBinop ("and", $1, $3) }
+refine_not:
+  | refine_cmp                                          { $1 }
+  | NOT_KW refine_not                                   { RpUnary ("not", $2) }
+refine_cmp:
+  | refine_sum                                          { $1 }
+  | refine_sum EQ refine_sum                            { RpBinop ("==", $1, $3) }
+  | refine_sum NEQ refine_sum                           { RpBinop ("!=", $1, $3) }
+  | refine_sum LT refine_sum                            { RpBinop ("<",  $1, $3) }
+  | refine_sum GT refine_sum                            { RpBinop (">",  $1, $3) }
+  | refine_sum LE refine_sum                            { RpBinop ("<=", $1, $3) }
+  | refine_sum GE refine_sum                            { RpBinop (">=", $1, $3) }
+refine_sum:
+  | refine_mul                                          { $1 }
+  | refine_sum PLUS refine_mul                          { RpBinop ("+", $1, $3) }
+  | refine_sum MINUS refine_mul                         { RpBinop ("-", $1, $3) }
+refine_mul:
+  | refine_unary                                        { $1 }
+  | refine_mul TIMES refine_unary                       { RpBinop ("*", $1, $3) }
+  | refine_mul DIV refine_unary                         { RpBinop ("/", $1, $3) }
+refine_unary:
+  | MINUS refine_unary                                  { RpUnary ("-", $2) }
+  | refine_atom                                         { $1 }
+refine_atom:
+  | INTLIT                                              { RpInt $1 }
+  | FLOATLIT                                            { RpFloat $1 }
+  | ID                                                  { RpVar $1 }
+  | LPAREN refine_or RPAREN                             { RpParen $2 }
 
 type_expr_tuple:
   | type_expr COMMA type_expr           { [$1; $3] }

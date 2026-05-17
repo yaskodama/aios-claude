@@ -1,0 +1,39 @@
+// Phase O-2.a: `where` clause refinement-type syntax (parsing only).
+//
+// AIPL OCaml grammar now accepts `T where <predicate>` in any type
+// position.  The predicate uses boolean keyword operators `and` / `or`
+// / `not`, the arithmetic / comparison set already in expressions,
+// and identifier binders.
+//
+// At this phase the predicate is parsed and stored in the AST as a
+// `RefinePred` value but NOT checked — the Z3-backed discharge step
+// arrives in Phase O-2.b.  For now this sample just exercises the
+// surface syntax across the three places type expressions appear:
+// var decls, method parameters, and method return types.
+
+class Engine {
+  // Parameter refinement: the binder is the parameter name `r`.
+  method process(r: int where r >= 0 and r <= 100) -> int where ret > 0 {
+    return r * 2 + 1;
+  }
+  // Disjunction in a refinement.
+  method sign(k: int where k == 1 or k == -1) -> int {
+    return k;
+  }
+  // `not`.
+  method nonzero(x: int where not (x == 0)) -> int {
+    return x;
+  }
+}
+
+// Variable refinement (AST-stored only — no runtime check yet).
+var n: int where n > 0 = 7;
+
+var e = new Engine();
+var a = now e.process(50);
+var b = now e.sign(-1);
+var c = now e.nonzero(42);
+print(a);
+print(b);
+print(c);
+print(n);
