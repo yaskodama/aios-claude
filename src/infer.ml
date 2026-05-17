@@ -49,13 +49,29 @@ let rec ty_of_type_expr_with_tbl
                 Hashtbl.replace t n tv;
                 Types.TVar tv)
        | _ -> Types.TAny)
-  (* O-2.a: refinement type `T where <pred>` lowers to its base type
-     for now.  The predicate `_pred` is intentionally discarded here;
-     Phase O-2.b will introduce a Types.ty constructor for refinements
-     and a Z3-based discharge step.  For O-2.a we just want the new
-     surface syntax to parse and round-trip through inference without
-     altering existing behaviour. *)
-  | Ast.TyERefined (base, _pred) -> go base
+  (* O-2.a / O-2.b: refinement type `T where <pred>` lowers to its
+     base type.  Phase O-2.b adds an opt-in Z3-backed
+     declaration-time check that prints a warning when the predicate
+     is vacuously false (UNSAT for every assignment).  Disabled
+     unless AIPL_REFINE_CHECK=1 so it never blocks the test loop. *)
+  | Ast.TyERefined (base, pred) ->
+      let base_ty = go base in
+      (if not !in_preinfer then
+        (* Only check during the main inference pass; preinfer is the
+           lightweight first scan that doesn't know binder names yet. *)
+        match Sys.getenv_opt "AIPL_REFINE_CHECK" with
+        | Some "1" ->
+            (try
+              if Refinement.is_vacuously_false
+                  ~base:base_ty ~binder:"x" pred then
+                Printf.eprintf
+                  "[refine warning] vacuously-false refinement: %s where %s\n%!"
+                  (match base_ty with TInt -> "int" | TFloat -> "float"
+                                    | TString -> "string" | _ -> "?")
+                  (Refinement.string_of_pred pred)
+            with _ -> ())
+        | _ -> ());
+      base_ty
 
 let ty_of_type_expr ?tvar_table te =
   ty_of_type_expr_with_tbl tvar_table te

@@ -21,7 +21,8 @@
   c_translator
   web_gateway
   ai
-  aipl_dist)
+  aipl_dist
+  refinement)
  (flags (:standard -w -a))
  (libraries tsdl threads unix))
 
@@ -54,3 +55,9 @@
  (modules test_aipl_dist)
  (flags (:standard -w -a))
  (libraries abcllib str unix threads))
+
+(executable
+ (name test_refine_check)
+ (modules test_refine_check)
+ (flags (:standard -w -a))
+ (libraries abcllib unix))

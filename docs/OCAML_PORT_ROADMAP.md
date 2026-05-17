@@ -93,15 +93,36 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
 
 実測 LOC: 約 80 行 (推定 100-200 内).
 
-#### O-2.b (1 session, medium): Z3 binding + Int refinement (CE-1, CE-9)
+#### O-2.b (1 session, medium): Z3 backend + Int refinement (CE-1, CE-9) ✅ 完了 (2026-05-18)
 
-- `opam install z3` で OCaml バインディング導入
-- `src/refinement.ml` を新規作成 (Z3 Solver wrapper)
-- `_z3_check_int : expr -> bool * string` を実装
-- `infer.ml` の制約解決後に refinement check を呼ぶ
-- declaration-time の vacuously-false 検出 (CE-9)
+実装結果:
+- z3 4.15.2 CLI を `opam install z3` 経由で利用 (OCaml bindings ではなく
+  SMT-LIB 2 + `z3 -in -t:5000` で stdin/stdout 経由、依存最小化)
+- `src/refinement.ml` (~165 LOC) を新規作成:
+  - `Ast.refine_pred` → SMT-LIB 2 への renderer (`render_pred`)
+  - 自由変数収集 + `(declare-const v Int)` 自動生成 (`collect_vars`,
+    `render_smt`)
+  - `find_z3 ()` で `command -v z3` 検出 + キャッシュ
+  - `run_z3_check` で 1-shot 実行 (PATH に z3 が無い場合は `None`)
+  - `check_pred : base:ty -> binder:string -> refine_pred -> check_result`
+    で `Satisfiable | Unsatisfiable | Deferred string` を返す
+  - `is_vacuously_false` 便利関数
+  - `string_of_pred` で diagnostic message 生成
+- `src/infer.ml` の `ty_of_type_expr_with_tbl` に `TyERefined` 用 hook を
+  追加 (env `AIPL_REFINE_CHECK=1` で発火、stderr に `[refine warning]
+  vacuously-false refinement: ...` を出力、Z3 不在時 silent fallback)
+- 単体テスト 6 個追加 (test_aipl_dist 内: SAT/UNSAT/OR+NOT/free-vars/
+  non-Int defer/string_of_pred) → 14/14 PASS
+- `abclc/WhereVacuous.abcl` サンプル + driver `src/test_refine_check.ml`
+- 既存 72 abclc サンプル全 PASS
 
-推定: 300-500 LOC
+実測 LOC: 約 250 行 (推定 300-500 内).
+
+⚠️ 現状の限界:
+- 警告は `Typecheck.run` 経由でしか発火しない (`repl_thread.exe -f` の
+  ランタイム実行パスでは型検査は走らない). `/api/typecheck` endpoint と
+  `web_gateway.ml` 経由で観測可能.
+- 警告のみ (エラー化なし). `--strict` 相当の機能は CLI 統合 (O-2.f) で.
 
 #### O-2.c (1 session, medium): Real / Rat refinement (CE-6)
 

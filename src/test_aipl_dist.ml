@@ -173,6 +173,80 @@ let test_quorum () =
        with Not_found -> false));
   pass "quorum_replicate first-wins + all-fail"
 
+(* ─────────────────────────────────────────────────────────────── *)
+(* O-2.b: refinement (Z3-backed) tests                              *)
+(* ─────────────────────────────────────────────────────────────── *)
+
+let test_refinement_sat_basic () =
+  (* `Int where k >= 0 and k <= 100` is satisfiable. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">=", RpVar "k", RpInt 0),
+                  RpBinop ("<=", RpVar "k", RpInt 100))) in
+  (match Refinement.check_pred ~base:Types.TInt ~binder:"k" pred with
+   | Refinement.Satisfiable -> ()
+   | r ->
+       let lbl = match r with
+         | Refinement.Unsatisfiable -> "unsat"
+         | Refinement.Deferred s    -> "deferred(" ^ s ^ ")"
+         | Refinement.Satisfiable   -> "sat"
+       in
+       fail "refinement sat basic" ("got " ^ lbl));
+  pass "refinement SAT (k>=0 and k<=100)"
+
+let test_refinement_unsat () =
+  (* `Int where k >= 5 and k <= 3` is vacuously false. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">=", RpVar "k", RpInt 5),
+                  RpBinop ("<=", RpVar "k", RpInt 3))) in
+  (match Refinement.check_pred ~base:Types.TInt ~binder:"k" pred with
+   | Refinement.Unsatisfiable -> ()
+   | r ->
+       let lbl = match r with
+         | Refinement.Satisfiable -> "sat"
+         | Refinement.Deferred s  -> "deferred(" ^ s ^ ")"
+         | Refinement.Unsatisfiable -> "unsat"
+       in
+       fail "refinement unsat" ("got " ^ lbl));
+  pass "refinement UNSAT (k>=5 and k<=3)"
+
+let test_refinement_with_or_not () =
+  (* `not (x == 0) or x > 100` — satisfiable (any x != 0). *)
+  let pred = Ast.(RpBinop ("or",
+                  RpUnary ("not", RpBinop ("==", RpVar "x", RpInt 0)),
+                  RpBinop (">", RpVar "x", RpInt 100))) in
+  (match Refinement.check_pred ~base:Types.TInt ~binder:"x" pred with
+   | Refinement.Satisfiable -> ()
+   | _ -> fail "refinement or+not" "expected SAT");
+  pass "refinement OR / NOT operators"
+
+let test_refinement_free_vars () =
+  (* Multi-binder predicate: `m > a and m < b` — sat for a < b. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">", RpVar "m", RpVar "a"),
+                  RpBinop ("<", RpVar "m", RpVar "b"))) in
+  (match Refinement.check_pred ~base:Types.TInt ~binder:"m" pred with
+   | Refinement.Satisfiable -> ()
+   | _ -> fail "refinement free vars" "expected SAT");
+  pass "refinement with free vars (m>a and m<b)"
+
+let test_refinement_non_int () =
+  let pred = Ast.(RpBinop (">", RpVar "x", RpInt 0)) in
+  (match Refinement.check_pred ~base:Types.TString ~binder:"x" pred with
+   | Refinement.Deferred _ -> ()
+   | _ -> fail "refinement non-int" "expected Deferred");
+  pass "refinement defers non-Int base"
+
+let test_refinement_string_of_pred () =
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">=", RpVar "k", RpInt 0),
+                  RpUnary ("not", RpBinop ("==", RpVar "k", RpInt 5)))) in
+  let s = Refinement.string_of_pred pred in
+  assert (s <> "");
+  (* Spot-check: must contain the operands. *)
+  assert (try let _ = Str.search_forward (Str.regexp "k >= 0") s 0 in true
+          with Not_found -> false);
+  pass "refinement string_of_pred"
+
 let () =
   Printf.printf "=== aipl_dist smoke ===\n%!";
   test_disabled ();
@@ -183,4 +257,11 @@ let () =
   test_subtree ();
   test_tls_auto_parent ();
   test_quorum ();
-  Printf.printf "\n8/8 passing\n%!"
+  Printf.printf "\n=== refinement (Z3) ===\n%!";
+  test_refinement_sat_basic ();
+  test_refinement_unsat ();
+  test_refinement_with_or_not ();
+  test_refinement_free_vars ();
+  test_refinement_non_int ();
+  test_refinement_string_of_pred ();
+  Printf.printf "\n14/14 passing\n%!"
