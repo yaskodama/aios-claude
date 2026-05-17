@@ -1,0 +1,160 @@
+{
+  "_source_aice": "AIPL_v2_Distributed.aice",
+  "_source_dialect": "aice_yaml_v1",
+  "_source_version": "0.2.0",
+  "_generated": "2026-05-17 (hand-crafted from YAML, post spec review)",
+  "_comment": "AIPL bootstrap v2 (2) distributed runtime: aipl_ai/runtime/remote の進化計算による分散・負荷分散・フェイルオーバ設計探索。11 axes (5 cell), 6 reviewers (R6 hard floor = real_world_precedent), MAP-Elites 8 seed × 30 gen.  AIPL の言語意味論は不変 (backward compat hard).  Spec review fix A/B 適用済 (real_world_floor = R6_score >= 0.5 閾値式, SHA256 完全一致 → 先頭 100 桁 / 意味的同等)。",
+
+  "name": "AIPL_v2_Distributed",
+  "task": "AIPL ランタイム層 (aipl_ai.py, aipl_runtime.py, aipl_remote) を進化計算で拡張し、分散・負荷分散・フェイルオーバを実現する設計を発見する。既存 AIPL プログラム (PsiLang2, evolve block, samples/feature_a-g 21 件, src/python-aipl/samples 33 件) は無変更で動くこと必須。",
+  "schema_ref": "aipl_distributed.schema.json",
+
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "scheduler_model",
+      "failover_policy",
+      "actor_placement",
+      "supervisor_strategy",
+      "opt_in_annotation_style"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415930
+  },
+
+  "operators": {
+    "mutations": [
+      { "name": "axis_resample",   "kind": "single_axis",            "weight": 0.55 },
+      { "name": "coherent_shift",  "kind": "multi_axis_correlated",  "weight": 0.35 },
+      { "name": "llm_proposal",    "kind": "llm_directed",           "weight": 0.10 }
+    ],
+    "crossovers": [
+      { "name": "uniform",   "kind": "axis_uniform",       "weight": 0.6 },
+      { "name": "one_point", "kind": "schema_partition",   "weight": 0.4 }
+    ]
+  },
+
+  "evaluation": {
+    "use_ai": true,
+    "evaluator": "Evaluator",
+    "hard_floor_reviewer": "R6_RealWorldPrecedent",
+    "hard_floor": {
+      "reviewer": "R6_RealWorldPrecedent",
+      "threshold": 0.5,
+      "_comment": "Spec fix A: R6 score < 0.5 → final fitness 0 (real_world_floor)."
+    },
+    "tasks": [
+      "SurviveSilentHang",
+      "SustainedThroughput",
+      "BackwardCompatPsiLang2",
+      "MultiProviderFailover",
+      "LineageDurability",
+      "ImplCostEstimate"
+    ],
+    "task_specs": {
+      "SurviveSilentHang":       { "weight": 0.20, "hard": true,  "spec": "ノード A の OpenAI SDK が silent hang した場合、ノード B が継続して全 38 個体を評価できる" },
+      "SustainedThroughput":     { "weight": 0.20, "hard": true,  "spec": "OpenAI tier 1 (500 RPM, 200k TPM) を超えても他 provider 自動切替で 30+ calls/min を維持" },
+      "BackwardCompatPsiLang2":  { "weight": 0.20, "hard": true,  "spec": "既存 PsiLang2 chudnovsky.psi を 1 行も変更せず実行可能" },
+      "MultiProviderFailover":   { "weight": 0.15, "spec": "gpt-4o-mini → claude-haiku-4-5 自動切替後も π 計算結果が同等 (数値: 先頭 100 桁一致 / テキスト: 意味的同等)" },
+      "LineageDurability":       { "weight": 0.15, "spec": "1 ノード強制 kill しても lineage の最後の世代まで他ノードに保存されている" },
+      "ImplCostEstimate":        { "weight": 0.10, "spec": "ランタイム改修が 1000-3000 行で済む (言語実装は不変)" }
+    },
+    "reviewers": [
+      {
+        "name": "R1_HangResilience",
+        "weight": 0.20,
+        "persona": "あなたは R1 (ハング耐性) を判定するレビュアーです。候補の failover_policy, rebalancing_trigger, supervisor_strategy を見て、1 provider/node の SDK silent hang を他に逃がせるかを判定。1.0 = quorum_replicate + restart + on_429_or_5xx 等が揃って完全耐性、0.7 = multi_provider_fallback あり、0.3 = same_provider_retry のみ、0.0 = none。半角数字 1 つで。"
+      },
+      {
+        "name": "R2_Throughput",
+        "weight": 0.15,
+        "persona": "あなたは R2 (スループット) を判定するレビュアーです。候補の scheduler_model, ai_provider_abstraction, rebalancing_trigger を見て、OpenAI tier 1 を超えるシナリオで 30+ calls/min を維持できるかを判定。1.0 = provider_pool + rate_limit_aware + 自動 trigger、0.7 = 2 つあり、0.3 = 1 つ、0.0 = none。半角数字 1 つで。"
+      },
+      {
+        "name": "R3_BackwardCompat",
+        "weight": 0.20,
+        "persona": "あなたは R3 (後方互換) を判定するレビュアーです。candidate の opt_in_annotation_style, actor_placement, message_serialization が、既存 AIPL プログラム (注釈なし) で意味論を変えずに動くかを判定。1.0 = no_annotation_runtime_only + 既存 single_process が retain される、0.7 = opt-in attribute、0.3 = 必須注釈、0.0 = 大破壊。半角数字 1 つで。"
+      },
+      {
+        "name": "R4_FailoverCorrectness",
+        "weight": 0.15,
+        "persona": "あなたは R4 (フェイルオーバ正確性) を判定するレビュアーです。candidate の message_serialization, lineage_replication, supervisor_strategy が、provider 切替時に結果が同等とみなせる程度に維持できるかを判定。AI 呼び出しの温度ノイズで完全 SHA256 一致は非現実的なので, \"数値出力なら先頭 100 桁 (許容誤差 1e-100) / テキストなら意味的同等\" を基準にする. 1.0 = deterministic seed + checkpoint で 100% 同等再現, 0.7 = 高確率で同等, 0.3 = 結果は provider 依存, 0.0 = 切替で必ず大きくずれる. 半角数字 1 つで。"
+      },
+      {
+        "name": "R5_ImplementabilityRuntime",
+        "weight": 0.15,
+        "persona": "あなたは R5 (ランタイム実装可能性) を判定するレビュアーです。candidate 全体を見て、aipl_ai.py (現在 900 行) + aipl_runtime.py + aipl_remote の追加実装が何行になるかを判定。1.0 = ≤ 500 行、0.7 = ≤ 1500 行、0.3 = ≤ 3000 行、0.0 = 3000 行超 or 言語実装を触る必要あり。半角数字 1 つで。"
+      },
+      {
+        "name": "R6_RealWorldPrecedent",
+        "weight": 0.15,
+        "persona": "あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する分散 actor / 並列計算フレームワークとどれだけ近いかを判定する。先例: (1) Erlang/OTP = restart strategies + supervisor tree + actor mailbox, (2) Akka (Scala/Java) = cluster + sharding + pubsub, (3) Microsoft Orleans = grain + activation pool, (4) Pony = causal channels + capability types, (5) Ray = task scheduler + object store, (6) Dask = dynamic task graph, (7) Celery + Redis = queue-based worker pool. スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor により最終 fitness=0)。半角数字 1 つで。"
+      }
+    ]
+  },
+
+  "meta_fitness": {
+    "silent_hang_resilience": 0.20,
+    "throughput_per_dollar":  0.20,
+    "backward_compat_score":  0.20,
+    "failover_correctness":   0.15,
+    "real_world_precedent":   0.10,
+    "low_runtime_added_loc":  0.10,
+    "low_latency_overhead":   0.05,
+    "_comment": "Sum = 1.00. real_world_floor (R6_score >= 0.5) multiplies the whole.  low_runtime_added_loc = 1 - normalize(loc, [100, 2000]).  low_latency_overhead = 1 - normalize(latency, [0, 1.0])."
+  },
+
+  "ranking": {
+    "strategy": "scalar_with_pareto_tiebreak",
+    "scenarios": [
+      "balanced",
+      "hang_resilience_first",
+      "throughput_first"
+    ],
+    "scenario_weights": {
+      "balanced": {
+        "silent_hang_resilience": 0.20,
+        "throughput_per_dollar":  0.20,
+        "backward_compat_score":  0.20,
+        "failover_correctness":   0.15,
+        "real_world_precedent":   0.10,
+        "low_runtime_added_loc":  0.10,
+        "low_latency_overhead":   0.05
+      },
+      "hang_resilience_first": {
+        "silent_hang_resilience": 0.45,
+        "throughput_per_dollar":  0.10,
+        "backward_compat_score":  0.15,
+        "failover_correctness":   0.20,
+        "real_world_precedent":   0.05,
+        "low_runtime_added_loc":  0.05,
+        "low_latency_overhead":   0.00
+      },
+      "throughput_first": {
+        "silent_hang_resilience": 0.10,
+        "throughput_per_dollar":  0.45,
+        "backward_compat_score":  0.15,
+        "failover_correctness":   0.05,
+        "real_world_precedent":   0.10,
+        "low_runtime_added_loc":  0.10,
+        "low_latency_overhead":   0.05
+      }
+    },
+    "top_k": 5
+  },
+
+  "runtime": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "concurrency": 8,
+    "request_timeout_s": 60,
+    "sdk_retries": 3,
+    "drain_timeout_s": 7200,
+    "idle_ms": 60000,
+    "checkpoint_per_gen": true,
+    "caffeinate": true,
+    "_comment": "8 seed × 30 gen × 6 reviewers ≈ 1440 LLM calls. gpt-4o-mini で ~$1-3 想定。"
+  }
+}

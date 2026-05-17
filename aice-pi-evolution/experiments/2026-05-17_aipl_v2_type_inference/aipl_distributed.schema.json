@@ -1,0 +1,141 @@
+{
+  "name": "aipl_distributed",
+  "extends": null,
+  "_comment": "AIPL bootstrap v2 (2) distributed runtime — 11 axes for evolutionary search. Generated from AIPL_v2_Distributed.aice v0.2.0.",
+  "axes": {
+    "scheduler_model": [
+      "single_priority_gate",
+      "rate_limit_aware_per_provider",
+      "token_budget_aware",
+      "latency_aware",
+      "cost_weighted_routing"
+    ],
+    "failover_policy": [
+      "none",
+      "same_provider_retry",
+      "multi_provider_fallback",
+      "multi_model_fallback",
+      "quorum_replicate"
+    ],
+    "actor_placement": [
+      "single_process",
+      "local_thread_pool",
+      "multi_process_local",
+      "multi_node_via_remote",
+      "cluster_with_scheduler"
+    ],
+    "actor_addressing": [
+      "global_var_only",
+      "actor_url",
+      "actor_id_with_resolver",
+      "pid_with_supervisor"
+    ],
+    "lineage_replication": [
+      "single_node_fs",
+      "dual_node_mirror",
+      "quorum_replication",
+      "eventual_consistency_log",
+      "append_only_distributed_log"
+    ],
+    "supervisor_strategy": [
+      "none",
+      "restart_actor",
+      "restart_subtree",
+      "checkpoint_and_resume",
+      "quarantine_and_skip"
+    ],
+    "message_serialization": [
+      "in_memory_pyobj",
+      "json_over_tcp",
+      "msgpack_over_tcp",
+      "grpc_streaming",
+      "zmq_with_msgpack"
+    ],
+    "opt_in_annotation_style": [
+      "no_annotation_runtime_only",
+      "attribute_decorator",
+      "actor_constructor_arg",
+      "config_file_external",
+      "env_var_routing"
+    ],
+    "observability_layer": [
+      "print_only",
+      "structured_log",
+      "opentelemetry_traces",
+      "prometheus_metrics",
+      "dashboard_websocket"
+    ],
+    "ai_provider_abstraction": [
+      "single_select_via_env",
+      "provider_pool_with_health",
+      "cost_aware_provider_router",
+      "tier_aware_router"
+    ],
+    "rebalancing_trigger": [
+      "never",
+      "on_429_or_5xx",
+      "on_latency_spike",
+      "on_quota_threshold",
+      "continuous_periodic"
+    ]
+  },
+  "ordinal_axes": {
+    "actor_placement": [
+      "single_process",
+      "local_thread_pool",
+      "multi_process_local",
+      "multi_node_via_remote",
+      "cluster_with_scheduler"
+    ],
+    "failover_policy": [
+      "none",
+      "same_provider_retry",
+      "multi_provider_fallback",
+      "multi_model_fallback",
+      "quorum_replicate"
+    ],
+    "supervisor_strategy": [
+      "none",
+      "restart_actor",
+      "restart_subtree",
+      "checkpoint_and_resume",
+      "quarantine_and_skip"
+    ],
+    "lineage_replication": [
+      "single_node_fs",
+      "dual_node_mirror",
+      "quorum_replication",
+      "eventual_consistency_log",
+      "append_only_distributed_log"
+    ]
+  },
+  "coherence": [
+    {
+      "_comment": "Cluster placements need real addressing.  Cluster_with_scheduler + global_var_only is incoherent.",
+      "if": { "actor_placement": ["multi_node_via_remote", "cluster_with_scheduler"] },
+      "require_not": { "actor_addressing": ["global_var_only"] }
+    },
+    {
+      "_comment": "in_memory_pyobj is single-process only.",
+      "if": { "message_serialization": ["in_memory_pyobj"] },
+      "require": { "actor_placement": ["single_process", "local_thread_pool"] }
+    },
+    {
+      "_comment": "Quorum replication needs distributed placement.",
+      "if": { "lineage_replication": ["quorum_replication", "append_only_distributed_log"] },
+      "require": { "actor_placement": ["multi_process_local", "multi_node_via_remote", "cluster_with_scheduler"] }
+    },
+    {
+      "_comment": "Quorum failover requires provider_pool (or stronger).",
+      "if": { "failover_policy": ["quorum_replicate"] },
+      "require": { "ai_provider_abstraction": ["provider_pool_with_health", "cost_aware_provider_router", "tier_aware_router"] }
+    },
+    {
+      "_comment": "Supervisor strategies beyond `none` need real addressing to identify dead actors.",
+      "if": { "supervisor_strategy": ["restart_actor", "restart_subtree", "checkpoint_and_resume"] },
+      "require_not": { "actor_addressing": ["global_var_only"] }
+    }
+  ],
+  "open_axes": false,
+  "notes": "Cell axes (5): scheduler_model, failover_policy, actor_placement, supervisor_strategy, opt_in_annotation_style. Cell space = 5×5×5×5×5 = 3125 cells.  With 8 seeds × 30 generations = 240 evaluations, expected coverage ~7%.  Coherence rules above prune incoherent combinations at generation time."
+}

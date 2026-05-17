@@ -24,8 +24,14 @@ problem:
   series: AIPL_bootstrap
   series_number: 2
   sub_experiment: 2_distributed
-  version: 0.1.0
+  version: 0.2.0
   created: 2026-05-17
+  changelog:
+    "0.2.0":
+      - "spec review fix A: real_world_floor を R6_score >= 0.5 の閾値式で正式定義"
+      - "spec review fix B: MultiProviderFailover の SHA256 完全一致を緩和"
+      - "spec review fix B: R4_FailoverCorrectness persona を同じ基準に揃える"
+    "0.1.0": "initial draft (promoted from .original_draft 2026-05-17)"
   description: |
     AIPL の意味論を維持したまま分散 / 負荷分散 / フェイルオーバを
     ランタイム層 (aipl_ai.py + aipl_runtime.py + aipl_remote) で実現する
@@ -69,6 +75,15 @@ goal:
        + 0.10 * (1 - normalize(runtime_added_loc, [100, 2000]))
        + 0.05 * (1 - normalize(latency_overhead, [0, 1.0])))
     bounds: [0.0, 1.0]
+    # Spec fix A (post-review): real_world_floor is *not* a free
+    # variable.  It is a threshold function over R6_RealWorldPrecedent
+    # so that候補が現実先例から離れすぎている場合に最終 fitness を
+    # 0 に潰す.  R6 が 0.5 未満なら hard floor 発動.
+    real_world_floor:
+      formula: "1.0 if R6_RealWorldPrecedent.score >= 0.5 else 0.0"
+      source_reviewer: R6_RealWorldPrecedent
+      threshold: 0.5
+      semantics: hard_zero_below_threshold
 
 constraints:
   must_not_change_aipl_semantics: true     # 必須: 言語仕様は変えない
@@ -205,7 +220,10 @@ evaluation:
     BackwardCompatPsiLang2: { weight: 0.20, hard: true,
       spec: "既存 PsiLang2 chudnovsky.psi を 1 行も変更せず実行可能" }
     MultiProviderFailover: { weight: 0.15,
-      spec: "gpt-4o-mini → claude-haiku-4-5 の自動切替で π 計算結果が同一 (SHA256)" }
+      spec: "gpt-4o-mini → claude-haiku-4-5 の自動切替後も π 計算結果が同等
+      とみなせる. AI 呼び出しは温度ノイズで完全 SHA256 一致は非現実的なため,
+      数値出力の場合は先頭 100 桁が一致 (許容誤差 ≤ 1e-100), テキスト出力
+      の場合は意味的同等 (judge LLM 一致) を許容する." }
     LineageDurability: { weight: 0.15,
       spec: "1 ノード強制 kill しても lineage の最後の世代まで他ノードに保存されている" }
     ImplCostEstimate: { weight: 0.10,
@@ -244,9 +262,11 @@ evaluation:
       persona: |
         あなたは R4 (フェイルオーバ正確性) を判定するレビュアーです。candidate の
         message_serialization, lineage_replication, supervisor_strategy が、provider
-        切替時に結果 (例: π 10000 桁の SHA256) を変えずに済むかを判定。1.0 =
-        deterministic + checkpoint で完全再現、0.7 = 高確率で同じ、0.3 = 結果は
-        provider 依存、0.0 = 切替で SHA256 必ず変わる。半角数字 1 つで。
+        切替時に結果が同等とみなせる程度に維持できるかを判定。AI 呼び出しの温度
+        ノイズで完全 SHA256 一致は非現実的なので, "数値出力なら先頭 100 桁 (許容
+        誤差 1e-100) / テキストなら意味的同等" を基準にする. 1.0 = deterministic
+        seed + checkpoint で 100% 同等再現, 0.7 = 高確率で同等, 0.3 = 結果は
+        provider 依存, 0.0 = 切替で必ず大きくずれる. 半角数字 1 つで。
 
     - name: R5_ImplementabilityRuntime
       weight: 0.15
