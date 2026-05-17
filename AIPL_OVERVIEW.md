@@ -184,6 +184,8 @@ invoke an OCaml actor and vice versa.  See
 If you're new to the project, this is the recommended path:
 
 1. `USER_MANUAL.md` — language reference, top-down by Phase.
+   Sections §6 (Phase C–E2 type inference) and §7 (AIPL v2
+   Distributed Runtime / `aipl_dist`) cover post-Phase-11 work.
 2. `docs/AIPL_Type_Soundness_Report.pdf` — what the type system
    does and doesn't prove.
 3. `aipl-self-host/level-a/README.md` then `level-b{1,2,3,4,5}` —

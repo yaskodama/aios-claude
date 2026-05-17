@@ -38,6 +38,9 @@
    - 5.6 [Philosophers — 食事する哲学者](#56-philosophers--食事する哲学者)
    - 5.7 [Rotate4Lines — SDL 描画とタイマー](#57-rotate4lines--sdl-描画とタイマー)
    - 5.8 [WebCalc — HTTP ゲートウェイと `select`](#58-webcalc--http-ゲートウェイと-select)
+6. [Phase C-E2 型推論 (Python ランタイム)](#6-phase-c-e2-型推論-python-ランタイム)
+7. [AIPL v2 Distributed Runtime (`aipl_dist`)](#7-aipl-v2-distributed-runtime-aipl_dist)
+8. [付録：トラブルシューティング](#8-付録トラブルシューティング)
 6. [付録：トラブルシューティング](#6-付録トラブルシューティング)
 
 ---
@@ -1402,7 +1405,248 @@ print("Open http://localhost:8080/ and send to actor 'calc'");
 
 ---
 
-## 6. 付録：トラブルシューティング
+## 6. Phase C-E2 型推論 (Python ランタイム)
+
+Phase 11 系の **gradual 静的型検査** に加え、Python 版 AIPL は Phase C 以降で
+**constraint-based Hindley–Milner 型推論 + Z3 refinement** を備える。注釈の
+明示が無くてもプログラム全体の型情報を組み立て、後段の Phase E-2 統合 CLI
+(`--check`) で type-check と inference を同時に走らせられる。
+
+実装ファイル: `src/python-aipl/aipl_inference.py` (約 1255 LOC, Phase E-2 時点)。
+
+### 6.1 CLI: `--infer`, `--check`
+
+| フラグ | 役割 |
+|---|---|
+| `--type-check` | Phase 11 系の signature-based gradual checker (既存) |
+| `--infer` | constraint-based HM 推論 + Z3 refinement (Phase C/D/E) を走らせ、メソッド毎に推論結果を表示して終了 |
+| **`--check`** | 上記 2 つを section ヘッダ付きで **同時実行** (Phase E-2)。両方の結果を 1 コマンドで得る |
+| `--strict` | issue があれば exit code 2 (typeck) / 3 (infer) で停止 |
+
+```sh
+# 型推論のみ
+python3 src/python-aipl/aipl_main.py program.aipl --infer
+
+# 統合: type-check + 型推論 (推奨)
+python3 src/python-aipl/aipl_main.py program.aipl --check
+
+# 厳密モード: いずれかが issue を出せば exit
+python3 src/python-aipl/aipl_main.py program.aipl --check --strict
+```
+
+`--infer` / `--check` はプログラムを実行しない (パース後に解析だけ走らせて exit)。
+
+### 6.2 推論される情報
+
+`--infer` の出力例 (`feature_b_crossclass/sample1_simple.aipl` より):
+
+```
+=== Adder.add ===
+  params:
+    x : Int
+    y : Int
+  return : Int
+
+=== Bridge.use_adder ===
+  params:
+    other : Adder
+    a : Int
+    b : Int
+  return : Int
+  locals:
+    s : Int
+
+[infer] 2 method(s), 0 unify issue(s), 0 refinement issue(s)
+```
+
+注釈ゼロのコードから `Adder.add` の `Int → Int → Int` と `Bridge.use_adder`
+の `other : Adder` までを **クラス越境で逆推論** している。
+
+### 6.3 達成された機能 (Phase C → E-2)
+
+| 機能 | Phase | 説明 |
+|---|---|---|
+| 基本 HM 型推論 | C | Int → Int の関数や Bool 述語、Rat/Real の自動推論 |
+| Cross-class 推論 (D-1) | D | `now obj.method()` を介して引数・戻り型がクラス間を流れる |
+| `where` 句 (refinement) | E-α | `Int where k >= 0 and k <= 100` を AIPL 表層で記述、Z3 で検査 |
+| Actor field 共有 (E-β) | E-β | `var n = 0;` のクラス field を method 横断で 1 つの TVar に固定 |
+| Record structural (E-γ) | E-γ | `{a: Int, b: Str}` 構造的型 + width subtyping |
+| Real/Rat refinement (E-γ-R) | E-γ-R | `Real where x > 0.0` の Z3 Real theory 判定 |
+| typeck × inference 統合 | E-2 | `--check` で type-check + 推論を 1 コマンド実行、`BUILTIN_SIGNATURES` 共有 |
+
+### 6.4 `where` 句の使い方
+
+```aipl
+class Engine {
+  method process(r: Int where r >= 0 and r <= 100) -> Int {
+    reply(r * 2);
+  }
+}
+```
+
+`AIPL_v2_TypeInference` 仕様で進化計算により発見された設計。サンプルは
+`aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_c_refinement/`。
+
+充足不可能な refinement (vacuous false) は **declaration-time** に検査される:
+
+```aipl
+method bad(k: Int where k >= 5 and k <= 3) -> Int { reply(k); }
+// → refinement issue: vacuously false (Z3 unsat)
+```
+
+### 6.5 詳細ドキュメント
+
+各 Phase の設計・実装記録は `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/`:
+
+- `PHASE_C_REPORT.md` (HM + Z3 基本実装)
+- `PHASE_D_REPORT.md` (cross-class)
+- `PHASE_E_REPORT.md` (`where` 句 in grammar)
+- `PHASE_E_BETA_REPORT.md` (actor field 共有)
+- `PHASE_E_GAMMA_REPORT.md` (record structural)
+- `PHASE_E_GAMMA_R_REPORT.md` (Real/Rat refinement)
+- `PHASE_E_2_REPORT.md` (`--check` 統合)
+- `SAMPLES_SNAPSHOT.md` (7 feature × 3 = 21 sample の実行スナップショット)
+
+---
+
+## 7. AIPL v2 Distributed Runtime (`aipl_dist`)
+
+`aipl_dist.py` は AIPL v2 (2) "Distributed" の進化計算で発見された設計
+(I0003 balanced / I0023 hang-resilience / I0036 Erlang OTP の 3 候補) を
+**ランタイム層に opt-in で重ね合わせる** モジュール (約 591 LOC)。AIPL 言語仕様
+は不変、既存サンプルは無改変で同じ挙動。
+
+実装ファイル:
+- `src/python-aipl/aipl_dist.py` (新規モジュール)
+- `src/python-aipl/aipl_interp.py` (spawn 時の自動 hook, +27 行)
+- `src/python-aipl/aipl_runtime.py` (actor 失敗時の自動 hook, +13 行)
+
+### 7.1 マスター切替
+
+```sh
+export AIPL_DIST_ENABLE=1   # ← これが unset / "0" なら全機能 no-op
+```
+
+`AIPL_DIST_ENABLE=1` を立てないと、`aipl_dist` の関数群は **すべて即 None /
+False を返す no-op**。既存プログラムへの影響ゼロを構造的に保証する。
+
+### 7.2 8 機能の一覧 (`AIPL_DIST_ENABLE=1` 前提)
+
+| 機能 | env var | 説明 |
+|---|---|---|
+| **I-1** env_var_routing | `AIPL_ROUTE="Name1:tag1,Name2:tag2"` | actor 名 → tag のルーティングテーブル。`route_for("Name")` で参照 |
+| **I-2** structured_log | `AIPL_DIST_LOG_FILE=/path/log.ndjson` | ND-JSON 1 行 / event、スレッドセーフ書込 |
+| **I-3** token_budget_aware | `AIPL_DIST_RPM=N` / `AIPL_DIST_TPM=N` | 60 秒スライディング窓で AI call をレート制限 |
+| **I-4** checkpoint_and_resume | `AIPL_DIST_CHECKPOINT_DIR=/path/ck` | actor field を atomic に save、spawn 時に restore |
+| **IQ** quarantine_and_skip | `AIPL_DIST_QUARANTINE_TTL=60` | actor 失敗時に自動隔離、subsequent send は silent skip |
+| **IM-1** quorum_replicate | `AIPL_DIST_QUORUM_PROVIDERS="openai,anthropic,gemini"` | 並列で N provider に投げ、最初に応答したものを採用 |
+| **IM-2** subtree_quarantine | `AIPL_DIST_SUBTREE_QUARANTINE=1` | actor 失敗時にその子孫もまとめて隔離 (Erlang OTP 風) |
+| **integration** | (上記の組合せ) | spawn ツリー追跡、観測性、レジリエンスを統合 |
+
+### 7.3 クイックスタート
+
+`AIPL_DIST_ENABLE=1` 一発で観測性 (I-2) と spawn ログだけが ON になる:
+
+```sh
+AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+  AIPL_DIST_LOG_FILE=/tmp/aipl.ndjson \
+  python3 src/python-aipl/aipl_main.py program.aipl
+
+cat /tmp/aipl.ndjson
+# {"ts": 1779033685.5..., "event": "actor_spawn", "actor": "counter", "cls": "Counter"}
+# {"ts": 1779033685.5..., "event": "actor_routed", "actor": "counter", ...}
+```
+
+### 7.4 PsiLang v3 silent-hang シナリオへの対策一式
+
+PsiLang v3 trial #1 で OpenAI silent hang により 35/38 個体喪失した問題に対し、
+3 MVP を同時有効化すると **call-level / actor-level / subtree-level の 3 重防御**:
+
+```sh
+export AIPL_DIST_ENABLE=1
+export AIPL_DIST_QUORUM_PROVIDERS="openai,anthropic,gemini"  # IM-1
+export AIPL_DIST_QUARANTINE_TTL=60                          # IQ
+export AIPL_DIST_SUBTREE_QUARANTINE=1                       # IM-2
+export AIPL_DIST_CHECKPOINT_DIR=/tmp/aipl_ck                # I-4
+export AIPL_DIST_LOG_FILE=/tmp/aipl.ndjson                  # I-2
+```
+
+- **call-level**: OpenAI が hang しても anthropic/gemini が応答 → caller 継続
+- **actor-level**: それでも actor が落ちたら自動 quarantine (60s)
+- **subtree-level**: 子孫 actor もまとめて隔離 (= Erlang OTP の blast-radius containment)
+- **persistent state**: actor 再 spawn 時にチェックポイント復元
+- **observability**: 全イベントが NDJSON で記録
+
+### 7.5 サンプル (8 機能 × 3 = 24)
+
+`aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/IMPL_I0003_MVP/samples/`
+配下に feature 別サブディレクトリで整理:
+
+```
+samples/
+├── i1_env_var_routing/        sample1_basic.aipl, sample2_no_match.py, sample3_log_correlation.py
+├── i2_structured_log/         sample1_basic.py, sample2_no_file.py, sample3_multi_thread.py
+├── i3_token_budget/           sample1_basic.py, sample2_blocking.py, sample3_aipl_integration.aipl
+├── i4_checkpoint/             sample1_basic.py, sample2_atomic.py, sample3_list_states.py
+├── iq_quarantine/             sample1_basic.aipl, sample2_ttl_expiry.py, sample3_manual_clear.py
+├── im1_quorum/                sample1_first_wins.py, sample2_tolerates_one_failure.py, sample3_all_fail.py
+├── im2_subtree_quarantine/    sample1_basic.aipl, sample2_grandchildren.aipl, sample3_unrelated_unaffected.aipl
+└── integration/               sample1_basic.aipl, sample2_combined_logging.aipl, sample3_full_resilience.aipl
+```
+
+ユニットテストは `IMPL_I0003_MVP/tests/test_aipl_dist.py` (27 個)。
+
+### 7.6 公開 API (`aipl_dist` モジュール)
+
+```python
+import aipl_dist
+
+# マスター
+aipl_dist.is_enabled()                  -> bool
+
+# I-1 routing
+aipl_dist.route_for(name: str)           -> Optional[str]
+aipl_dist.parse_route_table(raw: str)    -> dict[str, str]
+
+# I-2 log
+aipl_dist.log_event(event, **fields)     -> bool
+
+# I-3 budget
+aipl_dist.token_budget_gate()            -> Optional[TokenBudgetGate]
+aipl_dist.call_ai_with_budget(prompt, call_ai_fn=None, **kw) -> str
+
+# I-4 checkpoint
+aipl_dist.save_actor_state(name, state)  -> bool
+aipl_dist.restore_actor_state(name)      -> Optional[dict]
+aipl_dist.list_actor_states()            -> dict[str, str]
+
+# IQ quarantine
+aipl_dist.quarantine_actor(name, ttl=None) -> bool
+aipl_dist.is_quarantined(name)             -> bool
+aipl_dist.clear_quarantine(name)           -> bool
+aipl_dist.quarantine_status()              -> dict[str, float]
+
+# IM Erlang OTP
+aipl_dist.register_spawn(child, parent)    -> None
+aipl_dist.descendants_of(actor)            -> list[str]
+aipl_dist.quarantine_subtree(actor, ttl=None) -> list[str]
+aipl_dist.call_ai_quorum(prompt, providers=None, **kw) -> str
+```
+
+すべての関数は `AIPL_DIST_ENABLE != "1"` 時に None / False / 空 dict を返す no-op。
+
+### 7.7 進化計算による設計探索の出自
+
+`aipl_dist.py` の設計は手書きではなく、`AIPL_v2_Distributed.aice` (11 軸 GA 仕様)
+を MAP-Elites で 8 seed × 30 gen 探索した結果から派生:
+
+- 仕様: `AIPL_v2_Distributed.aice` / `.ga.json` / `.schema.json` (`aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/`)
+- Run 1 / Run 2 結果: `distributed_run_outputs/` (38 個体 / 25 cells / 24 min × 2)
+- 設計レポート: `IMPL_DESIGN.md`, `IMPL_RUN_REPORT.md`, `IMPL_INTEGRATION_REPORT.md`, `IMPL_I0023_REPORT.md`, `IMPL_I0036_REPORT.md`
+
+---
+
+## 8. 付録：トラブルシューティング
 
 | 症状 | 対処 |
 |------|------|
@@ -1412,7 +1656,14 @@ print("Open http://localhost:8080/ and send to actor 'calc'");
 | `select` がいつまでも返らない | パターンが受信メッセージと一致していない／`timeout` 未指定 |
 | SDL ウィンドウが反応しない | `sdl_present()` を毎フレーム呼ぶ／`wait` で yield する |
 | HTTP リクエストでハング | `reply` を呼んでいない or `select` が適切な `case` を持たない |
+| **`[infer] ... unify issue(s)`** | `--infer` の出力。場所 (`at assign to s` 等) を見て型注釈を調整／`AIPL_AI_PROVIDER=mock` で再現確認 |
+| **`refinement is vacuously false`** | `where` 句の predicate が Z3 で unsat。値域を見直す (例: `k >= 5 and k <= 3` は空集合) |
+| **`[actor X.Y] error: unknown function: foo`** | 実行時の builtin 未登録。`aipl_interp.py` の `BUILTIN_TABLE` を確認 |
+| **AIPL ランタイムが silent hang** | `AIPL_DIST_ENABLE=1 AIPL_DIST_QUARANTINE_TTL=60` を立てて再走。失敗 actor が自動隔離される |
+| **OpenAI tier-1 rate limit に当たる** | `AIPL_DIST_ENABLE=1 AIPL_DIST_RPM=400 AIPL_DIST_TPM=180000` で I-3 ゲートを有効化 |
+| **AI call が provider 1 つで詰まる** | `AIPL_DIST_QUORUM_PROVIDERS="openai,anthropic,gemini"` で並列フェイルオーバ |
 
 > 設計思想についての補足：AIPL では「同期したいなら sender に reply、
 > 待ちたいなら select、状態を切り替えたいなら become」と覚えておくと、
-> 大半の並行パターンを言語機能だけで表現できます。
+> 大半の並行パターンを言語機能だけで表現できます。耐障害性は
+> **言語ではなく `aipl_dist` の env var で重ねる** のが Phase E 後の運用パターン。

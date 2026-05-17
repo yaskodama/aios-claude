@@ -138,6 +138,11 @@ Dist  : 8/8     (3-node distributed mock)
 ## Reference
 
 - Language tour and grammar: [USER_MANUAL.md](USER_MANUAL.md)
+  - §6 Phase C–E2 type inference (`--check` / `--infer` for HM + Z3 refinement)
+  - §7 AIPL v2 Distributed Runtime (`aipl_dist`) — 8 opt-in features
+    (env_var_routing / structured_log / token_budget / checkpoint /
+    quarantine_and_skip / quorum_replicate / subtree_quarantine /
+    integration) for hang-resilience and rate control
 - Builtin reference: [BUILTINS.md](BUILTINS.md)
 - Sample index: `samples/` and `samples-ai/` and `samples-remote/`
   under `src/python-aipl/`; `abclc/*.abcl` and `abclc/ai-samples/`,
