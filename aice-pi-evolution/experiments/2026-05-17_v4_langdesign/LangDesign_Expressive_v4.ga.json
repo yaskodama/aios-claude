@@ -1,0 +1,186 @@
+{
+  "_source_aice": "LangDesign_Expressive_v3.aice",
+  "_source_dialect": "aice_yaml_v1",
+  "_generated": "2026-05-16 (hand-crafted from v3 YAML)",
+  "_comment": "v3: v2 と同じ 12 軸だが (a) schema に 6 新 coherence rule (b) R6_RealWorldPrecedent reviewer 追加 (c) R5 を実 probing 化 (d) rng_seed を 1 ズラして初期分散を変える。codegen 互換 (タスク名は文字列、reviewer は name/persona/weight)。",
+  "name": "LangDesign_Expressive_v4",
+  "task": "v4 = v3 + (a) Generator.seed/mutate/cross rejection sampling on schema coherence (b) Evaluator hard floor on R6_RealWorldPrecedent. v2 の結果に混在した 実在しない言語の組合せ (c_like+refinement, openai+claude-haiku 等) を排除しつつ、6 task (PiChudnovskyBsplit, Factorial, Quicksort, FFT, Matmul, Fibonacci) を実装可能な汎用言語の遺伝子を進化計算で発見する。R6 reviewer による hard floor で現実性を担保する。",
+  "schema_ref": "lang_design_paradigm_v4.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm",
+      "type_system",
+      "arithmetic_primitives",
+      "control_flow",
+      "syntax_family"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415928,
+    "_note": "rng_seed は v2 の 31415926 から 1 違いで、最初の seed 抽選が完全に同じにならないように変える。"
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.55
+      },
+      {
+        "name": "coherent_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.35
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.1
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.6
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.4
+      }
+    ]
+  },
+  "evaluation": {
+    "use_ai": true,
+    "evaluator": "Evaluator",
+    "tasks": [
+      "PiChudnovskyBsplit",
+      "FactorialN",
+      "QuicksortInPlace",
+      "FFTMultiply",
+      "MatmulNCubed",
+      "FibonacciClosedForm"
+    ],
+    "task_specs": {
+      "PiChudnovskyBsplit": {
+        "weight": 0.3,
+        "hard": true
+      },
+      "FactorialN": {
+        "weight": 0.15,
+        "hard": true
+      },
+      "QuicksortInPlace": {
+        "weight": 0.1
+      },
+      "FFTMultiply": {
+        "weight": 0.1
+      },
+      "MatmulNCubed": {
+        "weight": 0.1
+      },
+      "FibonacciClosedForm": {
+        "weight": 0.1
+      }
+    },
+    "reviewers": [
+      {
+        "name": "R1_AlgorithmExpressivity",
+        "weight": 0.25,
+        "persona": "あなたは R1 (アルゴリズム表現力) を判定するレビュアーです。候補の 12 軸を見て、Chudnovsky binary-splitting が当該言語の構文だけで書けるか判定。基準: 50 行以内 → 1.0、100 行以内 → 0.7、200 行以内 → 0.3、書けない → 0.0。0.0-1.0 の decimal で半角数字 1 つだけ返してください。"
+      },
+      {
+        "name": "R2_ArbitraryPrecisionSafety",
+        "weight": 0.2,
+        "persona": "あなたは R2 (任意精度安全性) を判定するレビュアーです。arithmetic_primitives と precision_control を見て、N=10000 桁の正確計算が型で保証されるかを判定。1.0 = arbitrary_int_plus_rational 以上 + per_value_annotation 以上、0.7 = arbitrary 系 + implicit/global_const、0.3 = decimal_with_precision のみ、0.0 = それ以下。0.0-1.0 で半角数字 1 つだけ。"
+      },
+      {
+        "name": "R3_RecursionAndIteration",
+        "weight": 0.15,
+        "persona": "あなたは R3 (制御フロー) を判定するレビュアーです。control_flow と termination_check の組合せが、binary tree 再帰と loop の両方を表現できるか判定。1.0 = general_recursion か structured_loops 両方が表現可能、0.7 = tail_call_only 制約付き、0.3 = pattern_match_fold のみ、0.0 = list_comprehension のみ。0.0-1.0 の decimal を半角数字 1 つだけ。"
+      },
+      {
+        "name": "R4_ImplementabilityFeasibility",
+        "weight": 0.15,
+        "persona": "あなたは R4 (ホスト実装可能性) を判定するレビュアーです。compilation_target, syntax_family, type_system, paradigm が Python ホストで 500-3000 行の interpreter として書けるか判定。1.0 = tree_walker + ml_like/c_like/python_like + dynamic/static_simple/hindley_milner、0.7 = bytecode_vm + 単純型、0.3 = dependent 型、0.0 = 重複した複雑さ。0.0-1.0 の decimal を半角数字 1 つだけ。"
+      },
+      {
+        "name": "R5_Generality",
+        "weight": 0.15,
+        "persona": "あなたは R5 (汎用性) を判定するレビュアーです。各タスクが要求する primitive と候補の軸を照合: (1) PiChudnovskyBsplit: arbitrary_int_plus_rational + 再帰 + Real sqrt 必須。(2) FactorialN: arbitrary_int + 再帰 OR loop。(3) QuicksortInPlace: 可変配列または ref + 再帰 (gc/rc/manual 可、linear/borrow_check は困難)。(4) FFTMultiply: 配列 + 複素数 (refinement/dependent/interval_arithmetic 型で表現可) + 再帰。(5) MatmulNCubed: 2D 配列 + structured_loops 必須。(6) FibonacciClosedForm: 代数的数 (refinement/dependent) OR 行列累乗 (structured_loops + 配列)。満たすタスク数 / 6 を 0.0-1.0 の decimal で返してください。"
+      },
+      {
+        "name": "R6_RealWorldPrecedent",
+        "weight": 0.1,
+        "persona": "あなたは R6 (現実世界の先例) を判定するレビュアーです。候補の 12 軸が現実に存在する言語のうちどれに近いかを判定する。先例表: (1) OCaml = functional + hindley_milner + arbitrary_int_plus_rational + general_recursion + ml_like; (2) Haskell = functional + hindley_milner + arbitrary_int_plus_rational + lazy + haskell_like; (3) Python = hybrid/imperative + dynamic + arbitrary_int + structured_loops + python_like; (4) Common Lisp = functional/hybrid + dynamic + arbitrary_int_plus_rational + general_recursion + lisp_like; (5) Scheme = functional + dynamic + arbitrary_int_plus_rational + tail_call_only + lisp_like; (6) SML = functional + hindley_milner + arbitrary_int + general_recursion + ml_like; (7) Idris/Agda/Coq = functional + dependent + arbitrary_int + structural_recursion or totality + ml_like/haskell_like; (8) Prolog = declarative_equation + dynamic + arbitrary_int + pattern_match_fold + prolog_like; (9) APL/J/K = dataflow + dynamic + arbitrary_int + list_comprehension + apl_like; (10) Mathematica = term_rewriting + dynamic + arbitrary_int_plus_rational + pattern_match_fold + lisp_like/custom_minimal。スコア: 5 軸以上一致 → 1.0、3-4 軸一致 → 0.5、2 軸以下 → 0.0 (これが返ったら hard floor で最終 fitness = 0)。0.0-1.0 の decimal を半角数字 1 つだけ。"
+      }
+    ],
+    "hard_floor_reviewer": "R6_RealWorldPrecedent"
+  },
+  "meta_fitness": {
+    "_comment": "scalar_fitness の 6 重みを meta_fitness に展開。R6 hard floor は AIPL ランタイム側で実装できないので reviewer weight 0.10 として平均化で表現する (近似)。",
+    "algorithm_expressivity": 0.25,
+    "generality_breadth": 0.25,
+    "minimality": 0.15,
+    "implementability": 0.15,
+    "concision": 0.1,
+    "real_world_precedent": 0.1
+  },
+  "ranking": {
+    "strategy": "scalar_with_pareto_tiebreak",
+    "scenarios": [
+      "balanced",
+      "expressivity_first",
+      "realism_first"
+    ],
+    "scenario_weights": {
+      "balanced": {
+        "algorithm_expressivity": 0.25,
+        "generality_breadth": 0.25,
+        "minimality": 0.15,
+        "implementability": 0.15,
+        "concision": 0.1,
+        "real_world_precedent": 0.1
+      },
+      "expressivity_first": {
+        "algorithm_expressivity": 0.4,
+        "generality_breadth": 0.3,
+        "minimality": 0.05,
+        "implementability": 0.1,
+        "concision": 0.05,
+        "real_world_precedent": 0.1
+      },
+      "realism_first": {
+        "algorithm_expressivity": 0.2,
+        "generality_breadth": 0.15,
+        "minimality": 0.1,
+        "implementability": 0.15,
+        "concision": 0.05,
+        "real_world_precedent": 0.35
+      }
+    },
+    "top_k": 5
+  },
+  "extensions": {
+    "_note": "codegen 非破壊。v2 → v3 の差分情報。",
+    "v3_diff_from_v2": {
+      "added_reviewer": "R6_RealWorldPrecedent (weight 0.10)",
+      "added_coherence_rules": 6,
+      "rng_seed_changed": "31415926 → 31415927",
+      "expected_effect": "実在しない言語 (c_like+refinement, dependent+python_like 等) が cell として現れにくくなる"
+    },
+    "v4_diff_from_v3": {
+      "codegen_changes": [
+        "Util.is_coherent(genome) emitted from schema coherence rules",
+        "Generator.seed/mutate/cross do rejection sampling (≤50 tries)",
+        "Evaluator clamps fitness to 0.0 if hard_floor_reviewer returns 0.0"
+      ],
+      "ga_changes": [
+        "hard_floor_reviewer: R6_RealWorldPrecedent",
+        "rng_seed: 31415927 → 31415928"
+      ]
+    }
+  }
+}

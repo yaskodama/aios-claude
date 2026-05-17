@@ -46,6 +46,74 @@ def _axis_table(axes: dict[str, list[str]]) -> str:
     return "|".join(f"{axis}:{','.join(values)}" for axis, values in axes.items())
 
 
+def _emit_get_axis_block(genome_var: str, axis: str, out: str, indent: str = "    ") -> str:
+    """Emit AIPL that reads `axis` from `genome_var` into local `out`.
+
+    Inlined from Util.get_axis so it can be called from within Util
+    methods themselves (AIPL actors are not re-entrant)."""
+    k = f"{out}_k"; i = f"{out}_i"; r = f"{out}_r"; b = f"{out}_b"
+    return (
+        f'{indent}var {k} = "{axis}=";\n'
+        f'{indent}var {i} = str_index({genome_var}, {k});\n'
+        f'{indent}var {out} = "";\n'
+        f'{indent}if ({i} >= 0) {{\n'
+        f'{indent}  var {r} = str_sub({genome_var}, {i} + str_len({k}));\n'
+        f'{indent}  var {b} = str_index({r}, "|");\n'
+        f'{indent}  if ({b} < 0) {{ {out} = {r}; }}\n'
+        f'{indent}  else {{ {out} = str_sub({r}, 0, {b}); }}\n'
+        f'{indent}}}\n'
+    )
+
+
+def _emit_is_coherent(coherence_rules: list) -> str:
+    """Emit `method is_coherent(genome) { var ok = 1; … reply(ok); }`.
+
+    AIPL has no `&&` or `and` operator and no early `return`, so we
+    use a flag `ok` set to 0 on any violation, and nested if's for
+    multi-condition checks (one `if` per term).  The get_axis logic
+    is inlined because AIPL actors are not safely re-entrant from
+    the same method (no `now self.…`).
+
+    Supports rule forms:
+      { "if": {axis: value}, "then":    {axis: value} }
+      { "if": {axis: value}, "then_in": {axis: [v1, v2, ...]} }
+    """
+    lines = ["  method is_coherent(genome) {", "    var ok = 1;"]
+    for idx, rule in enumerate(coherence_rules):
+        cond = rule.get("if") or {}
+        then_eq = rule.get("then") or {}
+        then_in = rule.get("then_in") or {}
+        if not cond or (not then_eq and not then_in):
+            continue
+        if_axis, if_val = next(iter(cond.items()))
+        out_a = f"a{idx}"
+        out_b = f"b{idx}"
+        lines.append(f'    // rule {idx}: if {if_axis}="{if_val}" ⇒ …')
+        lines.append(_emit_get_axis_block("genome", if_axis, out_a))
+        lines.append(f'    if ({out_a} == "{if_val}") {{')
+        if then_eq:
+            then_axis, then_val = next(iter(then_eq.items()))
+            lines.append(_emit_get_axis_block("genome", then_axis, out_b, indent="      "))
+            # `if b != "" then if b != val then ok=0` — nested for no &&
+            lines.append(f'      if ({out_b} != "") {{')
+            lines.append(f'        if ({out_b} != "{then_val}") {{ ok = 0; }}')
+            lines.append( '      }')
+        else:
+            then_axis, then_vals = next(iter(then_in.items()))
+            lines.append(_emit_get_axis_block("genome", then_axis, out_b, indent="      "))
+            lines.append(f'      if ({out_b} != "") {{')
+            # match-any: track local `in_set` and mark violation only if zero
+            lines.append('        var in_set = 0;')
+            for v in then_vals:
+                lines.append(f'        if ({out_b} == "{v}") {{ in_set = 1; }}')
+            lines.append('        if (in_set == 0) { ok = 0; }')
+            lines.append( '      }')
+        lines.append("    }")
+    lines.append("    reply(ok);")
+    lines.append("  }")
+    return "\n".join(lines)
+
+
 def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
     name = spec["name"]
     task_desc = spec.get("task", "")
@@ -60,6 +128,10 @@ def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
     axis_table = _axis_table(axes)
     axes_csv = ",".join(axes.keys())
     cell_axes_csv = ",".join(cell_axes)
+
+    # v4: emit Util.is_coherent from schema's coherence rules.  Empty
+    # block (just `reply(1)`) when the schema has no rules.
+    is_coherent_block = _emit_is_coherent(schema.get("coherence", []))
 
     # Build per-task dispatch with inline profile literals (no self-method
     # call to avoid the actor's re-entrant deadlock).
@@ -99,6 +171,19 @@ def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
             "}"
         )
     else:
+        # v4 (2026-05-17): optional hard-floor reviewer.  When the named
+        # reviewer returns 0.0, the entire evaluator output is clamped
+        # to 0.0 — implements the "[reviewer] = 0 ⇒ overall = 0" pattern
+        # declared in .aice / .ga.json.  Spec: evaluation.hard_floor_reviewer
+        # = "<reviewer name>" (matches one of evaluation.reviewers[].name).
+        hard_floor_name = spec.get("evaluation", {}).get("hard_floor_reviewer")
+        hard_floor_index = None
+        if hard_floor_name:
+            for ix, r in enumerate(reviewers, start=1):
+                if r.get("name") == hard_floor_name:
+                    hard_floor_index = ix
+                    break
+
         field_decls = "\n".join(f"  var r{i} = 0;" for i in range(1, n_reviewers + 1))
         init_params = ", ".join(f"rev{i}" for i in range(1, n_reviewers + 1))
         init_assigns = "\n".join(f"    r{i} = rev{i};" for i in range(1, n_reviewers + 1))
@@ -109,6 +194,23 @@ def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
             fanout_lines.append(f"    var s{i} = await(f{i});")
             fanout_lines.append(f"    var w{i} = now r{i}.get_weight();")
         combined_expr = " + ".join(f"s{i} * w{i}" for i in range(1, n_reviewers + 1))
+        # Optional hard-floor check inserted right after we have all s_i values.
+        hard_floor_check = ""
+        if hard_floor_index is not None:
+            hard_floor_check = (
+                f"    // v4 hard-floor: if reviewer {hard_floor_index} "
+                f"({hard_floor_name!r}) returned 0.0, overall fitness = 0.0.\n"
+                f"    if (s{hard_floor_index} == 0.0) {{ reply(0.0); }}\n"
+                f"    else {{\n"
+                f"      var combined = {combined_expr};\n"
+                f"      reply(combined);\n"
+                f"    }}\n"
+            )
+        else:
+            hard_floor_check = (
+                f"    var combined = {combined_expr};\n"
+                f"    reply(combined);\n"
+            )
         evaluator_class_block = (
             "class Evaluator {\n"
             + field_decls + "\n\n"
@@ -117,8 +219,7 @@ def generate_program(spec: dict[str, Any], schema: dict[str, Any]) -> str:
             + "  }\n\n"
             + "  method score_for_task(genome, profile) {\n"
             + "\n".join(fanout_lines) + "\n"
-            + f"    var combined = {combined_expr};\n"
-            + "    reply(combined);\n"
+            + hard_floor_check
             + "  }\n"
             + "}"
         )
@@ -293,6 +394,8 @@ class Util {{
       reply(v);
     }}
   }}
+
+{is_coherent_block}
 }}
 
 // --------------------------------------------------------------------
@@ -378,45 +481,77 @@ class Generator {{
     values_table = values;
   }}
 
+  // v4 (2026-05-17): seed / mutate / cross now rejection-sample on the
+  // schema's coherence rules (via Util.is_coherent).  Up to 50 attempts;
+  // on every retry exhausted, the last candidate is returned even if
+  // incoherent, so the evolution never deadlocks on infeasible schemas.
+
   method seed() {{
-    var n_axes = now util.count_csv(axes_csv);
-    var i = 0;
+    var tries = 0;
     var g = "";
-    while (i < n_axes) do {{
-      var axis = now util.nth_csv(axes_csv, i);
-      var vals = now util.axis_values(values_table, axis);
-      var n_vals = now util.count_csv(vals);
-      var v = now util.nth_csv(vals, random(n_vals));
-      if (i == 0) {{ g = axis + "=" + v; }}
-      else {{ g = g + "|" + axis + "=" + v; }}
-      i = i + 1;
+    var ok = 0;
+    while (ok == 0) do {{
+      var n_axes = now util.count_csv(axes_csv);
+      var i = 0;
+      var cand = "";
+      while (i < n_axes) do {{
+        var axis = now util.nth_csv(axes_csv, i);
+        var vals = now util.axis_values(values_table, axis);
+        var n_vals = now util.count_csv(vals);
+        var v = now util.nth_csv(vals, random(n_vals));
+        if (i == 0) {{ cand = axis + "=" + v; }}
+        else {{ cand = cand + "|" + axis + "=" + v; }}
+        i = i + 1;
+      }}
+      g = cand;
+      ok = now util.is_coherent(g);
+      tries = tries + 1;
+      if (tries >= 50) {{ ok = 1; }}
     }}
     reply(g);
   }}
 
   method mutate(parent) {{
-    var n_axes = now util.count_csv(axes_csv);
-    var idx = random(n_axes);
-    var axis = now util.nth_csv(axes_csv, idx);
-    var vals = now util.axis_values(values_table, axis);
-    var n_vals = now util.count_csv(vals);
-    var v = now util.nth_csv(vals, random(n_vals));
-    var child = now util.set_axis(parent, axis, v);
+    var tries = 0;
+    var child = parent;
+    var ok = 0;
+    while (ok == 0) do {{
+      var n_axes = now util.count_csv(axes_csv);
+      var idx = random(n_axes);
+      var axis = now util.nth_csv(axes_csv, idx);
+      var vals = now util.axis_values(values_table, axis);
+      var n_vals = now util.count_csv(vals);
+      var v = now util.nth_csv(vals, random(n_vals));
+      var cand = now util.set_axis(parent, axis, v);
+      child = cand;
+      ok = now util.is_coherent(child);
+      tries = tries + 1;
+      if (tries >= 50) {{ ok = 1; }}
+    }}
     reply(child);
   }}
 
   method cross(a, b) {{
-    var n_axes = now util.count_csv(axes_csv);
-    var i = 0;
-    var child = "";
-    while (i < n_axes) do {{
-      var axis = now util.nth_csv(axes_csv, i);
-      var src = a;
-      if (random(2) == 1) {{ src = b; }}
-      var v = now util.get_axis(src, axis);
-      if (i == 0) {{ child = axis + "=" + v; }}
-      else {{ child = child + "|" + axis + "=" + v; }}
-      i = i + 1;
+    var tries = 0;
+    var child = a;
+    var ok = 0;
+    while (ok == 0) do {{
+      var n_axes = now util.count_csv(axes_csv);
+      var i = 0;
+      var cand = "";
+      while (i < n_axes) do {{
+        var axis = now util.nth_csv(axes_csv, i);
+        var src = a;
+        if (random(2) == 1) {{ src = b; }}
+        var v = now util.get_axis(src, axis);
+        if (i == 0) {{ cand = axis + "=" + v; }}
+        else {{ cand = cand + "|" + axis + "=" + v; }}
+        i = i + 1;
+      }}
+      child = cand;
+      ok = now util.is_coherent(child);
+      tries = tries + 1;
+      if (tries >= 50) {{ ok = 1; }}
     }}
     reply(child);
   }}
