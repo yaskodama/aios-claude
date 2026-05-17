@@ -1,0 +1,168 @@
+(* Smoke test for Aipl_dist (Phase O-1 port).
+   Run via:
+     dune exec test_aipl_dist
+   Expected output: all PASS lines.
+*)
+
+let pass label = Printf.printf "  PASS  %s\n%!" label
+let fail label msg = Printf.printf "  FAIL  %s  (%s)\n%!" label msg; exit 1
+
+let unset_all () =
+  List.iter (fun k -> Unix.putenv k "")
+    ["AIPL_DIST_ENABLE";
+     "AIPL_ROUTE";
+     "AIPL_DIST_LOG_FILE";
+     "AIPL_DIST_RPM";
+     "AIPL_DIST_TPM";
+     "AIPL_DIST_CHECKPOINT_DIR";
+     "AIPL_DIST_QUARANTINE_TTL";
+     "AIPL_DIST_QUORUM_PROVIDERS";
+     "AIPL_DIST_SUBTREE_QUARANTINE"]
+
+(* Aipl_dist caches the gate singleton internally; we can't reset it
+   from outside the module.  So we run gate-dependent tests in a
+   strict order or use a process boundary.  For this smoke test we
+   only call gate_init via TBM after setting env, and accept the
+   first config we see for gate-related tests. *)
+
+let test_disabled () =
+  unset_all ();
+  assert (not (Aipl_dist.is_enabled ()));
+  assert (Aipl_dist.route_for "A" = None);
+  assert (not (Aipl_dist.log_event "x" []));
+  assert (Aipl_dist.token_budget_gate () = None);
+  assert (Aipl_dist.checkpoint_dir () = None);
+  assert (not (Aipl_dist.save_actor_state "a" ~state_json:"{}"));
+  assert (Aipl_dist.restore_actor_state "a" = None);
+  assert (Aipl_dist.list_actor_states () = []);
+  assert (not (Aipl_dist.quarantine_actor "X"));
+  assert (not (Aipl_dist.is_quarantined "X"));
+  pass "disabled returns safe defaults"
+
+let test_route () =
+  unset_all ();
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_ROUTE" "Reviewer:fast,Worker:slow,Builder:gpu";
+  let t = Aipl_dist.parse_route_table "Reviewer:fast,Worker:slow" in
+  assert (List.assoc "Reviewer" t = "fast");
+  assert (List.assoc "Worker" t = "slow");
+  assert (Aipl_dist.route_for "Reviewer" = Some "fast");
+  assert (Aipl_dist.route_for "Unknown" = None);
+  pass "env_var_routing"
+
+let test_log () =
+  unset_all ();
+  let path = Filename.temp_file "aipl_smoke" ".ndjson" in
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_DIST_LOG_FILE" path;
+  assert (Aipl_dist.log_event "hello"
+    [("who", Aipl_dist.LStr "alice"); ("num", Aipl_dist.LInt 42)]);
+  assert (Aipl_dist.log_event "bye" [("who", Aipl_dist.LStr "bob")]);
+  let ic = open_in path in
+  let lines = ref [] in
+  (try while true do lines := input_line ic :: !lines done
+   with End_of_file -> ());
+  close_in ic;
+  Sys.remove path;
+  let lines = List.rev !lines in
+  assert (List.length lines = 2);
+  let l0 = List.nth lines 0 in
+  assert (try
+    let _ = Str.search_forward (Str.regexp "\"event\":\"hello\"") l0 0 in
+    true with Not_found -> false);
+  pass "structured_log NDJSON"
+
+let test_checkpoint () =
+  unset_all ();
+  let dir = Filename.temp_file "aipl_ck" "" in
+  Sys.remove dir; Unix.mkdir dir 0o755;
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_DIST_CHECKPOINT_DIR" dir;
+  assert (Aipl_dist.save_actor_state "Worker"
+    ~state_json:"{\"n\":7,\"label\":\"hello\"}");
+  let restored = Aipl_dist.restore_actor_state "Worker" in
+  (match restored with
+   | None -> fail "checkpoint roundtrip" "no restore"
+   | Some s ->
+       (try let _ = Str.search_forward
+              (Str.regexp "\"n\":7") s 0 in ()
+        with Not_found -> fail "checkpoint roundtrip" "n not found"));
+  (* list states *)
+  let states = Aipl_dist.list_actor_states () in
+  assert (List.mem_assoc "Worker" states);
+  (* cleanup *)
+  List.iter (fun (_, p) -> try Sys.remove p with _ -> ()) states;
+  (try Unix.rmdir dir with _ -> ());
+  pass "checkpoint save/restore/list"
+
+let test_quarantine () =
+  unset_all ();
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_DIST_QUARANTINE_TTL" "60";
+  assert (Aipl_dist.quarantine_actor "Flaky");
+  assert (Aipl_dist.is_quarantined "Flaky");
+  let st = Aipl_dist.quarantine_status () in
+  assert (List.mem_assoc "Flaky" st);
+  assert (Aipl_dist.clear_quarantine "Flaky");
+  assert (not (Aipl_dist.is_quarantined "Flaky"));
+  pass "quarantine_and_skip"
+
+let test_subtree () =
+  unset_all ();
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_DIST_QUARANTINE_TTL" "60";
+  Aipl_dist.register_spawn "a" (Some "root");
+  Aipl_dist.register_spawn "b" (Some "a");
+  Aipl_dist.register_spawn "c" (Some "a");
+  Aipl_dist.register_spawn "d" (Some "b");
+  let desc = Aipl_dist.descendants_of "a" in
+  let names = List.sort compare desc in
+  assert (names = ["b"; "c"; "d"]);
+  let newly = Aipl_dist.quarantine_subtree "a" in
+  assert (List.mem "a" newly && List.mem "b" newly &&
+          List.mem "c" newly && List.mem "d" newly);
+  assert (Aipl_dist.is_quarantined "a");
+  assert (Aipl_dist.is_quarantined "d");
+  assert (not (Aipl_dist.is_quarantined "root"));
+  (* cleanup so other tests see a clean slate *)
+  List.iter (fun n -> let _ = Aipl_dist.clear_quarantine n in ())
+    ["a"; "b"; "c"; "d"];
+  pass "subtree_quarantine"
+
+let test_quorum () =
+  unset_all ();
+  Unix.putenv "AIPL_DIST_ENABLE" "1";
+  Unix.putenv "AIPL_DIST_QUORUM_PROVIDERS" "fast,slow,broken";
+  let providers = Aipl_dist.quorum_providers () in
+  assert (providers = ["fast"; "slow"; "broken"]);
+  let call_fn = function
+    | "fast" -> Thread.delay 0.02; "fast-reply"
+    | "slow" -> Thread.delay 0.20; "slow-reply"
+    | "broken" -> raise (Failure "simulated 503")
+    | p -> failwith ("unknown provider " ^ p)
+  in
+  let r = Aipl_dist.call_ai_quorum ~providers ~call_ai_fn:call_fn in
+  assert (r = "fast-reply");
+  (* All-fail path *)
+  let all_broken = fun p -> failwith (p ^ " fails") in
+  (try
+    let _ = Aipl_dist.call_ai_quorum
+      ~providers:["x"; "y"] ~call_ai_fn:all_broken in
+    fail "quorum all-fail" "expected exception"
+   with Failure msg ->
+     assert (try
+       let _ = Str.search_forward
+         (Str.regexp "all providers failed") msg 0 in true
+       with Not_found -> false));
+  pass "quorum_replicate first-wins + all-fail"
+
+let () =
+  Printf.printf "=== aipl_dist smoke ===\n%!";
+  test_disabled ();
+  test_route ();
+  test_log ();
+  test_checkpoint ();
+  test_quarantine ();
+  test_subtree ();
+  test_quorum ();
+  Printf.printf "\n7/7 passing\n%!"

@@ -20,7 +20,8 @@
   compiler
   c_translator
   web_gateway
-  ai)
+  ai
+  aipl_dist)
  (flags (:standard -w -a))
  (libraries tsdl threads unix))
 
@@ -47,3 +48,9 @@
  (modules aipl2c)
  (flags (:standard -w -a))
  (libraries abcllib))
+
+(executable
+ (name test_aipl_dist)
+ (modules test_aipl_dist)
+ (flags (:standard -w -a))
+ (libraries abcllib str unix threads))

@@ -335,15 +335,15 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
   \midrule
   \endhead
 
-  DR-1 & I-1 \texttt{env\_var\_routing} (\texttt{AIPL\_ROUTE})       & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-2 & I-2 \texttt{structured\_log} (\texttt{AIPL\_DIST\_LOG\_FILE}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-3 & I-3 \texttt{token\_budget\_aware} (\texttt{AIPL\_DIST\_RPM} / \texttt{TPM}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-4 & I-4 \texttt{checkpoint\_and\_resume} (\texttt{AIPL\_DIST\_CHECKPOINT\_DIR}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-5 & IQ \texttt{quarantine\_and\_skip} (\texttt{AIPL\_DIST\_QUARANTINE\_TTL}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-6 & IM-1 \texttt{quorum\_replicate} (\texttt{AIPL\_DIST\_QUORUM\_PROVIDERS}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-8 & spawn-tree tracking (parent via thread name, auto)       & \Yes & \No & \No & \No & \No & \No & \No \\
-  DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-1 & I-1 \texttt{env\_var\_routing} (\texttt{AIPL\_ROUTE})       & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-2 & I-2 \texttt{structured\_log} (\texttt{AIPL\_DIST\_LOG\_FILE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-3 & I-3 \texttt{token\_budget\_aware} (\texttt{AIPL\_DIST\_RPM} / \texttt{TPM}) & \Yes & \No & \Yes\textsuperscript{1} & \Yes\textsuperscript{1} & \No & \No & \No \\
+  DR-4 & I-4 \texttt{checkpoint\_and\_resume} (\texttt{AIPL\_DIST\_CHECKPOINT\_DIR}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-5 & IQ \texttt{quarantine\_and\_skip} (\texttt{AIPL\_DIST\_QUARANTINE\_TTL}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-6 & IM-1 \texttt{quorum\_replicate} (\texttt{AIPL\_DIST\_QUORUM\_PROVIDERS}) & \Yes & \No & \Yes\textsuperscript{1} & \Yes\textsuperscript{1} & \No & \No & \No \\
+  DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  DR-8 & spawn-tree tracking (parent inference)                   & \Yes & \No & \Part\textsuperscript{2} & \Part\textsuperscript{2} & \No & \No & \No \\
+  DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \Part\textsuperscript{3} & \Part\textsuperscript{3} & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 
@@ -358,6 +358,15 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
 \textbf{設計探索の出自}: 同 dir の \texttt{AIPL\_v2\_Distributed.\{aice,ga.json,schema.json\}}
 を MAP-Elites で 24 min $\times$ 2 run。詳細は \texttt{IMPL\_I0003\_MVP/IMPL\_DESIGN.md}
 \textasciitilde{} \texttt{IMPL\_I0036\_REPORT.md} 参照。
+
+\smallskip
+\noindent\textsuperscript{1} OCaml は API surface (\texttt{Aipl\_dist.call\_ai\_quorum},
+\texttt{Aipl\_dist.token\_budget\_gate}) を提供するが \texttt{Ai.call\_ai} への
+auto-wiring は次フェーズ (O-1.5).
+\textsuperscript{2} 親追跡は \texttt{Aipl\_dist.register\_spawn} 明示呼出しに依存,
+TLS 経由の暗黙親はまだ.
+\textsuperscript{3} \texttt{spawn\_actor} と \texttt{actor\_loop} の except 経路は
+hook 済,\texttt{call\_ai} 経路は O-1.5 で接続.
 
 \clearpage
 

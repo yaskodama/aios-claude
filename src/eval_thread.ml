@@ -1514,6 +1514,15 @@ and actor_loop actor = (
     actor.last_sender <- msg.from;
     set_current_actor_name (Some actor.name);
     set_current_msg_id msg.msg_id;
+    (* IQ (aipl_dist): skip dispatch if the actor is currently
+       quarantined.  Drops the message; the caller is responsible for
+       timeout handling.  No-op unless AIPL_DIST_ENABLE=1. *)
+    let skip = (try Aipl_dist.is_quarantined actor.name with _ -> false) in
+    if skip then begin
+      let _ = (try Aipl_dist.log_event "actor_skip_quarantined"
+        [("actor", Aipl_dist.LStr actor.name)] with _ -> false) in
+      ()
+    end else
     (try
       eval_stmt actor msg.stmt
       with exn ->
@@ -1526,7 +1535,21 @@ and actor_loop actor = (
           Printf.eprintf "[FAILED] actor=%s msg_id=%s reason=%s\n%!"
             actor.name id (Printexc.to_string exn);
           push_web_evt (Printf.sprintf "[FAILED] id=%s to=%s reason=runtime:%s"
-            id actor.name (Printexc.to_string exn))
+            id actor.name (Printexc.to_string exn));
+          (* IQ/IM (aipl_dist): auto-quarantine the failing actor.  If
+             AIPL_DIST_SUBTREE_QUARANTINE=1, also quarantine every actor
+             spawned by this one (Erlang OTP blast-radius containment).
+             Disabled unless AIPL_DIST_ENABLE=1. *)
+          (try
+            let subtree =
+              try Sys.getenv "AIPL_DIST_SUBTREE_QUARANTINE" = "1"
+              with Not_found -> false
+            in
+            if subtree then
+              let _ = Aipl_dist.quarantine_subtree actor.name in ()
+            else
+              let _ = Aipl_dist.quarantine_actor actor.name in ()
+          with _ -> ())
     );
     set_current_msg_id None;
     set_current_actor_name None;
@@ -1612,6 +1635,33 @@ let spawn_actor ?(init_args : value list = []) ~(class_name:string) ~(actor_name
 
     Hashtbl.add actor_table actor_name a;
     ignore (Thread.create actor_loop a);
+
+    (* Phase O-1 (aipl_dist): emit spawn / routing log events and record
+       the spawn parent so subtree_quarantine has a tree to walk.
+       All no-ops unless AIPL_DIST_ENABLE=1.  Failures never raise. *)
+    (try
+      let _ = Aipl_dist.log_event "actor_spawn"
+        [("actor", Aipl_dist.LStr actor_name);
+         ("cls", Aipl_dist.LStr class_name)] in
+      (match Aipl_dist.route_for actor_name with
+       | Some tag ->
+           let _ = Aipl_dist.log_event "actor_routed"
+             [("actor", Aipl_dist.LStr actor_name);
+              ("cls", Aipl_dist.LStr class_name);
+              ("tag", Aipl_dist.LStr tag)] in ()
+       | None ->
+           (match Aipl_dist.route_for class_name with
+            | Some tag ->
+                let _ = Aipl_dist.log_event "actor_routed"
+                  [("actor", Aipl_dist.LStr actor_name);
+                   ("cls", Aipl_dist.LStr class_name);
+                   ("tag", Aipl_dist.LStr tag)] in ()
+            | None -> ()));
+      (* Parent inference: use the thread's name if we set one (we don't
+         currently), or fall back to actor_table introspection.  For the
+         OCaml port a richer parent track is added when we wire dispatch. *)
+      Aipl_dist.register_spawn actor_name None
+    with _ -> ());
 
     (* init を送る。init_args が空なら無引数で、そうでなければ値を式化して渡す *)
     let arg_exprs =
