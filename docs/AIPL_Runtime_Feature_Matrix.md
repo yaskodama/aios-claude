@@ -193,6 +193,66 @@ abort.
 | 25  | protocol traces (order-only)               |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
 | 26  | AIOS service registry (alias-resolved send) |  ✅  |  ✅        |  ❌   |  ❌  |  ❌  |  ❌  |  ❌  |
 
+## Phase C–E2 type inference (Python annotated only, added 2026-05-17/18)
+
+Phase 11–17 の checker layer に加え、Python (annotated) ランタイムは
+別モジュール `aipl_inference.py` (~1255 LOC) に **constraint-based
+Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-inferred/`)
+は依然 trace-based HM のままで、これらの新 phase は **取り込まれていない**。
+
+| ID    | Feature                                            | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C   | 関連レポート                          |
+| ----- | -------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :-: | ------------------------------------- |
+| CE-1  | Phase C: constraint-based HM + Z3 refinement (Int) |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_C_REPORT.md`                   |
+| CE-2  | Phase D-1: cross-class inference                   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_D_REPORT.md`                   |
+| CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
+| CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
+| CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
+| CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
+| CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
+| CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
+| CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
+
+サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
+
+OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
+Z3 backend には対応していない。OCaml への移植は今後の課題。
+
+## AIPL v2 Distributed runtime (`aipl_dist`, added 2026-05-18)
+
+進化計算 (MAP-Elites 8 seed × 30 gen × 2 run) で発見された分散ランタイム
+設計 (I0003 balanced / I0023 hang-resilience / I0036 Erlang OTP の 3 候補)
+を `aipl_dist.py` (591 LOC) として実装。AIPL 言語仕様は不変、既存サンプル
+は無改変で同じ挙動。**`AIPL_DIST_ENABLE=1` で全機能 opt-in**。
+
+| ID    | Feature                                              | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C   | env var                                       |
+| ----- | ---------------------------------------------------- | :--: | :--: | :---: | :--: | :--: | :--: | :-: | --------------------------------------------- |
+| DR-1  | I-1 `env_var_routing` (actor → tag table)            |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_ROUTE="Name:tag,..."`                   |
+| DR-2  | I-2 `structured_log` (ND-JSON / event)               |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_LOG_FILE=/path`                    |
+| DR-3  | I-3 `token_budget_aware` (sliding RPM/TPM gate)      |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_RPM` / `AIPL_DIST_TPM`             |
+| DR-4  | I-4 `checkpoint_and_resume` (atomic save/restore)    |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_CHECKPOINT_DIR`                    |
+| DR-5  | IQ `quarantine_and_skip` (auto-isolate failures)     |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_QUARANTINE_TTL=60`                 |
+| DR-6  | IM-1 `quorum_replicate` (parallel multi-provider)    |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_QUORUM_PROVIDERS="o,a,g"`          |
+| DR-7  | IM-2 `subtree_quarantine` (Erlang OTP blast-radius)  |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `AIPL_DIST_SUBTREE_QUARANTINE=1`              |
+| DR-8  | spawn-tree tracking (parent inference via thread name) | ✅ |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
+| DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (auto)                                        |
+
+**実装位置**:
+- `src/python-aipl/aipl_dist.py` (591 LOC, 新規)
+- `src/python-aipl/aipl_interp.py` (+27 行, spawn hook)
+- `src/python-aipl/aipl_runtime.py` (+13 行, error hook)
+- `src/python-aipl/aipl_ai.py` (+13 行, budget hook)
+
+**サンプル**: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/IMPL_I0003_MVP/samples/` (8 feature × 3 = 24 demo + 27/27 unit tests).
+
+**設計探索の出自**: 同 dir の `AIPL_v2_Distributed.{aice,ga.json,schema.json}` を
+MAP-Elites で 24 min × 2 run。詳細は `IMPL_I0003_MVP/IMPL_DESIGN.md` 〜
+`IMPL_I0036_REPORT.md` 参照。
+
+> なお Py-I (inferred) ランタイムは `aipl_dist` を import しないが、import
+> しても `AIPL_DIST_ENABLE=0` 時の no-op パスが効くので副作用ゼロ。将来的に
+> Py-I 側で env var を ON にすれば同じ機能群を共有できる構造。
+> OCaml 側への移植は run-time hooks 層を別途設計する必要があり、今後の課題。
+
 ## Networking / AI / infrastructure
 
 | #   | Feature                                       | Py-A                       | Py-I                | OCaml         | JS-O          | JS-B         | JS-N                          | C        |
@@ -398,10 +458,41 @@ schemes the same way.
 
 ---
 
-*Generated 2026-05-14.  Cumulative through the OCaml feature catch-up
-(records / tuples / dynamic compile / method injection / top-level
-functions / generics / type annotations / sized arrays / text & image
-I/O) and the C-codegen LLVM / OpenMP targets.  Earlier additions of
-the `python-aipl-inferred` runtime (commit `270f291`) and the
-`node-aipl-server` runtime are included.  For source pointers, run
-`grep` against the files listed in each runtime's source column.*
+### Post-Phase-11 (added 2026-05-17/18)
+
+| 領域 | Py-A 達成 | 他ランタイム | 関連セクション |
+|---|---|---|---|
+| Phase C–E2 型推論 (HM + Z3 refinement) | 9/9 | 0/9 | CE-1 〜 CE-9 |
+| AIPL v2 Distributed (`aipl_dist`) | 9/9 | 0/9 | DR-1 〜 DR-9 |
+
+**Py-A 単独で進化計算由来の 18 機能が opt-in 利用可能** (両方とも
+`AIPL_DIST_ENABLE=1` または `--check` / `--infer` で発火、デフォルトは
+従来挙動と同一)。OCaml 側への移植は今後の課題:
+
+- 型推論側: `--infer` の HM-with-refinement を OCaml HM 推論 (`src/infer.ml`)
+  に統合できれば CE-1, CE-2, CE-4 あたりは取り込み可能。`where` 句 (CE-3)
+  は OCaml lexer / parser の修正が必要。Z3 backend (CE-1, CE-6, CE-9) は
+  OCaml から呼び出すなら ZMQ 越し or 別プロセス via JSON が現実的。
+- ランタイム側: DR-1 / DR-2 / DR-4 / DR-5 / DR-8 / DR-9 は OCaml `eval_thread.ml`
+  + `aipl_remote.ml` への hook 追加 (~200 LOC) で実装可能。DR-3 (token budget)
+  と DR-6 (quorum) は AI client 層が必要。DR-7 (subtree) は spawn-tree
+  registry が要る。
+
+---
+
+*Generated 2026-05-14, updated 2026-05-18.*  Cumulative through:
+
+- OCaml feature catch-up (records / tuples / dynamic compile / method
+  injection / top-level functions / generics / type annotations / sized
+  arrays / text & image I/O).
+- C-codegen LLVM / OpenMP targets.
+- The `python-aipl-inferred` runtime (commit `270f291`).
+- The `node-aipl-server` runtime.
+- **Phase C–E2 constraint-based HM + Z3 refinement** (`aipl_inference.py`,
+  1255 LOC; sections CE-1..CE-9).
+- **AIPL v2 Distributed runtime** (`aipl_dist.py`, 591 LOC; sections
+  DR-1..DR-9), discovered by MAP-Elites GA + MVP-implemented for
+  I0003 / I0023 / I0036 winners.
+
+For source pointers, run `grep` against the files listed in each
+runtime's source column.

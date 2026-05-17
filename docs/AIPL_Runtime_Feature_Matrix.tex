@@ -287,6 +287,80 @@ the program does not abort.
 
 \clearpage
 
+\section*{Phase C--E2 type inference (Python annotated only, added 2026-05-17/18)}
+
+Phase 11--17 の checker layer に加え、Python (annotated) ランタイムは
+\textbf{constraint-based Hindley--Milner + Z3 refinement} 推論系を
+別モジュール \texttt{aipl\_inference.py} (\textasciitilde 1255 LOC) として持つ。
+Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
+これらの新 phase は取り込まれていない。
+
+\begin{longtable}{l F C C C C C C C}
+  \toprule
+  \textbf{ID} & \textbf{Feature} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  CE-1 & Phase C: constraint-based HM + Z3 refinement (Int)      & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-2 & Phase D-1: cross-class inference                        & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \No & \No & \No & \No & \No \\
+  \bottomrule
+\end{longtable}
+
+\textbf{サンプル}: \texttt{aice-pi-evolution/experiments/2026-05-17\_aipl\_v2\_type\_inference/samples/feature\_\{a..g\}/}
+(7 feature $\times$ 3 = 21 demo + 27/27 unit tests).
+
+OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),refinement (\texttt{where} 句) と
+Z3 backend には対応していない。OCaml への移植は今後の課題。
+
+\clearpage
+
+\section*{AIPL v2 Distributed runtime (\texttt{aipl\_dist}, added 2026-05-18)}
+
+進化計算 (MAP-Elites 8 seed $\times$ 30 gen $\times$ 2 run) で発見された
+分散ランタイム設計 (I0003 balanced / I0023 hang-resilience / I0036 Erlang
+OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL 言語仕様
+は不変,既存サンプルは無改変で同じ挙動。\textbf{\texttt{AIPL\_DIST\_ENABLE=1}
+で全機能 opt-in}。
+
+\begin{longtable}{l F C C C C C C C}
+  \toprule
+  \textbf{ID} & \textbf{Feature (env var)} & \textbf{Py-A} & \textbf{Py-I} & \textbf{OCaml} & \textbf{JS-O} & \textbf{JS-B} & \textbf{JS-N} & \textbf{C} \\
+  \midrule
+  \endhead
+
+  DR-1 & I-1 \texttt{env\_var\_routing} (\texttt{AIPL\_ROUTE})       & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-2 & I-2 \texttt{structured\_log} (\texttt{AIPL\_DIST\_LOG\_FILE}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-3 & I-3 \texttt{token\_budget\_aware} (\texttt{AIPL\_DIST\_RPM} / \texttt{TPM}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-4 & I-4 \texttt{checkpoint\_and\_resume} (\texttt{AIPL\_DIST\_CHECKPOINT\_DIR}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-5 & IQ \texttt{quarantine\_and\_skip} (\texttt{AIPL\_DIST\_QUARANTINE\_TTL}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-6 & IM-1 \texttt{quorum\_replicate} (\texttt{AIPL\_DIST\_QUORUM\_PROVIDERS}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-8 & spawn-tree tracking (parent via thread name, auto)       & \Yes & \No & \No & \No & \No & \No & \No \\
+  DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \No & \No & \No & \No & \No \\
+  \bottomrule
+\end{longtable}
+
+\textbf{実装位置}: \texttt{src/python-aipl/aipl\_dist.py} (591 LOC, 新規) +
+\texttt{aipl\_interp.py} (+27 行 spawn hook) +
+\texttt{aipl\_runtime.py} (+13 行 error hook) +
+\texttt{aipl\_ai.py} (+13 行 budget hook).
+
+\textbf{サンプル}: \texttt{aice-pi-evolution/experiments/2026-05-17\_aipl\_v2\_type\_inference/IMPL\_I0003\_MVP/samples/}
+(8 feature $\times$ 3 = 24 demo + 27/27 unit tests).
+
+\textbf{設計探索の出自}: 同 dir の \texttt{AIPL\_v2\_Distributed.\{aice,ga.json,schema.json\}}
+を MAP-Elites で 24 min $\times$ 2 run。詳細は \texttt{IMPL\_I0003\_MVP/IMPL\_DESIGN.md}
+\textasciitilde{} \texttt{IMPL\_I0036\_REPORT.md} 参照。
+
+\clearpage
+
 \section*{Networking, AI, infrastructure}
 
 \begin{longtable}{F C C C C C C C}
@@ -535,12 +609,50 @@ HM-style polymorphic inference --- a different research axis
 \smallskip
 
 \noindent\small
-Generated 2026-05-14.  Cumulative through the OCaml feature catch-up
-(records / tuples / dynamic compile / method injection / top-level
-functions / generics / type annotations / sized arrays / text \& image
-I/O) and the C-codegen LLVM / OpenMP targets.  Earlier additions of
+\subsubsection*{Post-Phase-11 (added 2026-05-17/18)}
+
+\begin{center}
+\begin{tabular}{lll l}
+\toprule
+領域 & Py-A 達成 & 他ランタイム & 関連 ID \\
+\midrule
+Phase C--E2 型推論 (HM + Z3 refinement) & 9/9 & 0/9 & CE-1 $\sim$ CE-9 \\
+AIPL v2 Distributed (\texttt{aipl\_dist}) & 9/9 & 0/9 & DR-1 $\sim$ DR-9 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Py-A 単独で進化計算由来の 18 機能が opt-in 利用可能}
+(\texttt{AIPL\_DIST\_ENABLE=1} または \texttt{--check} / \texttt{--infer}
+で発火,デフォルトは従来挙動と同一)。OCaml 側への移植 path:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item 型推論側: \texttt{--infer} の HM-with-refinement を OCaml HM
+  (\texttt{src/infer.ml}) に統合すれば CE-1, CE-2, CE-4 は取り込み可能.
+  \texttt{where} 句 (CE-3) は OCaml lexer/parser 修正が必要.Z3 backend
+  (CE-1, CE-6, CE-9) は別プロセス via JSON が現実的.
+\item ランタイム側: DR-1 / DR-2 / DR-4 / DR-5 / DR-8 / DR-9 は OCaml
+  \texttt{eval\_thread.ml} + \texttt{aipl\_remote.ml} への hook 追加
+  (\textasciitilde{}200 LOC) で実装可能.DR-3 / DR-6 は AI client 層,
+  DR-7 は spawn-tree registry が要る.
+\end{itemize}
+
+\bigskip
+
+\noindent
+\textit{Generated 2026-05-14, updated 2026-05-18.}
+Cumulative through: OCaml feature catch-up (records / tuples / dynamic
+compile / method injection / top-level functions / generics / type
+annotations / sized arrays / text \& image I/O);
+C-codegen LLVM / OpenMP targets;
 \texttt{python-aipl-inferred} (commit \texttt{270f291}) and
-\texttt{node-aipl-server} (commit \texttt{adeb0b6}) are included.
+\texttt{node-aipl-server} (commit \texttt{adeb0b6});
+\textbf{Phase C--E2 constraint-based HM + Z3 refinement}
+(\texttt{aipl\_inference.py}, 1255 LOC; sections CE-1..CE-9);
+\textbf{AIPL v2 Distributed runtime} (\texttt{aipl\_dist.py}, 591 LOC;
+sections DR-1..DR-9), discovered by MAP-Elites GA + MVP-implemented for
+I0003 / I0023 / I0036 winners.
+
 For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
