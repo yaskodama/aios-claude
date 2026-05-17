@@ -503,6 +503,24 @@ class Interpreter:
             for k, v in snap.items():
                 if k in actor.fields and isinstance(v, (int, float, bool, str)):
                     actor.fields[k] = v
+        # I-5 / I-6 (aipl_dist hooks): both effectively no-ops unless
+        # AIPL_DIST_ENABLE=1.  I-5 overlays checkpointed state from
+        # AIPL_DIST_CHECKPOINT_DIR; I-6 emits a structured-log event
+        # when AIPL_ROUTE assigns this actor to a tag.  Failures here
+        # never bubble up — they're observational integrations.
+        try:
+            import aipl_dist
+            ck_state = aipl_dist.restore_actor_state(name)
+            if ck_state:
+                for k, v in ck_state.items():
+                    if k in actor.fields and isinstance(v, (int, float, bool, str)):
+                        actor.fields[k] = v
+            tag = aipl_dist.route_for(name) or aipl_dist.route_for(cls_name)
+            if tag is not None:
+                aipl_dist.log_event("actor_routed", actor=name, cls=cls_name, tag=tag)
+            aipl_dist.log_event("actor_spawn", actor=name, cls=cls_name)
+        except Exception:
+            pass
         self.scheduler.register(actor)
         actor.start(self.dispatch)
         # If `init` is defined, send it the constructor args.

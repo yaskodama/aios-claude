@@ -1,0 +1,44 @@
+// End-to-end I0003 MVP demo (post-integration with aipl_runtime + aipl_ai)
+//
+// This is a normal .aipl program — no aipl_dist references in the source.
+// All integration is via env vars + auto-hooks in aipl_interp.spawn_actor
+// and aipl_ai.call_ai.  Run twice to see checkpoint restore.
+//
+// Pass 1 (initial):
+//   rm -rf /tmp/aipl_ck && mkdir /tmp/aipl_ck
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/aipl_dist_e2e.log \
+//   AIPL_ROUTE="Counter:hot,Reporter:cold" \
+//   AIPL_DIST_CHECKPOINT_DIR=/tmp/aipl_ck \
+//   python3 src/python-aipl/aipl_main.py end_to_end_demo.aipl
+//
+//   --> stdout: "counter result: 110"
+//       NDJSON log will contain `actor_spawn` and `actor_routed` events.
+//
+// Pass 2 (after manually saving a checkpoint):
+//   Create /tmp/aipl_ck/counter.json with {"state": {"n": 500}, ...}
+//   (or use IMPL_I0003_MVP/samples/checkpoint_demo.py first)
+//   --> counter starts at the checkpointed value instead of 0/100.
+
+// Note: no `init` method on Counter so checkpoint-restored state
+// isn't overwritten at spawn time.  (The existing _state_snapshot
+// mechanism has the same restriction — init() always wins.)
+class Counter {
+  var n = 0;
+  method bump(delta) {
+    n = n + delta;
+    reply(n);
+  }
+}
+
+class Reporter {
+  method announce(value) {
+    println("counter result: ", value);
+    reply(value);
+  }
+}
+
+var counter  = new Counter();
+var reporter = new Reporter();
+var bumped   = now counter.bump(10);
+var done     = now reporter.announce(bumped);

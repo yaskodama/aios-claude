@@ -544,6 +544,20 @@ def call_ai(
     gate = _get_concurrency_gate()
     if gate is not None:
         gate.acquire(priority)
+    # I-7 (aipl_dist hook): opt-in RPM/TPM sliding-window gate.
+    # No-op unless AIPL_DIST_ENABLE=1 and AIPL_DIST_RPM/TPM is set.
+    # Failures here never bubble up.
+    try:
+        import aipl_dist
+        dist_gate = aipl_dist.token_budget_gate()
+        if dist_gate is not None:
+            est = max(1, len(prompt) // 4 + int(max_tokens or 0))
+            dist_gate.acquire(est)
+            aipl_dist.log_event(
+                "call_ai_budget_acquire", est_tokens=est, **dist_gate.stats()
+            )
+    except Exception:
+        pass
     try:
         # Env-mock wins to keep tests / demos token-free even when callers
         # ask for a specific provider via provider_override.
