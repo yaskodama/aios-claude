@@ -118,9 +118,16 @@ class Actor:
                 # failing actor for AIPL_DIST_QUARANTINE_TTL seconds so
                 # subsequent messages don't repeatedly hit the same
                 # error.  No-op unless AIPL_DIST_ENABLE=1.
+                # IM (I0036 restart_subtree): when
+                # AIPL_DIST_SUBTREE_QUARANTINE=1, also quarantine every
+                # descendant the failing actor spawned (Erlang OTP
+                # blast-radius containment).
                 try:
-                    import aipl_dist
-                    aipl_dist.quarantine_actor(self.name)
+                    import aipl_dist, os
+                    if os.environ.get("AIPL_DIST_SUBTREE_QUARANTINE", "0") == "1":
+                        aipl_dist.quarantine_subtree(self.name)
+                    else:
+                        aipl_dist.quarantine_actor(self.name)
                 except Exception:
                     pass
             finally:

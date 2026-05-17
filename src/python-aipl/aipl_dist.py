@@ -51,6 +51,12 @@ __all__ = [
     "clear_quarantine",
     "quarantine_status",
     "quarantine_ttl",
+    # IM (I0036 Erlang OTP MVP):
+    "register_spawn",
+    "descendants_of",
+    "quarantine_subtree",
+    "call_ai_quorum",
+    "quorum_providers",
 ]
 
 
@@ -427,3 +433,163 @@ def quarantine_status() -> Dict[str, float]:
             else:
                 del _QUARANTINE[n]
     return out
+
+
+# ════════════════════════════════════════════════════════════════════════
+# IM (I0036 Erlang OTP MVP): restart_subtree + quorum_replicate
+# ════════════════════════════════════════════════════════════════════════
+#
+# The I0036 throughput winner of Run 2 picked:
+#   supervisor_strategy = restart_subtree
+#   failover_policy     = quorum_replicate
+#
+# Full restart_subtree needs to re-spawn dependants of a failed actor.
+# In MVP we take the passive equivalent: subtree-wide quarantine — when
+# actor X enters quarantine, every actor X transitively spawned also
+# enters quarantine for the same TTL.  This contains a failure to its
+# entire descendant tree without needing the (much larger) re-spawn
+# machinery, while still exhibiting Erlang OTP's blast-radius
+# containment semantics.
+
+_SPAWN_PARENT: Dict[str, str] = {}      # child -> parent
+_SPAWN_LOCK = threading.Lock()
+
+
+def register_spawn(child: str, parent: Optional[str]) -> None:
+    """Record that `parent` spawned `child`.  No-op when disabled or
+    `parent` is None (= top-level spawn)."""
+    if not is_enabled() or not parent:
+        return
+    with _SPAWN_LOCK:
+        _SPAWN_PARENT[child] = parent
+
+
+def descendants_of(actor: str) -> list:
+    """BFS over the spawn tree rooted at `actor`, excluding `actor`
+    itself."""
+    if not is_enabled():
+        return []
+    # Build children index on the fly.
+    with _SPAWN_LOCK:
+        items = list(_SPAWN_PARENT.items())
+    children: Dict[str, list] = {}
+    for c, p in items:
+        children.setdefault(p, []).append(c)
+    out: list = []
+    front = list(children.get(actor, []))
+    seen = {actor}
+    while front:
+        n = front.pop(0)
+        if n in seen:
+            continue
+        seen.add(n)
+        out.append(n)
+        front.extend(children.get(n, []))
+    return out
+
+
+def quarantine_subtree(actor: str, ttl: Optional[float] = None) -> list:
+    """Quarantine `actor` and every descendant.  Returns the list of
+    actors that were newly quarantined (excluding ones already in)."""
+    if not is_enabled():
+        return []
+    newly = []
+    if quarantine_actor(actor, ttl):
+        newly.append(actor)
+    for d in descendants_of(actor):
+        if quarantine_actor(d, ttl):
+            newly.append(d)
+    if newly:
+        log_event("subtree_quarantined", root=actor, members=newly)
+    return newly
+
+
+# ────────────────────────────────────────────────────────────────────────
+# quorum_replicate: parallel multi-provider call_ai, first-reply wins
+# ────────────────────────────────────────────────────────────────────────
+#
+# AIPL_DIST_QUORUM_PROVIDERS="openai,anthropic,gemini" (comma list)
+# The wrapper launches all listed providers concurrently and returns
+# whichever finishes first.  Providers that 500/timeout are silently
+# dropped — as long as at least one returns, the caller never sees the
+# failure.  This is the Run-1 silent-hang remedy at the call level
+# (vs the actor-level isolation from IQ quarantine).
+
+def quorum_providers() -> list:
+    """Parsed list from AIPL_DIST_QUORUM_PROVIDERS, or [] if unset."""
+    if not is_enabled():
+        return []
+    raw = os.environ.get("AIPL_DIST_QUORUM_PROVIDERS", "")
+    if not raw:
+        return []
+    out = []
+    for p in raw.split(","):
+        p = p.strip()
+        if p:
+            out.append(p)
+    return out
+
+
+def call_ai_quorum(prompt: str,
+                   call_ai_fn: Optional[Callable[..., str]] = None,
+                   providers: Optional[list] = None,
+                   **kwargs: Any) -> str:
+    """Send `prompt` to every provider in `providers` (or
+    `AIPL_DIST_QUORUM_PROVIDERS` when not supplied) and return whichever
+    reply arrives first.  Falls through to a plain call_ai if no
+    providers are listed or aipl_dist is disabled."""
+    if call_ai_fn is None:
+        import aipl_ai
+        call_ai_fn = aipl_ai.call_ai
+    plist = providers if providers is not None else quorum_providers()
+    if not plist:
+        return call_ai_fn(prompt, **kwargs)
+
+    import concurrent.futures
+    result_box: Dict[str, Any] = {"value": None, "winner": None,
+                                  "errors": []}
+    done_evt = threading.Event()       # set when first reply arrives
+    all_done = threading.Event()       # set when every provider has finished
+    pending = [len(plist)]
+    pending_lock = threading.Lock()
+    log_event("quorum_start", providers=plist, prompt_len=len(prompt))
+
+    def _one(prov: str):
+        try:
+            kw = dict(kwargs)
+            kw["provider_override"] = prov
+            t0 = time.time()
+            r = call_ai_fn(prompt, **kw)
+            if not done_evt.is_set():
+                result_box["value"] = r
+                result_box["winner"] = prov
+                done_evt.set()
+                log_event("quorum_first", winner=prov,
+                          ms=int((time.time() - t0) * 1000))
+            else:
+                log_event("quorum_late", provider=prov,
+                          ms=int((time.time() - t0) * 1000))
+        except Exception as e:
+            result_box["errors"].append((prov, repr(e)))
+            log_event("quorum_error", provider=prov, err=repr(e))
+        finally:
+            with pending_lock:
+                pending[0] -= 1
+                if pending[0] == 0:
+                    all_done.set()
+
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(plist)) as ex:
+        for prov in plist:
+            ex.submit(_one, prov)
+        # Wait for either the first successful reply OR every provider
+        # to fail.  Without all_done, all-fail paths would deadlock here.
+        while not done_evt.is_set():
+            if all_done.wait(timeout=0.1):
+                break
+    if result_box["winner"] is None:
+        # all providers errored — surface a synthesised error
+        msg = "quorum: all providers failed: " + "; ".join(
+            f"{p}={e}" for p, e in result_box["errors"])
+        raise RuntimeError(msg)
+    return result_box["value"]

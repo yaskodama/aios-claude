@@ -1,0 +1,59 @@
+// IM (I0036) sample: restart_subtree as cascading quarantine.
+//
+// Supervisor spawns 2 Workers, each of which spawns 1 Helper.  Then
+// Worker B raises an exception.  With AIPL_DIST_SUBTREE_QUARANTINE=1,
+// the failure cascades to Worker B's Helper (its descendant), but
+// leaves Worker A and its Helper untouched.  This is the Erlang OTP
+// "blast-radius containment" semantics in passive form — the failed
+// branch is quarantined while the rest of the supervisor tree keeps
+// running.
+//
+// Run:
+//   AIPL_AI_PROVIDER=mock AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_QUARANTINE_TTL=2 \
+//   AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub.ndjson \
+//   python3 src/python-aipl/aipl_main.py subtree_quarantine_demo.aipl
+//
+// Expect in NDJSON:
+//   - actor_spawn (sup, wA, wB, hA, hB, AI)
+//   - exactly ONE "[actor wB.crash] error" on stderr
+//   - subtree_quarantined event listing wB and hB
+//   - actor_skip_quarantined for follow-up sends to wB and hB only
+
+class Helper {
+  var label = "h";
+  method ping() { println("helper ", label, " pinged"); reply(0); }
+}
+
+class Worker {
+  var name = "w";
+  method init(n) { name = n; }
+  method spawn_helper() {
+    var h = new Helper();
+    reply(0);
+  }
+  method ok() { println("worker ", name, " ok"); reply(0); }
+  method crash() {
+    var x = 1 / 0;
+    reply(x);
+  }
+}
+
+class Supervisor {
+  method drive() {
+    var wA = new Worker();
+    var wB = new Worker();
+    var aOk = now wA.spawn_helper();    // wA spawns hA  (descendant)
+    var bOk = now wB.spawn_helper();    // wB spawns hB  (descendant)
+    var c   = now wB.crash();           // wB fails -> subtree quarantine
+    // After the crash, wB *and* hB are quarantined.  wA and hA stay live.
+    var rA  = now wA.ok();              // OK
+    var rB  = now wB.ok();              // skipped (wB quarantined)
+    println("supervisor done");
+    reply(0);
+  }
+}
+
+var sup = new Supervisor();
+var rc = now sup.drive();

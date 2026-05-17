@@ -503,13 +503,16 @@ class Interpreter:
             for k, v in snap.items():
                 if k in actor.fields and isinstance(v, (int, float, bool, str)):
                     actor.fields[k] = v
-        # I-5 / I-6 (aipl_dist hooks): both effectively no-ops unless
+        # I-5 / I-6 / IM (aipl_dist hooks): all no-ops unless
         # AIPL_DIST_ENABLE=1.  I-5 overlays checkpointed state from
         # AIPL_DIST_CHECKPOINT_DIR; I-6 emits a structured-log event
-        # when AIPL_ROUTE assigns this actor to a tag.  Failures here
-        # never bubble up — they're observational integrations.
+        # when AIPL_ROUTE assigns this actor to a tag; IM tracks the
+        # spawn parent (via the worker-thread name set by
+        # aipl_runtime.Actor.start: "actor-<name>") so I0036's
+        # subtree-quarantine can find descendants.  Failures here
+        # never bubble up.
         try:
-            import aipl_dist
+            import aipl_dist, threading as _t
             ck_state = aipl_dist.restore_actor_state(name)
             if ck_state:
                 for k, v in ck_state.items():
@@ -519,6 +522,11 @@ class Interpreter:
             if tag is not None:
                 aipl_dist.log_event("actor_routed", actor=name, cls=cls_name, tag=tag)
             aipl_dist.log_event("actor_spawn", actor=name, cls=cls_name)
+            parent = None
+            tname = _t.current_thread().name
+            if tname.startswith("actor-"):
+                parent = tname[len("actor-"):]
+            aipl_dist.register_spawn(name, parent)
         except Exception:
             pass
         self.scheduler.register(actor)

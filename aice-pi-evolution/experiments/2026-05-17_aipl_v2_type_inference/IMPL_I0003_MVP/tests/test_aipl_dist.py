@@ -308,6 +308,119 @@ def test_quarantine_custom_ttl_override():
 
 
 # ──────────────────────────────────────────────────────────────────────
+# IM (I0036): restart_subtree (passive subtree_quarantine)
+# ──────────────────────────────────────────────────────────────────────
+
+def test_spawn_tree_disabled_returns_empty():
+    _clean_env()
+    d = reload_dist()
+    d.register_spawn("c", "p")
+    assert d.descendants_of("p") == []
+
+
+def test_spawn_tree_simple():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    d = reload_dist()
+    #  root -> a, a -> b, a -> c, b -> d
+    d.register_spawn("a", "root")
+    d.register_spawn("b", "a")
+    d.register_spawn("c", "a")
+    d.register_spawn("d", "b")
+    assert set(d.descendants_of("root")) == {"a", "b", "c", "d"}
+    assert set(d.descendants_of("a")) == {"b", "c", "d"}
+    assert set(d.descendants_of("b")) == {"d"}
+    assert d.descendants_of("d") == []
+    assert d.descendants_of("nope") == []
+
+
+def test_subtree_quarantine():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUARANTINE_TTL"] = "60"
+    d = reload_dist()
+    d.register_spawn("a", "root")
+    d.register_spawn("b", "a")
+    d.register_spawn("c", "a")
+    members = d.quarantine_subtree("a")
+    assert set(members) == {"a", "b", "c"}
+    assert d.is_quarantined("a") is True
+    assert d.is_quarantined("b") is True
+    assert d.is_quarantined("c") is True
+    assert d.is_quarantined("root") is False    # not a descendant of a
+
+
+# ──────────────────────────────────────────────────────────────────────
+# IM (I0036): quorum_replicate
+# ──────────────────────────────────────────────────────────────────────
+
+def test_quorum_providers_parse():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUORUM_PROVIDERS"] = "openai,anthropic, gemini ,"
+    d = reload_dist()
+    assert d.quorum_providers() == ["openai", "anthropic", "gemini"]
+
+
+def test_quorum_disabled_passes_through():
+    _clean_env()
+    d = reload_dist()
+    seen = []
+    def fake(prompt, **kw):
+        seen.append(kw.get("provider_override"))
+        return "ok"
+    out = d.call_ai_quorum("hi", call_ai_fn=fake)
+    assert out == "ok"
+    assert seen == [None]   # no quorum -> single passthrough
+
+
+def test_quorum_first_wins():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUORUM_PROVIDERS"] = "fast,slow"
+    d = reload_dist()
+
+    def fake(prompt, **kw):
+        prov = kw.get("provider_override")
+        if prov == "slow":
+            time.sleep(0.2)
+            return "slow-reply"
+        return "fast-reply"
+    out = d.call_ai_quorum("hi", call_ai_fn=fake)
+    assert out == "fast-reply"
+
+
+def test_quorum_handles_one_failing_provider():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUORUM_PROVIDERS"] = "broken,working"
+    d = reload_dist()
+
+    def fake(prompt, **kw):
+        if kw.get("provider_override") == "broken":
+            raise RuntimeError("simulated provider failure")
+        time.sleep(0.05)
+        return "from-working"
+    out = d.call_ai_quorum("hi", call_ai_fn=fake)
+    assert out == "from-working"
+
+
+def test_quorum_all_fail_raises():
+    _clean_env()
+    os.environ["AIPL_DIST_ENABLE"] = "1"
+    os.environ["AIPL_DIST_QUORUM_PROVIDERS"] = "x,y"
+    d = reload_dist()
+
+    def fake(prompt, **kw):
+        raise RuntimeError(f"{kw.get('provider_override')} fails")
+    try:
+        d.call_ai_quorum("hi", call_ai_fn=fake)
+        assert False, "expected exception"
+    except RuntimeError as e:
+        assert "all providers failed" in str(e)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Runner
 # ──────────────────────────────────────────────────────────────────────
 
@@ -332,6 +445,14 @@ def _run():
         ("quarantine marks and clears", test_quarantine_marks_and_clears),
         ("quarantine expires after TTL", test_quarantine_expires_after_ttl),
         ("quarantine custom ttl override", test_quarantine_custom_ttl_override),
+        ("spawn tree disabled returns empty", test_spawn_tree_disabled_returns_empty),
+        ("spawn tree simple", test_spawn_tree_simple),
+        ("subtree quarantine cascades", test_subtree_quarantine),
+        ("quorum providers parse", test_quorum_providers_parse),
+        ("quorum disabled passes through", test_quorum_disabled_passes_through),
+        ("quorum first wins", test_quorum_first_wins),
+        ("quorum tolerates one failing provider", test_quorum_handles_one_failing_provider),
+        ("quorum all fail raises", test_quorum_all_fail_raises),
     ]
     failed = []
     for name, fn in tests:
