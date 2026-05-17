@@ -1,0 +1,37 @@
+// Integration / sample 3 — all 7 DR features active simultaneously.
+//
+// Routing + structured_log + token_budget + checkpoint + quarantine
+// + quorum + subtree_quarantine all enabled.  One actor (`Flaky`)
+// is intentionally bad to exercise quarantine; the AI-using actor
+// goes through the budget gate AND the quorum fan-out.
+//
+// Run (one-line):
+//   rm -rf /tmp/ck_full; mkdir /tmp/ck_full; rm -f /tmp/full.ndjson
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_ROUTE="Hot:fast,Cold:slow,AI:gpu" \
+//   AIPL_DIST_LOG_FILE=/tmp/full.ndjson \
+//   AIPL_DIST_RPM=5 \
+//   AIPL_DIST_CHECKPOINT_DIR=/tmp/ck_full \
+//   AIPL_DIST_QUARANTINE_TTL=10 \
+//   AIPL_DIST_QUORUM_PROVIDERS="mock,mock" \
+//   AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   dune exec src/repl_thread.exe -- -f run.bat
+
+class Hot   { method tick() { print("hot"); } }
+class Cold  { var n = 0; method add() { n = n + 1; print(n); } }
+class AI    { method ask() {
+  var r = ai_call("one-word reply");
+  print(r);
+} }
+class Flaky { method boom() { error("intentional"); } }
+
+var h = new Hot();
+var c = new Cold();
+var ai = new AI();
+var f = new Flaky();
+send h.tick();
+send c.add();
+send c.add();
+send ai.ask();
+send f.boom();
+send f.boom();

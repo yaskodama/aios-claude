@@ -1,0 +1,26 @@
+// DR-6 / sample 3 — quorum: all providers fail → caller surfaces
+// a synthesised error.
+//
+// When every provider raises, call_ai_quorum collects each error
+// message into one consolidated error event so the operator can
+// see what each provider returned.  The caller raises a single
+// AI_call_error capturing the full triple.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_QUORUM_PROVIDERS="broken,broken,broken" \
+//   AIPL_DIST_LOG_FILE=/tmp/qrm3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: 3 `quorum_provider_error` events; the actor surface
+// shows a single `[actor a.one] error: ai_call: all providers failed`.
+
+class Asker {
+  method one(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.one("Everyone fails");

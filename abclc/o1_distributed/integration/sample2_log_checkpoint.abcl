@@ -1,0 +1,30 @@
+// Integration / sample 2 — log + checkpoint together.
+//
+// Adds checkpoint to the observability mix: every state-mutating
+// method writes both an NDJSON event AND a fresh actor snapshot.
+// Recovery procedure: tail the log to identify the last commit per
+// actor, cross-check with the checkpoint file.
+//
+// Run twice to see resume.  First run:
+//   rm -rf /tmp/ck_int2; mkdir /tmp/ck_int2
+//   AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/int2.ndjson \
+//   AIPL_DIST_CHECKPOINT_DIR=/tmp/ck_int2 \
+//   dune exec src/repl_thread.exe -- -f bumps.bat
+//   # Second run with peek.bat: count remembered, log shows resume.
+
+class Counter {
+  var count = 0;
+  method bump() {
+    count = count + 1;
+    print(count);
+  }
+  method peek() {
+    print(count);
+  }
+}
+
+var c = new Counter();
+send c.bump();
+send c.bump();
+send c.peek();

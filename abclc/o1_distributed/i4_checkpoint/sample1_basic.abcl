@@ -1,0 +1,31 @@
+// DR-4 / sample 1 — checkpoint and restore.
+//
+// `Counter.bump` advances state; eval_thread.ml's auto-hook saves
+// the actor's serialised state under AIPL_DIST_CHECKPOINT_DIR after
+// each method.  A subsequent run with the same dir restores `count`
+// from disk, so `bump 1; bump 2; bump 3;` followed by a fresh run
+// that only does `peek;` will print the post-bump value, not the
+// initial.
+//
+// Run twice — see the second run's peek return the saved counter:
+//   rm -rf /tmp/ck1; mkdir /tmp/ck1
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_CHECKPOINT_DIR=/tmp/ck1 \
+//     dune exec src/repl_thread.exe -- -f bump.bat   # bump x3
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_CHECKPOINT_DIR=/tmp/ck1 \
+//     dune exec src/repl_thread.exe -- -f peek.bat   # prints 3
+
+class Counter {
+  var count = 0;
+  method bump() {
+    count = count + 1;
+    print(count);
+  }
+  method peek() {
+    print(count);
+  }
+}
+
+var c = new Counter();
+send c.bump();
+send c.bump();
+send c.bump();

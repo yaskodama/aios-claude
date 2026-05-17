@@ -1,0 +1,38 @@
+// DR-7 / sample 3 — two parallel subtrees: A crashes, B unaffected.
+//
+// Two independent trees (TreeA and TreeB).  TreeA crashes; the
+// cascade quarantines only TreeA and its descendants.  TreeB is
+// completely untouched: this is the Erlang OTP "blast radius"
+// containment guarantee — a sibling supervisor tree never gets
+// caught in a relative's collapse.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: TreeA's actors are quarantined; TreeB's prints all
+// succeed.  Log shows the cascade lists only TreeA-side actors.
+
+class Child {
+  method work(tag: string) { print(tag); }
+}
+class TreeA {
+  method run() {
+    var c = new Child();
+    send c.work("A-child");
+    error("A died");
+  }
+}
+class TreeB {
+  method run() {
+    var c = new Child();
+    send c.work("B-child");
+    send c.work("B-still-alive");
+  }
+}
+
+var a = new TreeA();
+var b = new TreeB();
+send a.run();
+send b.run();

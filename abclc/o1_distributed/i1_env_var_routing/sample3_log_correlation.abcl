@@ -1,0 +1,32 @@
+// DR-1 / sample 3 — routing decisions correlated through structured_log.
+//
+// Three actor classes, three routing targets, one log file.  Each
+// `spawn` event in the NDJSON carries both `actor_class` and `route`,
+// so a single `jq '.actor_class + "->" + .route'` over the log
+// reconstructs the full placement plan.  Useful for post-mortem
+// "where did everything end up?" forensics.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 \
+//   AIPL_ROUTE="Greeter:fast,Bench:slow,Logger:disk" \
+//   AIPL_DIST_LOG_FILE=/tmp/route3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//   jq -r '.event + " " + .actor_class + " -> " + (.route // "default")' \
+//      /tmp/route3.ndjson
+
+class Greeter {
+  method greet() { print("hi"); }
+}
+class Bench {
+  method work() { print("work"); }
+}
+class Logger {
+  method emit() { print("log"); }
+}
+
+var g = new Greeter();
+var b = new Bench();
+var l = new Logger();
+send g.greet();
+send b.work();
+send l.emit();

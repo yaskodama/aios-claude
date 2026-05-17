@@ -1,0 +1,30 @@
+// DR-1 / sample 1 — env_var_routing basic.
+//
+// Two actors of different classes spawn and run a trivial loop.  When
+// AIPL_DIST_ENABLE=1 and AIPL_ROUTE="Greeter:fast,Bench:slow" are
+// set, aipl_dist.route_for("Greeter") returns "fast" and is recorded
+// in the log file as a `spawn` event metadata.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_ROUTE="Greeter:fast,Bench:slow" \
+//   AIPL_DIST_LOG_FILE=/tmp/route1.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: /tmp/route1.ndjson contains a `spawn` event for Greeter
+// with route="fast" and for Bench with route="slow".
+
+class Greeter {
+  method greet() {
+    print("hello from greeter");
+  }
+}
+class Bench {
+  method work() {
+    print("benchmarking");
+  }
+}
+
+var g = new Greeter();
+var b = new Bench();
+send g.greet();
+send b.work();

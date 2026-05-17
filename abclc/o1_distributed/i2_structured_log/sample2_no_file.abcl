@@ -1,0 +1,22 @@
+// DR-2 / sample 2 — log_event is a graceful no-op when AIPL_DIST_LOG_FILE
+// is unset.
+//
+// When AIPL_DIST_ENABLE=1 but no AIPL_DIST_LOG_FILE is given,
+// aipl_dist.log_event() returns false / never raises.  The program
+// runs as if the runtime had no logging hook.  Useful for CI runs
+// that want the routing/checkpoint pieces but NOT a log file.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: program prints "noop ok" and exits 0.  No file created.
+
+class Quiet {
+  method tick() {
+    print("noop ok");
+  }
+}
+
+var q = new Quiet();
+send q.tick();

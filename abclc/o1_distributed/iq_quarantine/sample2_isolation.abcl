@@ -1,0 +1,34 @@
+// DR-5 / sample 2 — quarantine isolates one actor; siblings unaffected.
+//
+// `Flaky` blows up, `Stable` never does.  After the first send to
+// Flaky, Flaky is quarantined for the TTL window; Stable continues
+// to receive and process messages normally.  This verifies that
+// quarantine is per-actor, not blanket-class.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_QUARANTINE_TTL=30 \
+//   AIPL_DIST_LOG_FILE=/tmp/q2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: Stable prints its messages all the way through; Flaky's
+// later sends are silently dropped.
+
+class Flaky {
+  method boom() { error("die"); }
+}
+class Stable {
+  var n = 0;
+  method tick() {
+    n = n + 1;
+    print("stable:" + n);
+  }
+}
+
+var f = new Flaky();
+var s = new Stable();
+send f.boom();
+send s.tick();
+send f.boom();
+send s.tick();
+send f.boom();
+send s.tick();

@@ -1,0 +1,27 @@
+// DR-3 / sample 3 — TPM (tokens-per-minute) enforcement.
+//
+// Same call shape as samples 1/2 but the budget is expressed in
+// token-units rather than request-units.  The gate sums an
+// estimated `est_tokens` per call against the configured TPM cap.
+// Useful when individual calls vary wildly in size (a 4-token prompt
+// vs a 4000-token prompt cost very differently).
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_TPM=500 \
+//   AIPL_DIST_LOG_FILE=/tmp/budget3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: each admission event carries `tokens_remaining` showing
+// the running counter against the 500-tok cap.
+
+class Asker {
+  method large(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.large("write a long story");
+send a.large("write a very very long essay");

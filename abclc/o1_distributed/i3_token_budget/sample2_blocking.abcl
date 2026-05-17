@@ -1,0 +1,28 @@
+// DR-3 / sample 2 — gate blocks when RPM is exhausted.
+//
+// Same program as sample 1, but AIPL_DIST_RPM=2: after the first two
+// admissions the third call blocks until the sliding 60s window has
+// space.  This is the visible enforcement path — the program runs
+// to completion eventually, but the 3rd actor's wall-clock latency
+// noticeably exceeds the first two.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_RPM=2 \
+//   AIPL_DIST_LOG_FILE=/tmp/budget2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: log file has 2 `call_ai_budget_acquire` events plus 1
+// `call_ai_budget_wait` event for the blocked call.
+
+class Asker {
+  method one(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.one("q1");
+send a.one("q2");
+send a.one("q3");

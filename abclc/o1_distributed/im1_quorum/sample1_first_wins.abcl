@@ -1,0 +1,25 @@
+// DR-6 / sample 1 — quorum: first provider wins.
+//
+// With AIPL_DIST_QUORUM_PROVIDERS="mock,mock,mock" set, every
+// ai_call fans out to three parallel calls; the first to return
+// wins.  Subsequent late returns are logged as `quorum_late` but
+// their values are discarded.  Latency-bounded by the slowest
+// answer the caller had to wait for — i.e., the fastest one.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_QUORUM_PROVIDERS="mock,mock,mock" \
+//   AIPL_DIST_LOG_FILE=/tmp/qrm1.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: 1 `quorum_winner` event, 2 `quorum_late` events.
+
+class Asker {
+  method one(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.one("Hello?");

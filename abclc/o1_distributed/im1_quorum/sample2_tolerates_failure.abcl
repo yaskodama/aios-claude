@@ -1,0 +1,27 @@
+// DR-6 / sample 2 — quorum tolerates a failing provider.
+//
+// If 1 of 3 providers throws, the caller never sees the failure —
+// it picks up the winning response from one of the other two.  This
+// is the silent-hang remedy: a single bad provider doesn't stop
+// the caller from making progress.  The failure IS logged
+// (`quorum_provider_error`) so the operator can later see the
+// underlying flap.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_QUORUM_PROVIDERS="mock,broken,mock" \
+//   AIPL_DIST_LOG_FILE=/tmp/qrm2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: 1 `quorum_winner` event, 1 `quorum_provider_error`,
+// 1 `quorum_late` (or `quorum_winner` count == 1 always).
+
+class Asker {
+  method one(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.one("Tolerate one failure");

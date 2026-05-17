@@ -1,0 +1,42 @@
+// DR-7 / sample 1 — subtree quarantine: parent failure cascades to
+// descendants.
+//
+// Supervisor spawns 2 Workers; each Worker spawns 1 Helper.  Worker
+// B then raises.  With AIPL_DIST_SUBTREE_QUARANTINE=1, Worker B and
+// its Helper get quarantined together (one cascade event), while
+// Worker A and its Helper are untouched.  This is the Erlang OTP
+// "restart_subtree" containment semantic.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub1.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: log has 1 cascade affecting {Worker B, its Helper};
+// Worker A side still prints its tick.
+
+class Helper {
+  method help(tag: string) { print("help:" + tag); }
+}
+class Worker {
+  var id = 0;
+  method init(my_id: int) { id = my_id; }
+  method run(ok: int) {
+    var h = new Helper();
+    send h.help("from-" + id);
+    if (ok == 0) { error("worker " + id + " died"); }
+  }
+}
+class Supervisor {
+  method launch() {
+    var wa = new Worker();
+    var wb = new Worker();
+    send wa.init(1);
+    send wb.init(2);
+    send wa.run(1);   // ok
+    send wb.run(0);   // crash
+  }
+}
+
+var s = new Supervisor();
+send s.launch();

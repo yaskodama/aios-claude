@@ -1,0 +1,33 @@
+// DR-7 / sample 2 — 3-level cascade: Root → Mid → Leaf.
+//
+// Demonstrates that the cascade walks the full descendant tree, not
+// just immediate children.  Root crashing quarantines both Mid AND
+// Leaf in a single cascade event.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_SUBTREE_QUARANTINE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/sub2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: log has 1 cascade event listing 3 actors (Root, Mid,
+// Leaf) all quarantined together.
+
+class Leaf {
+  method work() { print("leaf"); }
+}
+class Mid {
+  method work() {
+    var l = new Leaf();
+    send l.work();
+  }
+}
+class Root {
+  method work() {
+    var m = new Mid();
+    send m.work();
+    error("root died");
+  }
+}
+
+var r = new Root();
+send r.work();

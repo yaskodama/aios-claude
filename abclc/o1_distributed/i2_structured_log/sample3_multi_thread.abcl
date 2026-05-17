@@ -1,0 +1,30 @@
+// DR-2 / sample 3 — multi-actor parallel logging.
+//
+// Five actors send messages concurrently.  log_event is mutex-guarded
+// at the aipl_dist layer so the NDJSON output is well-formed even
+// under parallel writes: every line parses as JSON, no torn writes.
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/log3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//   wc -l /tmp/log3.ndjson  # well-formed event count
+//   jq -s 'length' /tmp/log3.ndjson  # JSON-parsed event count
+//
+// Expected: the two counts match (no torn lines).
+
+class Worker {
+  method tick(name: string) {
+    print(name);
+  }
+}
+
+var w1 = new Worker();
+var w2 = new Worker();
+var w3 = new Worker();
+var w4 = new Worker();
+var w5 = new Worker();
+send w1.tick("a");
+send w2.tick("b");
+send w3.tick("c");
+send w4.tick("d");
+send w5.tick("e");

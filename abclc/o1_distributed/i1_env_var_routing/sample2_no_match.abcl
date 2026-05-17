@@ -1,0 +1,30 @@
+// DR-1 / sample 2 — actor name not in AIPL_ROUTE: graceful no-op.
+//
+// `Worker` is NOT in AIPL_ROUTE; route_for("Worker") returns None and
+// the runtime falls back to the default placement.  No error.  Helps
+// verify partial-routing-table scenarios (a real deployment may only
+// route a hot subset of actor classes).
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_ROUTE="Greeter:fast" \
+//   AIPL_DIST_LOG_FILE=/tmp/route2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: only Greeter's spawn event carries a route; Worker's
+// spawn event has route=null (or no `route` key).
+
+class Greeter {
+  method greet() {
+    print("hi");
+  }
+}
+class Worker {
+  method job() {
+    print("working");
+  }
+}
+
+var g = new Greeter();
+var w = new Worker();
+send g.greet();
+send w.job();

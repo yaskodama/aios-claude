@@ -1,0 +1,28 @@
+// DR-5 / sample 1 — quarantine_and_skip on repeated failure.
+//
+// `Flaky.boom` throws every time.  Without quarantine, every send
+// produces a `[actor ...] error: ...` line.  With
+// AIPL_DIST_QUARANTINE_TTL=10 set, the first error marks the actor
+// quarantined for 10s; subsequent sends are silently dropped (the
+// quarantine_skip event is logged but no error line is emitted).
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_QUARANTINE_TTL=10 \
+//   AIPL_DIST_LOG_FILE=/tmp/q1.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: log has one `quarantine_actor` event and N-1
+// `quarantine_skip` events for the subsequent sends.
+
+class Flaky {
+  method boom() {
+    error("intentional failure");
+  }
+}
+
+var f = new Flaky();
+send f.boom();
+send f.boom();
+send f.boom();
+send f.boom();
+send f.boom();

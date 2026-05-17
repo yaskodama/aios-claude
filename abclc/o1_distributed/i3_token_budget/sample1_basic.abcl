@@ -1,0 +1,26 @@
+// DR-3 / sample 1 — token_budget gate basic admission.
+//
+// One actor makes 3 ai_calls back-to-back.  With AIPL_DIST_RPM=10 the
+// gate admits all three immediately (rate well below limit).  Each
+// admission logs a `call_ai_budget_acquire` event with current
+// window usage.
+//
+// Run (mock provider, no API key needed):
+//   AIPL_DIST_ENABLE=1 ABCL_AI_PROVIDER=mock \
+//   AIPL_DIST_RPM=10 \
+//   AIPL_DIST_LOG_FILE=/tmp/budget1.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Expected: 3 mock replies print; log file has 3 admission events.
+
+class Asker {
+  method one(q: string) {
+    var resp = ai_call(q);
+    print(resp);
+  }
+}
+
+var a = new Asker();
+send a.one("first");
+send a.one("second");
+send a.one("third");

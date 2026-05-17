@@ -1,0 +1,32 @@
+// DR-4 / sample 3 — many actors saved; list them at recovery time.
+//
+// Spawns 5 actors of two classes (`Hot` and `Cold`).  After the run,
+// `AIPL_DIST_CHECKPOINT_DIR` contains a snapshot file per actor.
+// An operator-side `ls $AIPL_DIST_CHECKPOINT_DIR` reconstructs the
+// alive-actor inventory for a recovery script.
+//
+// Run:
+//   rm -rf /tmp/ck3; mkdir /tmp/ck3
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_CHECKPOINT_DIR=/tmp/ck3 \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//   ls /tmp/ck3/  # expects 5 files (Hot_*.json × 3, Cold_*.json × 2)
+
+class Hot {
+  var x = 1;
+  method tick() { x = x + 1; print(x); }
+}
+class Cold {
+  var y = 0;
+  method tick() { y = y + 1; print(y); }
+}
+
+var h1 = new Hot();
+var h2 = new Hot();
+var h3 = new Hot();
+var c1 = new Cold();
+var c2 = new Cold();
+send h1.tick();
+send h2.tick();
+send h3.tick();
+send c1.tick();
+send c2.tick();

@@ -1,0 +1,24 @@
+// DR-5 / sample 3 — TTL window scope.
+//
+// Demonstrates that AIPL_DIST_QUARANTINE_TTL is per-call (a sliding
+// window), so a long-TTL setting effectively makes quarantine
+// permanent within a single run.  Operationally this is the "no
+// retries this session" mode.
+//
+// Run with a long TTL:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_QUARANTINE_TTL=3600 \
+//   AIPL_DIST_LOG_FILE=/tmp/q3.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//
+// Then a short TTL contrasts: change to AIPL_DIST_QUARANTINE_TTL=1
+// and rerun — even brief sleeps would let the actor become eligible
+// again.
+
+class Failer {
+  method die() { error("bye"); }
+}
+
+var f = new Failer();
+send f.die();
+send f.die();
+send f.die();
