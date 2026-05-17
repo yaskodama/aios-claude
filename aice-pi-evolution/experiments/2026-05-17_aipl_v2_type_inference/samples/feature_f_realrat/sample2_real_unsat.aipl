@@ -1,0 +1,20 @@
+// Feature F (Phase E-γ-R) — Sample 2: vacuously-false Real predicates.
+// Z3 over the Real theory must detect that no real number can
+// satisfy these predicates and report each one.
+
+class BadReals {
+  method gt1_lt05(x: Real where x > 1.0 and x < 0.5) -> Real {
+    reply(x);
+  }
+  method strict_open_zero(y: Real where y > 0.0 and y < 0.0) -> Real {
+    reply(y);
+  }
+  method bigger_than_self(z: Real where z > z + 1.0) -> Real {
+    reply(z);
+  }
+  method bool_eq_int(w: Real where w == 1.0 and w == 2.0) -> Real {
+    reply(w);
+  }
+}
+
+var b = new BadReals();

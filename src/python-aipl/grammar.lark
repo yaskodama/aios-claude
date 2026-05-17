@@ -80,7 +80,8 @@ ref_mul: ref_unary (ref_mul_op ref_unary)*
 !ref_mul_op: "*" | "/"
 ?ref_unary: "-" ref_unary                                        -> ref_neg
           | ref_atom
-?ref_atom: INT                                                   -> ref_int
+?ref_atom: FLOAT                                                 -> ref_float
+         | INT                                                   -> ref_int
          | NAME                                                  -> ref_var
          | "(" refinement ")"                                    -> ref_paren
 

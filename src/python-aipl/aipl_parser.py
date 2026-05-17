@@ -355,6 +355,10 @@ class _Builder(Transformer):
         return str(items[0])
 
     @v_args(inline=False)
+    def ref_float(self, items):
+        return str(items[0])
+
+    @v_args(inline=False)
     def ref_var(self, items):
         return str(items[0])
 

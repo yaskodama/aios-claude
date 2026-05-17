@@ -993,20 +993,34 @@ def _check_refined_decls(decls: list) -> list:
 
 def _z3_check(z3, rt: TRefined, expr_src: str) -> tuple:
     """Best-effort: check that `rt.pred_src` is satisfiable when the
-    binder is a symbolic Int.  We parse the predicate via Python's
-    AST so `and`/`or`/`not` correctly translate to z3.And / z3.Or /
-    z3.Not instead of being short-circuited by Python's eval."""
-    if rt.base != T_INT:
-        return True, "non-Int refinement deferred to runtime"
+    binder is a symbolic Int / Real / Rat.  We parse the predicate
+    via Python's AST so `and`/`or`/`not` correctly translate to
+    z3.And / z3.Or / z3.Not instead of being short-circuited by
+    Python's eval.
+
+    Phase E-γ-R: dispatch on the refined base type — Real and Rat
+    refinements now use Z3's Real theory (Z3 represents rationals
+    as Reals with rational coefficients).  Bool refinements use
+    Z3 Bool; everything else still falls back to "deferred"."""
+    # Pick a Z3 sort constructor matching the refined base.
+    if rt.base == T_INT:
+        mk_var = z3.Int
+    elif rt.base in (T_REAL, T_RAT):
+        mk_var = z3.Real
+    elif rt.base == T_BOOL:
+        mk_var = z3.Bool
+    else:
+        return True, "non-numeric refinement deferred to runtime"
     try:
         import ast
         binder = rt.binder if rt.binder != "_" else "x"
-        # Free variables become fresh Z3 ints.
-        free: Dict[str, Any] = {binder: z3.Int(binder)}
+        # Free variables share the binder's sort so comparisons like
+        # `m > a and m < b` make sense (a, b are reals when m is).
+        free: Dict[str, Any] = {binder: mk_var(binder)}
         for tok in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rt.pred_src)):
             if tok in free or tok in ("and", "or", "not", "True", "False"):
                 continue
-            free[tok] = z3.Int(tok)
+            free[tok] = mk_var(tok)
         tree = ast.parse(rt.pred_src, mode="eval")
         pred = _ast_to_z3(tree.body, free, z3)
         s = z3.Solver()

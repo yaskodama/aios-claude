@@ -1,0 +1,30 @@
+// Feature F (Phase E-γ-R) — Sample 3: mixed Rat + Real predicates.
+// Rats are represented in Z3 as Reals (same theory), so SAT/UNSAT
+// detection works uniformly.  Mixing arithmetic with `or`, `not`,
+// chained compares, and integer literals in a Real context all
+// flow through the same _ast_to_z3 path.
+
+class Mixed {
+  // Rat: satisfiable
+  method rat_window(r: Rat where r > 0 and r < 1) -> Rat {
+    reply(r);
+  }
+  // Rat: holed interval (sat — union of two valid sub-intervals)
+  method rat_holed(s: Rat where (s > 0.0 and s < 0.4) or (s > 0.6 and s < 1.0)) -> Rat {
+    reply(s);
+  }
+  // Real: not-equality is satisfiable
+  method real_avoid_zero(x: Real where not (x == 0.0)) -> Real {
+    reply(x);
+  }
+  // Real: solves to a single point  (sat — x = 1.5)
+  method real_one_solution(x: Real where 2.0 * x + 1.0 == 4.0) -> Real {
+    reply(x);
+  }
+  // UNSAT: contradiction hidden behind boolean structure
+  method contradictory(z: Real where (z > 5.0) and not (z > 1.0)) -> Real {
+    reply(z);
+  }
+}
+
+var m = new Mixed();
