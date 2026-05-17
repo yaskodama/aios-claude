@@ -270,11 +270,17 @@ let rec infer_expr (env:env) (e:expr) : ty =
                  | TFun (param_tys, ret_ty) when
                      List.length param_tys = List.length arg_tys ->
                      (* Unify each arg with the declared param type so
-                        param-type errors surface (and so that fresh
-                        return-type tvars get pinned). *)
-                     List.iter2 (fun pt at ->
-                       ignore (unify_at e.loc pt at)
-                     ) param_tys arg_tys;
+                        param-type errors (including record shape and
+                        field-type mismatches) surface, and so that
+                        fresh return-type tvars get pinned. *)
+                     List.iteri (fun i pt ->
+                       let at = List.nth arg_tys i in
+                       if not (unify_at e.loc pt at) then
+                         Types.type_error ~loc:e.loc
+                           (Printf.sprintf
+                             "%s.%s: arg %d type mismatch"
+                             cls meth (i + 1))
+                     ) param_tys;
                      repr ret_ty
                  | _ -> TAny)
             | None -> TAny)
@@ -681,15 +687,20 @@ let preinfer_all_classes (p : Ast.program) (g0 : Types.tenv) : unit =
     let env_m = clone env_cls in
       set_var_scheme env_m "self"
       (Types.Forall ([], Types.TActor (c.Ast.cname, [])));
-      (* 仮引数ごとに新しい型変数を割り当てて ps に入れる *)
+      (* O-2.e: honor each parameter's `name: T` annotation when
+         present so cross-class call sites can verify arg shapes
+         (records, ints, …).  Without this, params were always
+         fresh tvars and any callsite silently unified. *)
     let ps =
-      List.map
-        (fun p ->
-           let a  = Types.fresh_tvar () in
-           let ty = Types.TVar a in
+      List.map2
+        (fun p t_opt ->
+           let ty = match t_opt with
+             | Some te -> ty_of_type_expr te
+             | None    -> Types.TVar (Types.fresh_tvar ())
+           in
            set_var_scheme env_m p (Types.Forall ([], ty));
            ty)
-        m.Ast.params
+        m.Ast.params m.Ast.param_types
     in
       (* O-2.d: take the declared return-type annotation seriously
          when present.  Without this every method's return was hard-

@@ -155,13 +155,25 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
 
 実測 LOC: 約 60 行 (推定 200-400 行と比べて大幅減).
 
-#### O-2.e (1 session, easy): Record structural (CE-5)
+#### O-2.e (1 session, easy): Record structural (CE-5) ✅ 完了 (2026-05-18)
 
-- OCaml は records を持つが、unify は nominal
-- `unify_record` を fields の集合一致 + 各 field の type 再帰 unify に変更
-- `infer.ml` の `Var → TyRecord(...)` constrain を追加
+実装結果 (調査の結果、unify は既に structural だった):
+- `Types.unify` の `TRecord` ケースを再確認 → 既に label-sort +
+  field 数一致 + per-field 再帰 unify を実装済 (Python E-γ と同等の
+  width-equal structural matching).
+- ところが `preinfer_all_classes` が method parameter annotation を
+  無視 (fresh tvar で代用) していたため,cross-class 呼出しで
+  record shape 不一致が silent だった.parameter annotation も
+  尊重するよう修正 (`List.map2 ... param_types`, ~6 行).
+- 検証: 既存 5 test に加えて record 5 test を追加 — basic /
+  shape mismatch / count mismatch / unsorted-fields / field-type
+  mismatch すべて 10/10 PASS.
+- 既存 abclc 74 + aipl_dist 18 完全無回帰.
+- サンプル `abclc/RecordStructural.abcl`.
 
-推定: 100-200 LOC
+実測 LOC: 約 30 行 (推定 100-200 から大幅減).
+発見: O-2.e の真の修正は **parameter annotation の尊重** という
+O-2.d の延長線上にある修正で、O-2.d と一体だった可能性もある.
 
 #### O-2.f (1 session, easy): CLI 統合 (CE-7, CE-8)
 

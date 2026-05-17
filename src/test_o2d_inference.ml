@@ -116,6 +116,81 @@ var v: string = now s.value();
   | Ok _ -> fail "method return type mismatch" "expected type error (string ≠ int)"
   | Error _ -> pass "method return type mismatch detected"
 
+(* ─────────────────────────────────────────────────────────────── *)
+(* O-2.e: record structural typing tests                            *)
+(* ─────────────────────────────────────────────────────────────── *)
+
+let test_record_basic () =
+  reset_state ();
+  let src = {|
+class Geometry {
+  method magnitude(p: {x: int, y: int}) -> int {
+    return p.x * p.x + p.y * p.y;
+  }
+}
+var g = new Geometry();
+var pt = {x: 3, y: 4};
+var m: int = now g.magnitude(pt);
+|} in
+  match try_check src with
+  | Ok _ -> pass "record basic (literal + field access)"
+  | Error msg -> fail "record basic" msg
+
+let test_record_shape_mismatch () =
+  reset_state ();
+  (* Pass a record with the wrong field name. *)
+  let src = {|
+class Reader {
+  method first(r: {head: int, tail: int}) -> int { return r.head; }
+}
+var rd = new Reader();
+var rec = {head: 7, other: 100};
+var x: int = now rd.first(rec);
+|} in
+  match try_check src with
+  | Ok _ -> fail "record shape mismatch" "expected Type_error (label `other` vs `tail`)"
+  | Error _ -> pass "record shape mismatch detected"
+
+let test_record_count_mismatch () =
+  reset_state ();
+  let src = {|
+class Reader {
+  method first(r: {head: int, tail: int}) -> int { return r.head; }
+}
+var rd = new Reader();
+var rec = {head: 7};
+var x: int = now rd.first(rec);
+|} in
+  match try_check src with
+  | Ok _ -> fail "record count mismatch" "expected Type_error (1 vs 2 fields)"
+  | Error _ -> pass "record count mismatch detected"
+
+let test_record_unsorted_fields () =
+  reset_state ();
+  (* Same fields but declared in the opposite order — structural
+     unification should sort and succeed. *)
+  let src = {|
+class R { method use(p: {a: int, b: int}) -> int { return p.a + p.b; } }
+var r = new R();
+var pt = {b: 4, a: 3};
+var n: int = now r.use(pt);
+|} in
+  match try_check src with
+  | Ok _ -> pass "record fields unsorted (structural unify)"
+  | Error msg -> fail "record unsorted fields" msg
+
+let test_record_field_type_mismatch () =
+  reset_state ();
+  let src = {|
+class R { method use(p: {a: int, b: int}) -> int { return p.a; } }
+var r = new R();
+var pt = {a: 3, b: "hi"};
+var n: int = now r.use(pt);
+|} in
+  match try_check src with
+  | Ok _ -> fail "record field type mismatch" "expected Type_error (b: int vs string)"
+  | Error _ -> pass "record field type mismatch detected"
+
 let () =
   Printf.printf "=== O-2.d cross-class / actor-field inference ===\n%!";
   test_cross_class_basic ();
@@ -123,4 +198,10 @@ let () =
   test_actor_field_used_inconsistently ();
   test_method_return_flows_back ();
   test_method_return_type_mismatch ();
+  Printf.printf "\n=== O-2.e record structural typing ===\n%!";
+  test_record_basic ();
+  test_record_shape_mismatch ();
+  test_record_count_mismatch ();
+  test_record_unsorted_fields ();
+  test_record_field_type_mismatch ();
   Printf.printf "\n(see PASS/FAIL above to gauge OCaml's existing coverage)\n%!"

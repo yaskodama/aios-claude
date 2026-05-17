@@ -206,7 +206,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-2  | Phase D-1: cross-class inference                   |  ✅  |  ❌  |  ✅³  |  ✅³ |  ❌  |  ❌  | ❌  | `PHASE_D_REPORT.md`                   |
 | CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  🟡¹  |  🟡¹ |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
 | CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ✅³  |  ✅³ |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
-| CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
+| CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ✅⁴  |  ✅⁴ |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
 | CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
@@ -240,6 +240,16 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   `TypedVarDecl` (`var x: T = e`) の unify 失敗を Type_error 化、
   actor field の cross-method 一貫性チェックも自動的に効くように
   なった (e.g., `s = x:int` と `s = y:string` の混在を検出)。
+
+⁴ OCaml は Phase O-2.e (2026-05-18) で record structural typing
+  を完成: `Types.unify` 内の `TRecord` ケースは既に
+  fields をラベルでソート → field 数 / ラベル一致 / 再帰 unify
+  という structural matching を実装していた。Phase O-2.e で
+  `preinfer_all_classes` が method の **parameter annotation**
+  も尊重するよう修正 (従来は fresh tvar で常に absorb)。これで
+  `method f(p: {a:int, b:int})` に shape 不一致の record literal
+  を渡すと type error が出る (count / label / field type すべて)。
+  サンプル: `abclc/RecordStructural.abcl`。
 
 OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
 Z3 backend には対応していない。OCaml への移植は今後の課題。
