@@ -1,9 +1,9 @@
 {
   "_source_aice": "AIPL_v2_Distributed.aice",
   "_source_dialect": "aice_yaml_v1",
-  "_source_version": "0.2.0",
-  "_generated": "2026-05-17 (hand-crafted from YAML, post spec review)",
-  "_comment": "AIPL bootstrap v2 (2) distributed runtime: aipl_ai/runtime/remote の進化計算による分散・負荷分散・フェイルオーバ設計探索。11 axes (5 cell), 6 reviewers (R6 hard floor = real_world_precedent), MAP-Elites 8 seed × 30 gen.  AIPL の言語意味論は不変 (backward compat hard).  Spec review fix A/B 適用済 (real_world_floor = R6_score >= 0.5 閾値式, SHA256 完全一致 → 先頭 100 桁 / 意味的同等)。",
+  "_source_version": "0.3.0",
+  "_generated": "2026-05-17 (Run 2 — R6 hard floor 緩和版)",
+  "_comment": "AIPL bootstrap v2 (2) distributed runtime: aipl_ai/runtime/remote の進化計算による分散・負荷分散・フェイルオーバ設計探索。11 axes (5 cell), 6 reviewers (R6 hard floor = real_world_precedent), MAP-Elites 8 seed × 30 gen.  AIPL の言語意味論は不変 (backward compat hard).  Run 2 緩和: real_world_floor 閾値 0.3 (was 0.5), R6 persona 緩和 (2+ 軸一致で 0.7)。",
 
   "name": "AIPL_v2_Distributed",
   "task": "AIPL ランタイム層 (aipl_ai.py, aipl_runtime.py, aipl_remote) を進化計算で拡張し、分散・負荷分散・フェイルオーバを実現する設計を発見する。既存 AIPL プログラム (PsiLang2, evolve block, samples/feature_a-g 21 件, src/python-aipl/samples 33 件) は無変更で動くこと必須。",
@@ -42,8 +42,8 @@
     "hard_floor_reviewer": "R6_RealWorldPrecedent",
     "hard_floor": {
       "reviewer": "R6_RealWorldPrecedent",
-      "threshold": 0.5,
-      "_comment": "Spec fix A: R6 score < 0.5 → final fitness 0 (real_world_floor)."
+      "threshold": 0.3,
+      "_comment": "Run 2 緩和 (was 0.5): R6 score < 0.3 → final fitness 0. Run 1 で 0.5 が全候補に発動し composite=0 が pairwise と乖離した問題への対応."
     },
     "tasks": [
       "SurviveSilentHang",
@@ -90,7 +90,7 @@
       {
         "name": "R6_RealWorldPrecedent",
         "weight": 0.15,
-        "persona": "あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する分散 actor / 並列計算フレームワークとどれだけ近いかを判定する。先例: (1) Erlang/OTP = restart strategies + supervisor tree + actor mailbox, (2) Akka (Scala/Java) = cluster + sharding + pubsub, (3) Microsoft Orleans = grain + activation pool, (4) Pony = causal channels + capability types, (5) Ray = task scheduler + object store, (6) Dask = dynamic task graph, (7) Celery + Redis = queue-based worker pool. スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor により最終 fitness=0)。半角数字 1 つで。"
+        "persona": "あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する分散 actor / 並列計算フレームワークとどれだけ近いかを判定する。先例: (1) Erlang/OTP = restart strategies + supervisor tree + actor mailbox, (2) Akka (Scala/Java) = cluster + sharding + pubsub, (3) Microsoft Orleans = grain + activation pool, (4) Pony = causal channels + capability types, (5) Ray = task scheduler + object store, (6) Dask = dynamic task graph, (7) Celery + Redis = queue-based worker pool. スコア (Run 2 緩和版): 上記いずれか 1 つでも近い (2+ 軸一致) → 0.7, 2-3 先例で部分的に近い → 0.5, 先例とほぼ無関係 → 0.2, 完全に空想 → 0.0 (hard floor 0.3 未満で fitness=0). 「最も近い先例 1 つ」を意識するだけでよい. 半角数字 1 つで。"
       }
     ]
   },

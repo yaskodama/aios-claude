@@ -1,0 +1,455 @@
+{
+  "cells": {
+    "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0001",
+      "genome": {
+        "scheduler_model": "rate_limit_aware_per_provider",
+        "failover_policy": "none",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "actor_url",
+        "lineage_replication": "eventual_consistency_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "continuous_periodic"
+      },
+      "composite": 0.48958333333333337,
+      "generation": 0
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=multi_provider_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0002",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "multi_provider_fallback",
+        "actor_placement": "multi_node_via_remote",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5728333333333333,
+      "generation": 0
+    },
+    "scheduler_model=token_budget_aware|failover_policy=same_provider_retry|actor_placement=local_thread_pool|supervisor_strategy=checkpoint_and_resume|opt_in_annotation_style=env_var_routing": {
+      "id": "I0003",
+      "genome": {
+        "scheduler_model": "token_budget_aware",
+        "failover_policy": "same_provider_retry",
+        "actor_placement": "local_thread_pool",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "checkpoint_and_resume",
+        "message_serialization": "json_over_tcp",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5485,
+      "generation": 0
+    },
+    "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0037",
+      "genome": {
+        "scheduler_model": "token_budget_aware",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "global_var_only",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "zmq_with_msgpack",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5745,
+      "generation": 29
+    },
+    "scheduler_model=latency_aware|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external": {
+      "id": "I0016",
+      "genome": {
+        "scheduler_model": "latency_aware",
+        "failover_policy": "quorum_replicate",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "quorum_replication",
+        "supervisor_strategy": "restart_subtree",
+        "message_serialization": "grpc_streaming",
+        "opt_in_annotation_style": "config_file_external",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.6463333333333333,
+      "generation": 8
+    },
+    "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0006",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "local_thread_pool",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "none",
+        "message_serialization": "msgpack_over_tcp",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.5768333333333333,
+      "generation": 0
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external": {
+      "id": "I0007",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "local_thread_pool",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "restart_subtree",
+        "message_serialization": "msgpack_over_tcp",
+        "opt_in_annotation_style": "config_file_external",
+        "observability_layer": "print_only",
+        "ai_provider_abstraction": "single_select_via_env",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.5661666666666667,
+      "generation": 0
+    },
+    "scheduler_model=token_budget_aware|failover_policy=multi_provider_fallback|actor_placement=single_process|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=attribute_decorator": {
+      "id": "I0028",
+      "genome": {
+        "scheduler_model": "token_budget_aware",
+        "failover_policy": "multi_provider_fallback",
+        "actor_placement": "single_process",
+        "actor_addressing": "global_var_only",
+        "lineage_replication": "quorum_replication",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "attribute_decorator",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "on_latency_spike"
+      },
+      "composite": 0.6201666666666666,
+      "generation": 20
+    },
+    "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external": {
+      "id": "I0010",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "quorum_replicate",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "quorum_replication",
+        "supervisor_strategy": "restart_subtree",
+        "message_serialization": "grpc_streaming",
+        "opt_in_annotation_style": "config_file_external",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.6204999999999999,
+      "generation": 2
+    },
+    "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing": {
+      "id": "I0013",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "local_thread_pool",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "msgpack_over_tcp",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.6268333333333334,
+      "generation": 5
+    },
+    "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0014",
+      "genome": {
+        "scheduler_model": "rate_limit_aware_per_provider",
+        "failover_policy": "none",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "actor_url",
+        "lineage_replication": "eventual_consistency_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "continuous_periodic"
+      },
+      "composite": 0.47058333333333335,
+      "generation": 6
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=multi_process_local|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0029",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "none",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "eventual_consistency_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "continuous_periodic"
+      },
+      "composite": 0.5035000000000001,
+      "generation": 21
+    },
+    "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0017",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "none",
+        "message_serialization": "msgpack_over_tcp",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.5815,
+      "generation": 9
+    },
+    "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing": {
+      "id": "I0025",
+      "genome": {
+        "scheduler_model": "token_budget_aware",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "global_var_only",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "zmq_with_msgpack",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "single_select_via_env",
+        "rebalancing_trigger": "on_latency_spike"
+      },
+      "composite": 0.5218333333333333,
+      "generation": 17
+    },
+    "scheduler_model=token_budget_aware|failover_policy=multi_model_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0021",
+      "genome": {
+        "scheduler_model": "token_budget_aware",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "multi_node_via_remote",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5329166666666667,
+      "generation": 13
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=env_var_routing": {
+      "id": "I0023",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5425,
+      "generation": 15
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=multi_node_via_remote|supervisor_strategy=quarantine_and_skip|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0024",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "multi_node_via_remote",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "quarantine_and_skip",
+        "message_serialization": "zmq_with_msgpack",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5558333333333333,
+      "generation": 16
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=multi_model_fallback|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0026",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.5408333333333333,
+      "generation": 18
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0027",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "none",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.47383333333333333,
+      "generation": 19
+    },
+    "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=single_process|supervisor_strategy=none|opt_in_annotation_style=no_annotation_runtime_only": {
+      "id": "I0030",
+      "genome": {
+        "scheduler_model": "rate_limit_aware_per_provider",
+        "failover_policy": "none",
+        "actor_placement": "single_process",
+        "actor_addressing": "actor_url",
+        "lineage_replication": "eventual_consistency_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "no_annotation_runtime_only",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "continuous_periodic"
+      },
+      "composite": 0.56125,
+      "generation": 22
+    },
+    "scheduler_model=rate_limit_aware_per_provider|failover_policy=none|actor_placement=single_process|supervisor_strategy=none|opt_in_annotation_style=env_var_routing": {
+      "id": "I0031",
+      "genome": {
+        "scheduler_model": "rate_limit_aware_per_provider",
+        "failover_policy": "none",
+        "actor_placement": "single_process",
+        "actor_addressing": "actor_url",
+        "lineage_replication": "eventual_consistency_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "structured_log",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "continuous_periodic"
+      },
+      "composite": 0.47524999999999995,
+      "generation": 23
+    },
+    "scheduler_model=single_priority_gate|failover_policy=multi_model_fallback|actor_placement=local_thread_pool|supervisor_strategy=checkpoint_and_resume|opt_in_annotation_style=env_var_routing": {
+      "id": "I0033",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "multi_model_fallback",
+        "actor_placement": "local_thread_pool",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "checkpoint_and_resume",
+        "message_serialization": "msgpack_over_tcp",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "tier_aware_router",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.6661666666666667,
+      "generation": 25
+    },
+    "scheduler_model=cost_weighted_routing|failover_policy=none|actor_placement=cluster_with_scheduler|supervisor_strategy=none|opt_in_annotation_style=attribute_decorator": {
+      "id": "I0034",
+      "genome": {
+        "scheduler_model": "cost_weighted_routing",
+        "failover_policy": "none",
+        "actor_placement": "cluster_with_scheduler",
+        "actor_addressing": "actor_id_with_resolver",
+        "lineage_replication": "append_only_distributed_log",
+        "supervisor_strategy": "none",
+        "message_serialization": "in_memory_pyobj",
+        "opt_in_annotation_style": "attribute_decorator",
+        "observability_layer": "prometheus_metrics",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "on_latency_spike"
+      },
+      "composite": 0.5531666666666667,
+      "generation": 26
+    },
+    "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_process_local|supervisor_strategy=restart_subtree|opt_in_annotation_style=env_var_routing": {
+      "id": "I0036",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "quorum_replicate",
+        "actor_placement": "multi_process_local",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "dual_node_mirror",
+        "supervisor_strategy": "restart_subtree",
+        "message_serialization": "grpc_streaming",
+        "opt_in_annotation_style": "env_var_routing",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "on_quota_threshold"
+      },
+      "composite": 0.652,
+      "generation": 28
+    },
+    "scheduler_model=single_priority_gate|failover_policy=quorum_replicate|actor_placement=multi_node_via_remote|supervisor_strategy=restart_subtree|opt_in_annotation_style=config_file_external": {
+      "id": "I0038",
+      "genome": {
+        "scheduler_model": "single_priority_gate",
+        "failover_policy": "quorum_replicate",
+        "actor_placement": "multi_node_via_remote",
+        "actor_addressing": "pid_with_supervisor",
+        "lineage_replication": "quorum_replication",
+        "supervisor_strategy": "restart_subtree",
+        "message_serialization": "grpc_streaming",
+        "opt_in_annotation_style": "config_file_external",
+        "observability_layer": "opentelemetry_traces",
+        "ai_provider_abstraction": "cost_aware_provider_router",
+        "rebalancing_trigger": "never"
+      },
+      "composite": 0.6305,
+      "generation": 30
+    }
+  },
+  "filled": 25
+}

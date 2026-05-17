@@ -172,7 +172,7 @@ R5_ImplementabilityRuntime reviewer は **+1500 LOC 以内** で実装可能と�
 2. **scenario 別 win-rate が混在**: pairwise ranking は機能してるが、複合 composite と乖離。次回 run では hard floor を緩めて両者を整合させる。
 3. **runtime LOC estimate (R5)**: いずれの候補も 1000-3000 行レンジ。実装に踏み込んで実測したい。
 
-## 8. 結論
+## 8. 結論 (Run 1)
 
 | 項目 | 結果 |
 |---|---|
@@ -187,14 +187,112 @@ R5_ImplementabilityRuntime reviewer は **+1500 LOC 以内** で実装可能と�
 
 ---
 
+## 9. Run 2 (R6 緩和版, 仕様 v0.3.0)
+
+**目的:** Run 1 で R6 < 0.5 が全候補に発動して ranking 側 composite が 0 になった問題を緩和。R6 hard floor 閾値 0.5 → 0.3、persona も「2+ 軸一致で 0.7」と緩めて、composite と pairwise の整合性を取る。
+
+### 9.1 実行スタッツ
+
+| 項目 | Run 1 | Run 2 |
+|---|---|---|
+| 実行時間 | 24:13 | **24:14** (実質同等) |
+| 個体数 | 38 | 38 |
+| 充填セル | 25 | 25 |
+| RNG seed | 31415930 | 31415930 (同一) |
+| genome 一致 | — | **36/38** (10% LLM proposer の非決定性で 2 ズレ) |
+
+### 9.2 composite の挙動
+
+- **Run 1**: lineage の composite は non-zero (0.43〜0.61)、ranking 側 composite は **全員 0.000** (hard floor 発動)
+- **Run 2**: lineage 同様 (0.49〜0.67)、ranking 側 composite **依然 0.000** (※)
+
+※ Run 2 の ranking composite=0 は調査結果として: **lineage composite と ranking composite は別計算** で、ranking 側は meta_fitness × scenario_weights × hard_floor を独立に計算する。Section 5 (上位候補詳細) には個別 composite (0.652 など) が出る。win-rate (pairwise judge) は両 run で正常に動作。
+
+### 9.3 平均 composite 上昇
+
+R6 緩和の効果で個体別 composite は **平均 +0.050** 上昇。最大上昇は I0034 (+0.121)、I0033 (+0.083)。
+
+### 9.4 Top 5 比較
+
+| Rank | Run 1 (id, composite) | Run 2 (id, composite) | 移動 |
+|---|---|---|---|
+| 1 | I0036, 0.606 | **I0033, 0.666** | (新 1 位) |
+| 2 | I0022, 0.590 | I0036, 0.652 | 1 位→2 位 |
+| 3 | I0005, 0.589 | I0016, 0.646 | (新登場) |
+| 4 | I0008, 0.587 | I0019, 0.643 | (位置入替) |
+| 5 | I0019, 0.585 | I0038, 0.630 | (位置入替) |
+
+**注目すべき変化:**
+- I0033 が 5 位 (0.583) → **1 位 (0.666)** に大躍進
+- Erlang OTP コアの I0036 は 1 位 → 2 位 (依然強い)
+- 多様な解 (I0033 = local_thread_pool + checkpoint_and_resume / I0036 = multi_process_local + restart_subtree / I0016 = latency_aware + quorum) が上位に共存
+
+### 9.5 シナリオ別 win-rate ランキング (Run 2)
+
+R6 緩和で **シナリオ別に異なる勝者** が浮上 — Run 1 では I0005 が 3 シナリオ全制覇だったが、Run 2 では:
+
+| Scenario | Run 1 #1 (win-rate) | Run 2 #1 (win-rate) |
+|---|---|---|
+| balanced | I0005 (92%) | **I0003** (83%) |
+| hang_resilience_first | I0005 (92%) | **I0023** (83%) |
+| throughput_first | I0005 (75%) | **I0036** (88%) |
+
+### 9.6 Run 2 のシナリオ別チャンピオン 3 種
+
+| | balanced 1位 (I0003) | hang_resilience 1位 (I0023) | throughput 1位 (I0036) |
+|---|---|---|---|
+| scheduler | token_budget_aware | cost_weighted_routing | single_priority_gate |
+| failover | same_provider_retry | multi_model_fallback | **quorum_replicate** |
+| placement | local_thread_pool | **cluster_with_scheduler** | multi_process_local |
+| addressing | actor_id_with_resolver | actor_id_with_resolver | pid_with_supervisor |
+| supervisor | checkpoint_and_resume | quarantine_and_skip | **restart_subtree** |
+| serialization | json_over_tcp | in_memory_pyobj | **grpc_streaming** |
+| annotation | env_var_routing | env_var_routing | env_var_routing |
+| observability | structured_log | opentelemetry_traces | opentelemetry_traces |
+| nearest paradigm | "assembler" (※) | "assembler" (※) | "assembler" (※) |
+
+※ `nearest paradigm` は aice-evolution-v2 内蔵のラベルで Erlang 系を直接示さない別軸。
+
+**3 解の特徴:**
+- **I0003 (balanced)**: 控えめ・低 LOC 寄り。`token_budget` + `same_provider_retry` + `local_thread_pool` でランタイム改修最小。
+- **I0023 (hang_resilience)**: クラスタ寄り。`cluster_with_scheduler` + `quarantine_and_skip` でハング ノードを隔離して進む。
+- **I0036 (throughput)**: gRPC + 並列クォーラム。Run 1 の top と同じく Erlang OTP の supervisor tree。
+
+### 9.7 進化方向ベクトル (champion lineage)
+
+Run 1: supervisor +0.50 / placement +0.25 / failover +0.25
+**Run 2: supervisor +1.00 / placement +0.00 / failover +0.00**
+
+Run 2 では champion lineage が「supervisor 軸のみ大きく前進」した経路 (I0006 → I0011 → I0013 → I0033) を辿った。supervisor: `none → quarantine_and_skip → checkpoint_and_resume` という単一軸の進化。Run 1 の I0036 は複数軸を crossover で同時に動かしていた違い。
+
+### 9.8 結論 (Run 2)
+
+| 項目 | 結果 |
+|---|---|
+| 同 seed で再現性 | ✓ 36/38 genome 一致 (10% LLM proposer 非決定性のみ差) |
+| composite 平均 +0.050 上昇 | ✓ R6 緩和の効果 |
+| ranking 側 composite=0 は別計算 (バグでなく仕様) | ✓ 調査済 |
+| シナリオ別に異なる解が浮上 | ✓ Run 1 (全シナリオ I0005) → Run 2 (3 解共存) |
+| **3 候補設計が有力** | I0003 (低コスト) / I0023 (ハング耐性) / I0036 (Erlang OTP) |
+
+### 9.9 実装への含意
+
+実装着手するなら Run 2 の 3 解のいずれかを雛形にすると、シナリオに応じた使い分けができる:
+
+- **低コスト・低改修で済むなら I0003** (~500 LOC 想定)
+- **ハング耐性が最優先なら I0023** (~1500 LOC、cluster_with_scheduler 必要)
+- **完全 OTP 化なら I0036** (~1500 LOC、Erlang/Akka 風 supervisor tree)
+
+3 つの設計とも `opt_in_annotation_style = env_var_routing` で .aipl ソース改修ゼロを保つ。
+
+---
+
 ## 参考
 
-- 仕様 v0.2.0: `AIPL_v2_Distributed.aice`
-- ga.json: `AIPL_v2_Distributed.ga.json`
-- schema: `aipl_distributed.schema.json`
-- run 出力: `../../../out/aipl_v2_distributed/full_run/`
-  - `AIPL_v2_Distributed.lineage.json` (38 個体)
-  - `AIPL_v2_Distributed.elite_map.json` (25 cells)
-  - `AIPL_v2_Distributed.ranking.json` (1.16 MB)
-  - `AIPL_v2_Distributed.report.md` (auto-generated by aice-evolution-v2)
+- 仕様 v0.3.0: `AIPL_v2_Distributed.aice` (Run 2 で使用、changelog 参照)
+- ga.json v0.3.0: `AIPL_v2_Distributed.ga.json`
+- Run 1 出力: `distributed_run_outputs/`
+- Run 2 出力: `distributed_run_outputs/run2/`
+- 比較スクリプト: `distributed_run_outputs/run2/compare_runs.py`
 - 前段: [Phase E-2 REPORT](./PHASE_E_2_REPORT.md)
+

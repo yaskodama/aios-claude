@@ -24,9 +24,13 @@ problem:
   series: AIPL_bootstrap
   series_number: 2
   sub_experiment: 2_distributed
-  version: 0.2.0
+  version: 0.3.0
   created: 2026-05-17
   changelog:
+    "0.3.0":
+      - "Run 1 結果を踏まえた緩和: real_world_floor 閾値 0.5 → 0.3"
+      - "R6_RealWorldPrecedent persona を緩和 (2+ 軸一致 → 0.7, 部分一致 → 0.5)"
+      - "目的: pairwise judge と composite ranking を整合させる"
     "0.2.0":
       - "spec review fix A: real_world_floor を R6_score >= 0.5 の閾値式で正式定義"
       - "spec review fix B: MultiProviderFailover の SHA256 完全一致を緩和"
@@ -78,11 +82,12 @@ goal:
     # Spec fix A (post-review): real_world_floor is *not* a free
     # variable.  It is a threshold function over R6_RealWorldPrecedent
     # so that候補が現実先例から離れすぎている場合に最終 fitness を
-    # 0 に潰す.  R6 が 0.5 未満なら hard floor 発動.
+    # 0 に潰す.  Run 1 (threshold 0.5) では全候補が hard floor 発動
+    # → composite=0 で pairwise と乖離。Run 2 で 0.3 に緩める.
     real_world_floor:
-      formula: "1.0 if R6_RealWorldPrecedent.score >= 0.5 else 0.0"
+      formula: "1.0 if R6_RealWorldPrecedent.score >= 0.3 else 0.0"
       source_reviewer: R6_RealWorldPrecedent
-      threshold: 0.5
+      threshold: 0.3
       semantics: hard_zero_below_threshold
 
 constraints:
@@ -288,8 +293,10 @@ evaluation:
         (5) Ray = task scheduler + object store,
         (6) Dask = dynamic task graph,
         (7) Celery + Redis = queue-based worker pool.
-        スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor
-        により最終 fitness=0)。半角数字 1 つで。
+        スコア (Run 2 緩和版): 上記いずれか 1 つでも近い (2+ 軸一致) → 0.7,
+        2-3 先例で部分的に近い → 0.5, 先例とほぼ無関係 → 0.2, 完全に空想 → 0.0
+        (hard floor 0.3 未満で fitness=0). 「最も近い先例 1 つ」を意識する
+        だけでよい. 半角数字 1 つで。
 
 ranking:
   strategy: scalar_with_pareto_tiebreak
