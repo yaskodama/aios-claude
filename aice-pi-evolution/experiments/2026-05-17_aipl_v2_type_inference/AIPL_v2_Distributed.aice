@@ -1,0 +1,297 @@
+# ─────────────────────────────────────────────────────────────────────
+#  AIPL_v2_Distributed.aice
+#  Series: AIPL bootstrap v2, sub-experiment (2) — distributed runtime
+#
+#  Status: 仕様確定. AIPL bootstrap v2 (1) Type Inference は Phase
+#  C / D / E-α / E-β / E-γ / E-γ-R / E-2 まで完了 (PHASE_E_2_REPORT
+#  参照). この (2) は **言語実装ではなくランタイム層** での進化を
+#  扱い、aipl_ai.py / aipl_runtime.py / aipl_remote を拡張する案を
+#  進化計算で探索する.
+#
+#  AIPL の意味論 (actor / send / now / future / mailbox) を 変えずに
+#  分散 / 負荷分散 / フェイルオーバ を **ランタイム層**で実現する設計を
+#  進化計算で発見する. 狙いは PsiLang v3 / v4 / AIPL v2 (1) で繰り返し
+#  起きた OpenAI SDK silent hang と throughput 詰まりを構造的に解消する.
+#  既存 AIPL プログラム (PsiLang2, evolve block, samples/feature_a-g
+#  21 件, src/python-aipl/samples/ 33 件) は 1 行も変えないことを必須
+#  条件 (backward compat hard) とする.
+# ─────────────────────────────────────────────────────────────────────
+dialect: aice_yaml_v1
+
+problem:
+  name: AIPL_v2_Distributed
+  parent: aice-evolution-v2 (= AIPL bootstrap v1)
+  series: AIPL_bootstrap
+  series_number: 2
+  sub_experiment: 2_distributed
+  version: 0.1.0
+  created: 2026-05-17
+  description: |
+    AIPL の意味論を維持したまま分散 / 負荷分散 / フェイルオーバを
+    ランタイム層 (aipl_ai.py + aipl_runtime.py + aipl_remote) で実現する
+    設計を進化計算で発見する。目標:
+      (a) 既存 .aipl が 0 行変更で多並列化される (`@on(...)` 等の注釈は
+           opt-in で、無くても今まで通り動く)
+      (b) silent hang を 1 ノードに閉じ込め、他ノードがフェイルオーバ
+      (c) rate-limit (RPM/TPM) を超えそうな call を自動的に別 provider
+          / 別 model にルーティング
+      (d) lineage を複数ノードで replication し、片方が落ちても loss なし
+
+context:
+  pain_points:
+    - "PsiLang v3 trial #1: OpenAI silent hang で 35/38 個体喪失"
+    - "PsiLang v4 morning run: 47min vs night 75min (provider 不安定)"
+    - "v3 negative: hard floor が単一プロセス前提で実装し切れず"
+  existing_primitives:
+    - aipl_remote: "部分的に存在 (gateway, set_actor_lookup)"
+    - _PriorityGate: "ABCL_AI_MAX_CONCURRENT で同時並列を制限"
+    - AIPL_AI_REQUEST_TIMEOUT + SDK_RETRIES: "v3 で追加した SDK timeout"
+
+goal:
+  maximize:
+    - silent_hang_resilience       # 1 ノードハング時の生存率
+    - throughput_per_dollar        # tokens/sec or calls/min per $
+    - backward_compat_score        # 既存 .aipl が無変更で動く度
+    - failover_correctness         # provider 切替で結果が変わらない
+    - real_world_precedent         # Erlang/Akka/Pony/Orleans 等の先例度
+  minimize:
+    - runtime_added_loc            # aipl_ai/aipl_runtime/aipl_remote の追加実装
+    - latency_overhead             # 単発 call の遅延悪化
+
+  scalar_fitness:
+    formula: |
+      real_world_floor *
+      (0.20 * normalize(silent_hang_resilience, [0.0, 1.0])
+       + 0.20 * normalize(throughput_per_dollar, [0.0, 1.0])
+       + 0.20 * normalize(backward_compat_score, [0.0, 1.0])
+       + 0.15 * normalize(failover_correctness, [0.0, 1.0])
+       + 0.10 * normalize(real_world_precedent, [0.0, 1.0])
+       + 0.10 * (1 - normalize(runtime_added_loc, [100, 2000]))
+       + 0.05 * (1 - normalize(latency_overhead, [0, 1.0])))
+    bounds: [0.0, 1.0]
+
+constraints:
+  must_not_change_aipl_semantics: true     # 必須: 言語仕様は変えない
+  must_be_opt_in:                  true    # 注釈付けないコードは今まで通り
+  runtime_added_loc:        {max: 3000}
+  must_have_real_world_precedent:  true
+
+variables:
+  # ----- スケジューラ層 -----
+  scheduler_model:
+    type: enum
+    values: [single_priority_gate,           # 現状
+             rate_limit_aware_per_provider,  # RPM/TPM monitoring per backend
+             token_budget_aware,             # budget で routing
+             latency_aware,                  # p99 latency で routing
+             cost_weighted_routing]          # $/call で routing
+    default: rate_limit_aware_per_provider
+    cell_axis: true
+
+  failover_policy:
+    type: enum
+    values: [none,                           # 現状: retry only
+             same_provider_retry,
+             multi_provider_fallback,        # openai→anthropic→google
+             multi_model_fallback,           # gpt-4o-mini→gpt-4o→claude
+             quorum_replicate]               # 同じ call を 2-3 並列、最初に返ったのを採用
+    default: multi_provider_fallback
+    cell_axis: true
+
+  # ----- 分散 actor 層 -----
+  actor_placement:
+    type: enum
+    values: [single_process,                 # 現状
+             local_thread_pool,              # 同一プロセス内で actor を thread pool に分散
+             multi_process_local,            # multiprocessing で同一 host 内分散
+             multi_node_via_remote,          # aipl_remote 拡張で複数 host
+             cluster_with_scheduler]         # Erlang/Akka 風 cluster
+    default: multi_process_local
+    cell_axis: true
+
+  actor_addressing:
+    type: enum
+    values: [global_var_only,                # 現状
+             actor_url,                      # "tcp://node1:5000/Reviewer"
+             actor_id_with_resolver,         # ID + lookup service
+             pid_with_supervisor]            # Erlang OTP 風
+    default: actor_id_with_resolver
+
+  # ----- フォールトトレラント -----
+  lineage_replication:
+    type: enum
+    values: [single_node_fs,                 # 現状
+             dual_node_mirror,               # 2 ノードに同期書込
+             quorum_replication,             # N ノード中 majority 書込
+             eventual_consistency_log,       # log-based, async replication
+             append_only_distributed_log]    # Kafka/etcd 風
+    default: dual_node_mirror
+
+  supervisor_strategy:
+    type: enum
+    values: [none,                           # 現状: 死んだら終わり
+             restart_actor,                  # Erlang one_for_one
+             restart_subtree,                # rest_for_one
+             checkpoint_and_resume,
+             quarantine_and_skip]            # 死んだ actor は素通し
+    default: restart_actor
+    cell_axis: true
+
+  # ----- 通信 -----
+  message_serialization:
+    type: enum
+    values: [in_memory_pyobj,                # 現状 (同一プロセス前提)
+             json_over_tcp,
+             msgpack_over_tcp,
+             grpc_streaming,
+             zmq_pubsub]
+    default: msgpack_over_tcp
+
+  # ----- 注釈構文 (opt-in) -----
+  opt_in_annotation_style:
+    type: enum
+    values: [no_annotation_runtime_only,     # 全部 runtime config; AIPL 構文不変
+             attribute_decorator,            # @on("node1") class Reviewer { ... }
+             actor_constructor_arg,          # new Reviewer(...) on "node1"
+             config_file_external,           # 別の JSON で actor→node 対応
+             env_var_routing]                # AIPL_ROUTE=Reviewer:node1
+    default: no_annotation_runtime_only
+    cell_axis: true
+
+  # ----- 観測 / デバッグ -----
+  observability_layer:
+    type: enum
+    values: [print_only,                     # 現状
+             structured_log,                 # JSON line per event
+             opentelemetry_traces,
+             prometheus_metrics,
+             dashboard_websocket]            # 既存 aipl_dashboard を拡張
+    default: structured_log
+
+  # ----- AI provider 抽象化 -----
+  ai_provider_abstraction:
+    type: enum
+    values: [single_select_via_env,          # 現状 AIPL_AI_PROVIDER
+             provider_pool_with_health,      # 複数 provider を pool 化
+             cost_aware_provider_router,
+             tier_aware_router]              # tier 1/2/3 の RPM/TPM を意識
+    default: provider_pool_with_health
+
+  rebalancing_trigger:
+    type: enum
+    values: [never,
+             on_429_or_5xx,                  # rate limit / server error
+             on_latency_spike,
+             on_quota_threshold,             # daily token budget
+             continuous_periodic]            # 毎 30s チェック
+    default: on_429_or_5xx
+
+evaluation:
+  use_ai: true
+  evaluator: Evaluator
+  hard_floor_reviewer: R6_RealWorldPrecedent
+  tasks:
+    - SurviveSilentHang
+    - SustainedThroughput
+    - BackwardCompatPsiLang2
+    - MultiProviderFailover
+    - LineageDurability
+    - ImplCostEstimate
+  task_specs:
+    SurviveSilentHang: { weight: 0.20, hard: true,
+      spec: "ノード A の OpenAI SDK が silent hang した場合、ノード B が継続して全 38 個体を評価できる" }
+    SustainedThroughput: { weight: 0.20, hard: true,
+      spec: "OpenAI tier 1 (500 RPM, 200k TPM) を超えても他 provider 自動切替で 30+ calls/min を維持" }
+    BackwardCompatPsiLang2: { weight: 0.20, hard: true,
+      spec: "既存 PsiLang2 chudnovsky.psi を 1 行も変更せず実行可能" }
+    MultiProviderFailover: { weight: 0.15,
+      spec: "gpt-4o-mini → claude-haiku-4-5 の自動切替で π 計算結果が同一 (SHA256)" }
+    LineageDurability: { weight: 0.15,
+      spec: "1 ノード強制 kill しても lineage の最後の世代まで他ノードに保存されている" }
+    ImplCostEstimate: { weight: 0.10,
+      spec: "ランタイム改修が 1000-3000 行で済む (言語実装は不変)" }
+
+  reviewers:
+    - name: R1_HangResilience
+      weight: 0.20
+      persona: |
+        あなたは R1 (ハング耐性) を判定するレビュアーです。候補の failover_policy,
+        rebalancing_trigger, supervisor_strategy を見て、1 provider/node の SDK
+        silent hang を他に逃がせるかを判定。1.0 = quorum_replicate + restart +
+        on_429_or_5xx 等が揃って完全耐性、0.7 = multi_provider_fallback あり、
+        0.3 = same_provider_retry のみ、0.0 = none。半角数字 1 つで。
+
+    - name: R2_Throughput
+      weight: 0.15
+      persona: |
+        あなたは R2 (スループット) を判定するレビュアーです。候補の scheduler_model,
+        ai_provider_abstraction, rebalancing_trigger を見て、OpenAI tier 1 を
+        超えるシナリオで 30+ calls/min を維持できるかを判定。1.0 = provider_pool
+        + rate_limit_aware + 自動 trigger、0.7 = 2 つあり、0.3 = 1 つ、0.0 = none。
+        半角数字 1 つで。
+
+    - name: R3_BackwardCompat
+      weight: 0.20
+      persona: |
+        あなたは R3 (後方互換) を判定するレビュアーです。candidate の
+        opt_in_annotation_style, actor_placement, message_serialization が、
+        既存 AIPL プログラム (注釈なし) で意味論を変えずに動くかを判定。
+        1.0 = no_annotation_runtime_only + 既存 single_process が retain される、
+        0.7 = opt-in attribute、0.3 = 必須注釈、0.0 = 大破壊。半角数字 1 つで。
+
+    - name: R4_FailoverCorrectness
+      weight: 0.15
+      persona: |
+        あなたは R4 (フェイルオーバ正確性) を判定するレビュアーです。candidate の
+        message_serialization, lineage_replication, supervisor_strategy が、provider
+        切替時に結果 (例: π 10000 桁の SHA256) を変えずに済むかを判定。1.0 =
+        deterministic + checkpoint で完全再現、0.7 = 高確率で同じ、0.3 = 結果は
+        provider 依存、0.0 = 切替で SHA256 必ず変わる。半角数字 1 つで。
+
+    - name: R5_ImplementabilityRuntime
+      weight: 0.15
+      persona: |
+        あなたは R5 (ランタイム実装可能性) を判定するレビュアーです。candidate 全体
+        を見て、aipl_ai.py (現在 900 行) + aipl_runtime.py + aipl_remote の追加
+        実装が何行になるかを判定。1.0 = ≤ 500 行、0.7 = ≤ 1500 行、0.3 = ≤
+        3000 行、0.0 = 3000 行超 or 言語実装を触る必要あり。半角数字 1 つで。
+
+    - name: R6_RealWorldPrecedent
+      weight: 0.15
+      persona: |
+        あなたは R6 (現実先例) を判定するレビュアーです。候補が現実に存在する分散
+        actor / 並列計算フレームワークとどれだけ近いかを判定する。先例:
+        (1) Erlang/OTP = restart strategies + supervisor tree + actor mailbox,
+        (2) Akka (Scala/Java) = cluster + sharding + pubsub,
+        (3) Microsoft Orleans = grain + activation pool,
+        (4) Pony = causal channels + capability types,
+        (5) Ray = task scheduler + object store,
+        (6) Dask = dynamic task graph,
+        (7) Celery + Redis = queue-based worker pool.
+        スコア: 5 軸以上一致 → 1.0、3-4 軸 → 0.5、2 軸以下 → 0.0 (hard floor
+        により最終 fitness=0)。半角数字 1 つで。
+
+ranking:
+  strategy: scalar_with_pareto_tiebreak
+  scenarios: [balanced, hang_resilience_first, throughput_first]
+  top_k: 5
+
+search_params:
+  algorithm: map_elites
+  seed_count: 8
+  generations: 30
+  cell_axes: [scheduler_model, failover_policy, actor_placement,
+              supervisor_strategy, opt_in_annotation_style]
+  open_axes: false
+  rng_seed: 31415930
+
+runtime:
+  provider: openai
+  model: gpt-4o-mini
+  concurrency: 8
+  request_timeout_s: 60
+  sdk_retries: 3
+  drain_timeout_s: 7200
+  idle_ms: 60000
+  checkpoint_per_gen: on
+  caffeinate: on
