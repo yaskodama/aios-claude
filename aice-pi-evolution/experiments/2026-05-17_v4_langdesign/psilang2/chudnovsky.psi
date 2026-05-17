@@ -1,0 +1,49 @@
+# chudnovsky.psi — π to N decimal digits via Chudnovsky binary-splitting,
+#                  in PsiLang2 (v4 evolution top 1 genome).
+#
+# v4 top 1 (score 0.639):
+#   paradigm              = hybrid_imperative_functional
+#   type_system           = refinement
+#   arithmetic_primitives = arbitrary_int_plus_rational
+#   control_flow          = pattern_match_fold
+#   syntax_family         = ml_like
+#
+# Refinement annotations use the `where` keyword to attach a predicate
+# to a type, e.g. `Int where x >= 0` or `Real where digits == 10000`.
+# The PsiLang2 preprocessor strips these clauses before the v2 parser
+# sees them — enforcement is deferred to v5 (gradual type checker).
+
+# ─── k-th Chudnovsky term ─────────────────────────────────────────
+fn term(k: Int where k >= 0) -> Rat =
+  let sign: Int where sign == 1 or sign == -1 =
+    if k mod 2 == 0 then 1 else -1 in
+  let num: Int = sign * int_fact(6 * k) * (545140134 * k + 13591409) in
+  let den: Int where den > 0 =
+    int_fact(3 * k) * int_pow(int_fact(k), 3) * int_pow(640320, 3 * k) in
+  rat(num, den)
+
+# ─── Binary splitting on the half-open interval [a, b) ────────────
+fn bsplit(a: Int where a >= 0, b: Int where b > a) -> Rat =
+  if b - a == 1 then term(a)
+  else
+    let m: Int where m > a and m < b = (a + b) / 2 in
+    let left:  Rat = bsplit(a, m) in
+    let right: Rat = bsplit(m, b) in
+    rat_add(left, right)
+
+# ─── π = 426880·√10005 / S  with full refinement contract ────────
+fn chudnovsky_pi(n_digits: Int where n_digits > 0) -> Real where digits == n_digits =
+  let n_terms: Int where n_terms >= 2 = n_digits / 14 + 2 in
+  let prec:    Int where prec > n_digits = n_digits + 20 in
+  let _bump = set_precision(prec) in
+  let s_rat:  Rat = bsplit(0, n_terms) in
+  let s_real: Real where digits == prec = real_from_rat(s_rat, prec) in
+  let c:      Real where digits == prec =
+    real_mul(real_from_int(426880),
+              real_sqrt(real_from_int(10005), prec)) in
+  real_div(c, s_real)
+
+# ─── Entry point ──────────────────────────────────────────────────
+let pi:  Real where digits == 10000 = chudnovsky_pi(10000) in
+let str: Str  where length == 10002 = real_to_string(pi, 10000) in
+emit(str)

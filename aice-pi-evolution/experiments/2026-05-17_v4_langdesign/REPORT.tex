@@ -1,0 +1,466 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{v4 LangDesign 進化計算 --- coherence rejection + R6 hard floor
+の実装と検証}\label{v4-langdesign-ux9032ux5316ux8a08ux7b97-coherence-rejection-r6-hard-floor-ux306eux5b9fux88c5ux3068ux691cux8a3c}
+
+\textbf{日付:} 2026-05-17 \textbf{実験名:}
+\texttt{2026-05-17\_v4\_langdesign} \textbf{作業ディレクトリ:}
+\texttt{aice-pi-evolution/experiments/2026-05-17\_v4\_langdesign/}
+\textbf{親実験:} \href{../2026-05-16_v3_langdesign/REPORT.md}{v3
+(negative result)} \textbf{結論:} v3 で同定した 2 つの欠陥を
+\texttt{aipl\_codegen.py} レベルで解消し、coherence 違反を \textbf{15/38
+→ 0/38} に完全排除。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. 目的}\label{ux76eeux7684}
+
+v3 (\texttt{2026-05-16\_v3\_langdesign}) が示した negative result: -
+coherence 違反個体が 15/38 (top 5 中 4/5) - R6\_RealWorldPrecedent が
+hard floor として機能せず加重平均の 1 項にとどまる - 結果として top 5 が
+\textbf{\texttt{term\_rewriting\ +\ refinement\ +\ interval\_arithmetic\ +\ monadic\_bind\ +\ haskell\_like}}
+という架空組合せの cell に 4/5 集中
+
+を、\textbf{aipl\_codegen.py
+に技術的に解決策を実装}して再走することで覆す。
+
+\subsection{2. 実装した 2
+つの機能}\label{ux5b9fux88c5ux3057ux305f-2-ux3064ux306eux6a5fux80fd}
+
+\subsubsection{2.1 (a) Generator の coherence-aware rejection
+sampling}\label{a-generator-ux306e-coherence-aware-rejection-sampling}
+
+\texttt{aice-evolution-v2/src/aipl\_codegen.py} に追加した Python
+ヘルパが、schema の coherence rules から
+\texttt{Util.is\_coherent(genome)} を AIPL コードとして自動生成する:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{\_emit\_get\_axis\_block(...)}: \texttt{Util.get\_axis}
+  のインライン展開 (AIPL は再入不可なため自己呼び出し不可)
+\item
+  \texttt{\_emit\_is\_coherent(...)}: 各 rule を
+  \texttt{if\ A=v\ then\ B\ in\ \{…\}} の AIPL ネスト if に変換、フラグ
+  \texttt{ok} で集計
+\end{itemize}
+
+\texttt{Generator.seed()\ /\ mutate()\ /\ cross()} は最大 50 回
+rejection sampling し、coherence を満たす genome を返す:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{method seed() \{}
+\NormalTok{  var tries = 0; var g = ""; var ok = 0;}
+\NormalTok{  while (ok == 0) do \{}
+\NormalTok{    var cand = "";}
+\NormalTok{    // (axis{-}by{-}axis random generation)}
+\NormalTok{    g = cand;}
+\NormalTok{    ok = now util.is\_coherent(g);     // ← 新規}
+\NormalTok{    tries = tries + 1;}
+\NormalTok{    if (tries \textgreater{}= 50) \{ ok = 1; \}      // 安全弁}
+\NormalTok{  \}}
+\NormalTok{  reply(g);}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{2.2 (b) Evaluator の hard
+floor}\label{b-evaluator-ux306e-hard-floor}
+
+\texttt{spec.evaluation.hard\_floor\_reviewer\ =\ "\textless{}reviewer\ name\textgreater{}"}
+を \texttt{.ga.json} に指定すると、\texttt{Evaluator.score\_for\_task}
+の出力が次のようにクランプされる:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{// v4 hard{-}floor: if reviewer 6 (\textquotesingle{}R6\_RealWorldPrecedent\textquotesingle{}) returned 0.0,}
+\NormalTok{//                overall fitness = 0.0.}
+\NormalTok{if (s6 == 0.0) \{ reply(0.0); \}}
+\NormalTok{else \{}
+\NormalTok{  var combined = s1*w1 + s2*w2 + ... + s6*w6;}
+\NormalTok{  reply(combined);}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+v3 では \texttt{.aice} で「hard
+floor」と宣言しただけで実装されず、weight 0.10
+の加重平均にしかなっていなかった。v4 はこれを codegen
+レベルで正しく実装。
+
+\subsection{3. 結果}\label{ux7d50ux679c}
+
+\subsubsection{3.1 全体比較 (v3 vs
+v4)}\label{ux5168ux4f53ux6bd4ux8f03-v3-vs-v4}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2857}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2857}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2143}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+指標
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+v3
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+v4
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+変化
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+個体数 & 38 & 38 & --- \\
+\textbf{coherence 違反個体数} & \textbf{15/38 (39\%)} & \textbf{0/38
+(0\%)} & \textbf{✓ 完全排除} \\
+\textbf{Top 5 中の違反組合せ} & \textbf{4/5} & \textbf{0/5} & \textbf{✓
+完全消滅} \\
+max score & 0.670 & 0.639 & −4.6\% \\
+mean score & 0.479 & 0.395 & −17.5\% \\
+std (多様性) & 0.090 & \textbf{0.134} & \textbf{+49\% 増} \\
+hard-floor zero 個体 & 0 & 0 & R6 が 0.0 返さず \\
+壁時計 & 70 min & \textbf{47 min} & −33\% \\
+コスト & \$0.60 & \$0.59 & ≈同 \\
+\end{longtable}
+}
+
+\subsubsection{3.2 Top 5 (v4)}\label{top-5-v4}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1667}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1250}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedleft
+\#
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+id
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+gen
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+op
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+score
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+genome (要約)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+該当言語
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 & I35 & 27 & axis\_resample & \textbf{0.639} & hybrid\_imp\_func ·
+refinement · arbitrary\_int+rat · pattern\_match\_fold · ml\_like &
+\textbf{Liquid Haskell / F*} 風 \\
+2 & I6 & 0 (seed) & seed & 0.578 & functional · dynamic · interval ·
+tail\_call\_only · lisp\_like & \textbf{Scheme / Racket} 風 \\
+3 & I32 & 24 & axis\_resample & 0.567 & functional · dynamic · interval
+· pattern\_match · ml\_like & Erlang / Elixir 風 \\
+4 & I36 & 28 & uniform\_crossover & 0.566 & functional · dynamic ·
+interval · pattern\_match · lisp\_like & \textbf{Common Lisp} 風 \\
+5 & I24 & 16 & uniform\_crossover & 0.565 & functional · dynamic ·
+interval · tail\_call\_only · lisp\_like & \textbf{Scheme} 風 \\
+\end{longtable}
+}
+
+→ \textbf{すべて実在する言語ファミリーに 1 対 1 で対応}。v3 の架空組合せ
+(term\_rewriting+haskell\_like 等) は消滅。
+
+\subsubsection{3.3 Top 5 軸分布}\label{top-5-ux8ef8ux5206ux5e03}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v3 top 5
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v4 top 5
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+paradigm & \textbf{term\_rewriting 4} + oo 1 & \textbf{functional 4} +
+hybrid 1 \\
+type\_system & refinement 4, static\_simple 1 & \textbf{dynamic 4},
+refinement 1 \\
+arithmetic & interval 4, arbitrary\_int+rat 1 & interval 4,
+arbitrary\_int+rat 1 \\
+control\_flow & \textbf{monadic\_bind 4}, list\_comp 1 & pattern\_match
+3, tail\_call 2 \\
+syntax\_family & \textbf{haskell\_like 4}, ml\_like 1 &
+\textbf{lisp\_like 3}, ml\_like 2 \\
+\end{longtable}
+}
+
+→ v3 は 「Haskell-shape のような架空言語」 に集中、v4 は \textbf{Lisp/ML
+ファミリーの実在分布} に近似。
+
+\subsection{4. 主要な発見}\label{ux4e3bux8981ux306aux767aux898b}
+
+\subsubsection{4.1 Coherence
+の完全達成}\label{coherence-ux306eux5b8cux5168ux9054ux6210}
+
+\texttt{\_emit\_is\_coherent} が 18 の coherence rule を AIPL の
+\textbf{ネスト if + ok フラグ} に正しく展開し、rejection sampling
+が機能。mock smoke (38 個体) でも、real LLM run (38 個体) でも
+\textbf{violation 0}。
+
+\subsubsection{4.2 Hard floor
+は不発、しかし多様性は増加}\label{hard-floor-ux306fux4e0dux767aux3057ux304bux3057ux591aux69d8ux6027ux306fux5897ux52a0}
+
+R6 が \texttt{0.0} を返した個体は 0 (LLM の R6 prompt が「2 軸以下一致 =
+0.0」と書いてあっても、実際には 0.5 を返す甘さがあったため)。
+
+しかし副作用として: - score std が \textbf{+49\%} に拡大 - min が 0.320
+→ 0.072 に低下 - 「R6 が 0.5
+を返した個体」が実質ハードフロアに近い扱いを受け、低スコア帯に押し込まれた
+
+→ Hard floor は「設計通り」には動作しなかったが、\textbf{reviewer が low
+score を返すこと自体} が多様性回復に寄与。
+
+\subsubsection{4.3 平均スコアの低下は coherence
+制約の代価}\label{ux5e73ux5747ux30b9ux30b3ux30a2ux306eux4f4eux4e0bux306f-coherence-ux5236ux7d04ux306eux4ee3ux4fa1}
+
+v3 mean 0.479 → v4 mean 0.395 (−17.5\%)。狭い coherent な genome
+空間に強制された結果、reviewer
+に「最適化された」個体の絶対数が減少。これは v3 が「coherence
+を破ってまでスコアを稼ぐ」近道を持っていたことの裏返し。
+
+v4 の方が\textbf{正直な評価}になっている。
+
+\subsubsection{4.4 朝の OpenAI
+は速い}\label{ux671dux306e-openai-ux306fux901fux3044}
+
+v3 (深夜) 70 min、v4 (朝) 47 min。同じ codegen 規模、同じ reviewer 数で
+33\% 短縮。深夜の silent hang 問題が朝には起きなかった。
+
+\subsection{5. v2/v3/v4
+三世代の総括}\label{v2v3v4-ux4e09ux4e16ux4ee3ux306eux7dcfux62ec}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+世代
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+目的
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+教訓
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+v2 & 12 軸 + 5 reviewer で広域探索 & top 1: c\_like+refinement (架空) &
+自由度が高すぎると架空組合せが勝つ \\
+v3 & + 6 coherence rule, + R6 hard floor 宣言 & top 5 中 4/5 が違反 &
+\textbf{reviewer 設計だけでは hard 制約は表現できない} \\
+\textbf{v4} & + codegen で rejection sampling + 真の hard floor &
+\textbf{0/38 violation, 実在言語のみ} &
+\textbf{コードジェン側で物理的に強制すれば確実に効く} \\
+\end{longtable}
+}
+
+\subsubsection{codegen の進化}\label{codegen-ux306eux9032ux5316}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+機能 & 追加した世代 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+毎世代 lineage.dump checkpoint & v3 で追加 (silent hang 耐性) \\
+Util.is\_coherent 自動生成 & \textbf{v4} \\
+Generator.seed/mutate/cross の rejection sampling & \textbf{v4} \\
+Evaluator の hard floor reviewer & \textbf{v4} \\
+\end{longtable}
+}
+
+これらは \texttt{aipl\_codegen.py} の永続的な改良であり、\textbf{v4
+以降のすべての evolution run が自動で恩恵を受ける}。
+
+\subsection{6. v5 候補
+(本実験から派生する将来課題)}\label{v5-ux5019ux88dc-ux672cux5b9fux9a13ux304bux3089ux6d3eux751fux3059ux308bux5c06ux6765ux8ab2ux984c}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{R6 が 0.0 を返さない問題}: persona に「該当しない場合は 0.0
+  を返してください、これは hard floor です」を強調。または R6 を
+  decision tree 型 reviewer に置き換え (LLM ではなく rule-based)。
+\item
+  \textbf{interval\_arithmetic 偏重}: top 5 中 4/5 が interval. これは
+  reviewer R2 (任意精度安全性) で \texttt{interval\_arithmetic}
+  を「arbitrary 系」として 0.7-1.0
+  評価しているため。実装可能性で減点する rule が要る。
+\item
+  \textbf{PsiLang のクローン}: v4 top 1
+  (\texttt{hybrid\_imp\_func\ +\ refinement\ +\ arbitrary\_int+rat\ +\ pattern\_match\ +\ ml\_like})
+  で interpreter を実装し、Chudnovsky bsplit を書く (v2 で PsiLang
+  を実装したのと同じ方法論)。
+\end{enumerate}
+
+\subsection{7. 結論}\label{ux7d50ux8ad6}
+
+\begin{quote}
+\textbf{進化計算の制約は、reviewer (目的関数)
+だけで表現するのは限界がある。} ハード制約は \textbf{遺伝子生成段階
+(rejection sampling)} と \textbf{評価集計段階 (hard floor clamping)}
+の両方に物理的に実装する必要がある。
+\end{quote}
+
+v3 が示した failure mode (15/38 violation, 4/5 top 5 violation)
+を、\textbf{v4 で 0/38, 0/5 に完全排除}できた。実装は
+\texttt{aipl\_codegen.py} への +50 行で全 evolution run
+に波及する\textbf{永続的な基盤改良}。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{参考}\label{ux53c2ux8003}
+
+\begin{itemize}
+\tightlist
+\item
+  \href{../2026-05-16_v3_langdesign/REPORT.md}{v3: negative result}
+\item
+  \href{../2026-05-16_v2_langdesign/REPORT.md}{v2: PsiLang (positive
+  result)}
+\item
+  \href{../2026-05-16_robustness_v1/REPORT.md}{v1: PhiLang}
+\item
+  \href{../../REPORT_JA.md}{祖先: PiLang}
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,582 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{ltjsarticle}
+\usepackage{xcolor}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+  \setmainfont[]{Hiragino Sans}
+  \setmonofont[]{Menlo}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\section{PsiLang2 --- v4 top 1 genome
+の実装と評価}\label{psilang2-v4-top-1-genome-ux306eux5b9fux88c5ux3068ux8a55ux4fa1}
+
+\textbf{日付:} 2026-05-17 \textbf{作業ディレクトリ:}
+\texttt{aice-pi-evolution/experiments/2026-05-17\_v4\_langdesign/psilang2/}
+\textbf{親実験:} \href{../REPORT.md}{v4 LangDesign\_Expressive}
+\textbf{結論:} v4 進化計算が選んだ top 1 genome (refinement 型を含む) を
+\textbf{23 行の preprocessor 追加だけ}で実装し、π 10,000 桁を \textbf{v2
+PsiLang と SHA256 完全一致} で計算できることを確認。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. 目的}\label{ux76eeux7684}
+
+v4 進化計算 (\texttt{2026-05-17\_v4\_langdesign}) の top 1 個体:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1818}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1364}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+id
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+score
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+paradigm
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+type\_system
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+arithmetic
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+control\_flow
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+syntax\_family
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+I35 & 0.639 & hybrid\_imperative\_functional & \textbf{refinement} &
+arbitrary\_int\_plus\_rational & pattern\_match\_fold & ml\_like \\
+\end{longtable}
+}
+
+を\textbf{実際に動くインタプリタ}として実装し、その上で
+\textbf{Chudnovsky binary-splitting} によって π 10,000 桁を計算する。v2
+PsiLang との差分は \textbf{\texttt{refinement} 型システム}
+ただ一点なので、v2 を継承して refinement の構文だけ通せばよい。
+
+\subsection{2. 実装 --- PsiLang2 = PsiLang + 23 行
+preprocessor}\label{ux5b9fux88c5-psilang2-psilang-23-ux884c-preprocessor}
+
+\texttt{psilang2.py} は v2 の \texttt{psilang.py} (650 行)
+を\textbf{完全コピー}し、\texttt{tokenize()} の冒頭に \textbf{refinement
+剥がし preprocessor} を追加しただけ:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\_WHERE\_RE }\OperatorTok{=}\NormalTok{ re.}\BuiltInTok{compile}\NormalTok{(}
+    \VerbatimStringTok{r\textquotesingle{}}\DecValTok{\textbackslash{}b}\VerbatimStringTok{where}\DecValTok{\textbackslash{}b}\VerbatimStringTok{\textquotesingle{}}                                \CommentTok{\# the keyword}
+    \VerbatimStringTok{r\textquotesingle{}}\NormalTok{(?:}\VerbatimStringTok{==}\ControlFlowTok{|}\VerbatimStringTok{!=}\ControlFlowTok{|}\VerbatimStringTok{\textless{}=}\ControlFlowTok{|}\VerbatimStringTok{\textgreater{}=}\ControlFlowTok{|}\PreprocessorTok{[\^{},)}\CharTok{\textbackslash{}n}\PreprocessorTok{=]}\NormalTok{)}\OperatorTok{*?}\VerbatimStringTok{\textquotesingle{}}               \CommentTok{\# body: comparison ops atomic, or non{-}stop char}
+    \VerbatimStringTok{r\textquotesingle{}}\ExtensionTok{(}\FunctionTok{?=}\VerbatimStringTok{,}\ControlFlowTok{|}\CharTok{\textbackslash{})}\ControlFlowTok{|}\VerbatimStringTok{=}\ExtensionTok{(}\FunctionTok{?!}\VerbatimStringTok{=}\ExtensionTok{)}\ControlFlowTok{|}\DecValTok{\textbackslash{}b}\VerbatimStringTok{in}\DecValTok{\textbackslash{}b}\ControlFlowTok{|}\CharTok{\textbackslash{}n}\ExtensionTok{)}\VerbatimStringTok{\textquotesingle{}}\NormalTok{,               }\CommentTok{\# stop before , ) bare{-}= in newline}
+\NormalTok{    re.DOTALL,}
+\NormalTok{)}
+
+\KeywordTok{def}\NormalTok{ \_strip\_refinement(src: }\BuiltInTok{str}\NormalTok{) }\OperatorTok{{-}\textgreater{}} \BuiltInTok{str}\NormalTok{:}
+    \CommentTok{"""Remove \textasciigrave{}where \textless{}predicate\textgreater{}\textasciigrave{} clauses (v4 refinement annotations).}
+\CommentTok{    Comment{-}aware: skips lines starting with \textquotesingle{}\#\textquotesingle{}."""}
+\NormalTok{    out }\OperatorTok{=}\NormalTok{ []}
+    \ControlFlowTok{for}\NormalTok{ line }\KeywordTok{in}\NormalTok{ src.splitlines(keepends}\OperatorTok{=}\VariableTok{True}\NormalTok{):}
+        \ControlFlowTok{if}\NormalTok{ line.lstrip().startswith(}\StringTok{"\#"}\NormalTok{):}
+\NormalTok{            out.append(line)}
+        \ControlFlowTok{else}\NormalTok{:}
+\NormalTok{            out.append(\_WHERE\_RE.sub(}\StringTok{\textquotesingle{}\textquotesingle{}}\NormalTok{, line))}
+    \ControlFlowTok{return} \StringTok{""}\NormalTok{.join(out)}
+\end{Highlighting}
+\end{Shaded}
+
+合計 23 行 (\texttt{\_WHERE\_RE} 定義 5 行 +
+\texttt{\_strip\_refinement} 11 行 + \texttt{tokenize()} 内 1 行呼び出し
++ 説明コメント)。型注釈の本体は parse されずに捨てられる --- \textbf{v2
+と同じ「型は documentation」立場を refinement にも適用}しただけ。
+
+\subsection{\texorpdfstring{3. プログラム --- \texttt{chudnovsky.psi}
+(50
+行)}{3. プログラム --- chudnovsky.psi (50 行)}}\label{ux30d7ux30edux30b0ux30e9ux30e0-chudnovsky.psi-50-ux884c}
+
+v4 top 1 genome の全ての特性を活用した実装:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# ─── k{-}th Chudnovsky term ─────────────────────────────────────────}
+\NormalTok{fn term(k: Int where k \textgreater{}= 0) {-}\textgreater{} Rat =}
+\NormalTok{  let sign: Int where sign == 1 or sign == {-}1 =}
+\NormalTok{    if k mod 2 == 0 then 1 else {-}1 in}
+\NormalTok{  let num: Int = sign * int\_fact(6 * k) * (545140134 * k + 13591409) in}
+\NormalTok{  let den: Int where den \textgreater{} 0 =}
+\NormalTok{    int\_fact(3 * k) * int\_pow(int\_fact(k), 3) * int\_pow(640320, 3 * k) in}
+\NormalTok{  rat(num, den)}
+
+\NormalTok{\# ─── Binary splitting on the half{-}open interval [a, b) ────────────}
+\NormalTok{fn bsplit(a: Int where a \textgreater{}= 0, b: Int where b \textgreater{} a) {-}\textgreater{} Rat =}
+\NormalTok{  if b {-} a == 1 then term(a)}
+\NormalTok{  else}
+\NormalTok{    let m: Int where m \textgreater{} a and m \textless{} b = (a + b) / 2 in}
+\NormalTok{    let left:  Rat = bsplit(a, m) in}
+\NormalTok{    let right: Rat = bsplit(m, b) in}
+\NormalTok{    rat\_add(left, right)}
+
+\NormalTok{\# ─── π = 426880·√10005 / S  with full refinement contract ────────}
+\NormalTok{fn chudnovsky\_pi(n\_digits: Int where n\_digits \textgreater{} 0)}
+\NormalTok{                  {-}\textgreater{} Real where digits == n\_digits =}
+\NormalTok{  let n\_terms: Int where n\_terms \textgreater{}= 2 = n\_digits / 14 + 2 in}
+\NormalTok{  let prec:    Int where prec \textgreater{} n\_digits = n\_digits + 20 in}
+\NormalTok{  let \_bump = set\_precision(prec) in}
+\NormalTok{  let s\_rat:  Rat = bsplit(0, n\_terms) in}
+\NormalTok{  let s\_real: Real where digits == prec = real\_from\_rat(s\_rat, prec) in}
+\NormalTok{  let c:      Real where digits == prec =}
+\NormalTok{    real\_mul(real\_from\_int(426880),}
+\NormalTok{              real\_sqrt(real\_from\_int(10005), prec)) in}
+\NormalTok{  real\_div(c, s\_real)}
+
+\NormalTok{\# ─── Entry point ──────────────────────────────────────────────────}
+\NormalTok{let pi:  Real where digits == 10000 = chudnovsky\_pi(10000) in}
+\NormalTok{let str: Str  where length == 10002 = real\_to\_string(pi, 10000) in}
+\NormalTok{emit(str)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{4. 実行結果}\label{ux5b9fux884cux7d50ux679c}
+
+\subsubsection{4.1 走らせる}\label{ux8d70ux3089ux305bux308b}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{$}\NormalTok{ /usr/bin/python3 psilang2.py chudnovsky.psi }\OperatorTok{\textgreater{}}\NormalTok{ pi\_10k\_v4.txt}
+\ExtensionTok{$}\NormalTok{ wc }\AttributeTok{{-}c}\NormalTok{ pi\_10k\_v4.txt}
+   \ExtensionTok{10003}\NormalTok{ pi\_10k\_v4.txt}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{4.2 数値検証}\label{ux6570ux5024ux691cux8a3c}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+指標
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+実行時間 & \textbf{3.05 秒} (Apple M2) \\
+出力長 & 10,003 chars (= \texttt{"3."} + 10,000 桁 + 改行) \\
+先頭 102 桁の既知 π との一致 & ✓ \\
+Feynman 点 (\texttt{999999} の最初の出現位置) & \textbf{762} (well-known
+値と一致) \\
+1000 桁目 & \texttt{9} (OEIS A000796 と一致) \\
+\textbf{SHA256} &
+\textbf{\texttt{d44e2dba39a378de3f41dace85394c8a02130e8442a61e91f3a8dd8e406f61e6}} \\
+v2 PsiLang \texttt{chudnovsky.psi} 出力との bitwise 一致 & \textbf{✓}
+(同じ SHA256) \\
+v2 PsiLang \texttt{machin.psi} 等 4 通り出力との一致 & \textbf{✓} (全 5
+ファイルが同一ハッシュ) \\
+\end{longtable}
+}
+
+\subsection{5. v2 vs v4 PsiLang
+のソース差分}\label{v2-vs-v4-psilang-ux306eux30bdux30fcux30b9ux5deeux5206}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\StringTok{{-} \# PsiLang (v2 top 5 consensus, static\_simple type system)}
+\StringTok{{-} fn term(k) =                                              ← 型注釈なし}
+\StringTok{{-}   let sign = if k mod 2 == 0 then 1 else {-}1 in}
+\StringTok{{-}   let num  = sign * int\_fact(6 * k) * ...}
+\StringTok{{-}   let den  = int\_fact(3 * k) * ...}
+\StringTok{{-}   rat(num, den)}
+
+\VariableTok{+ \# PsiLang2 (v4 top 1, refinement type system)}
+\VariableTok{+ fn term(k: Int where k \textgreater{}= 0) {-}\textgreater{} Rat =                     ← 型 + 契約}
+\VariableTok{+   let sign: Int where sign == 1 or sign == {-}1 =           ← 値域も明示}
+\VariableTok{+     if k mod 2 == 0 then 1 else {-}1 in}
+\VariableTok{+   let num: Int = sign * int\_fact(6 * k) * ...}
+\VariableTok{+   let den: Int where den \textgreater{} 0 =                            ← 不変量明示}
+\VariableTok{+     int\_fact(3 * k) * ...}
+\VariableTok{+   rat(num, den)}
+\end{Highlighting}
+\end{Shaded}
+
+アルゴリズム本体は\textbf{完全に同じ}。違うのは
+\textbf{型注釈の表現力}だけ:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+注釈
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+何を主張するか
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{Int\ where\ k\ \textgreater{}=\ 0} & 引数は非負整数
+(組合せ展開の項番号) \\
+\texttt{Int\ where\ sign\ ==\ 1\ or\ sign\ ==\ -1} & sign は ±1
+(Chudnovsky 公式の交代符号) \\
+\texttt{Int\ where\ m\ \textgreater{}\ a\ and\ m\ \textless{}\ b} &
+二分割中点が区間内にある \\
+\texttt{Int\ where\ n\_terms\ \textgreater{}=\ 2} & 級数は少なくとも 2
+項以上 \\
+\texttt{Real\ where\ digits\ ==\ n\_digits} & 戻り値の Real
+は指定桁数の精度を持つ \\
+\end{longtable}
+}
+
+これらは \textbf{Chudnovsky bsplit
+の数学的契約をソース上に書き下したもの}。論文と実装が 1 対 1
+に対応する。
+
+\subsection{6. 評価}\label{ux8a55ux4fa1}
+
+\subsubsection{6.1 進化計算 → 言語実装
+のパス}\label{ux9032ux5316ux8a08ux7b97-ux8a00ux8a9eux5b9fux88c5-ux306eux30d1ux30b9}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+段階
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+v4 進化計算が示した top 1 genome & ✓ 5 軸の組合せが取得済 \\
+その genome を実装するインタプリタ & ✓ v2 PsiLang + 23 行
+preprocessor \\
+その言語で π 10,000 桁を書く & ✓ \texttt{chudnovsky.psi} (50 行) \\
+同じ問題を v2 PsiLang と同等に解く & ✓ SHA256 一致 \\
+\end{longtable}
+}
+
+→ 進化計算が選んだ言語仕様 → インタプリタ実装 → アルゴリズム記述 →
+数値検証、というループが \textbf{v4 でも完結}。
+
+\subsubsection{6.2 refinement
+注釈の現実的価値}\label{refinement-ux6ce8ux91c8ux306eux73feux5b9fux7684ux4fa1ux5024}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}ll@{}}
+\toprule\noalign{}
+観点 & 状態 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+注釈の \textbf{parse} & ✓ preprocessor で受理 (現在は捨てる) \\
+注釈の \textbf{実行時検査} & ✗ documentation only \\
+注釈の \textbf{静的検査} (v5 計画) & ✗ 未実装 \\
+命題証明 (SMT) (v5+ 計画) & ✗ 未実装 \\
+\end{longtable}
+}
+
+現状の refinement は \textbf{「読む人 (人間 / 将来の型検査器 / LLM)
+に対する仕様書」} として機能する段階。v2 が \texttt{static\_simple}
+注釈を「人間用ドキュメント」と扱ったのと同じ立場を refinement
+にも適用しただけ。
+
+\subsubsection{6.3 v4 vs v2 ---
+言語が伝える情報量}\label{v4-vs-v2-ux8a00ux8a9eux304cux4f1dux3048ux308bux60c5ux5831ux91cf}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v2 PsiLang
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+v4 PsiLang2
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+型システム宣言 & static\_simple & \textbf{refinement} \\
+型注釈の構文 & \texttt{:\ Int} のみ &
+\texttt{:\ Int\ where\ \textless{}predicate\textgreater{}} \\
+アルゴリズム本体 & 同一 & 同一 \\
+出力 SHA256 & \texttt{d44e2dba39a378…} &
+\textbf{\texttt{d44e2dba39a378…}} ✓ \\
+インタプリタ実装サイズ & 650 行 & 650 + 23 行 (preprocessor) \\
+「言語が伝える情報量」 & low (型のみ) & \textbf{high (型 + 不変量 +
+契約)} \\
+\end{longtable}
+}
+
+進化計算は v2 から v4 への遷移で \textbf{「型注釈を refinement
+に格上げ」}
+という設計判断を独立に発見した。これは静的型付き関数型言語の歴史 (ML →
+Coq / Liquid Haskell / F* / Idris) と方向性が一致する。
+
+\subsubsection{6.4 v4
+進化計算結果との整合性確認}\label{v4-ux9032ux5316ux8a08ux7b97ux7d50ux679cux3068ux306eux6574ux5408ux6027ux78baux8a8d}
+
+v4 top 1 (I35, score 0.639) の 5 軸 ↔ PsiLang2 での実現:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+軸
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+値
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+PsiLang2 での実現
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{paradigm} & hybrid\_imperative\_functional & \texttt{emit}
+(副作用) と \texttt{let}/\texttt{fn} (純粋式) の共存 \\
+\texttt{type\_system} & \textbf{refinement} & \textbf{\texttt{where}
+句による predicate} ← v4 で新規 \\
+\texttt{arithmetic\_primitives} & arbitrary\_int\_plus\_rational &
+\texttt{Int} / \texttt{Rat} builtin \\
+\texttt{control\_flow} & pattern\_match\_fold &
+\texttt{match\ …\ with\ \textbackslash{}\textbar{}\ pat\ -\textgreater{}\ e\ end}
++ 一般再帰 \\
+\texttt{syntax\_family} & ml\_like &
+\texttt{let\ x:\ T\ where\ P\ =\ e\ in\ body} の ML 系構文 \\
+\end{longtable}
+}
+
+→ \textbf{v4 top 1 は v2 PsiLang の上位互換} (refinement type
+注釈追加のみ)、同じ Python interpreter で実行可能
+ということが実証できた。
+
+\subsection{7.
+限界と次のステップ}\label{ux9650ux754cux3068ux6b21ux306eux30b9ux30c6ux30c3ux30d7}
+
+\subsubsection{7.1 現在の限界}\label{ux73feux5728ux306eux9650ux754c}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{refinement 注釈は実行時に検査されない}:
+  \texttt{Int\ where\ k\ \textgreater{}=\ 0}
+  と書いても、\texttt{term(-1)} を呼んでもクラッシュしない。Python の
+  \texttt{int} がそれを許す。
+\item
+  \textbf{\texttt{where} 内部の表現力}: 現在は
+  \texttt{and}/\texttt{or}/比較演算子の組合せ。否定
+  \texttt{not}、function 呼び出し、絶対値
+  \texttt{\textbar{}x\textbar{}}、多項式関係などは preprocessor
+  が剥がすだけで意味解析しない。
+\item
+  \textbf{コード上の Bug は注釈に頼れない}:
+  \texttt{k\ \textgreater{}=\ 0}
+  と書いてあっても、書き間違いで負数が紛れたら検出されない。
+\end{itemize}
+
+\subsubsection{7.2 v5 候補 (PsiLang2 →
+PsiLang3)}\label{v5-ux5019ux88dc-psilang2-psilang3}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+機能
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+期待効果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+(1) refinement runtime checker &
+\texttt{fn\ term(k:\ Int\ where\ k\ \textgreater{}=\ 0)} の呼び出しで
+\texttt{assert\ k\ \textgreater{}=\ 0} を入れる \\
+(2) gradual refinement type checker (静的) & コンパイル時に
+\texttt{k\ \textgreater{}=\ 0\ ⇒\ 6*k\ -\ 5\ \textless{}\ 6*k\ -\ 3}
+を導出 \\
+(3) SMT (Z3) 連携 &
+「契約が満たされる」を自動証明、満たされない呼び出しを静的に拒否 \\
+(4) 命題自動証明 &
+\texttt{chudnovsky\_pi(n)\ →\ Real\ where\ digits\ ==\ n}
+をプログラム全体に渡って検証 \\
+\end{longtable}
+}
+
+これらは v4 ranks 上では「もっと良い言語にする」設計判断であり、v4
+進化計算自身は \texttt{(1)〜(2)} までを \texttt{refinement\_type}
+軸の選好で示唆していた。
+
+\subsection{8. まとめ}\label{ux307eux3068ux3081}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+項目
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+結果
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+v4 top 1 genome の同定 & ✓ I35 = hybrid\_imp\_func + refinement +
+bigint+rat + pattern\_match + ml\_like \\
+インタプリタ実装 & \textbf{PsiLang2 = PsiLang + 23 行 preprocessor} \\
+π 10,000 桁プログラム & ✓ \texttt{chudnovsky.psi} (50 行) \\
+実行時間 & 3.05 秒 (v2 と同等) \\
+出力検証 & \textbf{v2 PsiLang と SHA256 完全一致} \\
+「進化計算→実装→検証」ループの完結 & ✓ \\
+refinement 注釈の現実価値 & △ documentation only (v5
+で本気の検査器を実装する道筋) \\
+\end{longtable}
+}
+
+v4 (進化計算) と PsiLang2 (実装) は組で「\textbf{型注釈を refinement
+に進化させる}」という設計選択の\textbf{実証ペア}になっている。アルゴリズム実行能力は
+v2 と同じだが、\textbf{ソースコードが伝える情報量} は明確に増えている
+--- その情報を活用する検査器が v5 で書ける、というのが本実験のもう 1
+つの含意。
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{参考}\label{ux53c2ux8003}
+
+\begin{itemize}
+\tightlist
+\item
+  \href{../REPORT.md}{v4 LangDesign 進化計算 REPORT}
+\item
+  \href{../../2026-05-16_v2_langdesign/REPORT.md}{v2 PsiLang (祖先)}
+\item
+  \href{../../2026-05-16_v2_langdesign/psilang/README.md}{v2 PsiLang
+  interpreter (基盤)}
+\end{itemize}
+
+\end{document}
