@@ -124,13 +124,22 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
   `web_gateway.ml` 経由で観測可能.
 - 警告のみ (エラー化なし). `--strict` 相当の機能は CLI 統合 (O-2.f) で.
 
-#### O-2.c (1 session, medium): Real / Rat refinement (CE-6)
+#### O-2.c (1 session, medium): Real / Rat refinement (CE-6) ✅ 完了 (2026-05-18)
 
-- O-2.b の sort dispatch を Real に拡張 (z3.Real)
-- Float リテラル を refinement predicate で許可 (lexer に既にあるか?)
-- `Rat` 型は OCaml AIPL に既存か? → 必要なら追加
+実装結果:
+- `src/refinement.ml` を `smt_sort = SMT_Int | SMT_Real` パラメータ化:
+  - `render_int_literal ~sort` — Int は `n`、Real は `n.0` フォーマット
+  - `render_float_literal` — `%.10g` decimal、負値は `(- 3.14)`、NaN/Inf は防御的に `0.0`
+  - `render_pred ~sort` — 全 sub-call に伝播、`/` は Int で `div`、Real で `/`
+  - `render_smt ~sort ~binder` — `(declare-const v Int/Real)` の選択
+- `check_pred` を `TFloat → SMT_Real` で dispatch (OCaml AIPL の `Rat` は
+  `TFloat` で代用; Z3 の Real は有理数体なので意味的に正しい)
+- `infer.ml` の hook はそのまま (base_ty 経由で自動的に Real 路に流れる)
+- 単体テスト 4 個追加: Real SAT/UNSAT/mixed-int-lit/real-division → 18/18 PASS
+- サンプル `abclc/WhereVacuousReal.abcl` (unit, bad_window, bad_self, half)
+- 既存 abclc 72 回帰 → 73/73 PASS
 
-推定: 100-200 LOC
+実測 LOC: 約 90 行 (推定 100-200 内).
 
 #### O-2.d (1 session, medium): Cross-class inference + actor field 共有 (CE-2, CE-4)
 

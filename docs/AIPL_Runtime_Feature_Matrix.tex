@@ -306,7 +306,7 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   CE-3 & Phase E-$\alpha$: \texttt{where} 句 in AIPL grammar      & \Yes & \No & \Part\textsuperscript{*} & \Part\textsuperscript{*} & \No & \No & \No \\
   CE-4 & Phase E-$\beta$: actor field 共有 (method 横断)         & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-5 & Phase E-$\gamma$: record structural typing              & \Yes & \No & \No & \No & \No & \No & \No \\
-  CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \No & \No & \No & \No & \No \\
+  CE-6 & Phase E-$\gamma$-R: Real / Rat refinement (Z3 Real)     & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
   CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \No & \No & \No & \No & \No \\
   CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
@@ -323,14 +323,15 @@ parsing 達成.\texttt{lexer.mll} に \texttt{where}/\texttt{and}/\texttt{or}/\t
 \texttt{ast.ml} に \texttt{TyERefined of type\_expr * refine\_pred} を追加.
 サンプル: \texttt{abclc/WhereClause.abcl}.
 
-\noindent\textsuperscript{**} CE-1 / CE-9: OCaml は Phase O-2.b
-(2026-05-18) で SMT-LIB 2 + z3 CLI バックエンドを実装.
-\texttt{src/refinement.ml} が \texttt{Ast.refine\_pred} を SMT-LIB 2 に
-レンダし \texttt{z3 -in -t:5000} に流す.
-\texttt{AIPL\_REFINE\_CHECK=1} で typecheck pass が vacuously-false な
-refinement に \texttt{[refine warning]} を吐く.
+\noindent\textsuperscript{**} CE-1 / CE-6 / CE-9: OCaml は Phase O-2.b
+(2026-05-18) で SMT-LIB 2 + z3 CLI バックエンドを実装,
+Phase O-2.c (同日) で Real 理論にも対応.
+\texttt{src/refinement.ml} が \texttt{Ast.refine\_pred} を \texttt{smt\_sort}
+(Int / Real) パラメータ付きで SMT-LIB 2 にレンダし \texttt{z3 -in -t:5000}
+に流す.\texttt{AIPL\_REFINE\_CHECK=1} で typecheck pass が
+vacuously-false な refinement に \texttt{[refine warning]} を吐く.
 z3 不在時は \texttt{Deferred} で graceful fallback.
-サンプル: \texttt{abclc/WhereVacuous.abcl}.
+サンプル: \texttt{abclc/WhereVacuous.abcl} (Int), \texttt{abclc/WhereVacuousReal.abcl} (Real).
 
 OCaml ランタイムも HM 推論を持つが (\#12 で \Yes),その他の refinement
 機能 (CE-1, CE-6, CE-9) と record structural typing (CE-5) は今後の課題.

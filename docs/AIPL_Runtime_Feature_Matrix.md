@@ -207,7 +207,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-3  | Phase E-α: `where` 句 in AIPL grammar              |  ✅  |  ❌  |  🟡¹  |  🟡¹ |  ❌  |  ❌  | ❌  | `PHASE_E_REPORT.md`                   |
 | CE-4  | Phase E-β: actor field 共有 (method 横断)         |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_BETA_REPORT.md`              |
 | CE-5  | Phase E-γ: record structural typing                |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_REPORT.md`             |
-| CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
+| CE-6  | Phase E-γ-R: Real / Rat refinement (Z3 Real)       |  ✅  |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | `PHASE_E_GAMMA_R_REPORT.md`           |
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ❌   |  ❌  |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
@@ -224,8 +224,13 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   (Typecheck.run 経由). `src/refinement.ml` は `Ast.refine_pred` を
   SMT-LIB 2 にレンダして `z3 -in -t:5000` に流し、`sat`/`unsat`/`unknown`
   を解釈。CLI が PATH に無い場合は `Deferred "z3 not available"` で graceful
-  fallback。サンプル: `abclc/WhereVacuous.abcl`。Real/Rat (CE-6) と
-  通常推論への統合は Phase O-2.c / O-2.d 以降。
+  fallback。サンプル: `abclc/WhereVacuous.abcl`。
+  Phase O-2.c (2026-05-18) で **`smt_sort` パラメータ化** により
+  `TFloat` → SMT-LIB Real 理論に対応 (CE-6)。`float where x > 0.0 and
+  x < 1.0` のような decimal 述語、`/` の real division、int リテラル
+  の自動 promote (例: `float where x > 0 and x < 100`) が動く。
+  サンプル: `abclc/WhereVacuousReal.abcl`。
+  通常推論への統合 (CE-7) と CLI 統合 (CE-8) は Phase O-2.d / O-2.f 以降。
 
 OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
 Z3 backend には対応していない。OCaml への移植は今後の課題。

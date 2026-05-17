@@ -236,6 +236,51 @@ let test_refinement_non_int () =
    | _ -> fail "refinement non-int" "expected Deferred");
   pass "refinement defers non-Int base"
 
+(* ─────────────────────────────────────────────────────────────── *)
+(* O-2.c: Real refinement tests                                     *)
+(* ─────────────────────────────────────────────────────────────── *)
+
+let test_refinement_real_sat () =
+  (* `Float where 0.0 < x and x < 1.0` is satisfiable. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop ("<", RpFloat 0.0, RpVar "x"),
+                  RpBinop ("<", RpVar "x", RpFloat 1.0))) in
+  (match Refinement.check_pred ~base:Types.TFloat ~binder:"x" pred with
+   | Refinement.Satisfiable -> ()
+   | _ -> fail "real SAT" "expected Satisfiable");
+  pass "refinement Real SAT (0.0 < x < 1.0)"
+
+let test_refinement_real_unsat () =
+  (* `Float where x > 1.0 and x < 0.5` is vacuously false. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">", RpVar "x", RpFloat 1.0),
+                  RpBinop ("<", RpVar "x", RpFloat 0.5))) in
+  (match Refinement.check_pred ~base:Types.TFloat ~binder:"x" pred with
+   | Refinement.Unsatisfiable -> ()
+   | _ -> fail "real UNSAT" "expected Unsatisfiable");
+  pass "refinement Real UNSAT (x > 1.0 and x < 0.5)"
+
+let test_refinement_real_mixed_int_lits () =
+  (* `Float where x > 0 and x < 100` (int literals in Real predicate)
+     should be satisfiable — Z3 auto-promotes the integers. *)
+  let pred = Ast.(RpBinop ("and",
+                  RpBinop (">", RpVar "x", RpInt 0),
+                  RpBinop ("<", RpVar "x", RpInt 100))) in
+  (match Refinement.check_pred ~base:Types.TFloat ~binder:"x" pred with
+   | Refinement.Satisfiable -> ()
+   | _ -> fail "real mixed int lits" "expected Satisfiable");
+  pass "refinement Real with int literals (auto-promoted)"
+
+let test_refinement_real_division () =
+  (* `Float where x / 2.0 == 0.5` should be sat (x = 1.0). *)
+  let pred = Ast.(RpBinop ("==",
+                  RpBinop ("/", RpVar "x", RpFloat 2.0),
+                  RpFloat 0.5)) in
+  (match Refinement.check_pred ~base:Types.TFloat ~binder:"x" pred with
+   | Refinement.Satisfiable -> ()
+   | _ -> fail "real division" "expected Satisfiable");
+  pass "refinement Real division"
+
 let test_refinement_string_of_pred () =
   let pred = Ast.(RpBinop ("and",
                   RpBinop (">=", RpVar "k", RpInt 0),
@@ -263,5 +308,9 @@ let () =
   test_refinement_with_or_not ();
   test_refinement_free_vars ();
   test_refinement_non_int ();
+  test_refinement_real_sat ();
+  test_refinement_real_unsat ();
+  test_refinement_real_mixed_int_lits ();
+  test_refinement_real_division ();
   test_refinement_string_of_pred ();
-  Printf.printf "\n14/14 passing\n%!"
+  Printf.printf "\n18/18 passing\n%!"
