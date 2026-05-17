@@ -1,0 +1,22 @@
+// Feature E (Phase E-γ) — Sample 2: record type *inferred from use*.
+//
+// `Reader.first(r)` only reads `r.head`.  The inference engine
+// constrains r to be a record containing at least `head` (TVar →
+// TRecord((head, η)) constraint).  When a caller passes
+// `{head: 7, tail: 0}`, the field types unify so head = Int.
+
+class Reader {
+  method first(r)  { reply(r.head); }
+  method second(r) { reply(r.tail); }
+  method both(r)   {
+    var a = r.head;
+    var b = r.tail;
+    reply(a + b);
+  }
+}
+
+var rd = new Reader();
+var rec = {head: 7, tail: 100};
+var x = now rd.first(rec);
+var y = now rd.second(rec);
+var s = now rd.both(rec);

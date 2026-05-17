@@ -1,0 +1,17 @@
+// Feature E (Phase E-γ) — Sample 3: structural mismatch detection.
+//
+// Two calls to the same method `process(r)` are made with records of
+// different field sets.  Both calls constrain `process`'s parameter
+// TVar — the first to {key, val}, the second to {key, label}.  Since
+// AIPL's record unification is strict (E-1 only supports exact field
+// sets, not width subtyping), the engine reports a unify failure.
+
+class Engine {
+  method process(r) { reply(r.key); }
+}
+
+var e   = new Engine();
+var r1  = {key: 3, val: 99};
+var r2  = {key: 4, label: 0 == 0};   // {key: Int, label: Bool}
+var a   = now e.process(r1);
+var b   = now e.process(r2);          // <- second call: shape conflict

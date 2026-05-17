@@ -258,6 +258,17 @@ def unify(t1: Any, t2: Any) -> Subst:
         for a, b in zip(t1.items, t2.items):
             s = compose(unify(apply(s, a), apply(s, b)), s)
         return s
+    # E-1: structural record unification.  Both records must have the
+    # same set of field names; per-field types are unified recursively.
+    if isinstance(t1, TRecord) and isinstance(t2, TRecord):
+        d1, d2 = dict(t1.fields), dict(t2.fields)
+        if set(d1.keys()) != set(d2.keys()):
+            raise UnifyError(
+                f"record fields differ: {sorted(d1)} vs {sorted(d2)}")
+        s: Subst = {}
+        for name in sorted(d1.keys()):
+            s = compose(unify(apply(s, d1[name]), apply(s, d2[name])), s)
+        return s
     # Refinement vs base: drop refinement for unification (kept aside for SMT)
     if isinstance(t1, TRefined):
         return unify(t1.base, t2)
@@ -484,25 +495,50 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
     if FutureCall and isinstance(e, FutureCall):
         inner = _infer_method_dispatch(infer, env, e, is_future=True)
         return TCon("Future", (inner,))
-    # Record / field-access are skipped (kept as Dyn for gradual typing)
+    # E-1: record literals become TRecord with each field typed from
+    # its RHS expression.  Sorted by name so structural equality is
+    # order-independent.
     if RecordLit and isinstance(e, RecordLit):
-        return T_DYN
+        ftypes = []
+        for fname, fexpr in e.fields:
+            ftypes.append((fname, _infer_expr(infer, env, fexpr)))
+        ftypes.sort(key=lambda x: x[0])
+        return TRecord(tuple(ftypes))
     if FieldAccess and isinstance(e, FieldAccess):
-        # E-3: `obj.f` — look up obj's class then resolve f via
-        # class_fields.  Falls back to Dyn for record literals or
-        # unknown receivers (gradual typing).
+        # E-3 (class fields) + E-1 (record fields): resolve the
+        # receiver's type and walk the attr chain.  Falls back to
+        # Dyn for opaque receivers (gradual typing).
         sch = env.lookup(e.name)
-        if sch:
-            recv_t = apply(infer.subst, instantiate(infer, sch))
-            if isinstance(recv_t, TCon):
-                fields = infer.class_fields.get(recv_t.name, {})
-                t = fields.get(e.attrs[0]) if e.attrs else None
-                if t is not None:
-                    # Chain through nested attrs (only depth-1 supported;
-                    # deeper paths stay Dyn).
-                    if len(e.attrs) == 1:
-                        return apply(infer.subst, t)
-        return T_DYN
+        if not sch:
+            return T_DYN
+        cur = apply(infer.subst, instantiate(infer, sch))
+        for attr in e.attrs:
+            cur = apply(infer.subst, cur)
+            if isinstance(cur, TCon):
+                fields = infer.class_fields.get(cur.name, {})
+                nxt = fields.get(attr)
+                if nxt is None:
+                    return T_DYN
+                cur = nxt
+            elif isinstance(cur, TRecord):
+                nxt = dict(cur.fields).get(attr)
+                if nxt is None:
+                    infer.issues.append(InferenceIssue(
+                        kind="field",
+                        msg=f"record has no field '{attr}': {cur}",
+                        location=f"{e.name}.{'.'.join(e.attrs)}",
+                    ))
+                    return T_DYN
+                cur = nxt
+            elif isinstance(cur, TVar):
+                # Constrain receiver to a record containing this field.
+                ft = infer.fresh()
+                infer.constrain(cur, TRecord(((attr, ft),)),
+                                where=f"{e.name}.{attr} access")
+                cur = ft
+            else:
+                return T_DYN
+        return apply(infer.subst, cur)
     if New and isinstance(e, New):
         # `new ClassName(args)` produces TCon(ClassName).  We also unify
         # the constructor's `init(...)` signature if registered.
@@ -634,7 +670,12 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
             infer.constrain(rhs_t, ann, where=f"var {s.name}")
             env.bind(s.name, Scheme((), apply(infer.subst, ann)))
         else:
-            env.bind(s.name, generalise(env, apply(infer.subst, rhs_t)))
+            # E-1: do NOT generalise unbound TVars here.  Actor return
+            # values (NowCall's ret_tvar, new ClassName's TCon) must
+            # stay monomorphic so later constraint propagation (e.g.,
+            # reply({...}) populating the TVar with a TRecord) flows
+            # to every use site of the binding.
+            env.bind(s.name, Scheme((), apply(infer.subst, rhs_t)))
         return
     # `var x = new ClassName(args)` is its own AST node (VarNew) —
     # bind x : TCon(ClassName) and check the init call's arity (D-1).
@@ -1135,7 +1176,24 @@ def infer_program(program: Any) -> list:
     # Pass 2: re-infer (records final issues + accurate types).
     method_results = _run_method_pass(True)
 
-    # (Global statements were already processed in Pass 0; nothing to do here.)
+    # E-1: re-run global statements once more so unify failures from
+    # argument propagation (e.g., passing records of incompatible
+    # shapes to the same method) surface in the final issue list.
+    # Pass-0 issues were dropped to silence forward-ref noise; by now
+    # every method signature is fully resolved, so any error here is
+    # a *real* shape mismatch.  We snapshot subst length so a second
+    # successful unify is a no-op.
+    issues_before_repass = len(infer.issues)
+    global_repass_env = shared_env.child()
+    for decl in getattr(program, "decls", []):
+        if GlobalStmt and isinstance(decl, GlobalStmt):
+            _infer_stmt(infer, global_repass_env, decl.stmt)
+    # Filter out spurious unbound/forward-ref errors that may resurface;
+    # keep only `unify` and `arity` kind issues from this re-pass.
+    repass_issues = infer.issues[issues_before_repass:]
+    infer.issues = infer.issues[:issues_before_repass] + [
+        i for i in repass_issues if i.kind in ("unify", "arity", "field")
+    ]
 
     # Apply final substitution to all collected results
     for r in method_results:

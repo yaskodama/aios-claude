@@ -1,0 +1,25 @@
+// Feature E (Phase E-γ: record structural typing) — Sample 1.
+// Record literals get a precise {field: T, ...} type; field reads
+// look up the right T; record literals flow back into method param
+// types via unification.
+
+class Geometry {
+  method makePoint(x, y)  { reply({a: x, b: y}); }
+  method dx(p, q)         { reply(q.a - p.a); }
+  method magnitudeSquared(p) {
+    var x = p.a;
+    var y = p.b;
+    reply(x * x + y * y);
+  }
+}
+
+var g  = new Geometry();
+var p1 = now g.makePoint(3, 4);
+var p2 = now g.makePoint(10, 20);
+var d  = now g.dx(p1, p2);
+var m  = now g.magnitudeSquared(p1);
+
+// Standalone record literal — should infer {a: Int, b: Bool}.
+var rec = {a: 5, b: 0 == 0};
+var r_a = rec.a;
+var r_b = rec.b;
