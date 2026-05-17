@@ -294,6 +294,12 @@ class Inference:
     # is inferred so `now obj.method(args)` can unify against them.
     # Schema: { class_name: { method_name: (param_tvars, ret_tvar) } }
     class_sigs: Dict[str, Dict[str, tuple]] = field(default_factory=dict)
+    # E-3: class-level field TVars shared across every method.  Each
+    # field gets exactly one TVar, populated by Pass-0 from its
+    # initializer and further refined by every usage (read or write)
+    # in any method body.
+    # Schema: { class_name: { field_name: TVar } }
+    class_fields: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     # The currently-being-inferred (class, method) pair so `reply(...)`
     # can constrain the method's return type slot.
     current_method: Optional[tuple] = None
@@ -482,6 +488,20 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
     if RecordLit and isinstance(e, RecordLit):
         return T_DYN
     if FieldAccess and isinstance(e, FieldAccess):
+        # E-3: `obj.f` — look up obj's class then resolve f via
+        # class_fields.  Falls back to Dyn for record literals or
+        # unknown receivers (gradual typing).
+        sch = env.lookup(e.name)
+        if sch:
+            recv_t = apply(infer.subst, instantiate(infer, sch))
+            if isinstance(recv_t, TCon):
+                fields = infer.class_fields.get(recv_t.name, {})
+                t = fields.get(e.attrs[0]) if e.attrs else None
+                if t is not None:
+                    # Chain through nested attrs (only depth-1 supported;
+                    # deeper paths stay Dyn).
+                    if len(e.attrs) == 1:
+                        return apply(infer.subst, t)
         return T_DYN
     if New and isinstance(e, New):
         # `new ClassName(args)` produces TCon(ClassName).  We also unify
@@ -683,7 +703,22 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
             infer.constrain(fn_t, TArrow(tuple(arg_ts), ret_t),
                             where=f"call {s.name}")
         return
-    # Skip Send / FieldAssign etc. — left as gradual unknown
+    # E-3: `obj.f = v` — resolve obj's class and constrain the
+    # corresponding field TVar with v's type.  Stays gradual for
+    # record literals or unknown receivers.
+    from aipl_ast import FieldAssign as _FieldAssign      # late import
+    if _FieldAssign and isinstance(s, _FieldAssign):
+        rhs_t = _infer_expr(infer, env, s.expr)
+        sch = env.lookup(s.name)
+        if sch and s.attrs and len(s.attrs) == 1:
+            recv_t = apply(infer.subst, instantiate(infer, sch))
+            if isinstance(recv_t, TCon):
+                ftvar = infer.class_fields.get(recv_t.name, {}).get(s.attrs[0])
+                if ftvar is not None:
+                    infer.constrain(ftvar, rhs_t,
+                                    where=f"{recv_t.name}.{s.attrs[0]} :=")
+        return
+    # Skip Send etc. — left as gradual unknown
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -1016,6 +1051,37 @@ def infer_program(program: Any) -> list:
                 params = tuple(infer.fresh() for _ in m.params)
                 ret    = infer.fresh()
                 infer.class_sigs[decl.name][m.name] = (params, ret)
+            # E-3: pre-register one shared TVar per class field so
+            # every method body sees the same slot.  Initializer type
+            # is folded in below (after the loop, so all field TVars
+            # exist before any RHS expression is inferred — handles
+            # forward references between fields).
+            infer.class_fields[decl.name] = {}
+            for f in getattr(decl, "fields", []) or []:
+                fname = getattr(f, "name", None)
+                if fname:
+                    infer.class_fields[decl.name][fname] = infer.fresh()
+
+    # E-3 Pass-(-1): fold each field initializer's type into its TVar.
+    # We do this in a dedicated mini-env so the initializer expression
+    # can reference earlier fields of the same class.
+    for decl in getattr(program, "decls", []):
+        if ClassDecl and isinstance(decl, ClassDecl):
+            init_env = shared_env.child()
+            for fname, ftvar in infer.class_fields[decl.name].items():
+                init_env.bind(fname, Scheme((), ftvar))
+            for f in getattr(decl, "fields", []) or []:
+                if not (VarDecl and isinstance(f, VarDecl)): continue
+                ftvar = infer.class_fields[decl.name].get(f.name)
+                if ftvar is None: continue
+                if getattr(f, "expr", None) is not None:
+                    rhs_t = _infer_expr(infer, init_env, f.expr)
+                    infer.constrain(ftvar, rhs_t,
+                                    where=f"{decl.name}.{f.name} init")
+                if getattr(f, "type_annotation", None):
+                    ann_t = _parse_annotation(f.type_annotation, infer)
+                    infer.constrain(ftvar, ann_t,
+                                    where=f"{decl.name}.{f.name} :type")
 
     # Pass 1 + Pass 2: infer each method's body twice — the second pass
     # uses the fully-populated class_sigs from pass 1 so cross-class
@@ -1027,10 +1093,12 @@ def infer_program(program: Any) -> list:
         for decl in getattr(program, "decls", []):
             if ClassDecl and isinstance(decl, ClassDecl):
                 cls_env = shared_env.child()
-                for f in getattr(decl, "fields", []) or []:
-                    if VarDecl and isinstance(f, VarDecl):
-                        rhs_t = _infer_expr(infer, cls_env, f.expr)
-                        cls_env.bind(f.name, Scheme((), apply(infer.subst, rhs_t)))
+                # E-3: every method sees the same per-class field TVars
+                # so reads in one method and writes in another flow
+                # through unify (Int written by `init(n)` is visible
+                # as Int in `bump()`'s `n + 1`).
+                for fname, ftvar in infer.class_fields.get(decl.name, {}).items():
+                    cls_env.bind(fname, Scheme((), ftvar))
                 for m in decl.methods:
                     res = infer_method(decl, m, infer=infer,
                                         shared_env=cls_env.child())
@@ -1083,6 +1151,10 @@ def infer_program(program: Any) -> list:
             _check_refinements(infer.refinements))
         method_results[-1].refinement_issues.extend(
             _check_refined_decls(infer.refined_decls))
+        # E-3: expose final inference state so the CLI can print
+        # per-class field types.  Attached to the first result so the
+        # CLI's lookup is order-independent.
+        method_results[0]._infer_state = infer
     return method_results
 
 

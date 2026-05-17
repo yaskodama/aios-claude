@@ -1,0 +1,16 @@
+// Feature D (Phase E-β) — Sample 3: cross-method type conflict.
+//
+// The field `s` is consistently used as an Int through the
+// initializer and asInt()/asBool().  Then writeBool() tries to write
+// a Bool into it — the inference engine flags a unify failure at
+// `assign to s` (Int vs Bool).  This is the kind of bug that was
+// completely invisible before Phase E-β.
+
+class Mixed {
+  var s = 0;
+  method asInt(x: Int)      { s = x; }
+  method asBool()           { reply(s == 0); }       // OK: read Int, returns Bool
+  method writeBool(b: Bool) { s = b; }               // BAD: Int field <- Bool
+}
+
+var m = new Mixed();

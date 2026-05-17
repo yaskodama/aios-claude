@@ -1,0 +1,33 @@
+// Feature D (Phase E-β) — Sample 2: field type *purely* inferred
+// from writes, with no helpful initializer.
+//
+// The initializer `var n = 0;` would normally pin n to Int.  Here we
+// initialize with another field so n's type is *open* until init()
+// writes a value.  Three classes participate so the inference must
+// chain across actor boundaries:
+//   - Source.value() -> Int
+//   - Bridge.feed(s) reads s.value(), writes to Sink.put()
+//   - Sink.put(x) writes x to field stored
+
+class Source {
+  method value() { reply(42); }
+}
+
+class Sink {
+  var stored = 0;          // type still open until put() writes
+  method put(x)    { stored = x; reply(stored); }
+  method peek()    { reply(stored); }
+}
+
+class Bridge {
+  method feed(s, k) {
+    var v = now s.value();        // v : Int (from Source.value)
+    var r = now k.put(v);         // pushes v : Int → Sink.stored : Int
+    reply(r);
+  }
+}
+
+var s = new Source();
+var k = new Sink();
+var b = new Bridge();
+var ans = now b.feed(s, k);

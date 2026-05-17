@@ -1,0 +1,21 @@
+// Feature D (Phase E-β: actor field inference) — Sample 1.
+// A field initialized with `0` plus cross-method usage.  The field's
+// type (Int) is reinforced from three sources at once:
+//   - the initializer        (var n = 0)
+//   - the init() write        (n = initial)
+//   - the bump() arithmetic   (n = n + delta)
+// All three flow through the shared TVar for Counter.n.
+
+class Counter {
+  var n = 0;
+  method init(initial)  { n = initial; }
+  method get()           { reply(n); }
+  method bump(delta) {
+    n = n + delta;
+    reply(n);
+  }
+  method reset() { n = 0; reply(n); }
+}
+
+var c = new Counter(100);
+var v = now c.bump(7);

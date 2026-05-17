@@ -79,7 +79,7 @@ def main():
             print("[type] no issues.", file=sys.stderr)
 
     if args.infer:
-        from aipl_inference import infer_program
+        from aipl_inference import infer_program, apply
         results = infer_program(program)
         total_issues = 0
         total_refs   = 0
@@ -88,6 +88,18 @@ def main():
             print(file=sys.stderr)
             total_issues += len(r.issues)
             total_refs   += len(r.refinement_issues)
+        # E-3: surface per-class field types from infer.class_fields.
+        # The driver attaches the final Inference state to results[0].
+        infer_state = getattr(results[0], "_infer_state", None) if results else None
+        if infer_state and infer_state.class_fields:
+            print("=== class fields ===", file=sys.stderr)
+            for cls, fields in infer_state.class_fields.items():
+                if not fields: continue
+                print(f"  {cls}:", file=sys.stderr)
+                for fname, ftvar in fields.items():
+                    t = apply(infer_state.subst, ftvar)
+                    print(f"    {fname} : {t}", file=sys.stderr)
+            print(file=sys.stderr)
         print(f"[infer] {len(results)} method(s), {total_issues} unify issue(s), "
               f"{total_refs} refinement issue(s)", file=sys.stderr)
         if args.strict and (total_issues or total_refs):
