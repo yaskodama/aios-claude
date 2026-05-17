@@ -1,0 +1,112 @@
+// AIPL_Python_SendSelectAlignment.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (3) — semantic alignment
+// between the OCaml AIPL runtime (commit 590e3aa) and the Python
+// (type-inferred) AIPL runtime.
+//
+// Origin: commit 590e3aa fixed three OCaml runtime bugs in the
+// send / now / future / select / reply interaction layer.  Of those,
+// fix (2) (`new X()` in method body) does NOT apply to Python —
+// _resolve_actor dereferences Actor objects directly.  Fix (1)
+// (reply-on-send routing) and fix (3) (script-mode actor quiescence)
+// DO apply.
+//
+// Pain points in Python AIPL today:
+//
+//   (1) aipl_interp.py:_b_reply (line ~977) is send-path-blind.
+//       On a fire-and-forget send, reply(v) prints `[REPLY] v`
+//       and drops the value.  A Driver doing
+//         send w.ask(q); select { case reply(r) -> ... }
+//       therefore times out: Worker's reply(r) is never delivered.
+//
+//   (3) aipl_runtime.Scheduler.wait_idle defaults to
+//       idle_ms=120 / timeout_s=2.0.  Real-provider AI calls and
+//       long select{} timeouts can blow past 2 seconds; the
+//       script-mode entrypoint (aipl_main.py -f file.abcl) returns
+//       with messages still in flight.  OCaml's fix added a busy
+//       flag toggled around eval_stmt + 100ms stable window + 5s cap.
+//
+// Goal of this evolution: pick a (reply-routing × quiesce-strategy)
+// pair that mirrors OCaml semantics while leaving the 38 existing
+// src/python-aipl/samples*.abcl programs unaffected.
+
+aice AIPL_Python_SendSelectAlignment {
+  dialect = "aice_evolution_v2";
+
+  task = "OCaml AIPL commit 590e3aa の fix (1) reply-on-send routing と fix (3) script-mode actor quiescence を Python (型推論) AIPL ランタイムに移植する設計を MAP-Elites で探索する。aipl_interp.py の _b_reply と aipl_runtime.py の Scheduler.wait_idle を主な改修対象とし、aipl_main.py の -f エントリは触らない。後方互換 (既存 samples 38 件が無変更で動く) を hard floor とする。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  // ── 評価タスク群 (lowerer は spec をそのまま reviewer に渡す) ──
+  evaluation_tasks {
+    task ReplySendDelivery {
+      spec = "Driver の `send w.ask(q)` に対し Worker が `reply(r)` だけ呼ぶ最小例で、Driver の `select { case reply(r) -> ... }` が値を受け取れること。現状 Python は [REPLY] r を stdout に出して値を捨てる。";
+    }
+    task ScriptModeNoRace {
+      spec = "aipl_main.py -f script.bat で `send d.run(...)` が top-level の唯一の文の場合、Driver.run() の本体 (内部の select を含む) が完走してから main() が return すること。現状 wait_idle(timeout_s=2.0) で AI 呼び出しを伴うケースが切られる。";
+    }
+    task BackwardCompatAllSamples {
+      spec = "src/python-aipl/samples/*.abcl (33 件) + src/python-aipl/samples-ai/*.abcl (5 件) の出力が修正前と byte-equivalent (provider noise を正規化後)。新規に [send] no-such-actor 等のエラーが出ないこと。";
+    }
+    task AiCallSendSelectMock {
+      spec = "ABCL_AI_PROVIDER=mock で OCaml 側に既にある now / future+await / send+select の 3 つのデモを Python 移植版で実行し、3 つとも mock reply を観測できること。";
+    }
+    task WaitIdleOverhead {
+      spec = "actor を 1 つも spawn しないプログラムが 200ms 以内に main() から return すること。actor 1 つで 1 回 print するだけのプログラムが 500ms 以内に return すること。";
+    }
+    task ImplLocBudget {
+      spec = "aipl_interp.py + aipl_runtime.py への追加 diff が 300 行以内 (OCaml 同等修正は 95 行)。AST / parser には触らない。";
+    }
+  }
+
+  // ── 探索パラメタ ──
+  // cell_axes はカテゴリ軸を文字列で渡す DSL 仕様 (lowerer 側で paradigm
+  // 等の標準軸名にマップされる).  本実験では reply ルーティング戦略と
+  // quiesce 戦略が 2 つの主要軸。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "reply_routing, quiesce_strategy";
+    generations = 12;
+    seed_count  = 8;
+    open_axes   = false;
+    rng_seed    = 31415931;
+  }
+
+  // ── meta fitness 配分 ──
+  meta_fitness {
+    trend_alignment       = 0.10;
+    frontier_coverage     = 0.15;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.20;
+    implementability      = 0.40;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "reply_correctness_first", "backward_compat_first"];
+    top_k     = 5;
+  }
+
+  // ── 評価者 (LLM persona) ──
+  reviewers {
+    reviewer ReplyRouting {
+      persona = "あなたは reply ルーティング判定者です。候補が Worker.reply(r) を Driver の select { case reply(r) -> ... } に届けられるかを評価。OCaml 590e3aa の fix (1) は `send sender.reply(v)` (固定メソッド名 reply) で経路を作り、pseudo-sender (<top>/<new>/<spawn>) を除外する形。1.0 = 完全一致、0.7 = メソッド名が違うが意味論的に同等、0.3 = print のみ (現状)、0.0 = 値が失われる。'OK: <根拠>' / 'NG: <欠けている要素>' の 1 行で返答。";
+    }
+    reviewer QuiesceCorrectness {
+      persona = "あなたは quiesce 戦略判定者です。候補の script_quiesce_strategy + busy_flag_granularity が、Scheduler.wait_idle 終了時に未完了の send が無く、かつ idle program が無駄に待たないかを評価。OCaml 590e3aa fix (3) は actor.busy フラグを eval_stmt 周りで toggle し、100ms stable window + 5s wall-clock cap。1.0 = 同等、0.7 = busy 無しでも timeout_s 拡張で実用、0.3 = 現状 2s 固定、0.0 = race 残存。'OK' / 'NG' の 1 行で返答。";
+    }
+    reviewer BackwardCompat {
+      persona = "あなたは後方互換性レビュアーです。候補が src/python-aipl/samples の Counter / BoundedBuffer / AIChain / Channels / Phase11+ 型付きサンプル 38 件で動作変化を起こさないかを評価。reply の挙動を変える際に既存サンプルが reply(v) を pseudo-sender (top-level) からの送信先で使っていないかが鍵。1.0 = 無変化、0.7 = 1-2 例で stdout 軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的破壊。'OK' / 'NG: <破壊する sample 名>' の 1 行で返答。";
+    }
+    reviewer BusyFlagAccuracy {
+      persona = "あなたは busy flag 精度レビュアーです。候補の busy_flag_granularity (none / per_dispatch / per_method_body / per_blocking_call) が、ai_call の HTTP 待ちや time.sleep 中も正しく busy と判定できるかを評価。1.0 = per_blocking_call、0.7 = per_method_body、0.3 = per_dispatch、0.0 = none。'OK' / 'NG' の 1 行で返答。";
+    }
+    reviewer ImplementabilityPython {
+      persona = "あなたは Python 実装可能性レビュアーです。候補の aipl_interp.py (~2600 行) + aipl_runtime.py (~200 行) への追加 diff が何行になるかを評価。OCaml 同等は 95 行。1.0 = ≤ 100 行、0.7 = ≤ 200 行、0.3 = ≤ 300 行、0.0 = 300 行超 or AST/parser を触る必要あり。'OK' / 'NG' の 1 行で返答。";
+    }
+    reviewer OCamlParity {
+      persona = "あなたは OCaml 整合性レビュアーです。候補が commit 590e3aa の fix (1) + fix (3) と意味論的に一致するかを評価。Python と OCaml の send/select 経路で、同一ソースが両ランタイムで同じ観測結果を出すかを問う。1.0 = 完全一致、0.7 = 値は届くが log 形式 / timing が異なる、0.3 = 部分的、0.0 = 不一致。'OK' / 'NG' の 1 行で返答。";
+    }
+  }
+}
