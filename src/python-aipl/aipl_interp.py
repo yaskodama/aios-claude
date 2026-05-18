@@ -1952,6 +1952,80 @@ def _b_crdt_replicate(args, frame, interp):
     return aipl_dist.crdt_replicate(args[0], args[1])
 
 
+# ─── DR-17 W1: Plumtree gossip overlay primitives ──────────────────
+# Each primitive is a thin shim over aipl_dist.plumtree_* — see that
+# module for state shape and event semantics.
+
+def _b_plumtree_init(args, frame, interp):
+    """plumtree_init(actor_id, eager_peers_str, lazy_peers_str).
+    Peer lists are comma-separated strings ("" = empty)."""
+    if len(args) < 3:
+        raise ValueError("plumtree_init(actor_id, eager_str, lazy_str)")
+    actor = str(args[0])
+    eager = [p for p in str(args[1] or "").split(",") if p]
+    lazy  = [p for p in str(args[2] or "").split(",") if p]
+    import aipl_dist
+    return bool(aipl_dist.plumtree_init(actor, eager, lazy))
+
+def _b_plumtree_broadcast(args, frame, interp):
+    if len(args) < 3:
+        raise ValueError("plumtree_broadcast(actor_id, msg_id, payload)")
+    import aipl_dist
+    return aipl_dist.plumtree_broadcast(str(args[0]), str(args[1]),
+                                        str(args[2]))
+
+def _b_plumtree_deliver(args, frame, interp):
+    if len(args) < 4:
+        raise ValueError("plumtree_deliver(receiver, sender, msg_id, payload)")
+    import aipl_dist
+    return bool(aipl_dist.plumtree_deliver(str(args[0]), str(args[1]),
+                                           str(args[2]), str(args[3])))
+
+def _b_plumtree_digest(args, frame, interp):
+    if len(args) < 3:
+        raise ValueError("plumtree_digest(receiver, sender, msg_id)")
+    import aipl_dist
+    return bool(aipl_dist.plumtree_digest(str(args[0]), str(args[1]),
+                                          str(args[2])))
+
+def _b_plumtree_seen(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("plumtree_seen(actor_id, msg_id)")
+    import aipl_dist
+    return bool(aipl_dist.plumtree_seen(str(args[0]), str(args[1])))
+
+def _b_plumtree_payload(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("plumtree_payload(actor_id, msg_id)")
+    import aipl_dist
+    v = aipl_dist.plumtree_payload(str(args[0]), str(args[1]))
+    return v if v is not None else ""
+
+def _b_plumtree_eager_peers(args, frame, interp):
+    if not args:
+        raise ValueError("plumtree_eager_peers(actor_id)")
+    import aipl_dist
+    return ",".join(aipl_dist.plumtree_eager_peers(str(args[0])))
+
+def _b_plumtree_lazy_peers(args, frame, interp):
+    if not args:
+        raise ValueError("plumtree_lazy_peers(actor_id)")
+    import aipl_dist
+    return ",".join(aipl_dist.plumtree_lazy_peers(str(args[0])))
+
+def _b_plumtree_demote(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("plumtree_demote(actor_id, peer)")
+    import aipl_dist
+    return bool(aipl_dist.plumtree_demote(str(args[0]), str(args[1])))
+
+def _b_plumtree_promote(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("plumtree_promote(actor_id, peer)")
+    import aipl_dist
+    return bool(aipl_dist.plumtree_promote(str(args[0]), str(args[1])))
+
+
 # ─── CE-11: Capability Types primitives ─────────────────────────────
 # Runtime capability operations.  Pure wrappers around aipl_dist's
 # TLS-based capability set — see CapabilityError there for the
@@ -3042,6 +3116,17 @@ _BUILTINS = {
     "crdt_lww_value":                _b_crdt_lww_value,
     "crdt_lww_merge":                _b_crdt_lww_merge,
     "crdt_replicate":                _b_crdt_replicate,
+    # DR-17 W1: Plumtree gossip overlay
+    "plumtree_init":                 _b_plumtree_init,
+    "plumtree_broadcast":            _b_plumtree_broadcast,
+    "plumtree_deliver":              _b_plumtree_deliver,
+    "plumtree_digest":               _b_plumtree_digest,
+    "plumtree_seen":                 _b_plumtree_seen,
+    "plumtree_payload":              _b_plumtree_payload,
+    "plumtree_eager_peers":          _b_plumtree_eager_peers,
+    "plumtree_lazy_peers":           _b_plumtree_lazy_peers,
+    "plumtree_demote":               _b_plumtree_demote,
+    "plumtree_promote":              _b_plumtree_promote,
     # CE-11: Capability types (run-time capability tracking layered
     # on top of the Phase-12 static effect system)
     "grant_cap":                     _b_grant_cap,

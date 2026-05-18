@@ -27,6 +27,9 @@ env_for() {
     ce16_rowpoly/sample1_basic_rowvar.abcl)    echo "AIPL_ROWPOLY=1" ;;
     ce16_rowpoly/sample2_open_closed.abcl)     echo "AIPL_ROWPOLY=1" ;;
     ce16_rowpoly/sample3_nested_rowvar.abcl)   echo "AIPL_ROWPOLY=1" ;;
+    dr17_plumtree/sample1_eager_broadcast.simple.abcl) echo "AIPL_DIST_ENABLE=1" ;;
+    dr17_plumtree/sample2_lazy_repair.abcl)            echo "AIPL_DIST_ENABLE=1" ;;
+    dr17_plumtree/sample3_demote_promote.abcl)         echo "AIPL_DIST_ENABLE=1" ;;
     dr12_region/sample1_primary_hit.abcl)
       echo "AIPL_REGION=us-east-1 AIPL_REGION_FAILOVER=us-east-1,eu-west-1 AIPL_ROUTE_REGION_us-east-1=Greeter:fast" ;;
     dr12_region/sample2_failover_chain.abcl)

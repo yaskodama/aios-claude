@@ -1,0 +1,31 @@
+// DR-17 W1 / sample 2 — lazy digest triggers a repair pull.
+//
+// Network: a — b (eager) and a ··· c (lazy).  When a broadcasts,
+// b receives the full payload via eager push.  c hears only a
+// digest "I have msg-1".  Because c hasn't seen msg-1 yet, the
+// digest triggers a pull request — which would fetch the payload
+// from a on the wire.  The smoke checks that the digest event is
+// emitted (the pull-request log line) and that c stays unseen
+// until the payload is then delivered.
+
+var a_init = plumtree_init("a", "b",  "c");
+var b_init = plumtree_init("b", "a",  "");
+var c_init = plumtree_init("c", "",   "a");
+
+// Origin broadcast.
+var fanout = plumtree_broadcast("a", "msg-2", "lazy-repair-payload");
+print("[dr17/2] origin a eager fanout = " + fanout);
+
+// Eager: a → b.
+var ok_b = plumtree_deliver("b", "a", "msg-2", "lazy-repair-payload");
+print("[dr17/2] b eager accepted = " + ok_b);
+
+// Lazy: a → c (digest only, c hasn't seen the msg).
+var triggered = plumtree_digest("c", "a", "msg-2");
+print("[dr17/2] c received digest, pull triggered = " + triggered);
+print("[dr17/2] c sees before pull? " + plumtree_seen("c", "msg-2"));
+
+// Simulate the pull completing: a delivers the full payload to c.
+var ok_c = plumtree_deliver("c", "a", "msg-2", "lazy-repair-payload");
+print("[dr17/2] c sees after pull?  " + plumtree_seen("c", "msg-2"));
+print("[dr17/2] c payload = " + plumtree_payload("c", "msg-2"));

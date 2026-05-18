@@ -1103,3 +1103,158 @@ def regions_available() -> list:
         if k.startswith("AIPL_ROUTE_REGION_") and v.strip():
             out.append(k[len("AIPL_ROUTE_REGION_"):])
     return sorted(out)
+
+
+# ─── DR-17 W1: Plumtree gossip overlay ──────────────────────────────
+#
+# Round-7 winner of the distributed-axis variant selection.  Plumtree
+# (Probabilistic Broadcast Trees, Leitao et al. 2007) maintains TWO
+# overlays per peer:
+#
+#   eager set : actors that get the FULL payload pushed (spanning
+#               tree topology — fast path)
+#   lazy set  : actors that get only a digest "I have msg X" hint
+#               (gossip overlay — used for repair when eager fails)
+#
+# Repair: an actor that hears about a missing msg via the lazy
+# digest pulls the full payload from the digest sender.  The
+# spanning tree thus self-heals when eager links drop.
+#
+# Implementation: state lives in a module-level dict keyed by
+# `actor_id`.  Wire is virtual — every broadcast event is logged
+# via NDJSON (DR-2) and we record which peer would have received
+# the payload (eager) and which the digest (lazy).  Real I/O is
+# out of scope for this MVP; the visible semantic is "after N rounds
+# of broadcast, every peer has seen the message".
+
+# Per-actor Plumtree state:
+#   {actor_id: {"eager": set[str], "lazy": set[str],
+#               "seen":  dict[str, str]}}      msg_id -> payload
+_PLUMTREE_STATE: Dict[str, Dict[str, Any]] = {}
+
+
+def _pt_state(actor_id: str) -> Dict[str, Any]:
+    if actor_id not in _PLUMTREE_STATE:
+        _PLUMTREE_STATE[actor_id] = {"eager": set(), "lazy": set(), "seen": {}}
+    return _PLUMTREE_STATE[actor_id]
+
+
+def plumtree_init(actor_id: str,
+                  eager_peers: list,
+                  lazy_peers: list) -> bool:
+    """Register/replace an actor's Plumtree overlay membership.
+
+    `eager_peers` are the spanning-tree neighbors that receive full
+    payload pushes; `lazy_peers` the gossip-overlay peers that receive
+    digests only.  Same actor may be in both sets — Plumtree expects
+    them disjoint but we don't enforce that yet."""
+    st = _pt_state(actor_id)
+    st["eager"] = set(eager_peers or [])
+    st["lazy"]  = set(lazy_peers  or [])
+    log_event("plumtree_init",
+              actor=actor_id,
+              eager=sorted(st["eager"]),
+              lazy=sorted(st["lazy"]))
+    return True
+
+
+def plumtree_broadcast(actor_id: str,
+                       msg_id: str,
+                       payload: str) -> int:
+    """Originate a message at `actor_id`.  Returns the eager fan-out
+    count.  Caller should follow up with `plumtree_deliver_to` on
+    every eager peer (the AIPL-side sample loop does the fan-out)."""
+    st = _pt_state(actor_id)
+    if msg_id in st["seen"]:
+        log_event("plumtree_dup_origin", actor=actor_id, msg=msg_id)
+        return 0
+    st["seen"][msg_id] = payload
+    log_event("plumtree_broadcast",
+              actor=actor_id, msg=msg_id,
+              payload_len=len(payload),
+              eager=sorted(st["eager"]),
+              lazy=sorted(st["lazy"]))
+    return len(st["eager"])
+
+
+def plumtree_deliver(receiver_id: str,
+                     sender_id: str,
+                     msg_id: str,
+                     payload: str) -> bool:
+    """Apply an eager push at the receiver.  If the receiver hasn't
+    seen `msg_id` yet, it stores it and would forward to its own eager
+    set (minus the sender).  Returns True if the message was newly
+    accepted, False if it was a duplicate."""
+    st = _pt_state(receiver_id)
+    if msg_id in st["seen"]:
+        log_event("plumtree_dup_eager",
+                  actor=receiver_id, from_=sender_id, msg=msg_id)
+        return False
+    st["seen"][msg_id] = payload
+    forward_to = sorted(p for p in st["eager"] if p != sender_id)
+    log_event("plumtree_payload_delivered",
+              actor=receiver_id, from_=sender_id, msg=msg_id,
+              forward_eager=forward_to)
+    return True
+
+
+def plumtree_digest(receiver_id: str,
+                    sender_id: str,
+                    msg_id: str) -> bool:
+    """Apply a lazy gossip digest at the receiver.  If `msg_id` is
+    new, the receiver asks the sender for the full payload (`pull`).
+    Returns True when a pull is triggered."""
+    st = _pt_state(receiver_id)
+    if msg_id in st["seen"]:
+        log_event("plumtree_dup_lazy",
+                  actor=receiver_id, from_=sender_id, msg=msg_id)
+        return False
+    log_event("plumtree_pull_request",
+              actor=receiver_id, from_=sender_id, msg=msg_id)
+    return True
+
+
+def plumtree_seen(actor_id: str, msg_id: str) -> bool:
+    return msg_id in _pt_state(actor_id)["seen"]
+
+
+def plumtree_payload(actor_id: str, msg_id: str) -> Optional[str]:
+    return _pt_state(actor_id)["seen"].get(msg_id)
+
+
+def plumtree_eager_peers(actor_id: str) -> list:
+    return sorted(_pt_state(actor_id)["eager"])
+
+
+def plumtree_lazy_peers(actor_id: str) -> list:
+    return sorted(_pt_state(actor_id)["lazy"])
+
+
+def plumtree_demote(actor_id: str, peer: str) -> bool:
+    """Move `peer` from eager to lazy at `actor_id`'s view.  Used by
+    the repair path: when an eager peer falls behind (duplicate
+    arrivals from a lazy peer for the same msg) Plumtree demotes
+    it to lazy so the spanning tree converges away."""
+    st = _pt_state(actor_id)
+    if peer in st["eager"]:
+        st["eager"].discard(peer)
+        st["lazy"].add(peer)
+        log_event("plumtree_demote", actor=actor_id, peer=peer)
+        return True
+    return False
+
+
+def plumtree_promote(actor_id: str, peer: str) -> bool:
+    """Inverse of demote: move `peer` from lazy back to eager."""
+    st = _pt_state(actor_id)
+    if peer in st["lazy"]:
+        st["lazy"].discard(peer)
+        st["eager"].add(peer)
+        log_event("plumtree_promote", actor=actor_id, peer=peer)
+        return True
+    return False
+
+
+def plumtree_reset() -> None:
+    """Test helper — clear all per-actor Plumtree state."""
+    _PLUMTREE_STATE.clear()
