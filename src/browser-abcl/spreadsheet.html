@@ -127,10 +127,16 @@
       return id;
     };
 
-    // ─── JS-side formula evaluator (E1 minimum) ─────────────────
-    // Mirrors GSheetsCore12.abcl's PA4 parser + Core12 dispatch,
-    // distilled to ~80 LOC.  Supports literals, refs (A1, $A$1),
-    // binops (+ - * /), parens, and 5 functions (SUM AVG MIN MAX COUNT).
+    // ─── JS-side formula evaluator (Phase 5.5 expanded) ─────────
+    // Mirrors GSheetsCore12.abcl's PA4 parser + Core12 dispatch
+    // (now ALL 12 functions, not just 5) + comparison ops needed
+    // by IF(cond, t, e).  Supports:
+    //   literals (INT), refs (A1, $A$1)
+    //   arithmetic + - * /
+    //   comparison < > <= >= == !=
+    //   parens ( )
+    //   12 functions: SUM AVG MIN MAX COUNT COUNTA IF ABS POWER MOD
+    //                 ROUND FLOOR CEIL
 
     function tokenize(s) {
       const T = [];
@@ -151,6 +157,11 @@
           }
           T.push({ k: "IDENT", v: s.slice(i, j).replace(/\$/g, "") });
           i = j;
+        } else if ((c === "<" || c === ">" || c === "=" || c === "!") &&
+                   s[i+1] === "=") {
+          // Two-char comparison ops: <=, >=, ==, !=
+          T.push({ k: c + "=", v: c + "=" });
+          i += 2;
         } else {
           T.push({ k: c, v: c }); i++;
         }
@@ -180,6 +191,8 @@
         return { tag: "Ref", id: t.v };
       }
       if (t.k === "(") { eat(); const e = parseExpr(); eat(); return e; }
+      // Unary minus (e.g. -5 inside expressions).
+      if (t.k === "-") { eat(); const e = parsePrim(); return { tag: "Bin", op: "-", lhs: { tag: "Lit", val: 0 }, rhs: e }; }
       return { tag: "Lit", val: 0 };
     }
     function parseMul() {
@@ -189,13 +202,24 @@
       }
       return l;
     }
-    function parseExpr() {
+    function parseAdd() {
       let l = parseMul();
       while (peek().k === "+" || peek().k === "-") {
         const op = eat().k; l = { tag: "Bin", op, lhs: l, rhs: parseMul() };
       }
       return l;
     }
+    function parseCmp() {
+      let l = parseAdd();
+      const ck = peek().k;
+      if (ck === "<" || ck === ">" || ck === "<=" || ck === ">=" ||
+          ck === "==" || ck === "!=") {
+        const op = eat().k; const r = parseAdd();
+        return { tag: "Bin", op, lhs: l, rhs: r };
+      }
+      return l;
+    }
+    function parseExpr() { return parseCmp(); }
     function parseFormula(s) {
       __toks = tokenize(s); __pos = 0;
       return parseExpr();
@@ -206,19 +230,51 @@
       if (a.tag === "Ref") return cellValues.get(a.id) || 0;
       if (a.tag === "Bin") {
         const l = evalAst(a.lhs), r = evalAst(a.rhs);
-        return a.op === "+" ? l + r
-             : a.op === "-" ? l - r
-             : a.op === "*" ? l * r
-             : a.op === "/" ? Math.trunc(l / r)
-             : 0;
+        switch (a.op) {
+          case "+":  return l + r;
+          case "-":  return l - r;
+          case "*":  return l * r;
+          case "/":  return r === 0 ? 0 : Math.trunc(l / r);
+          case "<":  return l <  r ? 1 : 0;
+          case ">":  return l >  r ? 1 : 0;
+          case "<=": return l <= r ? 1 : 0;
+          case ">=": return l >= r ? 1 : 0;
+          case "==": return l === r ? 1 : 0;
+          case "!=": return l !== r ? 1 : 0;
+        }
+        return 0;
       }
       if (a.tag === "Call") {
+        const nm = a.name;
+        // IF needs short-circuit (evaluate the chosen branch only).
+        if (nm === "IF") {
+          if (a.args.length < 3) return 0;
+          const c = evalAst(a.args[0]);
+          return c !== 0 ? evalAst(a.args[1]) : evalAst(a.args[2]);
+        }
         const vs = a.args.map(evalAst);
-        if (a.name === "SUM")   return vs.reduce((s, v) => s + v, 0);
-        if (a.name === "AVG")   return vs.length ? Math.trunc(vs.reduce((s, v) => s + v, 0) / vs.length) : 0;
-        if (a.name === "MIN")   return vs.length ? Math.min(...vs) : 0;
-        if (a.name === "MAX")   return vs.length ? Math.max(...vs) : 0;
-        if (a.name === "COUNT") return vs.filter(v => v !== 0).length;
+        switch (nm) {
+          case "SUM":    return vs.reduce((s, v) => s + v, 0);
+          case "AVG":    return vs.length ? Math.trunc(vs.reduce((s, v) => s + v, 0) / vs.length) : 0;
+          case "MIN":    return vs.length ? Math.min(...vs) : 0;
+          case "MAX":    return vs.length ? Math.max(...vs) : 0;
+          case "COUNT":  return vs.filter(v => v !== 0).length;
+          case "COUNTA": return vs.length;
+          case "ABS":    return Math.abs(vs[0] || 0);
+          case "POWER":  return Math.pow(vs[0] || 0, vs[1] || 0);
+          case "MOD": {
+            const a0 = vs[0] || 0, b0 = vs[1] || 0;
+            if (b0 === 0) return 0;
+            return a0 - Math.trunc(a0 / b0) * b0;
+          }
+          case "ROUND": {
+            const x = vs[0] || 0, d = vs[1] || 0;
+            const m = Math.pow(10, d);
+            return Math.round(x * m) / m;
+          }
+          case "FLOOR": return Math.floor(vs[0] || 0);
+          case "CEIL":  return Math.ceil (vs[0] || 0);
+        }
         return 0;
       }
       return 0;
