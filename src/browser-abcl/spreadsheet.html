@@ -13,7 +13,11 @@
     #cellLabel { width: 60px; background: #181828; color: #aef; border: 1px solid #335; padding: 4px 8px; font-family: monospace; text-align: center; }
     #formulaBar { flex: 1; background: #fafafe; color: #222; border: 1px solid #557; padding: 4px 8px; font-family: monospace; font-size: 0.9rem; }
     #formulaBar:focus { outline: 2px solid #5ad; }
-    #controls { margin: 10px 0; display: flex; gap: 8px; }
+    #sheetIdRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #sheetIdLabel { color: #aef; font-size: 0.78rem; }
+    #sheetId { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 160px; }
+    #serverInfo { color: #788; font-size: 0.7rem; margin-left: auto; }
+    #controls { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
     button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446; cursor: pointer; font-family: monospace; }
     button:hover { background: #334; }
     #log { width: 720px; height: 140px; background: #050510; color: #9aa; font-size: 0.75rem; overflow-y: auto; padding: 8px; margin-top: 6px; white-space: pre-wrap; border: 1px solid #223; }
@@ -46,9 +50,17 @@
     <input id="formulaBar" type="text" placeholder="click a cell, type a value or formula, press Enter…" autocomplete="off">
   </div>
 
+  <div id="sheetIdRow">
+    <span id="sheetIdLabel">sheet_id:</span>
+    <input id="sheetId" type="text" value="demo">
+    <span id="serverInfo">server: <span id="serverUrl">http://localhost:8090</span></span>
+  </div>
+
   <div id="controls">
     <button id="btnRun">▶ Run</button>
     <button id="btnStop">■ Stop</button>
+    <button id="btnSave" title="POST /api/sheet/&lt;id&gt;/save">💾 Save</button>
+    <button id="btnLoad" title="GET /api/sheet/&lt;id&gt;/load">📂 Load</button>
     <button id="btnShowSrc">Show ABCL source</button>
   </div>
   <div id="log"></div>
@@ -281,6 +293,67 @@
     document.getElementById("btnRun").addEventListener("click", runProgram);
     document.getElementById("btnStop").addEventListener("click", () => { stopAll(); appendLog("[stopped]"); });
     document.getElementById("btnShowSrc").addEventListener("click", () => { logDiv.textContent = ABCL_SOURCE; });
+
+    // ─── Phase 5.4: Save / Load via JS-N node-aipl-server ──────
+    // Server runs at AIPL_NODE_URL (default http://localhost:8090).
+    // Toggle the env-driven URL by setting window.__AIPL_NODE_URL
+    // before page load.
+    const NODE_URL = window.__AIPL_NODE_URL || "http://localhost:8090";
+    document.getElementById("serverUrl").textContent = NODE_URL;
+
+    function currentSheetSnapshot() {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return { rows: 3, cols: 3, cells: [] };
+      return { rows: s.rows, cols: s.cols,
+               cells: s.cells.map(c => ({ row: c.row, col: c.col,
+                                          val: String(c.val),
+                                          kind: c.kind })) };
+    }
+
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      const id = document.getElementById("sheetId").value.trim() || "demo";
+      const snap = currentSheetSnapshot();
+      try {
+        const r = await fetch(`${NODE_URL}/api/sheet/${encodeURIComponent(id)}/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(snap),
+        });
+        const j = await r.json();
+        if (j.ok) appendLog(`[save] ${id}.json (${j.cells} cells) → ${j.path}`);
+        else     appendLog(`[save error] ${j.error || JSON.stringify(j)}`);
+      } catch (e) { appendLog(`[save error] ${e}`); }
+    });
+
+    document.getElementById("btnLoad").addEventListener("click", async () => {
+      const id = document.getElementById("sheetId").value.trim() || "demo";
+      try {
+        const r = await fetch(`${NODE_URL}/api/sheet/${encodeURIComponent(id)}/load`);
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          appendLog(`[load error] HTTP ${r.status} ${j.error || ""}`);
+          return;
+        }
+        const j = await r.json();
+        // Apply each cell via the existing sheet_cell primitive +
+        // mirror into cellValues.
+        const runtime = interp && interp.runtime;
+        if (!runtime) { appendLog("[load error] no interpreter"); return; }
+        cellValues.clear();
+        // Re-init the canvas so stale cells from the current view
+        // get wiped before we replay.
+        runtime._callBuiltin("sheet_init", [j.rows, j.cols],
+                             { __currentActor: null });
+        for (const c of (j.cells || [])) {
+          runtime._callBuiltin("sheet_cell",
+                               [c.row, c.col, String(c.val), c.kind],
+                               { __currentActor: null });
+          cellValues.set(cellId(c.row, c.col), Number(c.val));
+        }
+        appendLog(`[load] ${id}.json — restored ${j.cells.length} cells`);
+      } catch (e) { appendLog(`[load error] ${e}`); }
+    });
+
     window.addEventListener("load", runProgram);
   </script>
 </body>

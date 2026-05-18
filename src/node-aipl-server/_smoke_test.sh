@@ -114,6 +114,40 @@ case "$resp" in
   *)             fail=$((fail + 1)); printf '  FAIL  /api/broadcast: %s\n' "$resp" ;;
 esac
 
+# ── Phase 5.4: /api/sheet/<id>/{save,load} + /list + CORS ────
+total=$((total + 1))
+save_resp=$(curl -s -X POST http://localhost:$PORT/api/sheet/smoke_id/save \
+  -H 'Content-Type: application/json' \
+  -d '{"rows":3,"cols":3,"cells":[{"row":0,"col":0,"val":"10","kind":"Value"},{"row":0,"col":2,"val":"30","kind":"Formula"}]}')
+case "$save_resp" in
+  *'"ok":true'*'"cells":2'*) pass=$((pass + 1)); printf '  PASS  /api/sheet/save (2 cells)\n' ;;
+  *) fail=$((fail + 1)); printf '  FAIL  /api/sheet/save: %s\n' "$save_resp" ;;
+esac
+
+total=$((total + 1))
+load_resp=$(curl -s http://localhost:$PORT/api/sheet/smoke_id/load)
+case "$load_resp" in
+  *'"id": "smoke_id"'*'"val": "10"'*'"val": "30"'*) pass=$((pass + 1)); printf '  PASS  /api/sheet/load round-trip\n' ;;
+  *) fail=$((fail + 1)); printf '  FAIL  /api/sheet/load: %s\n' "$(echo "$load_resp" | head -c 200)" ;;
+esac
+
+total=$((total + 1))
+list_resp=$(curl -s http://localhost:$PORT/api/sheet/list)
+case "$list_resp" in
+  *'"ok":true'*'"smoke_id"'*) pass=$((pass + 1)); printf '  PASS  /api/sheet/list shows saved sheet\n' ;;
+  *) fail=$((fail + 1)); printf '  FAIL  /api/sheet/list: %s\n' "$list_resp" ;;
+esac
+
+total=$((total + 1))
+cors=$(curl -s -I -X OPTIONS http://localhost:$PORT/api/sheet/smoke_id/save -H 'Origin: http://localhost:3000' | tr -d '\r')
+case "$cors" in
+  *'Access-Control-Allow-Origin'*'*'*) pass=$((pass + 1)); printf '  PASS  CORS preflight (OPTIONS)\n' ;;
+  *) fail=$((fail + 1)); printf '  FAIL  CORS preflight: %s\n' "$(echo "$cors" | head -3)" ;;
+esac
+
+# Clean up sheet file created above (default dir is /tmp/aipl_sheets).
+rm -f /tmp/aipl_sheets/smoke_id.json 2>/dev/null
+
 # Shut down server
 kill "$SPID" 2>/dev/null
 sleep 0.2

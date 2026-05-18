@@ -220,12 +220,24 @@ curl -X POST -H 'Content-Type: application/json' \\
 </body></html>`;
 
 function send(res, code, ctype, body) {
-  res.writeHead(code, { "Content-Type": ctype });
+  // CORS (Phase 5.4): allow the browser-abcl static server at
+  // localhost:3000 to call /api/sheet/* on the AIPL Node server.
+  // Wildcard origin is fine for a local dev setup.
+  res.writeHead(code, {
+    "Content-Type": ctype,
+    "Access-Control-Allow-Origin":  "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  });
   res.end(body);
 }
 
 const server = createServer(async (req, res) => {
   try {
+    if (req.method === "OPTIONS") {
+      // CORS preflight — send() already attaches the headers.
+      return send(res, 204, "text/plain", "");
+    }
     if (req.method === "GET" && req.url === "/") {
       return send(res, 200, "text/html; charset=utf-8", STATUS_HTML);
     }
@@ -259,6 +271,67 @@ const server = createServer(async (req, res) => {
         typecheck: j.typecheck,
       });
       return send(res, 200, "application/json", JSON.stringify(out));
+    }
+
+    // ── Round 5 Phase 5.4: C2 ServerFile ─────────────────────
+    //   POST /api/sheet/<id>/save  body {rows, cols, cells: [...]}
+    //   GET  /api/sheet/<id>/load
+    //   GET  /api/sheet/list
+    //
+    // CE-11 capability gating: when AIPL_CAP_STRICT=1 and the env
+    // var AIPL_CAP_GRANT doesn't contain "fs", we 403 instead of
+    // touching the filesystem.
+    const sheetMatch = (req.url || "").match(/^\/api\/sheet\/([\w.\-]+)\/(save|load)(?:\?|$)/);
+    const listMatch  = (req.url || "") === "/api/sheet/list";
+    if (sheetMatch || listMatch) {
+      const strict = (process.env.AIPL_CAP_STRICT === "1");
+      const caps   = (process.env.AIPL_CAP_GRANT || "fs").split(",").map(s=>s.trim());
+      if (strict && !caps.includes("fs")) {
+        return send(res, 403, "application/json",
+                    JSON.stringify({ ok:false, error:"capability denied: fs" }));
+      }
+      const dir = process.env.AIPL_SHEET_DIR || "/tmp/aipl_sheets";
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      if (listMatch && req.method === "GET") {
+        const ids = fs.readdirSync(dir)
+                      .filter(n => n.endsWith(".json"))
+                      .map(n => n.slice(0, -5))
+                      .sort();
+        return send(res, 200, "application/json",
+                    JSON.stringify({ ok:true, dir, sheets: ids }));
+      }
+      if (sheetMatch) {
+        const id  = sheetMatch[1];
+        const op  = sheetMatch[2];
+        const fp  = `${dir}/${id}.json`;
+
+        if (op === "save" && req.method === "POST") {
+          const body = await readBody(req);
+          let j;
+          try { j = JSON.parse(body); }
+          catch { return send(res, 400, "application/json",
+                              JSON.stringify({ ok:false, error:"bad JSON" })); }
+          const payload = {
+            id,
+            rows: Number(j.rows || 3),
+            cols: Number(j.cols || 3),
+            cells: Array.isArray(j.cells) ? j.cells : [],
+            saved_at: new Date().toISOString(),
+          };
+          fs.writeFileSync(fp, JSON.stringify(payload, null, 2), "utf8");
+          return send(res, 200, "application/json",
+                      JSON.stringify({ ok:true, id, cells: payload.cells.length, path: fp }));
+        }
+        if (op === "load" && req.method === "GET") {
+          if (!fs.existsSync(fp)) {
+            return send(res, 404, "application/json",
+                        JSON.stringify({ ok:false, error:"not found", id }));
+          }
+          const text = fs.readFileSync(fp, "utf8");
+          return send(res, 200, "application/json", text);
+        }
+      }
     }
 
     send(res, 404, "text/plain", "not found");
