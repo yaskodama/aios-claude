@@ -236,6 +236,20 @@ the first region that knows the actor.  Logs
 round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
 axis, top elite I0012 had 0.70 for this task).
 
+¹⁵ CE-12 refinement unification: HM's `unify` previously dropped
+refinement predicates and relied on a post-hoc Z3 sweep
+(`_check_refinements`) to flag violations at end-of-pass.  CE-12
+adds an early subset check when both sides of a unify are
+`TRefined` and `AIPL_REFINE_UNIFY=1`: Z3 is asked whether
+`P_actual ∧ ¬P_expected` is UNSAT (i.e. the implication
+`P_actual ⇒ P_expected` holds).  When the implication fails, unify
+raises `UnifyError` immediately at the call site rather than at
+end-of-pass.  Sample drives the Python-level checker directly
+(documenting both directions); the post-hoc walk is preserved so
+disabling the env var keeps the previous behaviour intact.
+Reviewer avg 0.383 — eighth and last of the 8 evolved features
+from `AIPL_PyI_NextGen.aice`.
+
 ¹⁴ CE-13 record width subtyping: `aipl_inference.unify` previously
 required two `TRecord` types to have *exactly* identical field
 sets, which rules out the natural AIPL pattern where a method's
@@ -346,6 +360,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._collect_effects_from_ast` (commit `3edfa30`) |
 | **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{grant,revoke,has,check}_*` + 5 primitives |
 | **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference.unify` (record arm) |
+| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._refine_subset_z3` + unify TRefined×TRefined arm |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -748,4 +763,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11/CE-13 + DR-10/DR-11/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
+*Last regenerated: 2026-05-18 (after **all 8 evolved features** CE-10/CE-11/CE-12/CE-13 + DR-10/DR-11/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*

@@ -38,6 +38,7 @@ Z3 is loaded lazily; if unavailable, refinement clauses are treated as
 documentation (matching v2 PsiLang's `static_simple` semantics).
 """
 from __future__ import annotations
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -276,12 +277,77 @@ def unify(t1: Any, t2: Any) -> Subst:
         for name in sorted(common):
             s = compose(unify(apply(s, d1[name]), apply(s, d2[name])), s)
         return s
-    # Refinement vs base: drop refinement for unification (kept aside for SMT)
+    # CE-12: refinement-aware unification.  When both sides are
+    # TRefined the bases must unify; in addition, when
+    # AIPL_REFINE_UNIFY=1 we Z3-check the predicate-subset relation
+    # P_t1 ⊨ P_t2 (i.e. every value of t1 also satisfies t2's
+    # predicate).  An early UnifyError surfaces refinement violations
+    # at unify time instead of waiting for the post-hoc
+    # `_check_refinements` walk.  Without the env var the behaviour
+    # collapses to the pre-CE-12 path (drop the refinement, unify
+    # bases) so existing programs run unchanged.
+    if isinstance(t1, TRefined) and isinstance(t2, TRefined):
+        s = unify(t1.base, t2.base)
+        if os.environ.get("AIPL_REFINE_UNIFY", "0") == "1":
+            ok, why = _refine_subset_z3(t1, t2)
+            if not ok:
+                raise UnifyError(
+                    f"refinement subtype check failed: {t1} ⊄ {t2} ({why})")
+        return s
     if isinstance(t1, TRefined):
         return unify(t1.base, t2)
     if isinstance(t2, TRefined):
         return unify(t1, t2.base)
     raise UnifyError(f"no rule to unify {t1} with {t2}")
+
+
+def _refine_subset_z3(rt_sub: 'TRefined', rt_sup: 'TRefined') -> tuple:
+    """CE-12: check whether every value satisfying rt_sub's predicate
+    also satisfies rt_sup's.  We encode `P_sub ∧ ¬P_sup` and ask Z3
+    whether it is UNSAT.  Returns (ok, why) — ok=True means the
+    subset relation holds (or could not be checked, in which case
+    we conservatively allow the unify to proceed).
+    """
+    try:
+        import z3
+    except Exception:
+        return True, "z3 unavailable; deferred"
+    if rt_sub.base != rt_sup.base:
+        return True, "different bases — handled by unify(bases)"
+    # Reuse the same encoding pipeline as _z3_check.
+    if rt_sub.base == T_INT:
+        mk_var = z3.Int
+    elif rt_sub.base in (T_REAL, T_RAT):
+        mk_var = z3.Real
+    elif rt_sub.base == T_BOOL:
+        mk_var = z3.Bool
+    else:
+        return True, "non-numeric refinement deferred"
+    try:
+        import ast as _ast
+        # Use a shared symbolic variable for the binder: both
+        # predicates need to reference the same value.
+        shared_binder = "_x"
+        free: Dict[str, Any] = {
+            rt_sub.binder if rt_sub.binder != "_" else "x": mk_var(shared_binder),
+            rt_sup.binder if rt_sup.binder != "_" else "x": mk_var(shared_binder),
+        }
+        # Free variables that appear in either predicate (other than
+        # binders) get fresh Int/Real/Bool symbols of the same sort.
+        for src in (rt_sub.pred_src, rt_sup.pred_src):
+            for tok in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", src)):
+                if tok in free or tok in ("and", "or", "not", "True", "False"):
+                    continue
+                free[tok] = mk_var(tok)
+        p_sub = _ast_to_z3(_ast.parse(rt_sub.pred_src, mode="eval").body, free, z3)
+        p_sup = _ast_to_z3(_ast.parse(rt_sup.pred_src, mode="eval").body, free, z3)
+        s = z3.Solver()
+        s.add(z3.And(p_sub, z3.Not(p_sup)))
+        if s.check() == z3.unsat:
+            return True, "subset confirmed"
+        return False, f"counterexample exists: {rt_sub.pred_src} ⊅ {rt_sup.pred_src}"
+    except Exception as e:
+        return True, f"could not encode refinement ({type(e).__name__}: {e})"
 
 
 def _bind(v: TVar, t: Any) -> Subst:
