@@ -404,8 +404,50 @@ export class Runtime {
       case "Select":
         return this.evalSelect(stmt, env);
 
+      case "Saga":
+        return this.evalSaga(stmt, env);
+
       default:
         throw new Error("Unsupported statement: " + stmt.type);
+    }
+  }
+
+  // DR-11: saga orchestration.  Run each step's body in order; on
+  // any failure run the LIFO `compensate` blocks for all already-
+  // completed steps and re-raise.  Structured NDJSON events match
+  // the OCaml/Py-I event names verbatim.
+  evalSaga(stmt, env) {
+    const completed = [];   // indices of steps whose body finished
+    this._ng_log_event("saga_started", { steps: stmt.steps.length });
+    try {
+      for (let i = 0; i < stmt.steps.length; i++) {
+        const step = stmt.steps[i];
+        for (const st of step.body.statements) this.evalStmt(st, env);
+        completed.push(i);
+        this._ng_log_event("saga_step_complete", { index: i });
+      }
+      this._ng_log_event("saga_finished", { steps: stmt.steps.length });
+      return null;
+    } catch (err) {
+      const idx = completed.length;   // index of the failing step
+      this._ng_log_event("saga_step_failed", {
+        index: idx, error: String(err.message || err),
+      });
+      for (let j = completed.length - 1; j >= 0; j--) {
+        const step = stmt.steps[completed[j]];
+        try {
+          for (const st of step.compensate.statements) this.evalStmt(st, env);
+          this._ng_log_event("saga_compensated", { index: completed[j] });
+        } catch (cerr) {
+          this._ng_log_event("saga_compensate_failed", {
+            index: completed[j], error: String(cerr.message || cerr),
+          });
+        }
+      }
+      this._ng_log_event("saga_aborted", {
+        failed_index: idx, compensated: completed.length,
+      });
+      throw err;
     }
   }
 
@@ -648,8 +690,50 @@ export class Runtime {
       case "image_size":
       case "image_pixel":     break;
 
-      default:
+      default: {
+        // Next-gen primitives (CE-11 + DR-10/11/12/13): route via the
+        // shared dispatcher so CallStmt parity matches CallExpr.
+        if (this._dispatchNextgen(name, args)) break;
         this.print(`[call] ${name}(${args.join(", ")})`);
+      }
+    }
+  }
+
+  // Routing helper: returns true when the name was a next-gen primitive
+  // and was handled.  Used by both _callBuiltin (statement form) and as
+  // a fallthrough for the CallExpr switch's "Unknown function" case.
+  _dispatchNextgen(name, args) {
+    switch (name) {
+      case "grant_cap":              this._nextgen_grant_cap(args);              return true;
+      case "revoke_cap":             this._nextgen_revoke_cap(args);             return true;
+      case "has_cap":                this._nextgen_has_cap(args);                return true;
+      case "current_caps":           this._nextgen_current_caps();               return true;
+      case "check_capability":       this._nextgen_check_capability(args);       return true;
+      case "current_region":         this._nextgen_current_region();             return true;
+      case "region_chain":           this._nextgen_region_chain();               return true;
+      case "route_for_region":       this._nextgen_route_for_region(args);       return true;
+      case "failover_region":        this._nextgen_failover_region(args);        return true;
+      case "regions_available":      this._nextgen_regions_available();          return true;
+      case "pool_create":            this._nextgen_pool_create(args);            return true;
+      case "pool_pick":              this._nextgen_pool_pick(args);              return true;
+      case "pool_size":              this._nextgen_pool_size(args);              return true;
+      case "pool_destroy":           this._nextgen_pool_destroy(args);           return true;
+      case "crdt_gcounter_new":      this._nextgen_crdt_gcounter_new();          return true;
+      case "crdt_gcounter_inc":      this._nextgen_crdt_gcounter_inc(args);      return true;
+      case "crdt_gcounter_value":    this._nextgen_crdt_gcounter_value(args);    return true;
+      case "crdt_gcounter_merge":    this._nextgen_crdt_gcounter_merge(args);    return true;
+      case "crdt_orset_new":         this._nextgen_crdt_orset_new();             return true;
+      case "crdt_orset_add":         this._nextgen_crdt_orset_add(args);         return true;
+      case "crdt_orset_remove":      this._nextgen_crdt_orset_remove(args);      return true;
+      case "crdt_orset_contains":    this._nextgen_crdt_orset_contains(args);    return true;
+      case "crdt_orset_values":      this._nextgen_crdt_orset_values(args);      return true;
+      case "crdt_orset_merge":       this._nextgen_crdt_orset_merge(args);       return true;
+      case "crdt_lww_new":           this._nextgen_crdt_lww_new(args);           return true;
+      case "crdt_lww_write":         this._nextgen_crdt_lww_write(args);         return true;
+      case "crdt_lww_value":         this._nextgen_crdt_lww_value(args);         return true;
+      case "crdt_lww_merge":         this._nextgen_crdt_lww_merge(args);         return true;
+      case "crdt_replicate":         this._nextgen_crdt_replicate(args);         return true;
+      default:                                                                    return false;
     }
   }
 
@@ -1503,6 +1587,7 @@ export class Runtime {
           case "crdt_lww_write":         return this._nextgen_crdt_lww_write(args);
           case "crdt_lww_value":         return this._nextgen_crdt_lww_value(args);
           case "crdt_lww_merge":         return this._nextgen_crdt_lww_merge(args);
+          case "crdt_replicate":         return this._nextgen_crdt_replicate(args);
 
           default: {
             // AIOS / protocol builtins (shared with CallStmt)
@@ -1617,16 +1702,21 @@ export class Runtime {
   }
   _ng_log_event(event, fields) {
     /* Best-effort structured log: in Node, append NDJSON to
-       AIPL_DIST_LOG_FILE; in browser, console.debug as JSON. */
+       AIPL_DIST_LOG_FILE; in browser, console.debug as JSON.
+       Reuses `_fs()` so server.mjs's injected fs module works
+       under both CJS and pure-ESM hosts. */
     const ts_ns = (Date.now() * 1e6) | 0;
     const rec = Object.assign({ ts_ns, event }, fields || {});
     if (typeof process !== "undefined" && process.env && process.env.AIPL_DIST_LOG_FILE) {
-      try {
-        // Lazy require so the browser bundle doesn't drag fs in.
-        const fs = require("node:fs");
-        fs.appendFileSync(process.env.AIPL_DIST_LOG_FILE, JSON.stringify(rec) + "\n");
-      } catch (_) { /* ignore */ }
-    } else if (typeof console !== "undefined" && console.debug) {
+      const fs = this._fs();
+      if (fs && fs.appendFileSync) {
+        try {
+          fs.appendFileSync(process.env.AIPL_DIST_LOG_FILE, JSON.stringify(rec) + "\n");
+          return;
+        } catch (_) { /* fall through */ }
+      }
+    }
+    if (typeof console !== "undefined" && console.debug) {
       console.debug("[aipl_log]", rec);
     }
   }

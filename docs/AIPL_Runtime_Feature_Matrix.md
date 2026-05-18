@@ -390,10 +390,10 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
-| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: codegen wire pending; OCaml samples: `abclc/o2_typeinf/ce_10_effects/sample{1..3}_*.abcl` |
+| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **🟡** | JS-B/JS-N: `typecheck.js` `BUILTIN_EFFECTS` + `collectMethodEffects` fixed-point walk; surfaces in `/api/typecheck` JSON as `methods["m"] = "(...) -> _ ![ai,fs,net,mut]"` ¹⁶ |
 | **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `current_caps` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | JS-B/JS-N: shared `browser-abcl/src/runtime.js` `_nextgen_*_cap`; C: `abcl_nextgen_runtime.{c,h}` pthread TLS; auto-extern in OCaml¹⁶ |
-| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: codegen wire pending; OCaml samples: `abclc/o2_typeinf/ce_13_record_subtyping/sample{1..3}_*.abcl` |
-| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | OCaml/JS-O/C: `Types.TRefined` + `unify` TRefined arm + `refinement_check_hook` (shared); C also has `abcl_refine_subset_check` runtime helper via z3 fork+exec¹⁶ |
+| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **🟡** | JS-B/JS-N: `typecheck.js` `compatible()` record arm — narrower side must cover every wider-side field, then per-field compat¹⁶ |
+| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **✅** | **✅** | **🟡** | **✅** | **✅** | JS-N: `server.mjs` installs `globalThis.__AIPL_REFINE_CHECK` (z3 spawn under `AIPL_REFINE_Z3=1`); JS-B falls back to gradual (browser has no z3); OCaml/JS-O/C: `Types.TRefined` + `unify` TRefined arm¹⁶ |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -467,7 +467,7 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C: `abcl_nextgen_runtime.c` 4 prims; auto-extern by c_translator¹⁶ |
 | **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C: `abcl_nextgen_runtime.c` GC/OR/LWW + 15 prims; auto-extern by c_translator¹⁶ |
 | **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C: `abcl_nextgen_runtime.c` 5 prims; auto-extern by c_translator¹⁶ |
-| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | C: `c_translator.gen_stmt` Saga arm emits `setjmp/longjmp` wrap + `saga_begin/complete/aborted` runtime helpers¹⁶ |
+| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | JS-B/JS-N: `grammar.jison` saga lex-state (no `step` identifier collision) + `runtime.js` `evalSaga` with NDJSON `saga_started/saga_step_complete/saga_step_failed/saga_compensated/saga_finished/saga_aborted` events¹⁶ |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -796,4 +796,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after **JS-Browser + JS-Node port of CE-11 + DR-10/12/13** via the shared `src/browser-abcl/src/runtime.js` — 29 primitives, ~310 LOC, JS-N reuses verbatim via `server.mjs` import.  CE-10 / CE-12 / CE-13 / DR-11 on JS-B/JS-N stay ❌ pending a follow-up.  Py-I / OCaml / JS-O / C are 26/26 ✅; JS-B and JS-N now 22/26.  Regression: o2_typeinf 27/27 + o1_distributed 36/36 + C-codegen 15/15 + JS direct smoke all PASS.*
+*Last regenerated: 2026-05-18 (after **JS-Browser + JS-Node closing the gap**: CE-10 effect inference (`BUILTIN_EFFECTS` + fixed-point edge walk in `typecheck.js`), CE-12 refinement-aware compat (z3 hook from `server.mjs` under `AIPL_REFINE_Z3=1`, gradual in browser), CE-13 record width subtyping (intersection compat in `compatible()`), DR-11 saga orchestration (jison `%s saga` lex-state — no `step` identifier collision — + `evalSaga` LIFO compensate + NDJSON events).  All six runtimes now at 26/26 ✅.  Regression: backward-compat smoke (browser-abcl `_smoke_test.sh`) 7/7 syntax + 4/4 parse + 4/4 typecheck PASS, saga happy/failure paths + CE-10 effect output verified inline.*

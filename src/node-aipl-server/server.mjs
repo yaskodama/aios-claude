@@ -37,6 +37,26 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import * as fs from "node:fs";
+import { spawnSync } from "node:child_process";
+
+// CE-12: optional z3 hook for refinement subset checks.
+// Enabled when AIPL_REFINE_Z3=1 *and* the `z3` binary is on PATH.
+// The shared typecheck.js calls globalThis.__AIPL_REFINE_CHECK(p_a, p_b)
+// expecting boolean "p_a => p_b" decided over the integer vars
+// mentioned in either predicate.
+if (process.env.AIPL_REFINE_Z3 === "1") {
+  globalThis.__AIPL_REFINE_CHECK = (predA, predB) => {
+    try {
+      const vars = new Set();
+      const grep = (p) => { for (const m of String(p).match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || []) vars.add(m); };
+      grep(predA); grep(predB);
+      const decls = [...vars].map(v => `(declare-const ${v} Int)`).join("\n");
+      const q = `${decls}\n(assert ${predA})\n(assert (not ${predB}))\n(check-sat)\n`;
+      const r = spawnSync("z3", ["-in"], { input: q, timeout: 800, encoding: "utf8" });
+      return r.status === 0 && /^unsat/m.test(r.stdout || "");
+    } catch { return false; }
+  };
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BROWSER = resolve(__dirname, "..", "browser-abcl");
@@ -96,10 +116,12 @@ function handleTypecheck(source) {
       for (const [k, v] of Object.entries(ms[c] || {})) {
         const ps = (v.params || []).map(String).join(", ");
         const ret = String(v.ret || "any");
-        methods[k] = `(${ps}) -> ${ret}`;
+        const eff = (info.effectsStr && info.effectsStr[c] && info.effectsStr[c][k]) || "pure";
+        methods[k] = `(${ps}) -> ${ret} ![${eff}]`;
       }
       result.classes[c] = { fields, methods };
     }
+    if (info.effectsStr) result.effects = info.effectsStr;
   } catch (e) {
     result.ok = false;
     errors.push(String(e.message || e).split("\n")[0]);

@@ -33,6 +33,84 @@ export class TypeError extends Error {
 
 const ANY = "any";
 
+// ─── CE-10: primitive effect table ──────────────────────────────
+// Effect labels match the OCaml/Py-I tables: ai, fs, net, mut.
+// "mut" tracks visible state mutation; "net" covers cross-region
+// or replication-style network reach.
+export const BUILTIN_EFFECTS = {
+  ai_call:              ["ai"],
+  ai_call_with_system:  ["ai"],
+  read_file:            ["fs"],
+  write_file:           ["fs", "mut"],
+  append_file:          ["fs", "mut"],
+  file_exists:          ["fs"],
+  image_load:           ["fs"],
+  image_save:           ["fs", "mut"],
+  image_create:         ["mut"],
+  image_set_pixel:      ["mut"],
+  grant_cap:            ["mut"],
+  revoke_cap:           ["mut"],
+  crdt_gcounter_inc:    ["mut"],
+  crdt_orset_add:       ["mut"],
+  crdt_orset_remove:    ["mut"],
+  crdt_lww_write:       ["mut"],
+  crdt_gcounter_merge:  ["mut"],
+  crdt_orset_merge:     ["mut"],
+  crdt_lww_merge:       ["mut"],
+  crdt_replicate:       ["mut", "net"],
+  failover_region:      ["net"],
+  route_for_region:     ["net"],
+  pool_create:          ["mut"],
+  pool_destroy:         ["mut"],
+};
+
+function effSet(arr) { return new Set(arr || []); }
+function effUnion(a, b) {
+  const out = new Set(a);
+  for (const e of b) out.add(e);
+  return out;
+}
+function effFmt(s) { return [...s].sort().join(","); }
+
+// ─── CE-12: refinement type wrapper ─────────────────────────────
+// A refined type is `{ kind:"refined", base, pred }`.  Equal preds
+// always unify; otherwise we attempt subset via the host's
+// `refinement_check` hook (which is plain string-equality in the
+// browser and may shell out to z3 in Node when AIPL_REFINE_Z3=1).
+export function refined(base, pred) {
+  return { kind: "refined", base, pred };
+}
+function refineBase(t) {
+  return (t && typeof t === "object" && t.kind === "refined") ? t.base : t;
+}
+function refinePred(t) {
+  return (t && typeof t === "object" && t.kind === "refined") ? t.pred : null;
+}
+function refineSubset(predA, predB) {
+  if (predA === predB) return true;
+  if (!predA || !predB) return false;
+  // Hook for Node-only z3.  Browser never enables this.
+  if (typeof globalThis !== "undefined" &&
+      typeof globalThis.__AIPL_REFINE_CHECK === "function") {
+    try { return !!globalThis.__AIPL_REFINE_CHECK(predA, predB); }
+    catch (_) { return false; }
+  }
+  return false;
+}
+
+// ─── CE-13: record type with width subtyping ────────────────────
+// A record type is `{ kind:"record", fields: { name: t, ... } }`.
+// Currently the only way to produce one is by reading actor field
+// maps via `classFieldTypes`; we surface this in the type tag
+// `"record:<ClassName>"` so checkProgram can do width subtyping
+// when the same actor is bound under a smaller interface.
+function recordOf(fields) {
+  return { kind: "record", fields: fields || {} };
+}
+function recordFields(t) {
+  return (t && typeof t === "object" && t.kind === "record") ? t.fields : null;
+}
+
 function isConcrete(t) {
   return t !== ANY && t !== "unit";
 }
@@ -41,6 +119,30 @@ function compatible(a, b) {
   // any matches anything
   if (a === ANY || b === ANY) return true;
   if (a === b) return true;
+  // CE-12: refinement-aware compatibility — bases must agree, preds
+  // must coincide or pass the host subset check.
+  const aIsRefined = a && typeof a === "object" && a.kind === "refined";
+  const bIsRefined = b && typeof b === "object" && b.kind === "refined";
+  if (aIsRefined || bIsRefined) {
+    const ba = refineBase(a), bb = refineBase(b);
+    if (!compatible(ba, bb)) return false;
+    const pa = refinePred(a), pb = refinePred(b);
+    if (!pa && !pb) return true;
+    if (!pa || !pb) return true;             // gradual: one side unrefined
+    return pa === pb || refineSubset(pa, pb);
+  }
+  // CE-13: record width subtyping — every field on the *narrower*
+  // side must be type-compatible with the same field on the wider
+  // side.  Order: compatible(narrower, wider) holds when narrower
+  // can be supplied in place of wider.
+  const aRec = recordFields(a), bRec = recordFields(b);
+  if (aRec && bRec) {
+    for (const k of Object.keys(bRec)) {
+      if (!(k in aRec)) return false;
+      if (!compatible(aRec[k], bRec[k])) return false;
+    }
+    return true;
+  }
   // int and float are compatible (numeric promotion)
   if ((a === "int" || a === "float") && (b === "int" || b === "float")) return true;
   // actor type compatibility: any actor matches the wildcard "actor:"
@@ -392,6 +494,14 @@ function checkProgram(ast, classFieldTypes, methodSigs) {
         if (node.timeoutBody) check(node.timeoutBody, env, currentClass);
         break;
 
+      // DR-11: saga body / compensate share the enclosing env
+      case "Saga":
+        for (const step of node.steps) {
+          check(step.body, env, currentClass);
+          check(step.compensate, env, currentClass);
+        }
+        break;
+
       // Print, Reply, CallStmt — only walk subexprs, no constraint
       case "Print":    inferExprType(node.expr, env); break;
       case "Reply":    inferExprType(node.expr, env); break;
@@ -421,11 +531,161 @@ function checkProgram(ast, classFieldTypes, methodSigs) {
 }
 
 // ----------------------------------------------------------------------
+// CE-10: collect declared + transitive effects for every method.
+// Result shape:  effects[className][methodName] = Set<"ai"|"fs"|"net"|"mut">
+
+function collectMethodEffects(ast) {
+  const effects = {};
+  for (const cls of ast.classes) {
+    effects[cls.name] = {};
+    for (const md of cls.methods) effects[cls.name][md.name] = new Set();
+  }
+
+  // Per-method: collect direct primitive effects, "mut" from any
+  // field assignment / index assign, "mut" from send/now/future
+  // (sending a message mutates the target actor's mailbox), plus
+  // a list of called (cls, method) edges so we can iterate to a
+  // fixed point afterwards.
+  const callEdges = {};   // "C.m" -> [["C2","m2"], ...]
+  function addEdge(from, to) {
+    if (!callEdges[from]) callEdges[from] = [];
+    callEdges[from].push(to);
+  }
+  function direct(node, ownerCls, ownerMethod, env) {
+    if (!node) return;
+    switch (node.type) {
+      case "Seq":
+        node.statements.forEach(s => direct(s, ownerCls, ownerMethod, env));
+        return;
+      case "VarDecl":
+        direct(node.expr, ownerCls, ownerMethod, env); return;
+      case "Assign":
+        // assignment to a class field counts as "mut"; locals/params do not
+        if (env.fields[node.name] !== undefined)
+          effects[ownerCls][ownerMethod].add("mut");
+        direct(node.expr, ownerCls, ownerMethod, env);
+        return;
+      case "IndexAssign":
+        effects[ownerCls][ownerMethod].add("mut");
+        direct(node.expr, ownerCls, ownerMethod, env);
+        node.dims.forEach(d => direct(d, ownerCls, ownerMethod, env));
+        return;
+      case "Send":
+      case "Now":
+      case "Future": {
+        effects[ownerCls][ownerMethod].add("mut");  // mailbox mutation
+        // Resolve target class via fields/params/locals
+        const tgtType = inferExprType(node.target, env);
+        if (typeof tgtType === "string" && tgtType.startsWith("actor:")) {
+          const cls = tgtType.slice(6);
+          if (cls) addEdge(`${ownerCls}.${ownerMethod}`, [cls, node.method]);
+        }
+        node.args.forEach(a => direct(a, ownerCls, ownerMethod, env));
+        return;
+      }
+      case "Print":  direct(node.expr, ownerCls, ownerMethod, env); return;
+      case "Reply":
+        // a reply propagates a value back — counts as mut on caller's reply slot
+        effects[ownerCls][ownerMethod].add("mut");
+        direct(node.expr, ownerCls, ownerMethod, env);
+        return;
+      case "CallStmt": {
+        const e = BUILTIN_EFFECTS[node.name];
+        if (e) for (const x of e) effects[ownerCls][ownerMethod].add(x);
+        node.args.forEach(a => direct(a, ownerCls, ownerMethod, env));
+        return;
+      }
+      case "If":
+        direct(node.cond, ownerCls, ownerMethod, env);
+        direct(node.thenBody, ownerCls, ownerMethod, env);
+        if (node.elseBody) direct(node.elseBody, ownerCls, ownerMethod, env);
+        return;
+      case "Select":
+        node.cases.forEach(c => direct(c.body, ownerCls, ownerMethod, env));
+        if (node.timeoutBody) direct(node.timeoutBody, ownerCls, ownerMethod, env);
+        return;
+      case "Saga":
+        // DR-11 + CE-10: saga is mut (writes events, runs side-effecting
+        // bodies). Walk each step and compensate too.
+        effects[ownerCls][ownerMethod].add("mut");
+        for (const step of node.steps) {
+          direct(step.body,       ownerCls, ownerMethod, env);
+          direct(step.compensate, ownerCls, ownerMethod, env);
+        }
+        return;
+      // Expressions
+      case "Binop":
+        direct(node.left, ownerCls, ownerMethod, env);
+        direct(node.right, ownerCls, ownerMethod, env);
+        return;
+      case "CallExpr": {
+        const e = BUILTIN_EFFECTS[node.name];
+        if (e) for (const x of e) effects[ownerCls][ownerMethod].add(x);
+        node.args.forEach(a => direct(a, ownerCls, ownerMethod, env));
+        return;
+      }
+      case "Await":
+        direct(node.expr, ownerCls, ownerMethod, env); return;
+      case "NewExpr":
+        // Construction sends `init` — propagates from constructor
+        addEdge(`${ownerCls}.${ownerMethod}`, [node.className, "init"]);
+        effects[ownerCls][ownerMethod].add("mut");
+        node.args.forEach(a => direct(a, ownerCls, ownerMethod, env));
+        return;
+    }
+  }
+
+  // Direct pass
+  for (const cls of ast.classes) {
+    for (const md of cls.methods) {
+      const env = {
+        fields: {}, params: {}, locals: {},
+        classFieldTypes: {}, methodSigs: {},
+      };
+      // Seed field map (just names, types don't matter for effects)
+      for (const f of (cls.fields || [])) env.fields[f.name] = ANY;
+      for (const p of md.params) env.params[p] = ANY;
+      direct(md.body, cls.name, md.name, env);
+    }
+  }
+
+  // Fixed-point over call edges
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const fromKey of Object.keys(callEdges)) {
+      const [fcls, fm] = fromKey.split(".");
+      if (!effects[fcls] || !effects[fcls][fm]) continue;
+      for (const [tcls, tm] of callEdges[fromKey]) {
+        if (!effects[tcls] || !effects[tcls][tm]) continue;
+        for (const e of effects[tcls][tm]) {
+          if (!effects[fcls][fm].has(e)) {
+            effects[fcls][fm].add(e);
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  return effects;
+}
+
+// ----------------------------------------------------------------------
 // Public entry
 
 export function runTypeCheck(ast, opts = {}) {
   const classFieldTypes = buildFieldTypes(ast);
   const methodSigs = buildMethodSigs(ast, classFieldTypes);
   checkProgram(ast, classFieldTypes, methodSigs);
-  return { classFieldTypes, methodSigs };
+  const effects = collectMethodEffects(ast);
+  // Serialize as plain strings for callers (e.g. server.mjs JSON).
+  const effectsStr = {};
+  for (const c of Object.keys(effects)) {
+    effectsStr[c] = {};
+    for (const m of Object.keys(effects[c])) {
+      effectsStr[c][m] = effFmt(effects[c][m]) || "pure";
+    }
+  }
+  return { classFieldTypes, methodSigs, effects, effectsStr };
 }

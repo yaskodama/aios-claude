@@ -126,3 +126,13 @@ export function IndexExpr(name, dims) {
 export function IndexAssign(name, dims, expr) {
   return { type: "IndexAssign", name, dims, expr };
 }
+
+// DR-11: saga orchestration — a list of (body, compensate) step pairs
+// run in order; on any failure, previously-completed steps' compensate
+// blocks fire in LIFO order then the failure re-raises.
+export function SagaStmt(steps) {
+  return { type: "Saga", steps };
+}
+export function SagaStep(body, compensate) {
+  return { type: "SagaStep", body, compensate };
+}

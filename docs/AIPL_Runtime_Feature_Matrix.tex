@@ -329,10 +329,10 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
-  \textbf{CE-10} & \textbf{effect type inference} (\texttt{\{ai, fs, net, mut\}} rows in inferred method types)\textsuperscript{h} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{CE-10} & \textbf{effect type inference} (\texttt{\{ai, fs, net, mut\}} rows in inferred method types)\textsuperscript{h} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes \\
   \textbf{CE-11} & \textbf{capability types} (\texttt{grant\_cap / revoke\_cap / has\_cap / check\_capability}, strict-mode via \texttt{AIPL\_CAP\_STRICT=1})\textsuperscript{j} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes & \Yes & \Yes \\
-  \textbf{CE-13} & \textbf{record width subtyping} (\texttt{TRecord} \texttt{unify} → intersection-based)\textsuperscript{n} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
-  \textbf{CE-12} & \textbf{refinement unification} (early Z3 subset check in \texttt{unify} under \texttt{AIPL\_REFINE\_UNIFY=1})\textsuperscript{o} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \textbf{\Yes} \\
+  \textbf{CE-13} & \textbf{record width subtyping} (\texttt{TRecord} \texttt{unify} → intersection-based)\textsuperscript{n} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes \\
+  \textbf{CE-12} & \textbf{refinement unification} (early Z3 subset check in \texttt{unify} under \texttt{AIPL\_REFINE\_UNIFY=1})\textsuperscript{o} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Part & \textbf{\Yes} & \textbf{\Yes} \\
   \bottomrule
 \end{longtable}
 
@@ -414,7 +414,7 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
   \textbf{DR-13} & \textbf{auto-scaling actor pool} (\texttt{pool\_create / pool\_pick / pool\_size / pool\_destroy} with hysteresis)\textsuperscript{i} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes & \Yes & \Yes \\
   \textbf{DR-10} & \textbf{CRDT actor state} (G-Counter / OR-Set / LWW-Register; 15 prims + \texttt{crdt\_replicate} hook)\textsuperscript{k} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes & \Yes & \Yes \\
   \textbf{DR-12} & \textbf{multi-region failover} (per-region route + \texttt{failover\_region} chain walk; 5 prims)\textsuperscript{l} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes & \Yes & \Yes \\
-  \textbf{DR-11} & \textbf{saga orchestration} (\texttt{saga \{ step \{...\} compensate \{...\} ... \}} statement, LIFO compensate-on-failure)\textsuperscript{m} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{DR-11} & \textbf{saga orchestration} (\texttt{saga \{ step \{...\} compensate \{...\} ... \}} statement, LIFO compensate-on-failure)\textsuperscript{m} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \Yes \\
   \bottomrule
 \end{longtable}
 
@@ -797,6 +797,6 @@ For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
 \bigskip
-\noindent\textit{Last regenerated: 2026-05-18 (after Py-I → \textbf{OCaml port of all 8 next-gen features}: CE-10/CE-11/CE-12/CE-13 + DR-10/DR-11/DR-12/DR-13.  CE-12 OCaml is \Part — Z3-subset API shipped but the unify-side early-flag hook is deferred since OCaml lowers \texttt{TyERefined} to base types before unification).}
+\noindent\textit{Last regenerated: 2026-05-18 (after \textbf{JS-Browser + JS-Node 26/26 closeout}: CE-10 effect inference + CE-12 z3-hook (Node) / gradual (Browser) + CE-13 record width subtyping in \texttt{typecheck.js}, DR-11 saga orchestration via jison \texttt{\%s saga} lex-state — no \texttt{step} identifier collision — plus \texttt{evalSaga} LIFO compensate with NDJSON \texttt{saga\_*} events.  All six runtimes (Py-I / OCaml / JS-O / JS-B / JS-N / C) are 26/26 \Yes.  Backward-compat smoke 7/7 + 4/4 + 4/4 PASS).}
 
 \end{document}

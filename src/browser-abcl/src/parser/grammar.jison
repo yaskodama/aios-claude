@@ -1,4 +1,5 @@
 %lex
+%s saga
 %%
 \s+                             /* skip */
 "//"[^\n]*                      /* skip line comments */
@@ -19,11 +20,20 @@
 "select"     return 'SELECT';
 "case"       return 'CASE';
 "timeout"    return 'TIMEOUT';
+"saga"       { yy.__saga_depth = 0; this.begin('saga'); return 'SAGA'; }
+<saga>"step"        return 'STEP';
+<saga>"compensate"  return 'COMPENSATE';
 "->"         return 'ARROW';
 "=="         return 'EQ';
 "!="         return 'NEQ';
 "<="         return 'LE';
 ">="         return 'GE';
+<saga>"{"  { yy.__saga_depth = (yy.__saga_depth | 0) + 1; return '{'; }
+<saga>"}"  {
+              yy.__saga_depth = (yy.__saga_depth | 0) - 1;
+              if (yy.__saga_depth <= 0) { this.popState(); }
+              return '}';
+           }
 "{"  return '{';
 "}"  return '}';
 "("  return '(';
@@ -142,6 +152,17 @@ stmt
   | IDENT '(' args ')' ';'                       { $$ = yy.CallStmt($1, $3); }
   | IF '(' expr ')' '{' stmts '}' else_opt       { $$ = yy.If($3, yy.Seq($6), $8); }
   | SELECT '{' select_cases timeout_opt '}'      { $$ = yy.Select($3, $4.ms, $4.body); }
+  | SAGA '{' saga_steps '}'                      { $$ = yy.SagaStmt($3); }
+  ;
+
+saga_steps
+  : saga_steps saga_step                         { $$ = $1.concat([$2]); }
+  | saga_step                                    { $$ = [$1]; }
+  ;
+
+saga_step
+  : STEP '{' stmts '}' COMPENSATE '{' stmts '}'
+      { $$ = yy.SagaStep(yy.Seq($3), yy.Seq($7)); }
   ;
 
 else_opt
