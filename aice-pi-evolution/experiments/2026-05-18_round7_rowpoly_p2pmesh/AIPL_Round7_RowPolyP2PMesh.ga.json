@@ -1,0 +1,131 @@
+{
+  "name": "AIPL_Round7_RowPolyP2PMesh",
+  "task": "Round 6 で選定された (CE-16 row-polymorphic actor interfaces, DR-17 P2P actor mesh) について、CE-16 を 4 variant (V1 tail-row-var / V2 polymorphic record open-marker / V3 structural object subsumption / V4 phantom interface witness) と DR-17 を 4 variant (W1 Plumtree / W2 HyParView / W3 SWIM + flat / W4 Kademlia DHT) に展開し、16 cell を MAP-Elites で再探索する refinement round。Py-I → OCaml の 2 runtime 実装可能性を hard requirement、既存 26 機能との後方互換は absolute floor。下流 cell は固定 (paradigm=ParallelOOP, type_safety=high, concurrency_model=structured, ownership_model=gc) — 残り 2 軸 (state_representation, effect_handling) のみ可変。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "effect_handling",
+      "state_representation"
+    ],
+    "generations": 8,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 31415938
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "CE16_V1_TailRowVar",
+      "CE16_V2_OpenMarker",
+      "CE16_V3_StructuralObject",
+      "CE16_V4_PhantomInterface",
+      "DR17_W1_Plumtree",
+      "DR17_W2_HyParView",
+      "DR17_W3_SWIMFlat",
+      "DR17_W4_Kademlia",
+      "BackwardCompat26",
+      "TwoRuntimeFloor",
+      "ImplCost",
+      "EvolvabilityToProductionStack",
+      "SampleCoverage"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "PinnedAxesReviewer",
+        "persona": "あなたは pinning レビュアーです。round 6 の収束軸 (paradigm=ParallelOOP, type_safety=high, concurrency_model=structured, ownership_model=gc) を守れている個体を高く評価。これらと違う値を持つ個体は急減点。1.0 = 4 軸全合致、0.7 = 3/4、0.3 = 2/4、0.0 = ≤1/4。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "CE16VariantPicker",
+        "persona": "あなたは CE-16 variant 選定レビュアーです。V1 tail-row-var (OCaml 系の正統)、V2 open marker (シンプルだが Generalize 微妙)、V3 structural object (理論的だが大改修)、V4 phantom interface (保守的すぎ)。Py-I + OCaml で実装容易かつ row-polymorphism として正統な variant を高評価。1.0 = ベストピック、0.7 = 良、0.3 = 妥協、0.0 = 不適。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "DR17VariantPicker",
+        "persona": "あなたは DR-17 variant 選定レビュアーです。W1 Plumtree (実績 Erlang/Riak)、W2 HyParView (Plumtree の下層)、W3 SWIM flat (最小)、W4 Kademlia (重いが分散レジストリ無し)。AIPL の actor model に最も自然にハマり、Py-I + OCaml で実装可能な variant を高評価。1.0 = 最良、0.7 = 良、0.3 = 妥協、0.0 = 不適。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ImplCostEstimator",
+        "persona": "あなたは 2-runtime 実装コスト見積もりレビュアーです。先行 round (Py-I/OCaml/C で各 700-880 LOC が next-gen 8 機能で平均) を踏まえ、提案 (CE-16 variant, DR-17 variant) ペアの Py-I + OCaml 合計を予測。1.0 = ≤1000、0.7 = ≤1800、0.3 = ≤3000、0.0 = >3000。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換レビュアーです。既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke + 27/27 type-inf + 36/36 distributed が無修正で動作するか。新機能は opt-in (env var / pragma)。1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ProductionReadinessReviewer",
+        "persona": "あなたは production readiness レビュアーです。提案された pair が Erlang/OTP、Akka、Pony と並んで language-stack として候補に上げられるレベルか。1.0 = peer 級、0.7 = 主要側面で対等、0.3 = 玩具→実用境界、0.0 = まだ玩具。1 行で返答。",
+        "weight": 0.16666666666666666
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.05,
+    "novelty": 0.05,
+    "evolvability": 0.15,
+    "cross_task_generality": 0.15,
+    "implementability": 0.55
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "ce16_first",
+      "dr17_first",
+      "impl_cost_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "ce16_first": {},
+      "dr17_first": {},
+      "impl_cost_first": {}
+    },
+    "top_k": 4
+  }
+}
