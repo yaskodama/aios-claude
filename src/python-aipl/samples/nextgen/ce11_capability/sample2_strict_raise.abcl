@@ -1,0 +1,16 @@
+// CE-11 / sample 2 — strict mode raises when capability missing.
+//
+// Run with:
+//   AIPL_CAP_STRICT=1 python3 aipl_main.py samples/nextgen/ce11_capability/sample2_strict_raise.abcl
+// Expected: missing capability "fs" → exception (caught and reported).
+
+class Worker {
+  method run() {
+    check_capability("fs");
+    print("[ce11/2] fs ok");
+  }
+}
+
+var w = new Worker();
+send w.run();
+print("[ce11/2] sender survived");   // visible only without strict mode

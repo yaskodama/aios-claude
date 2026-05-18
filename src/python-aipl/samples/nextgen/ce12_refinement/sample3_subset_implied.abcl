@@ -1,0 +1,15 @@
+// CE-12 / sample 3 — subset relation: (x > 0) ⇒ (x >= 0).
+//
+// When AIPL_REFINE_UNIFY=1, unify on the caller-side passes a
+// `x > 0` value into a parameter that requires only `x >= 0`.
+// Z3 confirms `(> x 0) => (>= x 0)`.
+
+function non_negative(x: int where x >= 0) -> int {
+  return x;
+}
+
+function strictly_positive(y: int where y > 0) -> int {
+  return non_negative(y);   // subset compat: OK under AIPL_REFINE_UNIFY=1
+}
+
+print("[ce12/3] strictly_positive(7) = " + strictly_positive(7));

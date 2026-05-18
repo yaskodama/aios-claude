@@ -1,0 +1,14 @@
+// DR-10 / sample 2 — OR-Set add / remove / contains.
+//
+// OR-Set tracks per-element add/remove tags so concurrent
+// add+remove resolves to "added" (remove-wins-by-tag).
+
+var s = crdt_orset_new();
+crdt_orset_add(s, "alice");
+crdt_orset_add(s, "bob");
+crdt_orset_add(s, "carol");
+crdt_orset_remove(s, "bob");
+
+print("[dr10/2] has alice = " + crdt_orset_contains(s, "alice"));   // true
+print("[dr10/2] has bob   = " + crdt_orset_contains(s, "bob"));     // false
+print("[dr10/2] values    = " + crdt_orset_values(s));

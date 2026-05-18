@@ -1,0 +1,18 @@
+// CE-13 / sample 1 — record width subtyping (Py-I inference).
+//
+// Py-I has no explicit record-type annotation; the inference pass
+// (`aipl_inference.unify`) sees that `greet` only reads `.name` and
+// the user record has extra fields {age, email}.  With CE-13's
+// intersection-based unify the call type-checks fine; pre-CE-13
+// it would raise "record field count mismatch".
+
+class Greeter {
+  method greet(p) {
+    return "Hello, " + p.name;
+  }
+}
+
+var g = new Greeter();
+var user = {name: "Alice", age: 30, email: "alice@example.com"};
+var hi = now g.greet(user);
+print("[ce13/1] " + hi);

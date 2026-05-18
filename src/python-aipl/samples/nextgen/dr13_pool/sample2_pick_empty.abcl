@@ -1,0 +1,9 @@
+// DR-13 / sample 2 — pool_pick on an empty pool returns "".
+//
+// pool_create with min=0 means no workers are auto-spawned; the
+// first pool_pick has nothing to hand out.
+
+var p = pool_create("Worker", 0, 2, 1);
+print("[dr13/2] pick on empty = '" + pool_pick(p) + "'");
+print("[dr13/2] size          = " + pool_size(p));
+pool_destroy(p);

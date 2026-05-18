@@ -1,0 +1,22 @@
+// DR-11 / sample 3 — single-step saga (edge case: 1 step succeeds).
+//
+// Verifies the orchestrator works when there's exactly one step
+// and the loop doesn't off-by-one on indices.
+
+class Logger {
+  method emit(msg) { print("[log] " + msg); }
+}
+
+class Driver {
+  method run(l) {
+    saga {
+      step       { send l.emit("only-step"); }
+      compensate { send l.emit("would-rollback (unused)"); }
+    }
+    print("[dr11/3] single-step saga ok");
+  }
+}
+
+var l = new Logger();
+var d = new Driver();
+send d.run(l);

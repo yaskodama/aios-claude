@@ -1,0 +1,15 @@
+// CE-10 / sample 3 — mixed-effects composition.
+//
+// Function `pipeline` reads from disk, asks AI, writes to disk.
+// Its declared effect set must contain ALL of {ai, fs, net} or the
+// checker rejects.
+
+function pipeline(in_path: string, out_path: string) -> int !{ai, fs, net} {
+  var text = read_file(in_path);
+  var answer = ai_call_with_system("Be brief.", text);
+  return write_file(out_path, answer);
+}
+
+write_file("/tmp/aipl_ce10_in.txt", "What is 1+1?\n");
+pipeline("/tmp/aipl_ce10_in.txt", "/tmp/aipl_ce10_out.txt");
+print("[ce10/3] pipeline done -> " + read_file("/tmp/aipl_ce10_out.txt"));

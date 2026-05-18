@@ -1,0 +1,11 @@
+// CE-12 / sample 1 — satisfiable refinement passes.
+//
+// Run with:
+//   AIPL_REFINE_UNIFY=1 python3 aipl_main.py \
+//     samples/nextgen/ce12_refinement/sample1_satisfiable.abcl
+
+function take_positive(n: int where n > 0) -> int {
+  return n + 1;
+}
+
+print("[ce12/1] take_positive(5) = " + take_positive(5));

@@ -1,0 +1,30 @@
+// DR-11 / sample 2 — failure path triggers LIFO compensation.
+//
+// Step 2 fails (division by zero); step 1's compensate fires
+// then the exception re-raises.  Bank balance is restored.
+//
+// NDJSON sequence:
+//   saga_started → saga_step_complete{0} → saga_step_failed{1}
+//   → saga_compensated{0} → saga_aborted
+
+class Bank {
+  var bal = 100;
+  method debit(amt) { bal = bal - amt; print("[bank] debit " + amt + " -> " + bal); }
+  method credit(amt) { bal = bal + amt; print("[bank] credit " + amt + " -> " + bal); }
+}
+
+class Driver {
+  method run(b) {
+    saga {
+      step       { send b.debit(30); }
+      compensate { send b.credit(30); }
+      step       { var oops = 1 / 0; }
+      compensate { print("[bank] never reached"); }
+    }
+    print("[dr11/2] unreachable");
+  }
+}
+
+var b = new Bank();
+var d = new Driver();
+send d.run(b);

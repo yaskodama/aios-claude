@@ -1,0 +1,21 @@
+// CE-13 / sample 3 — depth subtyping (record-of-record).
+//
+// `city_of` accesses .addr.city only.  The caller record nests an
+// addr literal with extra fields {zip, country}.  Both width
+// (extra fields at outer + inner levels) and depth (recursive
+// unify on .addr) succeed under CE-13.
+
+class Geo {
+  method city_of(p) {
+    return p.addr.city;
+  }
+}
+
+var g = new Geo();
+var u = {
+  name: "Alice",
+  addr: { city: "Tokyo", zip: "1000001", country: "JP" },
+  email: "alice@example.com"
+};
+var c = now g.city_of(u);
+print("[ce13/3] city = " + c);

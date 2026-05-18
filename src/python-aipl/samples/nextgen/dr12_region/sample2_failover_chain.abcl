@@ -1,0 +1,11 @@
+// DR-12 / sample 2 — primary missing, second region wins.
+//
+// Run with:
+//   AIPL_REGION=us-east-1 \
+//   AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-northeast-1" \
+//   AIPL_ROUTE_REGION_eu-west-1="Greeter:slow" \
+//     python3 aipl_main.py samples/nextgen/dr12_region/sample2_failover_chain.abcl
+// Expected: failover_region returns "eu-west-1" and emits a
+// region_failover NDJSON event.
+
+print("[dr12/2] failover Greeter = " + failover_region("Greeter"));
