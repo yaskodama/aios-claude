@@ -1,0 +1,156 @@
+// AIPL_Round7_RowPolyP2PMesh.aice  (2026-05-18 draft, follow-on to round 6)
+//
+// Round 6 (10 ind × 6 gen, OpenAI gpt-4o-mini × 8 workers) picked:
+//
+//   Type axis  : CE-16 row-polymorphic actor interfaces  (avg 0.686)
+//   Dist axis  : DR-17 P2P actor mesh                    (avg 0.714)
+//
+// Top elites converged on
+//   paradigm=ParallelOOP, type_safety=high, concurrency_model=structured,
+//   ownership_model=gc
+// across `effect_handling=monadic | algebraic_effects | implicit` —
+// the effect axis is *still* multi-modal, so round 7 should pin it
+// (or freeze it) instead of re-exploring.
+//
+// Goal.  Pick the *specific* row-poly + p2p variant pair to take
+// to implementation in Py-I + OCaml.  Round 7 is a refinement
+// round, not a discovery round — the upstream feature names are
+// fixed; we only choose the *design variant*.
+//
+// FOUR DESIGN VARIANTS PER FEATURE (16 cell baseline)
+//
+//   CE-16 row-polymorphic actor interfaces
+//     V1  Tail-row-variable unify      — TRecord adds `tail: row_var`;
+//                                        unify produces a fresh tvar
+//                                        for the unmatched-rest. Closest
+//                                        to the OCaml-style approach.
+//     V2  Polymorphic record open      — same surface as V1 but the row
+//          /closed marker                var carries an "open?" flag
+//                                        that's frozen on Generalize.
+//     V3  Structural object subsumption — drop the record kind and
+//                                        treat every record as a forall
+//                                        ρ. { a:T, b:U, ...ρ }; uses
+//                                        a Coq-style explicit kind.
+//     V4  Phantom interface witness    — record carries a phantom
+//                                        IfaceID; only literal records
+//                                        with the matching IfaceID may
+//                                        be passed.  Closest to nominal.
+//
+//   DR-17 P2P actor mesh
+//     W1  Plumtree (lazy + eager push)  — actors form a spanning
+//                                        tree for eager push and a
+//                                        gossip overlay for lazy
+//                                        pull.  Erlang-style.
+//     W2  HyParView (active+passive)    — bounded fanout, per-actor
+//                                        active list for routing,
+//                                        passive list for churn.
+//     W3  SWIM failure detector + UDP   — flat mesh, gossip-style
+//                                        failure detection only;
+//                                        routing remains via existing
+//                                        send.
+//     W4  Kademlia-style XOR routing    — full DHT with k-buckets.
+//                                        Heaviest; lets actors find
+//                                        each other by name without
+//                                        a central registry.
+
+aice AIPL_Round7_RowPolyP2PMesh {
+  dialect = "aice_evolution_v2";
+
+  task = "Round 6 で選定された (CE-16 row-polymorphic actor interfaces, DR-17 P2P actor mesh) について、CE-16 を 4 variant (V1 tail-row-var / V2 polymorphic record open-marker / V3 structural object subsumption / V4 phantom interface witness) と DR-17 を 4 variant (W1 Plumtree / W2 HyParView / W3 SWIM + flat / W4 Kademlia DHT) に展開し、16 cell を MAP-Elites で再探索する refinement round。Py-I → OCaml の 2 runtime 実装可能性を hard requirement、既存 26 機能との後方互換は absolute floor。下流 cell は固定 (paradigm=ParallelOOP, type_safety=high, concurrency_model=structured, ownership_model=gc) — 残り 2 軸 (state_representation, effect_handling) のみ可変。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── CE-16 4 variants ──
+    task CE16_V1_TailRowVar {
+      spec = "TRecord に tail: Option<row_var> を追加し、unify 時に label の差分を fresh row_var に吸収。OCaml style。Py-I `aipl_inference.unify` に 80-120 行、Generalize/Instantiate 同期で 30-50 行。OCaml `Types.TRecord` + `unify` は既に sorted-list 構造なので 150-200 行。implementability ≥ 0.7。";
+    }
+    task CE16_V2_OpenMarker {
+      spec = "TRecord に bool open を追加し、unify 時に open=true 側はラベル不足を許容、open=false は完全一致を要求。Let-generalize で open を closed に流す。surface 構文に { a, b, .. } / { a, b } の '..' marker。Py-I 100-150 LOC、OCaml 150-220 LOC。Generalize の挙動が少し複雑。";
+    }
+    task CE16_V3_StructuralObject {
+      spec = "record 概念を nominal な class からも分離し、全 record を forall ρ. { ... ; ρ } として扱う。Coq-style explicit kind annotation。最も理論的だが Py-I/OCaml の inference に大改修。Py-I 250-400 LOC、OCaml 350-500 LOC。implementability ≈ 0.5。";
+    }
+    task CE16_V4_PhantomInterface {
+      spec = "record が phantom IfaceID を持ち、record literal でのみ ID を annotate。Iface ID 付きとなしで unify 不可。最も保守的でユーザに優しいが、表現力が CE-13 とほぼ同じで「row-poly」とは言いがたい。Py-I 80-120 LOC、OCaml 100-150 LOC。implementability 0.9、新規性 0.4。";
+    }
+    // ── DR-17 4 variants ──
+    task DR17_W1_Plumtree {
+      spec = "Plumtree (Plumtree: Probabilistic Broadcast Trees, Leitao et al. 2007)。actor が eager-push 用 spanning tree と lazy-push 用 gossip overlay を維持。message digest をブロードキャストし、必要なら full payload を pull。Py-I `aipl_dist.py` に 350-500 LOC、OCaml `aipl_dist.ml` に 400-600 LOC。Plumtree は Erlang/Riak で実績豊富。";
+    }
+    task DR17_W2_HyParView {
+      spec = "HyParView (Leitao et al. 2008)。各 actor は active list (fanout=K1) と passive list (size=K2) を持ち、active で routing、passive は churn 補充用。SWIM-style failure detection と組み合わせ。Py-I 400-550 LOC、OCaml 450-650 LOC。";
+    }
+    task DR17_W3_SWIMFlat {
+      spec = "SWIM (Das et al. 2002) のみ。failure detection / membership だけ gossip 化し、routing は既存の名前ベース send をそのまま使う。最小コスト、ただし P2P routing は提供しない (mesh 'lite')。Py-I 200-300 LOC、OCaml 250-350 LOC。implementability 0.9。";
+    }
+    task DR17_W4_Kademlia {
+      spec = "Kademlia DHT。actor が k-bucket を持ち、XOR-distance で peer lookup。actor 名から hash → k-bucket lookup → send。中央レジストリ不要。実装重く Py-I 700-1000 LOC、OCaml 800-1100 LOC。BitTorrent / IPFS で実績。";
+    }
+    // ── cross-cutting ──
+    task BackwardCompat26 {
+      spec = "既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke が無修正で動作。新機能は opt-in (env var / pragma / 新文法 with parser-state)。";
+    }
+    task TwoRuntimeFloor {
+      spec = "(CE-16 variant, DR-17 variant) ペアが Py-I + OCaml の 2 runtime で同時に実装可能。片方は容易だが片方が困難な物はマイナス。";
+    }
+    task ImplCost {
+      spec = "(CE-16, DR-17) ペア合計の Py-I + OCaml 2-runtime 実装コスト見積もり。1.0 = ≤1000 LOC、0.7 = ≤1800、0.3 = ≤3000、0.0 = >3000。";
+    }
+    task EvolvabilityToProductionStack {
+      spec = "選ばれた pair が AIPL を実プロダクションスタック (Erlang/OTP / Akka / Pony) と比較しても遜色ない levels に押し上げるか。1.0 = peer 級、0.7 = ある主要側面で対等、0.3 = 玩具→実用境界、0.0 = まだ玩具。";
+    }
+    task SampleCoverage {
+      spec = "選んだ variant が AIPL の既存 sample 群 (actor / select / saga / pool / CRDT) と自然に統合できるか。row-poly は record sample (`abclc/RecordStructural.abcl`)、P2P は distributed sample で素直にテスト可能か。";
+    }
+  }
+
+  // 軸 pinning は lowerer が拾わないので注意 (reference_aice_pipeline 参照)。
+  // 代わりに reviewer 側で paradigm=ParallelOOP, type_safety=high,
+  // concurrency_model=structured, ownership_model=gc 以外を弱点として
+  // 採点するよう persona を仕込む。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "effect_handling, state_representation";
+    generations = 8;          // round 6 より少し増やして refinement
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 31415938;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.05;
+    novelty               = 0.05;   // refinement なので低く
+    evolvability          = 0.15;
+    cross_task_generality = 0.15;
+    implementability      = 0.55;   // ← 最重視
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "ce16_first", "dr17_first", "impl_cost_first"];
+    top_k     = 4;
+  }
+
+  reviewers {
+    reviewer PinnedAxesReviewer {
+      persona = "あなたは pinning レビュアーです。round 6 の収束軸 (paradigm=ParallelOOP, type_safety=high, concurrency_model=structured, ownership_model=gc) を守れている個体を高く評価。これらと違う値を持つ個体は急減点。1.0 = 4 軸全合致、0.7 = 3/4、0.3 = 2/4、0.0 = ≤1/4。1 行で返答。";
+    }
+    reviewer CE16VariantPicker {
+      persona = "あなたは CE-16 variant 選定レビュアーです。V1 tail-row-var (OCaml 系の正統)、V2 open marker (シンプルだが Generalize 微妙)、V3 structural object (理論的だが大改修)、V4 phantom interface (保守的すぎ)。Py-I + OCaml で実装容易かつ row-polymorphism として正統な variant を高評価。1.0 = ベストピック、0.7 = 良、0.3 = 妥協、0.0 = 不適。1 行で返答。";
+    }
+    reviewer DR17VariantPicker {
+      persona = "あなたは DR-17 variant 選定レビュアーです。W1 Plumtree (実績 Erlang/Riak)、W2 HyParView (Plumtree の下層)、W3 SWIM flat (最小)、W4 Kademlia (重いが分散レジストリ無し)。AIPL の actor model に最も自然にハマり、Py-I + OCaml で実装可能な variant を高評価。1.0 = 最良、0.7 = 良、0.3 = 妥協、0.0 = 不適。1 行で返答。";
+    }
+    reviewer ImplCostEstimator {
+      persona = "あなたは 2-runtime 実装コスト見積もりレビュアーです。先行 round (Py-I/OCaml/C で各 700-880 LOC が next-gen 8 機能で平均) を踏まえ、提案 (CE-16 variant, DR-17 variant) ペアの Py-I + OCaml 合計を予測。1.0 = ≤1000、0.7 = ≤1800、0.3 = ≤3000、0.0 = >3000。1 行で返答。";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換レビュアーです。既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke + 27/27 type-inf + 36/36 distributed が無修正で動作するか。新機能は opt-in (env var / pragma)。1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的。1 行で返答。";
+    }
+    reviewer ProductionReadinessReviewer {
+      persona = "あなたは production readiness レビュアーです。提案された pair が Erlang/OTP、Akka、Pony と並んで language-stack として候補に上げられるレベルか。1.0 = peer 級、0.7 = 主要側面で対等、0.3 = 玩具→実用境界、0.0 = まだ玩具。1 行で返答。";
+    }
+  }
+}

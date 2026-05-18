@@ -1,13 +1,13 @@
-# AIPL — Next Session Resume (2026-05-18)
+# AIPL — Next Session Resume (2026-05-18, second update)
 
-最新コミット `441cdb0` (origin/main と同期済み).
+最新コミット `7cde80b` (origin/main と同期済み).
 
 ```
+7cde80b aipl: User Manual next-gen chapter + evolution round 6 results
+1ece4f3 c-aipl: aipl2c --check surfaces CE-10 effects + closes CE-13 🟡
+341bc03 js-aipl: nextgen smoke runner + sample .abcl + session-doc refresh
 441cdb0 js-aipl: JS-B / JS-N close 26/26 — CE-10/12/13 + DR-11
 4ffba13 js-aipl: port CE-11 + DR-10/12/13 to shared JS-Browser + JS-Node
-0667dd4 aice: spec for porting 8 next-gen features to JS-Browser + JS-Node
-c1030b8 c-aipl: CE-12 → ✅ — c_translator sees TRefined through to base
-bf52b31 ocaml-aipl: CE-12 → ✅ by lifting refinement into Types.ty
 ```
 
 ## TL;DR
@@ -131,13 +131,30 @@ DR-11 saga 構文 (`saga { step { ... } compensate { ... } }`) は jison の `%s
 
 ---
 
-## 6. もし次セッションで「進めて」と言われたら...
+## 6. このセッションで完了した次の物 (上記 4 候補のうち 3 つ)
 
-オススメ順:
-1. **進化計算 round 6** : 6 ランタイム × 26 機能の現状をフィードバックに、次の next-next-gen 機能を MAP-Elites で発見. `.aice` テンプレートは既存 round と同じ schema が使える.
-2. **CE-10 + CE-13 を C codegen の --check 出力に露出** : 上記懸案 1 の解消. ~30-50 行の見積もり.
-3. **AIPL User Manual の next-gen 章追記** : `docs/AIPL_User_Manual.{tex,pdf}` に 8 機能の使い方 + サンプルを 1 章追加. ユーザ目線のドキュメント整理.
-4. **Py-A の next-gen 採用判断** : Py-A を「最小実装」のままにするか、CE-11 cap / DR-11 saga 等の安全系だけは入れるか、ポリシー再確認.
+- ✅ **進化計算 round 6** 実施 (`aice-pi-evolution/experiments/2026-05-18_round6_nextnextgen/`) — 10 個体 / 6 世代 / OpenAI gpt-4o-mini × 8 並列 ≈ 30 秒。詳細は `RESULTS.md`。
+- ✅ **CE-10 / CE-13 を C codegen の --check 出力に露出** (`aipl2c --check` flag, commit `1ece4f3`)。Feature Matrix の 🟡 → ✅ 解消、6 ランタイム × 26 機能の表は all-green。
+- ✅ **AIPL User Manual の next-gen 章追記** (`docs/AIPL_User_Manual.tex` lines 1148-1303、PDF は 18 → 21 ページ)。
+
+残: **Py-A の next-gen 採用判断**。現方針は「Py-A は最小実装枠、新機能は入れない」のまま。
+
+## 7. Round 6 の結果 = round 7 への引継ぎ
+
+| 軸 | Winner | Avg score (top 3 elites) | 採用理由 |
+|---|---|---|---|
+| 型 | **CE-16 row-polymorphic actor interfaces** | 0.686 | CE-13 record subtyping の自然な上位拡張。Py-I 250-400 LOC、OCaml 300-500 LOC 見積もり。 |
+| 分散 | **DR-17 P2P actor mesh** | 0.714 | 既存 star topology を gossip protocol で置換。Plumtree-style routing + per-actor anti-entropy。Py-I + OCaml 各 600-1100 LOC。 |
+
+Loser: DR-14 BFT quorum (0.590 — PBFT signature 層が C/JS 移植コスト高)。
+
+Top elites の収束軸:
+- paradigm = ParallelOOP
+- type_safety = high
+- concurrency_model = structured
+- ownership_model = gc
+
+**Round 7 の .aice 草稿**: `aice-pi-evolution/experiments/2026-05-18_round7_rowpoly_p2pmesh/AIPL_Round7_RowPolyP2PMesh.aice` (このコミットで追加)。3-4 design variant を seed として 16 cell を埋め直し、具体的 design を選定する想定。
 
 ---
 
@@ -159,4 +176,4 @@ DR-11 saga 構文 (`saga { step { ... } compensate { ... } }`) は jison の `%s
 
 ---
 
-*最終更新: 2026-05-18 (commit `441cdb0`).*
+*最終更新: 2026-05-18 (commit `7cde80b` + 続編 round 7 draft).*
