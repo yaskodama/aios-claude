@@ -1,0 +1,60 @@
+// Level Z — IO bridge (capability-checked).
+//
+// Host AIPL exposes primitives (read_file, write_file, ai_call,
+// ai_call_with_system) directly.  In a self-hosted world we want
+// programs running *through* the bootstrap pipeline to access them
+// only after passing a CE-11 capability check.  This actor is the
+// boundary: it wraps each host primitive with `check_capability`
+// so that a missing grant fails (strict mode) or just logs
+// cap_violation (advisory mode).
+//
+// Capabilities used:
+//   "fs"   for read / write / file_exists
+//   "ai"   for ai_call / ai_call_with_system
+//   "net"  for ai_call (implicit, since ai_call goes over the wire)
+//
+// Usage from a host AIPL program (not via the self-hosted parser —
+// the AIPL-side parser doesn't recognise class syntax):
+//
+//   grant_cap("fs");
+//   grant_cap("ai");
+//   var io = new IoBridge();
+//   var s = now io.read("/etc/hostname");
+//   print(s);
+
+class IoBridge {
+  // ── file system ────────────────────────────────────────────
+  method read(path) {
+    check_capability("fs");
+    var s = read_file(path);
+    reply(s);
+  }
+  method write(path, content) {
+    check_capability("fs");
+    var n = write_file(path, content);
+    reply(n);
+  }
+  method append(path, content) {
+    check_capability("fs");
+    var n = append_file(path, content);
+    reply(n);
+  }
+  method exists(path) {
+    check_capability("fs");
+    var b = file_exists(path);
+    reply(b);
+  }
+  // ── AI calls ───────────────────────────────────────────────
+  method ai_simple(prompt) {
+    check_capability("ai");
+    check_capability("net");
+    var s = ai_call(prompt);
+    reply(s);
+  }
+  method ai_chat(system, prompt) {
+    check_capability("ai");
+    check_capability("net");
+    var s = ai_call_with_system(system, prompt);
+    reply(s);
+  }
+}

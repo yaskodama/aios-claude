@@ -1,0 +1,3 @@
+var greeting = "Hello from Level Z";
+print(greeting);
+print(2 + 3);
