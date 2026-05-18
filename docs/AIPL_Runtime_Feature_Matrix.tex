@@ -329,10 +329,10 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
-  \textbf{CE-10} & \textbf{effect type inference} (\texttt{\{ai, fs, net, mut\}} rows in inferred method types)\textsuperscript{h} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{CE-11} & \textbf{capability types} (\texttt{grant\_cap / revoke\_cap / has\_cap / check\_capability}, strict-mode via \texttt{AIPL\_CAP\_STRICT=1})\textsuperscript{j} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{CE-13} & \textbf{record width subtyping} (\texttt{TRecord} \texttt{unify} → intersection-based)\textsuperscript{n} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{CE-12} & \textbf{refinement unification} (early Z3 subset check in \texttt{unify} under \texttt{AIPL\_REFINE\_UNIFY=1})\textsuperscript{o} & \No & \textbf{\Yes} & \Part & \Part & \No & \No & \No \\
+  \textbf{CE-10} & \textbf{effect type inference} (\texttt{\{ai, fs, net, mut\}} rows in inferred method types)\textsuperscript{h} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{CE-11} & \textbf{capability types} (\texttt{grant\_cap / revoke\_cap / has\_cap / check\_capability}, strict-mode via \texttt{AIPL\_CAP\_STRICT=1})\textsuperscript{j} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{CE-13} & \textbf{record width subtyping} (\texttt{TRecord} \texttt{unify} → intersection-based)\textsuperscript{n} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{CE-12} & \textbf{refinement unification} (early Z3 subset check in \texttt{unify} under \texttt{AIPL\_REFINE\_UNIFY=1})\textsuperscript{o} & \No & \textbf{\Yes} & \Part & \Part & \No & \No & \Part \\
   \bottomrule
 \end{longtable}
 
@@ -411,10 +411,10 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
   DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-8 & spawn-tree tracking (TLS-auto parent)                    & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
-  \textbf{DR-13} & \textbf{auto-scaling actor pool} (\texttt{pool\_create / pool\_pick / pool\_size / pool\_destroy} with hysteresis)\textsuperscript{i} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{DR-10} & \textbf{CRDT actor state} (G-Counter / OR-Set / LWW-Register; 15 prims + \texttt{crdt\_replicate} hook)\textsuperscript{k} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{DR-12} & \textbf{multi-region failover} (per-region route + \texttt{failover\_region} chain walk; 5 prims)\textsuperscript{l} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
-  \textbf{DR-11} & \textbf{saga orchestration} (\texttt{saga \{ step \{...\} compensate \{...\} ... \}} statement, LIFO compensate-on-failure)\textsuperscript{m} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \No \\
+  \textbf{DR-13} & \textbf{auto-scaling actor pool} (\texttt{pool\_create / pool\_pick / pool\_size / pool\_destroy} with hysteresis)\textsuperscript{i} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{DR-10} & \textbf{CRDT actor state} (G-Counter / OR-Set / LWW-Register; 15 prims + \texttt{crdt\_replicate} hook)\textsuperscript{k} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{DR-12} & \textbf{multi-region failover} (per-region route + \texttt{failover\_region} chain walk; 5 prims)\textsuperscript{l} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
+  \textbf{DR-11} & \textbf{saga orchestration} (\texttt{saga \{ step \{...\} compensate \{...\} ... \}} statement, LIFO compensate-on-failure)\textsuperscript{m} & \No & \textbf{\Yes} & \textbf{\Yes} & \textbf{\Yes} & \No & \No & \Yes \\
   \bottomrule
 \end{longtable}
 
