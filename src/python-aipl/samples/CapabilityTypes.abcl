@@ -1,0 +1,41 @@
+// CE-11 — capability types (run-time capability tracking).
+//
+// Layered on the Phase-12 effect system: each thread carries a
+// set of held capabilities ({fs, ai, net, mut, ...}) seeded from
+// the AIPL_CAP_GRANT env var.  `check_capability(name)` asserts
+// the current scope holds it; advisory by default, enforcing when
+// AIPL_CAP_STRICT=1.
+//
+// Run advisory (default — violations logged, never raised):
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/cap.ndjson \
+//   python3 src/python-aipl/aipl_main.py samples/CapabilityTypes.abcl
+//
+// Run strict (CapabilityError raised on miss):
+//   AIPL_CAP_STRICT=1 AIPL_CAP_GRANT="fs,ai" \
+//   python3 src/python-aipl/aipl_main.py samples/CapabilityTypes.abcl
+
+class Demo {
+  method run() {
+    print("[demo] starting");
+    print("[demo] held: " + current_caps());
+
+    grant_cap("fs");
+    grant_cap("ai");
+    print("[demo] after grants: " + current_caps());
+
+    // Asserting a held cap — passes silently.
+    check_capability("fs");
+    print("[demo] check_capability(fs) passed");
+
+    // Asserting a missing cap.  Advisory mode (default): logs and
+    // returns true; strict mode (AIPL_CAP_STRICT=1): raises and the
+    // print below is skipped.
+    revoke_cap("ai");
+    print("[demo] revoked ai; held: " + current_caps());
+    check_capability("ai");
+    print("[demo] check_capability(ai) — advisory passed, strict would have raised");
+  }
+}
+
+var d = new Demo();
+send d.run();

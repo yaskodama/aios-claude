@@ -85,18 +85,27 @@ aice AIPL_PyI_NextGen {
   }
 
   // ── 探索パラメタ ──
-  // Reduced from 8 seed × 15 gen → 4 seed × 5 gen after a 6-minute
-  // dry-run showed `ai_evaluator.py` evaluates each individual
-  // serially (9 task × 6 reviewer = 54 LLM calls = 4-5 min/indiv).
-  // The reduced scale yields ~32 individual evaluations (~45 min
-  // / ~$1 at gpt-4o-mini), enough to fill the 4×4=16 cell map.
+  // Round 2 (2026-05-18 second pass): the previous run collapsed all
+  // individuals into `?|?` because cell_axes named axes that aren't
+  // in `programming_paradigm.schema.json` (type_extension /
+  // distribution_extension are conceptual, not schema-defined).
+  // Switched to two real schema axes that differentiate the remaining
+  // CE-11/12/13 + DR-10/11/12 features cleanly:
+  //   effect_handling  ∈ {implicit, monadic, algebraic_effects, capability}
+  //   concurrency_model ∈ {none, threads_locks, actor_messages,
+  //                        csp_channels, structured}
+  // CE-11 ↔ capability, CE-12 ↔ refinement (type_safety:dependent),
+  // DR-10 ↔ CRDT (state_representation:symbol_owned), DR-11/12 ↔
+  // actor_messages variants.  With the ai_evaluator parallelization
+  // patch (commit 3edfa30), 8 × 10 ≈ 80 evals at ~35s each completes
+  // in 8-12 minutes wall-clock.
   search {
     algorithm   = "map_elites";
-    cell_axes   = "type_extension, distribution_extension";
-    generations = 5;
-    seed_count  = 4;
+    cell_axes   = "effect_handling, concurrency_model";
+    generations = 10;
+    seed_count  = 8;
     open_axes   = false;
-    rng_seed    = 31415932;
+    rng_seed    = 31415933;
   }
 
   // ── meta fitness 配分 ──

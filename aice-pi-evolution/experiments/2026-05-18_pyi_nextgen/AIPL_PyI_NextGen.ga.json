@@ -5,13 +5,13 @@
   "search": {
     "algorithm": "map_elites",
     "cell_axes": [
-      "type_extension",
-      "distribution_extension"
+      "effect_handling",
+      "concurrency_model"
     ],
-    "generations": 5,
-    "seed_count": 4,
+    "generations": 10,
+    "seed_count": 8,
     "open_axes": false,
-    "rng_seed": 31415932
+    "rng_seed": 31415933
   },
   "operators": {
     "mutations": [

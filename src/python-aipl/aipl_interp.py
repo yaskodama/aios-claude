@@ -1801,6 +1801,141 @@ def _b_pool_destroy(args, frame, interp):
     return bool(aipl_dist.pool_destroy(args[0]))
 
 
+# ─── DR-10: CRDT actor state primitives ──────────────────────────────
+# Thin wrappers around aipl_dist's CRDT functions.  Every prim is
+# total: invalid types raise ValueError up to the interp's error
+# handler.  Replication is wired via crdt_replicate which is a no-op
+# unless AIPL_DIST_ENABLE=1.
+
+def _b_crdt_gcounter_new(args, frame, interp):
+    import aipl_dist
+    return aipl_dist.gcounter_new()
+
+def _b_crdt_gcounter_inc(args, frame, interp):
+    """crdt_gcounter_inc(c[, n=1]) -> dict.  Mutates and returns c."""
+    if not args:
+        raise ValueError("crdt_gcounter_inc(c[, n])")
+    import aipl_dist
+    n = int(args[1]) if len(args) > 1 else 1
+    return aipl_dist.gcounter_inc(args[0], n)
+
+def _b_crdt_gcounter_value(args, frame, interp):
+    import aipl_dist
+    if not args:
+        raise ValueError("crdt_gcounter_value(c)")
+    return aipl_dist.gcounter_value(args[0])
+
+def _b_crdt_gcounter_merge(args, frame, interp):
+    import aipl_dist
+    if len(args) < 2:
+        raise ValueError("crdt_gcounter_merge(a, b)")
+    return aipl_dist.gcounter_merge(args[0], args[1])
+
+def _b_crdt_orset_new(args, frame, interp):
+    import aipl_dist
+    return aipl_dist.orset_new()
+
+def _b_crdt_orset_add(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_orset_add(s, elem)")
+    import aipl_dist
+    return aipl_dist.orset_add(args[0], args[1])
+
+def _b_crdt_orset_remove(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_orset_remove(s, elem)")
+    import aipl_dist
+    return aipl_dist.orset_remove(args[0], args[1])
+
+def _b_crdt_orset_contains(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_orset_contains(s, elem)")
+    import aipl_dist
+    return bool(aipl_dist.orset_contains(args[0], args[1]))
+
+def _b_crdt_orset_values(args, frame, interp):
+    if not args:
+        raise ValueError("crdt_orset_values(s)")
+    import aipl_dist
+    return list(aipl_dist.orset_values(args[0]))
+
+def _b_crdt_orset_merge(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_orset_merge(a, b)")
+    import aipl_dist
+    return aipl_dist.orset_merge(args[0], args[1])
+
+def _b_crdt_lww_new(args, frame, interp):
+    import aipl_dist
+    initial = args[0] if args else None
+    return aipl_dist.lww_new(initial)
+
+def _b_crdt_lww_write(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_lww_write(r, value)")
+    import aipl_dist
+    return aipl_dist.lww_write(args[0], args[1])
+
+def _b_crdt_lww_value(args, frame, interp):
+    if not args:
+        raise ValueError("crdt_lww_value(r)")
+    import aipl_dist
+    return aipl_dist.lww_value(args[0])
+
+def _b_crdt_lww_merge(args, frame, interp):
+    if len(args) < 2:
+        raise ValueError("crdt_lww_merge(a, b)")
+    import aipl_dist
+    return aipl_dist.lww_merge(args[0], args[1])
+
+def _b_crdt_replicate(args, frame, interp):
+    """crdt_replicate(name, value).  Logs an event for the
+    deployment-layer replicator (no-op unless AIPL_DIST_ENABLE=1)."""
+    if len(args) < 2:
+        raise ValueError("crdt_replicate(name, value)")
+    import aipl_dist
+    return aipl_dist.crdt_replicate(args[0], args[1])
+
+
+# ─── CE-11: Capability Types primitives ─────────────────────────────
+# Runtime capability operations.  Pure wrappers around aipl_dist's
+# TLS-based capability set — see CapabilityError there for the
+# strict-mode (AIPL_CAP_STRICT=1) semantics.
+
+def _b_grant_cap(args, frame, interp):
+    if not args or not isinstance(args[0], str):
+        raise ValueError("grant_cap(name)")
+    import aipl_dist
+    return bool(aipl_dist.grant_cap(args[0]))
+
+def _b_revoke_cap(args, frame, interp):
+    if not args or not isinstance(args[0], str):
+        raise ValueError("revoke_cap(name)")
+    import aipl_dist
+    return bool(aipl_dist.revoke_cap(args[0]))
+
+def _b_has_cap(args, frame, interp):
+    if not args or not isinstance(args[0], str):
+        raise ValueError("has_cap(name)")
+    import aipl_dist
+    return bool(aipl_dist.has_cap(args[0]))
+
+def _b_current_caps(args, frame, interp):
+    import aipl_dist
+    return list(aipl_dist.current_caps())
+
+def _b_check_capability(args, frame, interp):
+    """check_capability(name | array<name>).  Returns True if all
+    held; logs a `cap_violation` event when missing.  When
+    AIPL_CAP_STRICT=1, raises a CapabilityError on miss (surfaces as
+    a runtime error in the calling actor)."""
+    if not args:
+        raise ValueError("check_capability(name | names)")
+    import aipl_dist
+    aipl_dist.check_capability(args[0])
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Standard library (string + I/O + misc).  Keep these synchronous and
 # total — anything that can hit the filesystem returns "" / False on
@@ -2804,6 +2939,29 @@ _BUILTINS = {
     "pool_pick":                     _b_pool_pick,
     "pool_size":                     _b_pool_size,
     "pool_destroy":                  _b_pool_destroy,
+    # DR-10: CRDT actor state
+    "crdt_gcounter_new":             _b_crdt_gcounter_new,
+    "crdt_gcounter_inc":             _b_crdt_gcounter_inc,
+    "crdt_gcounter_value":           _b_crdt_gcounter_value,
+    "crdt_gcounter_merge":           _b_crdt_gcounter_merge,
+    "crdt_orset_new":                _b_crdt_orset_new,
+    "crdt_orset_add":                _b_crdt_orset_add,
+    "crdt_orset_remove":             _b_crdt_orset_remove,
+    "crdt_orset_contains":           _b_crdt_orset_contains,
+    "crdt_orset_values":             _b_crdt_orset_values,
+    "crdt_orset_merge":              _b_crdt_orset_merge,
+    "crdt_lww_new":                  _b_crdt_lww_new,
+    "crdt_lww_write":                _b_crdt_lww_write,
+    "crdt_lww_value":                _b_crdt_lww_value,
+    "crdt_lww_merge":                _b_crdt_lww_merge,
+    "crdt_replicate":                _b_crdt_replicate,
+    # CE-11: Capability types (run-time capability tracking layered
+    # on top of the Phase-12 static effect system)
+    "grant_cap":                     _b_grant_cap,
+    "revoke_cap":                    _b_revoke_cap,
+    "has_cap":                       _b_has_cap,
+    "current_caps":                  _b_current_caps,
+    "check_capability":              _b_check_capability,
     # Introspection
     "inspect":                       _b_inspect,
     "inspect_all":                   _b_inspect_all,

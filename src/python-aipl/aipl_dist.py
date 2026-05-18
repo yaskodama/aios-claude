@@ -746,3 +746,273 @@ def pool_destroy(pool_name: str) -> bool:
             pass
     log_event("pool_destroyed", pool=pool_name, retired=len(victims))
     return True
+
+
+# ─── DR-10: CRDT actor state ────────────────────────────────────────
+# Three CRDT data types backed by `aipl_dist` so AIPL programs can
+# declare conflict-free replicated state without writing the merge
+# logic themselves.  Each type is a small Python dict with a stable
+# JSON shape that survives `save_actor_state` / `restore_actor_state`
+# round-trips, so I-4 checkpointing already works for free.
+#
+#   G-Counter  : monotonically-increasing per-replica counter.
+#                 value = sum of per-replica counts.
+#   OR-Set     : observed-remove set with unique add tags.
+#                 add / remove preserve the LUB across replicas.
+#   LWW-Register : last-writer-wins single-value cell, keyed on
+#                 monotonic Unix timestamp + replica-id tiebreaker.
+#
+# The replica id is taken from AIPL_DIST_REPLICA_ID (defaults to the
+# hostname).  When AIPL_DIST_ENABLE is off the constructors still
+# return well-formed dicts so programs can use them as plain local
+# state — only `crdt_replicate` (which currently logs the merge as
+# an event for future remote-replication wiring) is gated.
+
+import socket as _socket
+
+def _replica_id() -> str:
+    rid = os.environ.get("AIPL_DIST_REPLICA_ID")
+    if rid:
+        return rid
+    try:
+        return _socket.gethostname() or "node-0"
+    except Exception:
+        return "node-0"
+
+
+# ---- G-Counter (grow-only counter) ----
+
+def gcounter_new() -> dict:
+    """Fresh G-Counter — empty per-replica map.  value() = 0."""
+    return {"_kind": "GCounter", "counts": {}}
+
+def gcounter_inc(c: dict, n: int = 1) -> dict:
+    """Increment the local replica's count by `n` (in place; also
+    returned for chaining)."""
+    if not isinstance(c, dict) or c.get("_kind") != "GCounter":
+        raise ValueError("gcounter_inc: not a G-Counter")
+    if n < 0:
+        raise ValueError("gcounter_inc: G-Counter is grow-only (n >= 0)")
+    rid = _replica_id()
+    c["counts"][rid] = int(c["counts"].get(rid, 0)) + int(n)
+    return c
+
+def gcounter_value(c: dict) -> int:
+    if not isinstance(c, dict) or c.get("_kind") != "GCounter":
+        raise ValueError("gcounter_value: not a G-Counter")
+    return sum(int(v) for v in c["counts"].values())
+
+def gcounter_merge(a: dict, b: dict) -> dict:
+    """LUB: per-replica max.  Pure — returns a new dict."""
+    if a.get("_kind") != "GCounter" or b.get("_kind") != "GCounter":
+        raise ValueError("gcounter_merge: type mismatch")
+    out = {"_kind": "GCounter", "counts": {}}
+    keys = set(a["counts"].keys()) | set(b["counts"].keys())
+    for k in keys:
+        out["counts"][k] = max(int(a["counts"].get(k, 0)),
+                               int(b["counts"].get(k, 0)))
+    return out
+
+
+# ---- OR-Set (observed-remove set) ----
+
+import uuid as _uuid
+
+def orset_new() -> dict:
+    return {"_kind": "ORSet", "adds": {}, "removes": {}}
+
+def orset_add(s: dict, elem: Any) -> dict:
+    """Tag the add with a fresh UUID so concurrent removes can't
+    accidentally cancel a later add of the same element."""
+    if s.get("_kind") != "ORSet":
+        raise ValueError("orset_add: not an OR-Set")
+    key = _orset_elem_key(elem)
+    s["adds"].setdefault(key, []).append(str(_uuid.uuid4()))
+    return s
+
+def orset_remove(s: dict, elem: Any) -> dict:
+    """Remove takes the set of add-tags currently observed for the
+    element and stores them under removes — concurrent adds with
+    different tags survive."""
+    if s.get("_kind") != "ORSet":
+        raise ValueError("orset_remove: not an OR-Set")
+    key = _orset_elem_key(elem)
+    observed = s["adds"].get(key, [])
+    if observed:
+        s["removes"].setdefault(key, []).extend(observed)
+    return s
+
+def orset_contains(s: dict, elem: Any) -> bool:
+    if s.get("_kind") != "ORSet":
+        raise ValueError("orset_contains: not an OR-Set")
+    key = _orset_elem_key(elem)
+    adds = set(s["adds"].get(key, []))
+    rems = set(s["removes"].get(key, []))
+    return bool(adds - rems)
+
+def orset_values(s: dict) -> list:
+    if s.get("_kind") != "ORSet":
+        raise ValueError("orset_values: not an OR-Set")
+    out = []
+    for key, adds in s["adds"].items():
+        rems = set(s["removes"].get(key, []))
+        if set(adds) - rems:
+            out.append(_orset_key_to_elem(key))
+    return out
+
+def orset_merge(a: dict, b: dict) -> dict:
+    """LUB: per-element union of add-tags AND remove-tags."""
+    if a.get("_kind") != "ORSet" or b.get("_kind") != "ORSet":
+        raise ValueError("orset_merge: type mismatch")
+    out = {"_kind": "ORSet", "adds": {}, "removes": {}}
+    for bag in ("adds", "removes"):
+        keys = set(a[bag].keys()) | set(b[bag].keys())
+        for k in keys:
+            out[bag][k] = list(set(a[bag].get(k, [])) | set(b[bag].get(k, [])))
+    return out
+
+def _orset_elem_key(elem: Any) -> str:
+    # JSON-encode to give every primitive value a deterministic key.
+    return json.dumps(elem, sort_keys=True, ensure_ascii=False)
+
+def _orset_key_to_elem(key: str) -> Any:
+    try:
+        return json.loads(key)
+    except Exception:
+        return key
+
+
+# ---- LWW-Register (last-writer-wins) ----
+
+def lww_new(initial: Any = None) -> dict:
+    """A fresh LWW-Register at timestamp 0.  `initial` is the seed
+    value — any concurrent write with ts > 0 wins."""
+    return {"_kind": "LWWReg", "value": initial, "ts": 0.0, "replica": _replica_id()}
+
+def lww_write(r: dict, value: Any) -> dict:
+    """Write the new value with the current monotonic timestamp."""
+    if r.get("_kind") != "LWWReg":
+        raise ValueError("lww_write: not an LWW-Register")
+    r["value"] = value
+    r["ts"] = time.time()
+    r["replica"] = _replica_id()
+    return r
+
+def lww_value(r: dict) -> Any:
+    if r.get("_kind") != "LWWReg":
+        raise ValueError("lww_value: not an LWW-Register")
+    return r["value"]
+
+def lww_merge(a: dict, b: dict) -> dict:
+    """Higher ts wins; tie → replica-id lex order (deterministic)."""
+    if a.get("_kind") != "LWWReg" or b.get("_kind") != "LWWReg":
+        raise ValueError("lww_merge: type mismatch")
+    if a["ts"] > b["ts"]:
+        return dict(a)
+    if a["ts"] < b["ts"]:
+        return dict(b)
+    # tie
+    return dict(a) if a["replica"] >= b["replica"] else dict(b)
+
+
+# ---- Cross-type replicate hook ----
+
+def crdt_replicate(name: str, value: dict, peers: Optional[list] = None) -> dict:
+    """Log a replication event for `name = value`.  In the current
+    MVP the peer fan-out is left to the deployment layer — every
+    CRDT op is purely local + crash-safe via save_actor_state.  The
+    event hook is here so a future multi-region driver can subscribe.
+    """
+    if not is_enabled():
+        return value
+    log_event("crdt_replicate", actor=name, kind=value.get("_kind", "?"),
+              replica=_replica_id())
+    return value
+
+
+# ─── CE-11: Capability Types ────────────────────────────────────────
+# Run-time capability tracking layered on the Phase-12 effect system.
+# Each thread carries a set of held capabilities (defaults to the env
+# var `AIPL_CAP_GRANT` parsed as a comma-separated list); guarded
+# primitives can call `check_capability(eff)` to assert the current
+# context holds the cap.  The check is a no-op unless
+# `AIPL_CAP_STRICT=1`, so existing programs run unchanged.
+#
+# Capability names map 1:1 to effect names from BUILTIN_EFFECTS
+# (`fs` / `ai` / `net` / `mut` / etc.), so the same vocabulary works
+# at both static-type-check time and run-time grant/revoke time.
+
+class CapabilityError(Exception):
+    """Raised when a guarded primitive runs without the required
+    capability and AIPL_CAP_STRICT=1 is in effect."""
+    pass
+
+_CAP_TLS = threading.local()
+
+
+def _cap_set_for_thread() -> set:
+    s = getattr(_CAP_TLS, "caps", None)
+    if s is None:
+        # Seed from env var on first touch.
+        raw = os.environ.get("AIPL_CAP_GRANT", "")
+        seed = {c.strip() for c in raw.split(",") if c.strip()}
+        _CAP_TLS.caps = seed
+        s = seed
+    return s
+
+
+def cap_strict() -> bool:
+    """True iff AIPL_CAP_STRICT=1 — turns the check from advisory
+    (just logged) to enforcing (raises CapabilityError)."""
+    return os.environ.get("AIPL_CAP_STRICT", "0") == "1"
+
+
+def grant_cap(name: str) -> bool:
+    """Add `name` to the current thread's capability set."""
+    s = _cap_set_for_thread()
+    if name in s:
+        return False
+    s.add(name)
+    log_event("cap_granted", cap=name)
+    return True
+
+
+def revoke_cap(name: str) -> bool:
+    """Remove `name` from the current thread's capability set."""
+    s = _cap_set_for_thread()
+    if name not in s:
+        return False
+    s.discard(name)
+    log_event("cap_revoked", cap=name)
+    return True
+
+
+def has_cap(name: str) -> bool:
+    return name in _cap_set_for_thread()
+
+
+def current_caps() -> list:
+    return sorted(_cap_set_for_thread())
+
+
+def check_capability(required: Any) -> None:
+    """Assert the current thread holds every `required` capability.
+    `required` may be a single str or an iterable of str.  If
+    AIPL_CAP_STRICT=0 (default) violations are logged but do NOT
+    raise — gives operators a no-risk migration path.  When strict
+    is enabled, a missing cap raises CapabilityError."""
+    if isinstance(required, str):
+        req = {required}
+    else:
+        try:
+            req = set(required)
+        except Exception:
+            return
+    s = _cap_set_for_thread()
+    missing = req - s
+    if not missing:
+        return
+    log_event("cap_violation", missing=sorted(missing), held=sorted(s))
+    if cap_strict():
+        raise CapabilityError(
+            f"capability denied: missing {sorted(missing)} (held: {sorted(s)})")

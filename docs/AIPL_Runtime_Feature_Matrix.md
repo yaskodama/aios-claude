@@ -206,6 +206,38 @@ the existing structured-log NDJSON.  Sample:
 `src/python-aipl/samples/AutoScalingPool.abcl`.  Picked by the same
 MAP-Elites run (reviewer score 0.67 — top of the distribution axis).
 
+¹⁰ CE-11 capability types: runtime capability tracking layered on
+the Phase-12 static effect system.  Each thread carries a set of
+held capabilities (seeded from `AIPL_CAP_GRANT="fs,ai,net,mut"`),
+maintained via TLS in `aipl_dist`.  Five primitives —
+`grant_cap(name)`, `revoke_cap(name)`, `has_cap(name)`,
+`current_caps()`, `check_capability(name | array<name>)`.
+Capability names coincide with effect tags from BUILTIN_EFFECTS
+(`fs` / `ai` / `net` / `mut`) so the same vocabulary works at
+static-check time and runtime.  Default mode is advisory (missing
+caps log `cap_violation`); `AIPL_CAP_STRICT=1` raises
+`CapabilityError` on any miss, surfaced as an actor runtime error.
+Sample: `src/python-aipl/samples/CapabilityTypes.abcl`.  Picked by
+the 2026-05-18 round-2 MAP-Elites (reviewer avg 0.430 — top of the
+type-extension axis; CapabilityTypes=0.73 in the top elite I0012).
+
+¹¹ DR-10 CRDT actor state: three classic conflict-free replicated
+data types implemented as plain dicts so they survive
+`save_actor_state` / `restore_actor_state` round-trips for free.
+G-Counter (grow-only counter, per-replica max merge), OR-Set
+(observed-remove set with UUID add-tags), LWW-Register
+(last-writer-wins by monotonic timestamp + replica-id tiebreak).
+15 primitives total: `crdt_gcounter_{new,inc,value,merge}`,
+`crdt_orset_{new,add,remove,contains,values,merge}`,
+`crdt_lww_{new,write,value,merge}`, `crdt_replicate(name, value)`.
+Replica id comes from `AIPL_DIST_REPLICA_ID` (defaults to hostname).
+`crdt_replicate` logs an event for the deployment-layer replicator;
+peer fan-out itself is left to a future multi-region driver
+(DR-12 candidate).  Sample:
+`src/python-aipl/samples/CRDTState.abcl`.  Picked by round-2 MAP-
+Elites (reviewer avg 0.410 — second after CE-11 on the distribution
+axis).
+
 ## Type system
 
 | #   | Feature                              | Py-A      | Py-I       | OCaml      | JS-O       | JS-B                       | JS-N                       | C                       |
@@ -264,7 +296,8 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
-| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._collect_effects_from_ast` (commit TBD) |
+| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._collect_effects_from_ast` (commit `3edfa30`) |
+| **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{grant,revoke,has,check}_*` + 5 primitives |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -336,6 +369,7 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | DR-8  | spawn-tree tracking (parent inference, TLS-auto)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
 | DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
 | **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.pool_*` + `_b_pool_*` primitives  |
+| **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{gcounter,orset,lww}_*` + 15 primitives |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -664,4 +698,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I CE-10 + DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites).*
+*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
