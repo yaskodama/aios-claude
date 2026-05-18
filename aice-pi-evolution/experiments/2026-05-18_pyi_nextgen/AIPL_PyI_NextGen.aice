@@ -1,0 +1,135 @@
+// AIPL_PyI_NextGen.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (4) — next-generation
+// features for the Python (type-inferred) AIPL runtime, beyond
+// Phase C-E2 type inference (CE-1〜9) and AIPL v2 Distributed
+// (DR-1〜9), both of which are already at 9/9 on Py-I today.
+//
+// Two directions to evolve simultaneously:
+//
+//   TYPE-INFERENCE NEXT-GEN (CE-10〜CE-13)
+//     CE-10 effect type inference     — track `ai_call` / file-io /
+//                                       net as effect rows in the
+//                                       inferred type
+//     CE-11 capability types          — Cap<X> must be held to invoke
+//                                       certain primitives; gradual
+//                                       grant/revoke at runtime
+//     CE-12 refinement unification    — language-native refinement
+//                                       integrated into HM (currently
+//                                       --infer is a separate post-hoc
+//                                       Z3 pass)
+//     CE-13 record + variant subtyping — depth/width subtyping with
+//                                       principal-types preserved
+//
+//   DISTRIBUTED NEXT-GEN (DR-10〜DR-13)
+//     DR-10 CRDT actor state          — G-Counter / OR-Set / LWW-Reg
+//                                       baked into actor field
+//                                       declarations
+//     DR-11 saga orchestration        — declarative compensating
+//                                       actions on multi-step failure
+//     DR-12 multi-region failover     — geo-aware route_for + lineage
+//                                       replication across regions
+//     DR-13 auto-scaling actor pool   — load-driven spawn/retire with
+//                                       hysteresis
+//
+// Goal: pick the (CE-x, DR-y) pair with the highest combined
+// implementability score per added feature, subject to backward
+// compatibility with everything that exists today (Py-I 9/9 in
+// each section, 38 samples unchanged).
+
+aice AIPL_PyI_NextGen {
+  dialect = "aice_evolution_v2";
+
+  task = "Py-I (Python 型推論) AIPL に Phase C-E2 (CE-1〜9) と AIPL v2 Distributed (DR-1〜9) の次世代となる機能を進化計算で探索する。型推論軸 (CE-10〜13: effect / capability / refinement-native / subtyping) と分散軸 (DR-10〜13: CRDT state / saga / multi-region / auto-scaling) を 2 つの MAP-Elites cell-axis として 4×4=16 セルを埋める。既存 18 機能と 38 サンプルの後方互換を hard floor とし、追加機能ごとの aipl_interp + aipl_inference + aipl_dist への diff コスト (LOC) を最小化する。OCaml への横展開可能性 (Phase O 同等性) も評価軸に含める。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  // ── 評価タスク群 ──
+  evaluation_tasks {
+    // ── 型推論軸 (CE-10〜13) ──
+    task EffectTypeInference {
+      spec = "メソッドが `ai_call` / `read_file` / `write_file` / `send target.x(...)` / `now target.x(...)` を呼ぶと、推論される型に effect row `{ai, fs, net}` などが付く。明示宣言 `effect [ai, fs]` で制限可。Phase 12 `Effects.abcl` の静的解析を HM に統合。";
+    }
+    task CapabilityTypes {
+      spec = "`Cap<AI>` / `Cap<FS>` / `Cap<Net>` を first-class 型として保持し、対応する primitive はその capability を引数で受けないと呼び出せない (deny-by-default)。`grant`/`revoke` プリミティブで実行時にスコープ制御。capability の派生は静的 inference で追跡。";
+    }
+    task RefinementUnification {
+      spec = "現在 `--infer` で post-hoc Z3 discharge している refinement (`var n: int where n > 0`) を HM の unify 段階で native に解く。`where` 述語は型変数に attach され、unify 時に SMT に投入。Real / Int の dispatch も unify 内で自動化。Py-A の CE-1〜9 と動作互換。";
+    }
+    task RecordVariantSubtyping {
+      spec = "Phase 14 record + tuple + variant に depth (フィールド型方向) + width (フィールド数方向) subtyping を導入。`{x:int, y:int} <: {x:int}` の関係を unify でハンドルし principal type を維持。variant も `enum Color { R | G | B }` を `enum AnyColor { R | G | B | A }` の subtype にできる。";
+    }
+    // ── 分散軸 (DR-10〜13) ──
+    task CRDTActorState {
+      spec = "アクタフィールドに `var counter: GCounter = ...;` / `var members: ORSet[string] = ...;` / `var last: LWWReg[float] = ...;` 等の CRDT 型を導入。merge は型ごとの結合則を自動使用。`aipl_dist.replicate(actor)` で remote ノードと自動同期。AIPL_DIST_CRDT_REPLICAS=N で N-way replication。";
+    }
+    task SagaOrchestration {
+      spec = "`saga { step a.do() compensate a.undo(); step b.do() compensate b.undo(); }` 構文 (or method 内 builtin) で multi-step 操作を宣言。途中失敗時は **後ろから順に** compensate を逆実行。タイムアウト / リトライ / abort 検出は runtime hook。AIPL_DIST_SAGA_LOG_FILE に各 step / compensate を NDJSON 記録。";
+    }
+    task MultiRegionFailover {
+      spec = "AIPL_REGION=us-east-1 / eu-west-1 等で同一プログラムを複数ノードで起動した時、`route_for` が region-aware になり、primary region の障害時に secondary region へ自動 failover。lineage replication は region-aware (region 越し eventual consistency)。Py-A の DR-1 / DR-4 の上位互換。";
+    }
+    task AutoScalingActorPool {
+      spec = "`pool Worker[min=2, max=16, target_qlen=10] { ... }` 宣言で actor pool を作る。queue 長 / 平均 dispatch 時間 / CPU 使用率に基づき hysteresis (低 watermark 5, 高 watermark 20 等) で spawn / retire を自動決定。DR-3 token budget と協調し budget 圧迫時は spawn 抑制。";
+    }
+    // ── cross-cutting / 共通評価 ──
+    task BackwardCompatExisting {
+      spec = "src/python-aipl/samples/*.abcl (33 件) + src/python-aipl/samples-ai/*.abcl (5 件 + 新規 _send_reply_demo 4 件) が全て byte-equivalent (provider noise を正規化後) で動作。CE-1〜9 / DR-1〜9 の挙動も変化なし。";
+    }
+    task OCamlPortability {
+      spec = "提案された機能を OCaml AIPL に横展開する難度。Py-I の HM (`aipl_inference.py`) と Z3 backend は OCaml の `infer.ml` + `refinement.ml` に対応物あり。effect / capability / CRDT は OCaml にも実装可能か (Phase O-equivalent パスを描けるか) を評価。";
+    }
+    task ImplCostBudget {
+      spec = "選ばれた 1 つの CE-* と 1 つの DR-* の合計 diff が aipl_interp.py + aipl_inference.py + aipl_dist.py に 600 行以内 (現状 Phase O 同等修正は OCaml 95 行 / Python 97 行)。AST / grammar 変更がある場合は parser も含めて 600 行枠内。";
+    }
+  }
+
+  // ── 探索パラメタ ──
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "type_extension, distribution_extension";
+    generations = 15;
+    seed_count  = 8;
+    open_axes   = false;
+    rng_seed    = 31415932;
+  }
+
+  // ── meta fitness 配分 ──
+  // 後方互換 + 実装可能性を重視 (進化計算の探索後すぐに実装に移したい)
+  meta_fitness {
+    trend_alignment       = 0.10;
+    frontier_coverage     = 0.20;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.20;
+    implementability      = 0.35;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "type_first", "distribution_first", "impl_cost_first"];
+    top_k     = 5;
+  }
+
+  // ── レビュアー (LLM persona) ──
+  reviewers {
+    reviewer TypeInferenceFeasibility {
+      persona = "あなたは型推論実装可能性レビュアーです。候補の CE-10〜13 の選択肢 (effect / capability / refinement-unification / subtyping) について、Py-I の現状 aipl_inference.py (~1255 行、constraint-based HM + Z3 backend) にどれくらいの追加で組み込めるかを評価。1.0 = ≤150 行 + 既存 unify を破壊しない、0.7 = ≤300 行、0.3 = AST / parser 拡張要 (≤500 行)、0.0 = HM の再設計レベル。'OK: <根拠>' / 'NG: <欠けている要素>' の 1 行で返答。";
+    }
+    reviewer DistributedFeasibility {
+      persona = "あなたは分散ランタイム実装可能性レビュアーです。候補の DR-10〜13 (CRDT / saga / multi-region / auto-scaling) を Py-I の aipl_dist.py (~591 行) + aipl_runtime.py + aipl_remote にどれくらいの追加で実装できるかを評価。Erlang OTP / Akka / Orleans / Ray 等の先行実装との一致度も加味。1.0 = ≤200 行 + 既存 DR-1〜9 を維持、0.7 = ≤400 行、0.3 = 大規模変更要 (~600 行)、0.0 = 完全新設計。1 行で返答。";
+    }
+    reviewer BackwardCompat {
+      persona = "あなたは後方互換性レビュアーです。候補の CE-* / DR-* が既存 38 サンプル (samples/ + samples-ai/) と CE-1〜9 / DR-1〜9 の動作を変えないかを評価。新機能は全て opt-in (注釈 / 環境変数 / 新構文) で発火し、無宣言コードは無変化 — を満たすか。1.0 = 完全 opt-in、0.7 = 大半 opt-in だが 1-2 例で stdout 微変化、0.3 = 多数で挙動変化、0.0 = 破壊的。1 行で返答。";
+    }
+    reviewer OCamlParity {
+      persona = "あなたは OCaml AIPL 移植可能性レビュアーです。Py-I に追加した CE-* / DR-* が OCaml AIPL にも Phase O-同等の手段で移植可能かを評価。OCaml は infer.ml + refinement.ml + aipl_dist.ml + eval_thread.ml で対応物を持つ。CRDT / saga / multi-region は runtime hook で OCaml に同形写像できるか。effect / capability / subtyping は OCaml 型推論器の拡張で表現可能か。1.0 = 容易に同形写像、0.7 = ある程度の追加実装で可、0.3 = 大幅再設計、0.0 = 言語仕様レベルで非対称。1 行で返答。";
+    }
+    reviewer EvolutionarySignificance {
+      persona = "あなたは進化的意義レビュアーです。候補の CE-* / DR-* の組合せが AIPL を「次の世代の actor 言語」として位置づけられる先進性を持つかを評価。Erlang OTP / Akka / Orleans / Pony / Ray / Hopac / Tokio / Pulsar Functions 等の現実先例との差別化軸を持つか。1.0 = 明確な新規性 + 先例の弱点を補強、0.7 = 既存先例の組合せだが AIPL の文脈で意味あり、0.3 = ほぼ既存技術の写し、0.0 = AIPL の actor model と整合せず。1 行で返答。";
+    }
+    reviewer ImplCostEstimate {
+      persona = "あなたは実装コスト見積もりレビュアーです。Py-A / Py-I の Phase C-E2 + DR-1〜9 で達成された LOC 効率 (~1305 OCaml / Py-A は ~1846) を参照しつつ、候補の CE-x + DR-y 合計が aipl_interp + aipl_inference + aipl_dist + (parser 必要なら) grammar.lark に 600 行以内で済むかを評価。1.0 = ≤300 行、0.7 = ≤450 行、0.3 = ≤600 行、0.0 = 600 行超 or 既存層の大幅書き換え要。1 行で返答。";
+    }
+  }
+}

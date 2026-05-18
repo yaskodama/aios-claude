@@ -1,0 +1,129 @@
+{
+  "name": "AIPL_PyI_NextGen",
+  "task": "Py-I (Python 型推論) AIPL に Phase C-E2 (CE-1〜9) と AIPL v2 Distributed (DR-1〜9) の次世代となる機能を進化計算で探索する。型推論軸 (CE-10〜13: effect / capability / refinement-native / subtyping) と分散軸 (DR-10〜13: CRDT state / saga / multi-region / auto-scaling) を 2 つの MAP-Elites cell-axis として 4×4=16 セルを埋める。既存 18 機能と 38 サンプルの後方互換を hard floor とし、追加機能ごとの aipl_interp + aipl_inference + aipl_dist への diff コスト (LOC) を最小化する。OCaml への横展開可能性 (Phase O 同等性) も評価軸に含める。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "type_extension",
+      "distribution_extension"
+    ],
+    "generations": 15,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 31415932
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "EffectTypeInference",
+      "CapabilityTypes",
+      "RefinementUnification",
+      "RecordVariantSubtyping",
+      "CRDTActorState",
+      "SagaOrchestration",
+      "MultiRegionFailover",
+      "AutoScalingActorPool",
+      "BackwardCompatExisting",
+      "OCamlPortability",
+      "ImplCostBudget"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "TypeInferenceFeasibility",
+        "persona": "あなたは型推論実装可能性レビュアーです。候補の CE-10〜13 の選択肢 (effect / capability / refinement-unification / subtyping) について、Py-I の現状 aipl_inference.py (~1255 行、constraint-based HM + Z3 backend) にどれくらいの追加で組み込めるかを評価。1.0 = ≤150 行 + 既存 unify を破壊しない、0.7 = ≤300 行、0.3 = AST / parser 拡張要 (≤500 行)、0.0 = HM の再設計レベル。'OK: <根拠>' / 'NG: <欠けている要素>' の 1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "DistributedFeasibility",
+        "persona": "あなたは分散ランタイム実装可能性レビュアーです。候補の DR-10〜13 (CRDT / saga / multi-region / auto-scaling) を Py-I の aipl_dist.py (~591 行) + aipl_runtime.py + aipl_remote にどれくらいの追加で実装できるかを評価。Erlang OTP / Akka / Orleans / Ray 等の先行実装との一致度も加味。1.0 = ≤200 行 + 既存 DR-1〜9 を維持、0.7 = ≤400 行、0.3 = 大規模変更要 (~600 行)、0.0 = 完全新設計。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "BackwardCompat",
+        "persona": "あなたは後方互換性レビュアーです。候補の CE-* / DR-* が既存 38 サンプル (samples/ + samples-ai/) と CE-1〜9 / DR-1〜9 の動作を変えないかを評価。新機能は全て opt-in (注釈 / 環境変数 / 新構文) で発火し、無宣言コードは無変化 — を満たすか。1.0 = 完全 opt-in、0.7 = 大半 opt-in だが 1-2 例で stdout 微変化、0.3 = 多数で挙動変化、0.0 = 破壊的。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "OCamlParity",
+        "persona": "あなたは OCaml AIPL 移植可能性レビュアーです。Py-I に追加した CE-* / DR-* が OCaml AIPL にも Phase O-同等の手段で移植可能かを評価。OCaml は infer.ml + refinement.ml + aipl_dist.ml + eval_thread.ml で対応物を持つ。CRDT / saga / multi-region は runtime hook で OCaml に同形写像できるか。effect / capability / subtyping は OCaml 型推論器の拡張で表現可能か。1.0 = 容易に同形写像、0.7 = ある程度の追加実装で可、0.3 = 大幅再設計、0.0 = 言語仕様レベルで非対称。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "EvolutionarySignificance",
+        "persona": "あなたは進化的意義レビュアーです。候補の CE-* / DR-* の組合せが AIPL を「次の世代の actor 言語」として位置づけられる先進性を持つかを評価。Erlang OTP / Akka / Orleans / Pony / Ray / Hopac / Tokio / Pulsar Functions 等の現実先例との差別化軸を持つか。1.0 = 明確な新規性 + 先例の弱点を補強、0.7 = 既存先例の組合せだが AIPL の文脈で意味あり、0.3 = ほぼ既存技術の写し、0.0 = AIPL の actor model と整合せず。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ImplCostEstimate",
+        "persona": "あなたは実装コスト見積もりレビュアーです。Py-A / Py-I の Phase C-E2 + DR-1〜9 で達成された LOC 効率 (~1305 OCaml / Py-A は ~1846) を参照しつつ、候補の CE-x + DR-y 合計が aipl_interp + aipl_inference + aipl_dist + (parser 必要なら) grammar.lark に 600 行以内で済むかを評価。1.0 = ≤300 行、0.7 = ≤450 行、0.3 = ≤600 行、0.0 = 600 行超 or 既存層の大幅書き換え要。1 行で返答。",
+        "weight": 0.16666666666666666
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.1,
+    "frontier_coverage": 0.2,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.2,
+    "implementability": 0.35
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "type_first",
+      "distribution_first",
+      "impl_cost_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "type_first": {},
+      "distribution_first": {},
+      "impl_cost_first": {}
+    },
+    "top_k": 5
+  }
+}
