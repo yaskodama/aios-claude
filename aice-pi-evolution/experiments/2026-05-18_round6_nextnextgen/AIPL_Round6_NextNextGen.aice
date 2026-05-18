@@ -1,0 +1,158 @@
+// AIPL_Round6_NextNextGen.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (8) — discover the
+// *next-next-gen* feature axes that should follow the now-complete
+// 26-feature next-gen baseline (CE-1..13 + DR-1..13, all ✅ on 6
+// runtimes: Py-I / OCaml / JS-O / JS-B / JS-N / C).
+//
+// Premise.  Every "obvious" type-system or distribution-runtime
+// idea from textbook PLT / DS has now landed: HM inference,
+// refinements (Z3), effect rows, capabilities, record subtyping,
+// CRDTs, sagas, multi-region failover, auto-scaling pools.
+// What's *not* yet in AIPL and would visibly raise the ceiling?
+//
+// Eight candidate directions (4 type-system, 4 distribution):
+//
+//   TYPE-SYSTEM AXIS (one of CE-14..17 wins per cell)
+//     CE-14 session types        — protocol typing on actor
+//                                   message channels (e.g. linear
+//                                   `?req . !resp . end`) so the
+//                                   compiler rejects out-of-order
+//                                   exchanges and deadlocks.
+//     CE-15 dependent index types — refine integers by indices into
+//                                   array shapes (`(n: int{n>0}) ->
+//                                   array<n, T>`), eliminating the
+//                                   runtime OOB check class entirely.
+//     CE-16 row-polymorphic actor — model an actor's *visible*
+//           interfaces                interface as an extensible
+//                                   record-of-handlers; structural
+//                                   forward-compat for new methods.
+//     CE-17 gradual region types  — first-class region/lifetime
+//                                   types ("this value lives in
+//                                   region R") with inference,
+//                                   sandwiched between borrow-check
+//                                   strictness and GC ease.
+//
+//   DISTRIBUTION AXIS (one of DR-14..17 wins per cell)
+//     DR-14 BFT consensus quorum  — replace the current first-K
+//                                   quorum_replicate with a 2f+1
+//                                   Byzantine-tolerant agreement
+//                                   (PBFT / HotStuff sketch).
+//     DR-15 exactly-once delivery — message-id dedup window +
+//                                   piggyback acks, so retries
+//                                   on flaky links don't double
+//                                   apply.
+//     DR-16 actor live migration  — pause / serialise / resume an
+//                                   actor on a different node mid
+//                                   mailbox; preserve causal order.
+//     DR-17 P2P actor mesh        — drop the implicit star topology
+//                                   (every actor → root) in favour
+//                                   of gossip routing among peers;
+//                                   spawn-tree becomes optional.
+//
+// Same MAP-Elites recipe used in rounds 1-5: each evaluation_task
+// is graded by all reviewers; the genome dimension is (type-axis ×
+// dist-axis), so the 4×4 grid surfaces the most cost-effective
+// pair across BOTH axes simultaneously.  We don't want to commit
+// to the *implementation* yet — round 6's deliverable is just a
+// ranked top-5 of (CE-x, DR-y) pairs we'd want to take to round 7.
+
+aice AIPL_Round6_NextNextGen {
+  dialect = "aice_evolution_v2";
+
+  task = "AIPL に 26/26 next-gen 機能 (CE-1〜13 + DR-1〜13) が 6 ランタイム全てで ✅ になった今、次の言語進化軸を探索する。型システム側 (CE-14 session types / CE-15 dependent index types / CE-16 row-polymorphic actor interfaces / CE-17 gradual region types) と分散側 (DR-14 BFT quorum / DR-15 exactly-once / DR-16 live migration / DR-17 P2P mesh) の 4×4 = 16 cell を MAP-Elites で埋め、最も実装コスト効率の高い (CE, DR) ペアを top-5 として推薦する。**実装ではなく方向性の選択**が round 6 のゴール。既存 26 機能との後方互換 hard floor、Py-I + OCaml で先頭実装可能性を hard requirement。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── 型システム側 4 候補 ──
+    task SessionTypesCE14 {
+      spec = "actor の方法ごとに `?req . !resp . end` のような線形プロトコルを宣言し、通信順序とデッドロックを compile-time に弾く。先行例: Scribble, Session Types in TS。Py-I の grammar.lark に `protocol P { ... }` ブロック追加 + aipl_typeck の channel-typing pass。見積もり: Py-I 350-500 LOC、OCaml 400-600 LOC、JS 300-450 LOC。AIPL の actor model は既に send/now/future を持つので接ぎ木しやすい。";
+    }
+    task DependentIndexCE15 {
+      spec = "`array<n,T>` で `n: int{n>0}` を refinement で indexed-by する dependent type の弱版。CE-6 (Z3 real) + CE-12 (refinement unification) が下地。RuntimeBounds check が effectively-static になり、生成 C コードからも `assert(idx<n)` が消える。見積もり: Py-I 500-800 LOC、OCaml 600-900、C codegen ~200 (bound-elim pass)。";
+    }
+    task RowPolyActorCE16 {
+      spec = "actor の interface を `{m1: T1, m2: T2, ...}` 拡張可能レコードとして型づけ。CE-13 (record width subtyping) を full extensible-record に強化。複数バージョンの actor が同じ caller から見れる、PEP-style structural compat。見積もり: Py-I 250-400 LOC、OCaml 300-500、JS 200-350。CE-13 のすぐ上の物。";
+    }
+    task GradualRegionCE17 {
+      spec = "Rust の region/lifetime を gradual に。値ごとに `'r1 / 'r2 / static` を attach し、actor が region を跨ぐ際は明示。GC との sandwich でゼロコスト化選択肢。Rust より緩い、Pony より厳しい。見積もり: Py-I 600-1000 LOC、OCaml 700-1200、C codegen 中規模。type system に root をはるので破壊力大。";
+    }
+    // ── 分散側 4 候補 ──
+    task BFTQuorumDR14 {
+      spec = "DR-6 quorum_replicate (first-K 集計) を 2f+1 Byzantine fault-tolerant に置換。PBFT or HotStuff の 3-phase pre-prepare / prepare / commit を AIPL の構造化ログ + signature 路と統合。replica が悪意ある応答を返しても correct value に収束。見積もり: aipl_dist.py に 400-700 LOC、OCaml 同等、C は signature crypto がほしくなるので +200。";
+    }
+    task ExactlyOnceDR15 {
+      spec = "現状 at-least-once な send! / now / future に msg-id dedup window を入れる。ack 機構 + idempotency token + per-peer slide window。AIPL の structured log (DR-2) に既に ts_ns があるので id 生成は容易。effect の visible 重複が完全に消える。見積もり: Py-I/OCaml/C 各 300-500 LOC、JS 250-400。";
+    }
+    task LiveMigrationDR16 {
+      spec = "actor を実行中に pause → serialise (field state + mailbox + reply slots) → 別 node で resume。causal 順序を保つため Lamport clock または vector clock を per-actor で持つ必要。DR-7 (subtree quarantine) + DR-12 (region failover) と相補。見積もり: aipl_dist.py に 500-900 LOC、OCaml 600-1000。actor model に hooks がしっかり噛む。";
+    }
+    task P2PMeshDR17 {
+      spec = "現在の暗黙的 star topology (全 actor → root) を gossip protocol 路線に変える。Kademlia or Plumtree。spawn-tree が消えるとは限らず、causal observability を維持するため routing meta が必要。中央集権の単純さを失う代わりに WAN / IoT 向けに伸びる。見積もり: 600-1100 LOC、network stack 一部書き直し。";
+    }
+    // ── cross-cutting ──
+    task BackwardCompat26 {
+      spec = "既存 26 機能と 71 sample (abclc/_smoke_test.sh) + 14 nextgen smoke (browser-abcl/_smoke_nextgen.sh) + 15 C-codegen smoke が無改修で動作。新機能は全て opt-in。1 行で返答。";
+    }
+    task TwoRuntimeFloor {
+      spec = "選ばれた (CE, DR) ペアが Py-I と OCaml の少なくとも 2 ランタイムで現実的な工数 (各 ≤ 1500 LOC) で実装可能。JS-B/JS-N/C への横展開は後続 round で許容するが、最初の 2 つは必須。";
+    }
+    task ImplCost {
+      spec = "(CE, DR) ペア合計の実装コスト見積もり (Py-I + OCaml の 2 runtime 合計)。1.0 = ≤1500 LOC、0.7 = ≤2500、0.3 = ≤4000、0.0 = >4000。";
+    }
+    task LanguageImpact {
+      spec = "言語/設計に与える正のインパクト。1.0 = AIPL の新規ユーザ獲得につながる差別化機能、0.7 = 既存ユースケースの厳密性 / 性能を底上げ、0.3 = niche、0.0 = trivia。";
+    }
+  }
+
+  // 1 セル = (type-axis effect_handling × dist-axis concurrency_model).
+  // schema-valid な軸名のみ使う (round 5 で `?|?` 崩壊した教訓)。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "effect_handling, concurrency_model";
+    generations = 6;
+    seed_count  = 4;
+    open_axes   = false;
+    rng_seed    = 31415937;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.05;
+    novelty               = 0.20;     // ← round 6 は探索寄り
+    evolvability          = 0.15;
+    cross_task_generality = 0.15;
+    implementability      = 0.40;     // ← まだ重視
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "type_first", "dist_first", "impl_cost_first", "novelty_first"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer LanguagePLTReviewer {
+      persona = "あなたは PLT 設計レビュアーです。CE-14..17 / DR-14..17 が AIPL の言語仕様にとってどれくらい意味あるか。session types は Scribble / Multiparty Session、dependent index は Liquid Haskell / F*、row-poly は OCaml polymorphic variants / PureScript、region types は Rust lifetimes / Pony rcaps。1.0 = AIPL の主要な未解決領域に直撃、0.7 = 周辺改善、0.3 = 重複・代替あり、0.0 = AIPL に不適合。1 行で返答。";
+    }
+    reviewer DistResearchReviewer {
+      persona = "あなたは分散システム研究レビュアーです。DR-14..17 が AIPL ランタイムにどれくらい妥当か。BFT は PBFT / HotStuff / Tendermint、exactly-once は Kafka / RabbitMQ idempotency、live migration は Erlang VM hot-code、P2P mesh は Plumtree / GossipSub。1.0 = 実装 + 測定価値高、0.7 = 教科書的だが ROI 中、0.3 = 過剰、0.0 = AIPL の actor model に合わない。1 行で返答。";
+    }
+    reviewer ImplCostEstimator {
+      persona = "あなたは Py-I + OCaml 2 runtime 実装コスト見積もりレビュアーです。先行 round (Py-I next-gen 700 LOC、OCaml 795 LOC、C 880 LOC、JS-B 310 LOC + JS-N reuse) を踏まえ、提案ペアの 2 runtime 合計を予測。1.0 = ≤1500 行、0.7 = ≤2500、0.3 = ≤4000、0.0 = >4000。1 行で返答。";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換性レビュアーです。既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke が無修正で動作するか。新機能は全て opt-in (env var / pragma / 新文法 with parser-state)。1.0 = 完全 opt-in、0.7 = 1-2 sample で軽微影響、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
+    }
+    reviewer NoveltyReviewer {
+      persona = "あなたは新規性レビュアーです。AIPL がこれまで持っていなかった機能か。既存に近いコア (例: CE-16 ≈ CE-13 強化) はやや低スコア。1.0 = 新規領域、0.7 = 強化された延長、0.3 = 重複的、0.0 = 既存と等価。1 行で返答。";
+    }
+    reviewer EvolvabilityReviewer {
+      persona = "あなたは evolvability レビュアーです。この (CE, DR) ペアが採用された後、次の round 7 でさらに発展しうるか。例: session types の上に automaton-based actor optimisation、BFT の上に Tendermint-style proof aggregation。1.0 = 後続発展余地大、0.7 = 1-2 step 後の進化見える、0.3 = 単発、0.0 = 行き止まり。1 行で返答。";
+    }
+    reviewer TwoRuntimeFeasibility {
+      persona = "あなたは 2-runtime 同時実装可能性レビュアーです。提案機能は Py-I と OCaml の両方で同じ semantics で実装可能か (片方は容易だが片方が原理的に困難な物はマイナス)。例: 線形型は OCaml で重め、CRDT は逆に Python 容易。1.0 = 両 runtime 同程度の容易さ、0.7 = どちらかが 1.5x コスト、0.3 = 2x コスト、0.0 = 片方が原理的に困難。1 行で返答。";
+    }
+  }
+}

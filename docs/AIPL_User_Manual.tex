@@ -1146,6 +1146,200 @@ aipl_dist.call_ai_quorum(prompt, providers=None, **kw)
 \end{itemize}
 
 % ============================================================
+\section{Next-gen 機能 (CE-10〜13 + DR-10〜13, 2026-05-18)}
+% ============================================================
+
+Phase C-E2 (CE-1〜9) と AIPL v2 Distributed (DR-1〜9) の上に積み増した
+\textbf{8 個の next-gen 機能}.進化計算 (round 4 + 5) で 4 つの
+type-system 軸 (CE-10〜13) と 4 つの分散軸 (DR-10〜13) が選定され,
+Py-I → OCaml → JS-O → JS-B / JS-N → C の 6 ランタイム全てに ✅
+ポート完了 (\texttt{docs/AIPL\_Runtime\_Feature\_Matrix.pdf} 18 ページ参照).
+既存 26 機能と全 71 サンプルは無修正で動作.
+
+\subsection{8 機能と既定値}
+
+\begin{center}
+\begin{tabular}{p{2cm}p{4.5cm}p{7cm}}
+\toprule
+機能 & 既定値 / トリガ & 役割 \\
+\midrule
+CE-10 effect & 自動 (常時 on, opt-out 不要) &
+  各 method の副作用集合を \texttt{\{ai, fs, net, mut\}} で推論し
+  \texttt{--check} 出力に表示.外部効果を持つメソッドを誤って pure
+  扱いするのを防ぐ. \\
+CE-11 capability & \texttt{AIPL\_CAP\_GRANT="fs,ai,..."}, strict は \texttt{AIPL\_CAP\_STRICT=1} &
+  primitive 呼出し前に \texttt{check\_capability("fs")} を挟むと,
+  cap が grant されていなければ \texttt{cap\_violation} ログ +
+  (strict 時) 例外. \\
+CE-12 refinement unify & 既定 lazy, \texttt{AIPL\_REFINE\_UNIFY=1} で eager &
+  \texttt{int where x>0} などの述語を \texttt{unify} 時に Z3 で
+  subset 判定.JS-N は \texttt{AIPL\_REFINE\_Z3=1} で z3 spawn,
+  JS-B は gradual (z3-wasm 未バンドル). \\
+CE-13 record subtyping & 自動 &
+  \texttt{\{name, age, email\}} を \texttt{p: \{name: string\}} に
+  渡せるよう intersection-based に緩和 (depth 互換は維持). \\
+DR-10 CRDT state & 自動 (\texttt{AIPL\_DIST\_ENABLE=1} 下で) &
+  G-Counter / OR-Set / LWW-Register の 3 種 + \texttt{crdt\_replicate}.
+  multi-replica state を競合なく合流. \\
+DR-11 saga & 自動 (構文 \texttt{saga \{ step \{...\} compensate \{...\} ... \}}) &
+  step 列の途中で例外が起きると,既完了 step の compensate を
+  LIFO で発火し再 raise. \texttt{saga\_*} 7 イベントを NDJSON で記録. \\
+DR-12 region failover & \texttt{AIPL\_REGION=us-east-1}, \texttt{AIPL\_REGION\_FAILOVER="us-east-1,eu-west-1"}, \texttt{AIPL\_ROUTE\_REGION\_<R>="actor:tag,..."} &
+  \texttt{failover\_region(actor)} がチェーンを順に試行し,
+  ルートが見つかった region を返す. \\
+DR-13 auto-scaling pool & 自動 (\texttt{pool\_create(cls, min, max, target\_qlen)}) &
+  hysteresis controller で qlen 過多なら spawn,空きすぎなら retire.
+  \texttt{pool\_pick} はラウンドロビン. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{CE-10 effect 推論の出力例}
+
+\begin{lstlisting}[language=]
+$ aipl2c --check effects_demo.abcl
+=== inferred method effects ===
+[class_method_effects]
+class AIReporter
+  summarise effects: {ai, mut}
+class FileLog
+  write effects: {fs, mut}
+  peek  effects: {fs}
+class Pure
+  add   effects: {}
+\end{lstlisting}
+
+\noindent OCaml ランタイムでは \texttt{repl\_thread.exe --check} で同じ出力.
+Py-I は \texttt{python3 src/python-aipl/aipl\_main.py --check FILE},
+JS-N は \texttt{POST /api/typecheck} の JSON で
+\texttt{methods["m"] = "(...) -> \_ ![ai, fs, mut]"} として返る.
+
+\subsection{CE-11 capability の使い方}
+
+\begin{lstlisting}[language=]
+export AIPL_CAP_GRANT="fs,ai"
+export AIPL_CAP_STRICT=1
+aipl2c run.abcl && cc run.c -o run && ./run
+\end{lstlisting}
+
+\noindent \texttt{run.abcl} 側では:
+
+\begin{lstlisting}
+class Worker {
+  method run() {
+    check_capability("fs");        // ok: grant に入っている
+    var c = read_file("/etc/hosts");
+    check_capability("net");       // FAIL: strict mode で throw
+    /* ... */
+  }
+}
+\end{lstlisting}
+
+\noindent strict mode を切ると \texttt{check\_capability} は
+\texttt{cap\_violation} ログを出すだけで進む.
+
+\subsection{DR-11 saga 構文}
+
+\texttt{step \{ body \} compensate \{ rollback \}} のペアを並べる.
+
+\begin{lstlisting}
+class Flow {
+  method run(b) {
+    saga {
+      step       { send b.reserve(2); }
+      compensate { send b.release(2); }
+      step       { send b.charge(100); }
+      compensate { send b.refund(100); }
+    }
+  }
+}
+\end{lstlisting}
+
+\noindent 2 step 目で例外が起きると compensate 1 が発火して
+\texttt{reserve} が undo される. NDJSON ログ
+(\texttt{AIPL\_DIST\_LOG\_FILE=/path} 必須) に 7 種類のイベント
+(\texttt{saga\_started} / \texttt{saga\_step\_complete} /
+ \texttt{saga\_step\_failed} / \texttt{saga\_compensated} /
+ \texttt{saga\_compensate\_failed} / \texttt{saga\_finished} /
+ \texttt{saga\_aborted}) を吐く.
+
+\subsection{DR-10 CRDT の使い方}
+
+\begin{lstlisting}
+class Counter {
+  var c = 0;
+  method init() { c = crdt_gcounter_new(); }
+  method inc(n) { crdt_gcounter_inc(c, n); }
+  method val()  { reply(crdt_gcounter_value(c)); }
+  method sync(other) {
+    var merged = crdt_gcounter_merge(c, other);
+    c = merged;
+    crdt_replicate(c);
+  }
+}
+\end{lstlisting}
+
+\noindent OR-Set (\texttt{crdt\_orset\_add / remove / contains / values / merge}) と
+LWW-Register (\texttt{crdt\_lww\_new / write / value / merge}) も同様の API.
+\texttt{crdt\_replicate} は構造化ログに \texttt{crdt\_replicate} イベント
+を残すフック (実 transport は別途).
+
+\subsection{DR-12 multi-region failover}
+
+\begin{lstlisting}[language=bash]
+export AIPL_REGION=us-east-1
+export AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-northeast-1"
+export AIPL_ROUTE_REGION_us-east-1="Greeter:fast"
+export AIPL_ROUTE_REGION_eu-west-1="Greeter:slow"
+\end{lstlisting}
+
+\noindent プログラム側で \texttt{failover\_region("Greeter")} を呼ぶと,
+チェーンを順に試行して route が見つかった region を返す.
+全 region で route 未定義なら \texttt{region\_failover\_failed} を
+ログに残して空文字を返す.
+
+\subsection{DR-13 auto-scaling actor pool}
+
+\begin{lstlisting}
+class Master {
+  method init() {
+    var pool = pool_create("Worker", 2, 10, 4);  // min, max, target_qlen
+    /* ... */
+    var w = pool_pick(pool);
+    send w.task("payload");
+  }
+}
+\end{lstlisting}
+
+\noindent qlen が \texttt{target\_qlen} を上回ると hysteresis controller が
+新 worker を spawn,下回り続けると retire.\texttt{pool\_size} で
+現在の worker 数を取得. \texttt{pool\_destroy} で明示終了 (子 actor
+は通常通り終了).
+
+\subsection{6 ランタイムでの動作}
+
+機能ごとの ✅ 状況は \texttt{docs/AIPL\_Runtime\_Feature\_Matrix.pdf}
+(18 ページ) が随時更新される正本.2026-05-18 時点で
+Py-I / OCaml / JS-O / JS-B / JS-N / C 全てに 26 個の next-gen
+機能が ✅ で揃っている (Py-A は意図的に最小実装枠で 17 機能が ❌).
+
+\subsection{進化計算による設計の経緯}
+
+8 機能は手書きではなく \texttt{AIPL\_PyI\_NextGen.aice} /
+\texttt{AIPL\_OCaml\_NextGenPort.aice} / \texttt{AIPL\_C\_NextGenPort.aice} /
+\texttt{AIPL\_JSBJSN\_NextGenPort.aice} の 4 つの仕様を
+MAP-Elites で round 2〜5 として探索した結果:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item Round 2 (Py-I 4×4=16 cell): CE-10..13 + DR-10..13 を選定
+\item Round 3 (OCaml port): Py-I 8 機能をそのまま OCaml に直訳
+\item Round 4 (C codegen): \texttt{abcl\_nextgen\_runtime.\{c,h\}} 880 LOC
+\item Round 5 (JS-B + JS-N): 共有 \texttt{src/browser-abcl/src/} 経由
+\end{itemize}
+
+\noindent 4 .aice 仕様は \texttt{aice-pi-evolution/experiments/2026-05-18\_*/}.
+
+% ============================================================
 \section{付録: トラブルシューティング}
 % ============================================================
 

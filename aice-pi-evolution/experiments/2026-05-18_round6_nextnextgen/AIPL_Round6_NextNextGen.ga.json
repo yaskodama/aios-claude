@@ -1,0 +1,137 @@
+{
+  "name": "AIPL_Round6_NextNextGen",
+  "task": "AIPL に 26/26 next-gen 機能 (CE-1〜13 + DR-1〜13) が 6 ランタイム全てで ✅ になった今、次の言語進化軸を探索する。型システム側 (CE-14 session types / CE-15 dependent index types / CE-16 row-polymorphic actor interfaces / CE-17 gradual region types) と分散側 (DR-14 BFT quorum / DR-15 exactly-once / DR-16 live migration / DR-17 P2P mesh) の 4×4 = 16 cell を MAP-Elites で埋め、最も実装コスト効率の高い (CE, DR) ペアを top-5 として推薦する。**実装ではなく方向性の選択**が round 6 のゴール。既存 26 機能との後方互換 hard floor、Py-I + OCaml で先頭実装可能性を hard requirement。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "effect_handling",
+      "concurrency_model"
+    ],
+    "generations": 6,
+    "seed_count": 4,
+    "open_axes": false,
+    "rng_seed": 31415937
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "SessionTypesCE14",
+      "DependentIndexCE15",
+      "RowPolyActorCE16",
+      "GradualRegionCE17",
+      "BFTQuorumDR14",
+      "ExactlyOnceDR15",
+      "LiveMigrationDR16",
+      "P2PMeshDR17",
+      "BackwardCompat26",
+      "TwoRuntimeFloor",
+      "ImplCost",
+      "LanguageImpact"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "LanguagePLTReviewer",
+        "persona": "あなたは PLT 設計レビュアーです。CE-14..17 / DR-14..17 が AIPL の言語仕様にとってどれくらい意味あるか。session types は Scribble / Multiparty Session、dependent index は Liquid Haskell / F*、row-poly は OCaml polymorphic variants / PureScript、region types は Rust lifetimes / Pony rcaps。1.0 = AIPL の主要な未解決領域に直撃、0.7 = 周辺改善、0.3 = 重複・代替あり、0.0 = AIPL に不適合。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "DistResearchReviewer",
+        "persona": "あなたは分散システム研究レビュアーです。DR-14..17 が AIPL ランタイムにどれくらい妥当か。BFT は PBFT / HotStuff / Tendermint、exactly-once は Kafka / RabbitMQ idempotency、live migration は Erlang VM hot-code、P2P mesh は Plumtree / GossipSub。1.0 = 実装 + 測定価値高、0.7 = 教科書的だが ROI 中、0.3 = 過剰、0.0 = AIPL の actor model に合わない。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ImplCostEstimator",
+        "persona": "あなたは Py-I + OCaml 2 runtime 実装コスト見積もりレビュアーです。先行 round (Py-I next-gen 700 LOC、OCaml 795 LOC、C 880 LOC、JS-B 310 LOC + JS-N reuse) を踏まえ、提案ペアの 2 runtime 合計を予測。1.0 = ≤1500 行、0.7 = ≤2500、0.3 = ≤4000、0.0 = >4000。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換性レビュアーです。既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke が無修正で動作するか。新機能は全て opt-in (env var / pragma / 新文法 with parser-state)。1.0 = 完全 opt-in、0.7 = 1-2 sample で軽微影響、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "NoveltyReviewer",
+        "persona": "あなたは新規性レビュアーです。AIPL がこれまで持っていなかった機能か。既存に近いコア (例: CE-16 ≈ CE-13 強化) はやや低スコア。1.0 = 新規領域、0.7 = 強化された延長、0.3 = 重複的、0.0 = 既存と等価。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "EvolvabilityReviewer",
+        "persona": "あなたは evolvability レビュアーです。この (CE, DR) ペアが採用された後、次の round 7 でさらに発展しうるか。例: session types の上に automaton-based actor optimisation、BFT の上に Tendermint-style proof aggregation。1.0 = 後続発展余地大、0.7 = 1-2 step 後の進化見える、0.3 = 単発、0.0 = 行き止まり。1 行で返答。",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "TwoRuntimeFeasibility",
+        "persona": "あなたは 2-runtime 同時実装可能性レビュアーです。提案機能は Py-I と OCaml の両方で同じ semantics で実装可能か (片方は容易だが片方が原理的に困難な物はマイナス)。例: 線形型は OCaml で重め、CRDT は逆に Python 容易。1.0 = 両 runtime 同程度の容易さ、0.7 = どちらかが 1.5x コスト、0.3 = 2x コスト、0.0 = 片方が原理的に困難。1 行で返答。",
+        "weight": 0.14285714285714285
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.05,
+    "novelty": 0.2,
+    "evolvability": 0.15,
+    "cross_task_generality": 0.15,
+    "implementability": 0.4
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "type_first",
+      "dist_first",
+      "impl_cost_first",
+      "novelty_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "type_first": {},
+      "dist_first": {},
+      "impl_cost_first": {},
+      "novelty_first": {}
+    },
+    "top_k": 5
+  }
+}
