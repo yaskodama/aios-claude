@@ -66,6 +66,24 @@ check_contains "ActorSheet"    "$AS_LOG" "C2 = 1200"
 check_contains "ActorSheet"    "$AS_LOG" "C3 = 1330"
 check_contains "ActorSheet"    "$AS_LOG" "=== done ==="
 
+# ── Phase 3: PersistedSheet (P3 DistCheckpoint) ──────────────
+echo
+echo "[Phase 3] PersistedSheet (save / load round-trip)"
+PS_LOG="$LOGDIR/PersistedSheet.log"
+timeout 25 python3 aipl_main.py samples/spreadsheet/PersistedSheet.abcl > "$PS_LOG" 2>&1
+
+check_contains "PersistedSheet" "$PS_LOG" "=== original ==="
+check_contains "PersistedSheet" "$PS_LOG" "[save] /tmp/_persisted_sheet.txt"
+check_contains "PersistedSheet" "$PS_LOG" "=== reloaded ==="
+check_contains "PersistedSheet" "$PS_LOG" "[load] /tmp/_persisted_sheet.txt"
+# Same computed values appear twice (original + reloaded) — verify both runs
+orig_count=$(grep -c "C3 = 1330" "$PS_LOG")
+if [ "$orig_count" -eq 2 ]; then
+  pass=$((pass+1)); printf '  PASS  %-16s | round-trip C3 = 1330 (orig+reload)\n' "PersistedSheet"
+else
+  fail=$((fail+1)); printf '  FAIL  %-16s | expected 2 occurrences of C3=1330, got %d\n' "PersistedSheet" "$orig_count"
+fi
+
 echo
 echo "==== WebSpreadsheet smoke summary ===="
 echo "  pass=$pass  fail=$fail  (logs: $LOGDIR/)"

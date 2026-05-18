@@ -26,14 +26,14 @@
 | 0 | AST-formula eval (parser なし) | `HelloSheet.abcl` | ✅ 5 assertion |
 | 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | ✅ 4 assertion |
 | 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ✅ 5 assertion |
-| 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ⏳ |
-| 4 | R3 renderer + IT2 event bus | browser-abcl 統合 | ⏳ |
+| 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ✅ 5 assertion |
+| 4 | R3 renderer + IT2 event bus | `src/browser-abcl/spreadsheet.{html,abcl}` | 🔄 着手中 |
 
 ## smoke
 
 ```sh
 bash src/python-aipl/samples/spreadsheet/_smoke.sh
-# → pass=14  fail=0 (Phase 0 + 1 + 2)
+# → pass=19  fail=0 (Phase 0 + 1 + 2 + 3)
 ```
 
 ## 学んだこと (Phase 2)
