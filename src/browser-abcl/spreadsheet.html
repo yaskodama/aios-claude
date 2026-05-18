@@ -127,16 +127,21 @@
       return id;
     };
 
-    // ─── JS-side formula evaluator (Phase 5.5 expanded) ─────────
-    // Mirrors GSheetsCore12.abcl's PA4 parser + Core12 dispatch
-    // (now ALL 12 functions, not just 5) + comparison ops needed
-    // by IF(cond, t, e).  Supports:
+    // ─── JS-side formula evaluator (Round 6: + range refs) ──────
+    // Mirrors GSheetsCore12.abcl + GSheetsRanges.abcl from Py-I.
+    // Supports:
     //   literals (INT), refs (A1, $A$1)
+    //   range refs (A1:B10, $A$1:$E$5)
     //   arithmetic + - * /
     //   comparison < > <= >= == !=
     //   parens ( )
     //   12 functions: SUM AVG MIN MAX COUNT COUNTA IF ABS POWER MOD
     //                 ROUND FLOOR CEIL
+    //
+    // Range refs are flattened to their cell values inside Call
+    // args (SUM(A1:E5) sees 5×5=25 scalars); a bare Range outside
+    // a function returns the first cell's value (Sheets shows
+    // #ERROR; we degrade gracefully).
 
     function tokenize(s) {
       const T = [];
@@ -188,12 +193,50 @@
           eat(); // )
           return { tag: "Call", name: t.v, args };
         }
+        // R3: detect `IDENT : IDENT` as a Range node.
+        if (peek().k === ":") {
+          const sep = __toks[__pos];      // ":"
+          const nxt = __toks[__pos + 1];  // expected IDENT
+          if (nxt && nxt.k === "IDENT") {
+            eat(); // ":"
+            eat(); // end IDENT
+            return { tag: "Range", start_id: t.v, end_id: nxt.v };
+          }
+        }
         return { tag: "Ref", id: t.v };
       }
       if (t.k === "(") { eat(); const e = parseExpr(); eat(); return e; }
       // Unary minus (e.g. -5 inside expressions).
       if (t.k === "-") { eat(); const e = parsePrim(); return { tag: "Bin", op: "-", lhs: { tag: "Lit", val: 0 }, rhs: e }; }
       return { tag: "Lit", val: 0 };
+    }
+
+    // ─── R3 range-cell helpers (A1:B10 expansion) ───────────────
+    // Matches Py-I GSheetsRanges.abcl's id_to_pair / pair_to_id.
+    const RANGE_COLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    function idToPair(id) {
+      const colCh = id.charAt(0);
+      const col   = RANGE_COLS.indexOf(colCh);
+      const row1  = parseInt(id.slice(1), 10) || 0;
+      return { col, row: row1 - 1 };
+    }
+    function pairToId(col, row) {
+      return RANGE_COLS.charAt(col) + (row + 1);
+    }
+    function evalRange(node) {
+      const a = idToPair(node.start_id);
+      const b = idToPair(node.end_id);
+      let c0 = a.col, c1 = b.col;
+      let r0 = a.row, r1 = b.row;
+      if (c0 > c1) { const t = c0; c0 = c1; c1 = t; }
+      if (r0 > r1) { const t = r0; r0 = r1; r1 = t; }
+      const vs = [];
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          vs.push(cellValues.get(pairToId(c, r)) || 0);
+        }
+      }
+      return vs;
     }
     function parseMul() {
       let l = parsePrim();
@@ -228,6 +271,12 @@
     function evalAst(a) {
       if (a.tag === "Lit") return a.val;
       if (a.tag === "Ref") return cellValues.get(a.id) || 0;
+      if (a.tag === "Range") {
+        // Bare range outside a function call — Sheets shows #ERROR;
+        // we degrade gracefully to the first cell.
+        const vs = evalRange(a);
+        return vs.length ? vs[0] : 0;
+      }
       if (a.tag === "Bin") {
         const l = evalAst(a.lhs), r = evalAst(a.rhs);
         switch (a.op) {
@@ -252,7 +301,13 @@
           const c = evalAst(a.args[0]);
           return c !== 0 ? evalAst(a.args[1]) : evalAst(a.args[2]);
         }
-        const vs = a.args.map(evalAst);
+        // R3: flatten Range nodes into their cell-value lists so
+        // SUM(A1:E5) sees 25 scalars, not 1 Range AST.
+        const vs = [];
+        for (const arg of a.args) {
+          if (arg.tag === "Range") vs.push(...evalRange(arg));
+          else                     vs.push(evalAst(arg));
+        }
         switch (nm) {
           case "SUM":    return vs.reduce((s, v) => s + v, 0);
           case "AVG":    return vs.length ? Math.trunc(vs.reduce((s, v) => s + v, 0) / vs.length) : 0;
