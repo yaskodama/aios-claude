@@ -258,15 +258,22 @@ def unify(t1: Any, t2: Any) -> Subst:
         for a, b in zip(t1.items, t2.items):
             s = compose(unify(apply(s, a), apply(s, b)), s)
         return s
-    # E-1: structural record unification.  Both records must have the
-    # same set of field names; per-field types are unified recursively.
+    # CE-13: width subtyping for records.  Previously this required
+    # both records to have exactly the same set of field names; that
+    # rules out the common AIPL pattern where a method declares
+    # `r: {x: int}` and a caller passes `{x: int, y: int, z: string}`.
+    # Now we unify the INTERSECTION of fields (recursive depth-
+    # subtyping per field) and ignore fields present in only one
+    # side.  We still reject record × record with NO overlap to catch
+    # outright type errors (`{x: int}` vs `{label: string}`).
     if isinstance(t1, TRecord) and isinstance(t2, TRecord):
         d1, d2 = dict(t1.fields), dict(t2.fields)
-        if set(d1.keys()) != set(d2.keys()):
+        common = set(d1.keys()) & set(d2.keys())
+        if not common and (d1 and d2):
             raise UnifyError(
-                f"record fields differ: {sorted(d1)} vs {sorted(d2)}")
+                f"record fields disjoint: {sorted(d1)} vs {sorted(d2)}")
         s: Subst = {}
-        for name in sorted(d1.keys()):
+        for name in sorted(common):
             s = compose(unify(apply(s, d1[name]), apply(s, d2[name])), s)
         return s
     # Refinement vs base: drop refinement for unification (kept aside for SMT)

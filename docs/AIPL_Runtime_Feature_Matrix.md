@@ -236,6 +236,20 @@ the first region that knows the actor.  Logs
 round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
 axis, top elite I0012 had 0.70 for this task).
 
+¹⁴ CE-13 record width subtyping: `aipl_inference.unify` previously
+required two `TRecord` types to have *exactly* identical field
+sets, which rules out the natural AIPL pattern where a method's
+body reads a subset of the caller's record.  CE-13 changes this to
+intersection-based unification: fields present on both sides
+unify pairwise (depth subtyping preserved), fields on only one
+side are ignored (width subtyping), and wholly-disjoint records
+still raise.  Principal-type behavior of unannotated record
+parameters is preserved — inference accumulates the union of
+accessed fields as constraints on the param TVar.  Sample:
+`src/python-aipl/samples/RecordSubtyping.abcl`.  Picked by round-2
+MAP-Elites (reviewer avg 0.400 — fifth, second on the type-
+extension axis after CE-11).
+
 ¹³ DR-11 saga orchestration: declarative compensating-action
 orchestration as a new top-level statement.  `grammar.lark` gains
 `saga_stmt: "saga" "{" saga_step+ "}"` and
@@ -331,6 +345,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
 | **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._collect_effects_from_ast` (commit `3edfa30`) |
 | **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{grant,revoke,has,check}_*` + 5 primitives |
+| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference.unify` (record arm) |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -733,4 +748,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-11/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
+*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11/CE-13 + DR-10/DR-11/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*

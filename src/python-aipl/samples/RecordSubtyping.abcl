@@ -1,0 +1,41 @@
+// CE-13 — record width subtyping.
+//
+// The HM unify (`aipl_inference.unify`) previously required two
+// TRecord types to have *exactly* the same set of field names.
+// That rules out the common AIPL pattern where a method's body
+// reads only a subset of the caller's record.  CE-13 relaxes this
+// to intersection-based unification: fields that appear on both
+// sides must unify (depth subtyping), fields on only one side are
+// ignored (width subtyping).  Wholly-disjoint records still fail.
+//
+// Verify the inference quality with:
+//   python3 src/python-aipl/aipl_main.py --infer \
+//     src/python-aipl/samples/RecordSubtyping.abcl
+
+class Greeter {
+  // `p` is unannotated; inference figures out it needs at least .name.
+  method greet(p) {
+    return "Hello, " + p.name;
+  }
+}
+
+class Mailer {
+  // Reads .name AND .email — inference accumulates both.
+  method deliver(p) {
+    return "Sending to " + p.name + " <" + p.email + ">";
+  }
+}
+
+var g = new Greeter();
+var m = new Mailer();
+
+// Caller record has 4 fields.  Before CE-13 this would unify-fail
+// against Greeter.greet's inferred {name: string} (4 ≠ 1) and
+// Mailer.send's {name: string, email: string} (4 ≠ 2).  With CE-13
+// both succeed because the intersected fields unify.
+var user = {name: "Alice", age: 30, email: "alice@example.com", role: "admin"};
+
+var hi = now g.greet(user);
+var note = now m.deliver(user);
+print(hi);
+print(note);
