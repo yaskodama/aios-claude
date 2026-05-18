@@ -1,0 +1,173 @@
+// AIPL_WebSpreadsheet_Impl.aice  (2026-05-18 draft, round 2 follow-on)
+//
+// Round 1 (AIPL_WebSpreadsheet.aice) は 4 設計軸 (T 表現 × C 計算
+// × S 同期 × U UI) の MVP-recommended quadruple として
+// (T4 ActorPerCell, C1 ClientFull, S1 SingleUser, U2 Canvas_2D) を
+// 採掘した.Round 2 (本仕様) は4 つの選定を**固定**し、各コンポーネント
+// の**実装戦略**を 4 variant ずつ並べて再探索する.
+//
+// Round 1 の収束軸 (pinning targets):
+//   paradigm = ParallelOOP (round 1 elites)
+//   state_representation = symbol_owned   ← top 2 elites
+//   concurrency_model = structured        ← top 1 elite
+//   effect_handling = monadic             ← top elite (CE-10 と整合)
+//   ownership_model = gc                  ← top elite
+//
+// 本 round の cell_axes は round 1 で multi-modal だった
+// (type_safety, ownership_model) — refinement で「より厳密 vs 緩い」
+// の trade-off を浮き出させる.
+//
+// 6 コンポーネント × 4 variant = 24 evaluation task.各コンポーネントは
+// MVP 全体で接続される必要があり、reviewer は組合せの coherence と
+// AIPL 既存 infrastructure 再利用度を厳しく評価する.
+
+aice AIPL_WebSpreadsheet_Impl {
+  dialect = "aice_evolution_v2";
+
+  task = "Round 1 で採掘された MVP 設計 (T4 ActorPerCell + C1 ClientFull + S1 SingleUser + U2 Canvas_2D) を所与とし、6 コンポーネント (CellActor 設計 / FormulaEval 戦略 / Persistence backend / Renderer mode / Parser approach / Integration topology) の各 4 variant を MAP-Elites で探索する.4×4×4×4×4×4 = 4096 cell の組合せ空間から MVP 実装 (Py-I + JS-N + browser-abcl の 3 ランタイム協調) でベストの 6-tuple を top-5 として推薦する.既存 26 機能 + 47 self-host smoke + 24 OCaml/abclc nextgen + 24 Py-I nextgen の後方互換は absolute floor.LOC 見積もり ≤2500 LOC (round 1 で推定したレンジの下半分) を hard goal.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── CellActor 設計 (T4 内部) ──
+    task CA1_EagerSpawn {
+      spec = "シート open 時に全 cell actor を一気に spawn (100×26 = 2600 actor).初期化遅いが iteration 後はゼロオーバーヘッド.AIPL の `new` 連発、DR-13 pool で管理.見積もり 80-120 LOC.";
+    }
+    task CA2_LazyOnEdit {
+      spec = "cell が編集されるか formula 参照されたとき初めて spawn.empty cell は actor 持たない.95% empty の実 sheet で actor 数最小化.spawn-on-demand hook が必要.見積もり 120-180 LOC.";
+    }
+    task CA3_BlockOfCells {
+      spec = "1 block = 100 cells (10×10 タイル) を 1 actor で管理.actor 数 25×3 = 75 個程度に圧縮、内部 dense array.formula ref は (block_id, local_idx) で.見積もり 150-220 LOC.";
+    }
+    task CA4_HybridSpawn {
+      spec = "CA1+CA2 hybrid: visible cell (現スクロール位置) は eager、それ以外は lazy.scroll で boundary 越えたら spawn.見積もり 200-300 LOC.";
+    }
+    // ── FormulaEval 戦略 ──
+    task FE1_LevelAReuse {
+      spec = "aipl-self-host/level-a/metacircular.abcl の eval() を import して formula AST に流用.AIPL の既存自己反映 evaluator がそのまま動く.見積もり 50-100 LOC (主に AST builder).";
+    }
+    task FE2_DirectInterp {
+      spec = "formula 用に専用 interpreter を AIPL で書く.Level-A より高速、ただし車輪再発明.見積もり 200-300 LOC.";
+    }
+    task FE3_LazyMemoize {
+      spec = "FE1 + per-cell memoization.cell value 変化時のみ依存 cell を invalidate.topological recompute の代替.見積もり 250-350 LOC.";
+    }
+    task FE4_ActorEval {
+      spec = "各 cell actor が自分の formula を保持し、`send cell.eval()` で評価.AIPL native だが synchronous formula chain で deadlock 可能性.見積もり 300-400 LOC.";
+    }
+    // ── Persistence backend ──
+    task P1_LocalStorageOnly {
+      spec = "browser-side で localStorage に JSON dump.JS-B のみで完結、JS-N 不要.見積もり 50-80 LOC.";
+    }
+    task P2_FsRoundTrip {
+      spec = "AIPL の read_file/write_file (CE-11 cap fs).JS-N 側に save endpoint、CSV-like format.見積もり 100-150 LOC.";
+    }
+    task P3_DistCheckpoint {
+      spec = "DR-4 既存 AIPL_DIST_CHECKPOINT_DIR を流用.actor field を atomic save、open 時に restore.AIPL ネイティブ.見積もり 80-120 LOC.";
+    }
+    task P4_IndexedDB {
+      spec = "browser の IndexedDB API.数 MB sheet も保持可能、structured clone で関数も保存.JS-B 専用、JS-N と非対称.見積もり 150-220 LOC.";
+    }
+    // ── Renderer mode (U2 内部) ──
+    task R1_FullRepaint {
+      spec = "全 cell を毎フレーム描画.<10k cells で十分速い.実装最簡.見積もり 100-150 LOC.";
+    }
+    task R2_DirtyRect {
+      spec = "変化した cell を含む矩形だけ再描画.スクロール 60fps 維持.見積もり 200-300 LOC.";
+    }
+    task R3_LayerComposite {
+      spec = "grid lines / cell content / selection を別 canvas に layered で描画.合成は GPU.見積もり 250-350 LOC.";
+    }
+    task R4_OffscreenCanvas {
+      spec = "OffscreenCanvas + Web Worker でメインスレッド非ブロック.最新ブラウザ専用.見積もり 300-400 LOC.";
+    }
+    // ── Parser approach (formula 文法) ──
+    task PA1_RecursiveDescent {
+      spec = "AIPL function で手書き recursive descent.AIPL の制御構造で素直.見積もり 200-300 LOC.";
+    }
+    task PA2_PrattParser {
+      spec = "Pratt (top-down operator precedence) parser.演算子優先順位の表だけで完結、拡張容易.見積もり 150-250 LOC.";
+    }
+    task PA3_PEG_Generator {
+      spec = "PEG.js 系で grammar から JS parser 自動生成.AIPL の外側ツール依存、JS-N 限定.見積もり 100-150 LOC + 外部 PEG ライブラリ.";
+    }
+    task PA4_LevelCPort {
+      spec = "aipl-self-host/level-c/parser.abcl を流用 + AIPL formula 構文に拡張.既存資産再利用.見積もり 150-250 LOC.";
+    }
+    // ── Integration topology ──
+    task IT1_StarTopology {
+      spec = "中央 Coordinator actor が全 cell actor を管理、UI と通信もここを介す.AIPL の既定パターン.見積もり 100-150 LOC.";
+    }
+    task IT2_EventBus {
+      spec = "publish-subscribe バス.cell 更新 → 依存 cell + UI が subscribe.AIPL では actor + send で実装可、ただし event_bus actor 必要.見積もり 150-220 LOC.";
+    }
+    task IT3_DirectMsgPassing {
+      spec = "actor 同士が直接 send.UI も actor として扱う.AIPL の DR-8 spawn-tree が役立つ.見積もり 100-150 LOC.";
+    }
+    task IT4_DataflowGraph {
+      spec = "明示的 dependency graph を別 actor (Scheduler) が持ち、topological order で update.formula chain の正確性最強.見積もり 250-350 LOC.";
+    }
+    // ── 横断的タスク ──
+    task TotalImplCost {
+      spec = "6 コンポーネント合計 LOC (cell + formula + persist + render + parser + integration).1.0 = ≤1500、0.7 = ≤2200、0.3 = ≤3000、0.0 = >3000.";
+    }
+    task ThreeRuntimeCoherence {
+      spec = "Py-I (formula eval) + JS-N (server + persistence) + browser-abcl (UI + actor model) の 3 ランタイム協調.選ばれた variant 群が各 runtime の役割を破綻なく分担できるか.";
+    }
+    task BackwardCompat {
+      spec = "既存 26 機能 + 71 abclc + 14 JS nextgen + 47 self-host smoke + node-aipl-server 10/10 が無修正で動作.spreadsheet 全体は新 url path or 別 subcommand で opt-in.";
+    }
+    task ExistingInfraReuse {
+      spec = "既存 AIPL infra (Level-A eval, DR-13 pool, DR-4 checkpoint, CE-11 capability, HMAC URL signing, WebSocket) をどれだけ再利用しているか.1.0 = ≥5 件再利用、0.7 = 3-4 件、0.3 = 1-2 件、0.0 = 全て新規実装.";
+    }
+  }
+
+  // Round 1 で multi-modal だった 2 軸を refinement.
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "type_safety, ownership_model";
+    generations = 8;
+    seed_count  = 8;
+    open_axes   = false;
+    rng_seed    = 16180339;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.05;
+    novelty               = 0.05;   // refinement なので低く
+    evolvability          = 0.10;
+    cross_task_generality = 0.20;
+    implementability      = 0.55;   // ← 最重視
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["minimal_loc", "max_aipl_native", "browser_first", "server_first", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer PinnedRound1Reviewer {
+      persona = "あなたは round 1 収束軸 pinning レビュアーです.round 1 top elite (paradigm=Functional/ParallelOOP, state_repr=symbol_owned, concurrency_model=structured, effect_handling=monadic, ownership_model=gc) と矛盾しない個体を高評価.4 軸全合致 = 1.0、3/5 = 0.7、≤1/5 = 0.0.1 行で返答.";
+    }
+    reviewer AIPLNativenessReviewer {
+      persona = "あなたは AIPL ネイティブ度レビュアーです.選ばれた 6 variant 組合せが AIPL の actor model / DR-* / CE-* / self-host eval 機能をどれだけ自然に活用しているか.CA1 eager + FE1 LevelA-reuse + P3 dist-checkpoint + IT1 star は AIPL ど真ん中.JS-only な選択 (P1 localStorage / R4 offscreen / PA3 PEG.js) は AIPL を素通り.1.0 = AIPL を showcase、0.7 = 大半、0.3 = 一部、0.0 = AIPL の意味薄い.1 行で返答.";
+    }
+    reviewer LOCAccuracyReviewer {
+      persona = "あなたは LOC 見積もり精度レビュアーです.6 variant の見積もり LOC 合計が ≤2500 か.先行 round (Py-I next-gen 700 LOC で 8 機能、JS-B 310 LOC + 8 機能) を踏まえる.1.0 = ≤1500、0.7 = ≤2200、0.3 = ≤3000、0.0 = >3000.1 行で返答.";
+    }
+    reviewer ThreeRuntimeBalance {
+      persona = "あなたは 3 ランタイム協調レビュアーです.Py-I + JS-N + browser-abcl の役割分担が論理的か (Py-I = formula、JS-N = persistence + server、browser-abcl = UI + cell actor).variant 選択が各 runtime に偏らず、circular dependency も生まないか.1.0 = perfect、0.7 = 1-2 軽微、0.3 = 軸ずれ、0.0 = 破綻.1 行で返答.";
+    }
+    reviewer FormulaEngineFitReviewer {
+      persona = "あなたは formula engine 適合性レビュアーです.選ばれた FE (FormulaEval) + PA (Parser) + IT (Integration) の組合せが、Excel-like formula (=A1+B1+SUM(C1:C10)) を正しく評価できるか.特に topological recompute (循環参照検出含む) の対応.1.0 = full、0.7 = MVP 5 関数まで、0.3 = 算術のみ、0.0 = 不完全.1 行で返答.";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換レビュアーです.既存 26 機能 + 71 abclc + 14 JS nextgen + 47 self-host + 10 node-aipl-server smoke が無修正で動作するか.選ばれた variant 群が既存ファイルを変更せず、新 dir / 新 server subcommand / 新 url path のみで opt-in 可能か.1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.";
+    }
+    reviewer InfraReuseReviewer {
+      persona = "あなたは既存 infra 再利用レビュアーです.選ばれた組合せが何個の既存 AIPL infra を活用するか: (1) Level-A eval, (2) DR-13 pool, (3) DR-4 checkpoint, (4) CE-11 cap, (5) HMAC URL, (6) WebSocket, (7) DR-10 CRDT (将来 collab 用に残す価値), (8) DR-11 saga (bulk-paste undo 用).1.0 = ≥6 件、0.7 = 4-5 件、0.3 = 2-3 件、0.0 = ≤1 件.1 行で返答.";
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "name": "AIPL_WebSpreadsheet_Impl",
+  "task": "Round 1 で採掘された MVP 設計 (T4 ActorPerCell + C1 ClientFull + S1 SingleUser + U2 Canvas_2D) を所与とし、6 コンポーネント (CellActor 設計 / FormulaEval 戦略 / Persistence backend / Renderer mode / Parser approach / Integration topology) の各 4 variant を MAP-Elites で探索する.4×4×4×4×4×4 = 4096 cell の組合せ空間から MVP 実装 (Py-I + JS-N + browser-abcl の 3 ランタイム協調) でベストの 6-tuple を top-5 として推薦する.既存 26 機能 + 47 self-host smoke + 24 OCaml/abclc nextgen + 24 Py-I nextgen の後方互換は absolute floor.LOC 見積もり ≤2500 LOC (round 1 で推定したレンジの下半分) を hard goal.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "type_safety",
+      "ownership_model"
+    ],
+    "generations": 8,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 16180339
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "CA1_EagerSpawn",
+      "CA2_LazyOnEdit",
+      "CA3_BlockOfCells",
+      "CA4_HybridSpawn",
+      "FE1_LevelAReuse",
+      "FE2_DirectInterp",
+      "FE3_LazyMemoize",
+      "FE4_ActorEval",
+      "P1_LocalStorageOnly",
+      "P2_FsRoundTrip",
+      "P3_DistCheckpoint",
+      "P4_IndexedDB",
+      "R1_FullRepaint",
+      "R2_DirtyRect",
+      "R3_LayerComposite",
+      "R4_OffscreenCanvas",
+      "PA1_RecursiveDescent",
+      "PA2_PrattParser",
+      "PA3_PEG_Generator",
+      "PA4_LevelCPort",
+      "IT1_StarTopology",
+      "IT2_EventBus",
+      "IT3_DirectMsgPassing",
+      "IT4_DataflowGraph",
+      "TotalImplCost",
+      "ThreeRuntimeCoherence",
+      "BackwardCompat",
+      "ExistingInfraReuse"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "PinnedRound1Reviewer",
+        "persona": "あなたは round 1 収束軸 pinning レビュアーです.round 1 top elite (paradigm=Functional/ParallelOOP, state_repr=symbol_owned, concurrency_model=structured, effect_handling=monadic, ownership_model=gc) と矛盾しない個体を高評価.4 軸全合致 = 1.0、3/5 = 0.7、≤1/5 = 0.0.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "AIPLNativenessReviewer",
+        "persona": "あなたは AIPL ネイティブ度レビュアーです.選ばれた 6 variant 組合せが AIPL の actor model / DR-* / CE-* / self-host eval 機能をどれだけ自然に活用しているか.CA1 eager + FE1 LevelA-reuse + P3 dist-checkpoint + IT1 star は AIPL ど真ん中.JS-only な選択 (P1 localStorage / R4 offscreen / PA3 PEG.js) は AIPL を素通り.1.0 = AIPL を showcase、0.7 = 大半、0.3 = 一部、0.0 = AIPL の意味薄い.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "LOCAccuracyReviewer",
+        "persona": "あなたは LOC 見積もり精度レビュアーです.6 variant の見積もり LOC 合計が ≤2500 か.先行 round (Py-I next-gen 700 LOC で 8 機能、JS-B 310 LOC + 8 機能) を踏まえる.1.0 = ≤1500、0.7 = ≤2200、0.3 = ≤3000、0.0 = >3000.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ThreeRuntimeBalance",
+        "persona": "あなたは 3 ランタイム協調レビュアーです.Py-I + JS-N + browser-abcl の役割分担が論理的か (Py-I = formula、JS-N = persistence + server、browser-abcl = UI + cell actor).variant 選択が各 runtime に偏らず、circular dependency も生まないか.1.0 = perfect、0.7 = 1-2 軽微、0.3 = 軸ずれ、0.0 = 破綻.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "FormulaEngineFitReviewer",
+        "persona": "あなたは formula engine 適合性レビュアーです.選ばれた FE (FormulaEval) + PA (Parser) + IT (Integration) の組合せが、Excel-like formula (=A1+B1+SUM(C1:C10)) を正しく評価できるか.特に topological recompute (循環参照検出含む) の対応.1.0 = full、0.7 = MVP 5 関数まで、0.3 = 算術のみ、0.0 = 不完全.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換レビュアーです.既存 26 機能 + 71 abclc + 14 JS nextgen + 47 self-host + 10 node-aipl-server smoke が無修正で動作するか.選ばれた variant 群が既存ファイルを変更せず、新 dir / 新 server subcommand / 新 url path のみで opt-in 可能か.1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "InfraReuseReviewer",
+        "persona": "あなたは既存 infra 再利用レビュアーです.選ばれた組合せが何個の既存 AIPL infra を活用するか: (1) Level-A eval, (2) DR-13 pool, (3) DR-4 checkpoint, (4) CE-11 cap, (5) HMAC URL, (6) WebSocket, (7) DR-10 CRDT (将来 collab 用に残す価値), (8) DR-11 saga (bulk-paste undo 用).1.0 = ≥6 件、0.7 = 4-5 件、0.3 = 2-3 件、0.0 = ≤1 件.1 行で返答.",
+        "weight": 0.14285714285714285
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.05,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.2,
+    "implementability": 0.55
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "minimal_loc",
+      "max_aipl_native",
+      "browser_first",
+      "server_first",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "minimal_loc": {},
+      "max_aipl_native": {},
+      "browser_first": {},
+      "server_first": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}
