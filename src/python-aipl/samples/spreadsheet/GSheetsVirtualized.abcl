@@ -1,0 +1,272 @@
+// Round 5 Phase 5.2 — G3 VirtualizedInfinite (viewport spawn / scroll recycle).
+//
+// Round 2 picked CA4 HybridSpawn as the cell-actor strategy: viewport
+// cells are spawned eagerly, off-screen cells are lazy.  Round 5
+// Phase 5.2 makes that concrete: a 100×5 logical sheet but at most
+// ~25 cell actors live at any time (the viewport size).
+//
+// Console demo flow:
+//   1. Build a 100-row × 5-col logical grid (just metadata).
+//   2. Set viewport rows 0-4 → 5×5 = 25 actors spawn.
+//      Print top-left value to prove the viewport works.
+//   3. "Scroll" to rows 95-99 (bottom of the sheet).  25 old actors
+//      retire, 25 new spawn.  Bounded active count.
+//   4. Stats: spawn / retire / active actor counts.
+//
+// In a real Web Sheet this is driven by the user's scroll event; here
+// we simulate via explicit `viewport_set(r0, r1)` calls.  Actor count
+// stays bounded regardless of logical sheet size.
+
+class Cell {
+  var id   = "";
+  var val  = 0;
+
+  method init(my_id, v) {
+    id  = my_id;
+    val = v;
+    reply(0);
+  }
+  method read() { reply(val); }
+}
+
+class Sheet {
+  // Logical store: array of {id, val} pairs for ALL cells (lightweight).
+  var rows_total = 100;
+  var cols_total = 5;
+  var data_ids   = [];        // parallel "id" array
+  var data_vals  = [];        // parallel "val" array
+
+  // Viewport: rows [vp_r0, vp_r1] inclusive.  Cols always 0..cols_total-1.
+  var vp_r0 = 0;
+  var vp_r1 = 4;
+
+  // Live actor set (parallel arrays).
+  var live_ids   = [];
+  var live_refs  = [];
+
+  // Counters for instrumentation.
+  var spawn_count  = 0;
+  var retire_count = 0;
+
+  // ── Logical-store helpers ──────────────────────────────────
+  method add(id, v) {
+    array_push(data_ids, id);
+    array_push(data_vals, v);
+    reply(0);
+  }
+
+  method data_lookup(id) {
+    var i = 0;
+    var n = array_len(data_ids);
+    while (i < n) do {
+      if (array_get(data_ids, i) == id) {
+        return array_get(data_vals, i);
+      }
+      i = i + 1;
+    }
+    return 0;
+  }
+
+  // ── Live-actor-set helpers (avoid `now self.X` re-entrance) ─
+  method is_live(id) {
+    var i = 0;
+    var n = array_len(live_ids);
+    while (i < n) do {
+      if (array_get(live_ids, i) == id) { return 1; }
+      i = i + 1;
+    }
+    return 0;
+  }
+
+  method find_live(id) {
+    var i = 0;
+    var n = array_len(live_ids);
+    while (i < n) do {
+      if (array_get(live_ids, i) == id) {
+        return array_get(live_refs, i);
+      }
+      i = i + 1;
+    }
+    return 0;
+  }
+
+  // Rebuild live_ids/live_refs to drop one id (linear scan).
+  method retire_id(id) {
+    var new_ids = [];
+    var new_refs = [];
+    var i = 0;
+    var n = array_len(live_ids);
+    while (i < n) do {
+      var lid = array_get(live_ids, i);
+      if (lid != id) {
+        array_push(new_ids, lid);
+        array_push(new_refs, array_get(live_refs, i));
+      }
+      i = i + 1;
+    }
+    live_ids  = new_ids;
+    live_refs = new_refs;
+    retire_count = retire_count + 1;
+  }
+
+  // ── Viewport ──────────────────────────────────────────────
+  method viewport_set(r0, r1) {
+    // 1. Retire actors outside the new viewport.
+    var keep_ids = [];
+    var keep_refs = [];
+    var i = 0;
+    var n = array_len(live_ids);
+    while (i < n) do {
+      var lid = array_get(live_ids, i);
+      // parse row from id, e.g. "C42" → 42
+      var rest = str_sub(lid, 1, str_len(lid));
+      var row1 = parse_int_str(rest);
+      var row0 = row1 - 1;
+      if (row0 >= r0) {
+        if (row0 <= r1) {
+          array_push(keep_ids, lid);
+          array_push(keep_refs, array_get(live_refs, i));
+        } else {
+          retire_count = retire_count + 1;
+        }
+      } else {
+        retire_count = retire_count + 1;
+      }
+      i = i + 1;
+    }
+    live_ids  = keep_ids;
+    live_refs = keep_refs;
+    vp_r0 = r0;
+    vp_r1 = r1;
+
+    // 2. Spawn actors for every cell newly inside the viewport.
+    var rr = r0;
+    while (rr <= r1) do {
+      var cc = 0;
+      while (cc < cols_total) do {
+        var id = col_to_letter(cc) + (rr + 1);
+        var already = 0;
+        // inline is_live (avoid self-now re-entrance)
+        var k = 0;
+        var m = array_len(live_ids);
+        while (k < m) do {
+          if (array_get(live_ids, k) == id) { already = 1; k = m; }
+          else { k = k + 1; }
+        }
+        if (already == 0) {
+          var v = 0;
+          // inline data_lookup
+          var j = 0;
+          var jn = array_len(data_ids);
+          while (j < jn) do {
+            if (array_get(data_ids, j) == id) { v = array_get(data_vals, j); j = jn; }
+            else { j = j + 1; }
+          }
+          var c = new Cell(id, v);
+          array_push(live_ids, id);
+          array_push(live_refs, c);
+          spawn_count = spawn_count + 1;
+        }
+        cc = cc + 1;
+      }
+      rr = rr + 1;
+    }
+    reply(0);
+  }
+
+  method live_count()    { reply(array_len(live_ids)); }
+  method total_spawn()   { reply(spawn_count); }
+  method total_retire()  { reply(retire_count); }
+}
+
+// ── helpers (col letter + int parse) ──────────────────────────
+function col_to_letter(col) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return str_sub(alpha, col, col + 1);
+}
+function digit_val(c) {
+  if (c == "0") { return 0; } if (c == "1") { return 1; }
+  if (c == "2") { return 2; } if (c == "3") { return 3; }
+  if (c == "4") { return 4; } if (c == "5") { return 5; }
+  if (c == "6") { return 6; } if (c == "7") { return 7; }
+  if (c == "8") { return 8; } if (c == "9") { return 9; }
+  return 0;
+}
+function parse_int_str(s) {
+  var v = 0;
+  var i = 0;
+  var n = str_len(s);
+  while (i < n) do {
+    v = v * 10 + digit_val(str_sub(s, i, i + 1));
+    i = i + 1;
+  }
+  return v;
+}
+
+// ── demo: 100×5 logical, viewport bounds active to ≤25 ────────
+function run_demo() {
+  var s = new Sheet();
+
+  // Populate 500 logical cells: row r col c gets value r*5 + c + 1
+  var r = 0;
+  while (r < 100) do {
+    var c = 0;
+    while (c < 5) do {
+      var id = col_to_letter(c) + (r + 1);
+      var v = r * 5 + c + 1;
+      var _ = now s.add(id, v);
+      c = c + 1;
+    }
+    r = r + 1;
+  }
+
+  // Initial viewport: top 5 rows (rows 0..4 0-based).
+  var _v1 = now s.viewport_set(0, 4);
+  var live1   = now s.live_count();
+  var span1   = now s.total_spawn();
+  var ret1    = now s.total_retire();
+  print("[vp] rows 0..4 : live=" + live1 + "  spawn=" + span1 + "  retire=" + ret1);
+
+  // Check a cell in viewport: A1 = row 0 col 0 → value 1.
+  var a1_ref = now s.find_live("A1");
+  var a1_val = now a1_ref.read();
+  print("[read] A1 (in vp) = " + a1_val);
+
+  // Off-viewport cell: C50 should not be live.
+  var c50_live = now s.is_live("C50");
+  print("[in_vp] C50 currently live? " + c50_live);
+
+  // Scroll way down: viewport rows 95..99.
+  var _v2 = now s.viewport_set(95, 99);
+  var live2   = now s.live_count();
+  var span2   = now s.total_spawn();
+  var ret2    = now s.total_retire();
+  print("[vp] rows 95..99: live=" + live2 + "  spawn=" + span2 + "  retire=" + ret2);
+
+  // Old A1 should now be retired.
+  var a1_live = now s.is_live("A1");
+  print("[in_vp] A1 currently live (after scroll)? " + a1_live);
+
+  // New viewport: B98 → row 97 col 1 → value 97*5 + 1 + 1 = 487.
+  var b98_ref = now s.find_live("B98");
+  var b98_val = now b98_ref.read();
+  print("[read] B98 (in vp) = " + b98_val);
+
+  // Scroll back to middle: rows 50..54.  Some overlap with neither
+  // previous viewport, so 25 retire + 25 spawn.
+  var _v3 = now s.viewport_set(50, 54);
+  var live3   = now s.live_count();
+  var span3   = now s.total_spawn();
+  var ret3    = now s.total_retire();
+  print("[vp] rows 50..54: live=" + live3 + "  spawn=" + span3 + "  retire=" + ret3);
+
+  // Bounded invariant: live count never exceeds 25 (= 5 rows × 5 cols).
+  if (live1 == 25) { print("[invariant] vp1 live=25 OK"); }
+  if (live2 == 25) { print("[invariant] vp2 live=25 OK"); }
+  if (live3 == 25) { print("[invariant] vp3 live=25 OK"); }
+
+  print("=== done ===");
+}
+
+print("=== GSheetsVirtualized 100×5 logical / 5×5 viewport ===");
+run_demo();

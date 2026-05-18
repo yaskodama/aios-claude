@@ -120,6 +120,23 @@ check_contains "GSheetsRanges" "$GR_LOG" "G3 = 3"        # \$A\$1 + \$B\$1
 check_contains "GSheetsRanges" "$GR_LOG" "G4 = 21"       # SUM(A1:E1) + A2
 check_contains "GSheetsRanges" "$GR_LOG" "G5 = 310"      # 325 - 15
 
+# ── Phase 5.2: GSheetsVirtualized (G3 viewport spawn/recycle) ─
+echo
+echo "[Phase 5.2] GSheetsVirtualized (100x5 logical / 5x5 viewport)"
+GV_LOG="$LOGDIR/GSheetsVirtualized.log"
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsVirtualized.abcl > "$GV_LOG" 2>&1
+
+check_contains "GSheetsVirt"   "$GV_LOG" "rows 0..4 : live=25  spawn=25  retire=0"
+check_contains "GSheetsVirt"   "$GV_LOG" "A1 (in vp) = 1"
+check_contains "GSheetsVirt"   "$GV_LOG" "C50 currently live? 0"
+check_contains "GSheetsVirt"   "$GV_LOG" "rows 95..99: live=25  spawn=50  retire=25"
+check_contains "GSheetsVirt"   "$GV_LOG" "A1 currently live (after scroll)? 0"
+check_contains "GSheetsVirt"   "$GV_LOG" "B98 (in vp) = 487"
+check_contains "GSheetsVirt"   "$GV_LOG" "rows 50..54: live=25  spawn=75  retire=50"
+check_contains "GSheetsVirt"   "$GV_LOG" "vp1 live=25 OK"
+check_contains "GSheetsVirt"   "$GV_LOG" "vp2 live=25 OK"
+check_contains "GSheetsVirt"   "$GV_LOG" "vp3 live=25 OK"
+
 echo
 echo "==== WebSpreadsheet smoke summary ===="
 echo "  pass=$pass  fail=$fail  (logs: $LOGDIR/)"
