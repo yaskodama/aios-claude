@@ -181,6 +181,31 @@ note ⁶ above.  Cross-runtime samples:
 `abclc/ai-samples/SendReplyMethod.abcl` (OCaml, commit `cbec37c`)
 and `src/python-aipl/samples-ai/_send_reply_demo/*.abcl` (Python).
 
+⁸ CE-10 effect type inference: the inference walk
+(`aipl_inference._collect_effects_from_ast`) accumulates the set of
+side-effect categories implied by every primitive call site, using
+the `BUILTIN_EFFECTS` table maintained in `aipl_typeck.py` (Phase 12
+capability-based effect system, 43 primitives covering fs / ai+net /
+mut).  `InferenceResult.effects` (inferred) and
+`InferenceResult.declared_effects` (from a `!{eff1, eff2}` clause on
+the method) are surfaced in `repl`-style render output; a mismatch
+(declared subset doesn't cover inferred) raises a `⚠ inferred but
+not declared` line.  Picked by the 2026-05-18 MAP-Elites run
+(`AIPL_PyI_NextGen.aice`, reviewer score 0.70 — top of the field).
+
+⁹ DR-13 auto-scaling actor pool: hysteresis-driven dynamic actor
+pool.  Four primitives — `pool_create(cls, min, max, target_qlen
+[, pool_name])`, `pool_pick(name)`, `pool_size(name)`,
+`pool_destroy(name)` — wired to `aipl_dist.pool_*`.  Scaling
+decisions run on every `pool_pick`: if mean qlen > `2 * target_qlen`
+and size < max → spawn; if mean qlen < `target_qlen / 2` and size >
+min → retire (LIFO).  Hysteresis prevents flapping at the boundary.
+No-op unless `AIPL_DIST_ENABLE=1`; events `pool_created` /
+`pool_scale_up` / `pool_scale_down` / `pool_destroyed` flow into
+the existing structured-log NDJSON.  Sample:
+`src/python-aipl/samples/AutoScalingPool.abcl`.  Picked by the same
+MAP-Elites run (reviewer score 0.67 — top of the distribution axis).
+
 ## Type system
 
 | #   | Feature                              | Py-A      | Py-I       | OCaml      | JS-O       | JS-B                       | JS-N                       | C                       |
@@ -239,6 +264,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
+| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_inference._collect_effects_from_ast` (commit TBD) |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -309,6 +335,7 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | DR-7  | IM-2 `subtree_quarantine` (Erlang OTP blast-radius)  |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_SUBTREE_QUARANTINE=1`              |
 | DR-8  | spawn-tree tracking (parent inference, TLS-auto)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
 | DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
+| **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.pool_*` + `_b_pool_*` primitives  |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -637,4 +664,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Phase O-3 send/select alignment).*
+*Last regenerated: 2026-05-18 (after Py-I CE-10 + DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites).*

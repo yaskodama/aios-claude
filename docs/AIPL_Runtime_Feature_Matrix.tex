@@ -239,7 +239,9 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
 \textsuperscript{b} \small Py-A / Py-I は Pillow 経由で PNG / JPEG / GIF / WebP を判定して読み書き。\\
 \textsuperscript{c} \small OCaml / JS-O / JS-B / JS-N は純ランタイムの PPM (P6) バックエンド (RGBA メモリ表現、保存時はアルファ破棄)。PNG は外部ライブラリが必要。\\
 \textsuperscript{f} \small Python \texttt{select \{ case ... \}} 文は commit \texttt{9aaf371} (2026-05-18) で追加された (\texttt{grammar.lark}, \texttt{aipl\_ast.SelectStmt}, \texttt{aipl\_parser.\_Builder.select\_*}, \texttt{aipl\_interp.\_do\_select})。OCaml \texttt{parser.mly} の select\_cases / select\_pat / select\_timeout と同じ shape / semantics。チャネルベースの \texttt{select\_recv(...)} は Python では別ビルトインとして引き続き利用可能。\\
-\textsuperscript{g} \small 29e / 29f は send-and-receive の 2 つの等価 shape。reply-on-send routing (commits \texttt{590e3aa} OCaml / \texttt{dd9d604} Python) のおかげで、\texttt{Worker.reply(r)} は受信側 mailbox に \texttt{reply(r)} メッセージとして配送される。(e) は通常メソッド定義 \texttt{method reply(r) \{...\}}、(f) は明示 \texttt{select \{ case reply(r) -> ... \}}。C ランタイムは reply slot 自体無いため \No。サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) と \texttt{src/python-aipl/samples-ai/\_send\_reply\_demo/*.abcl}。
+\textsuperscript{g} \small 29e / 29f は send-and-receive の 2 つの等価 shape。reply-on-send routing (commits \texttt{590e3aa} OCaml / \texttt{dd9d604} Python) のおかげで、\texttt{Worker.reply(r)} は受信側 mailbox に \texttt{reply(r)} メッセージとして配送される。(e) は通常メソッド定義 \texttt{method reply(r) \{...\}}、(f) は明示 \texttt{select \{ case reply(r) -> ... \}}。C ランタイムは reply slot 自体無いため \No。サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) と \texttt{src/python-aipl/samples-ai/\_send\_reply\_demo/*.abcl}。\\
+\textsuperscript{h} \small CE-10 effect type inference: inference walk (\texttt{aipl\_inference.\_collect\_effects\_from\_ast}) accumulates side-effect categories from every primitive call site, using the \texttt{BUILTIN\_EFFECTS} table maintained in \texttt{aipl\_typeck.py} (Phase 12 system, 43 primitives covering fs / ai+net / mut). \texttt{InferenceResult.effects} (inferred) と \texttt{declared\_effects} (from \texttt{!\{eff1, eff2\}} clause) を render し、\texttt{declared} が \texttt{inferred} を被覆しないとき \texttt{$\Warning$ inferred but not declared} を表示。2026-05-18 MAP-Elites \texttt{AIPL\_PyI\_NextGen.aice} で reviewer 0.70 で 1 位。\\
+\textsuperscript{i} \small DR-13 auto-scaling actor pool: hysteresis-driven 動的 actor プール。 4 prims \texttt{pool\_create(cls, min, max, target\_qlen[, name])} / \texttt{pool\_pick} / \texttt{pool\_size} / \texttt{pool\_destroy} で構成。\texttt{pool\_pick} 毎に平均 qlen を判定し \texttt{> 2*target} なら spawn (size $<$ max)、\texttt{< target/2} なら retire (size $>$ min)。\texttt{AIPL\_DIST\_ENABLE=1} でのみ動作。イベント \texttt{pool\_created} / \texttt{pool\_scale\_up} / \texttt{pool\_scale\_down} / \texttt{pool\_destroyed} は既存の structured-log NDJSON に流れる。サンプル: \texttt{src/python-aipl/samples/AutoScalingPool.abcl}。MAP-Elites reviewer 0.67 で distribution 軸 1 位。
 
 \section*{Type system}
 
@@ -321,6 +323,7 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
   CE-7 & Phase E-2: typeck $\times$ inference 統合 CLI \texttt{--check} & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-8 & \texttt{--infer} standalone CLI (Phase D-4)             & \Yes & \No & \Yes\textsuperscript{\$} & \Yes\textsuperscript{\$} & \No & \No & \No \\
   CE-9 & refinement vacuously-false detection (declaration-time, Z3 unsat) & \Yes & \No & \Part\textsuperscript{**} & \Part\textsuperscript{**} & \No & \No & \No \\
+  \textbf{CE-10} & \textbf{effect type inference} (\texttt{\{ai, fs, net, mut\}} rows in inferred method types)\textsuperscript{h} & \No & \textbf{\Yes} & \No & \No & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 
@@ -399,6 +402,7 @@ OTP の 3 候補) を \texttt{aipl\_dist.py} (591 LOC) として実装。AIPL �
   DR-7 & IM-2 \texttt{subtree\_quarantine} (\texttt{AIPL\_DIST\_SUBTREE\_QUARANTINE}) & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-8 & spawn-tree tracking (TLS-auto parent)                    & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
   DR-9 & runtime hooks (interp / actor / call\_ai) — opt-in       & \Yes & \No & \Yes & \Yes & \No & \No & \No \\
+  \textbf{DR-13} & \textbf{auto-scaling actor pool} (\texttt{pool\_create / pool\_pick / pool\_size / pool\_destroy} with hysteresis)\textsuperscript{i} & \No & \textbf{\Yes} & \No & \No & \No & \No & \No \\
   \bottomrule
 \end{longtable}
 
@@ -781,6 +785,6 @@ For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
 \bigskip
-\noindent\textit{Last regenerated: 2026-05-18 (after Phase O-3 send/select alignment).}
+\noindent\textit{Last regenerated: 2026-05-18 (after Py-I CE-10 + DR-13 from \texttt{AIPL\_PyI\_NextGen.aice} MAP-Elites).}
 
 \end{document}

@@ -1722,6 +1722,85 @@ def _b_save_state(args, frame, interp):
     return None
 
 
+# ─── DR-13: auto-scaling actor pool ────────────────────────────────
+# Thin language-facing wrappers around aipl_dist.pool_*.  All four
+# primitives are no-ops unless AIPL_DIST_ENABLE=1.
+
+def _b_pool_create(args, frame, interp):
+    """pool_create(cls, min, max, target_qlen[, pool_name]).
+    Spawns `min` actors of class `cls` and registers an auto-scaling
+    pool.  Returns the pool name (string), or "" if disabled."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("pool_create(cls, min, max, target_qlen[, pool_name])")
+    try:
+        import aipl_dist
+    except Exception:
+        return ""
+    cls_name = args[0]
+    min_n = int(args[1]) if len(args) > 1 else 1
+    max_n = int(args[2]) if len(args) > 2 else max(min_n, 4)
+    target = int(args[3]) if len(args) > 3 else 4
+    pool_name = args[4] if len(args) > 4 and isinstance(args[4], str) else None
+
+    def _spawn(c: str) -> str:
+        actor = interp.spawn_actor(c, [])
+        return actor.name
+
+    def _retire(name: str) -> None:
+        a = interp.scheduler.get(name)
+        if a is not None:
+            a.stop()
+
+    def _qlen(name: str) -> int:
+        a = interp.scheduler.get(name)
+        if a is None:
+            return 0
+        try:
+            return a.mailbox._q.qsize()
+        except Exception:
+            return 0
+
+    return aipl_dist.pool_create(
+        cls_name, min_n, max_n, target,
+        spawn_cb=_spawn, retire_cb=_retire, qlen_cb=_qlen,
+        pool_name=pool_name,
+    )
+
+
+def _b_pool_pick(args, frame, interp):
+    """pool_pick(pool_name) -> string.  Round-robin selects the next
+    pool member; may scale up/down as a side-effect."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("pool_pick(pool_name)")
+    try:
+        import aipl_dist
+    except Exception:
+        return ""
+    return aipl_dist.pool_pick(args[0]) or ""
+
+
+def _b_pool_size(args, frame, interp):
+    """pool_size(pool_name) -> int."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("pool_size(pool_name)")
+    try:
+        import aipl_dist
+    except Exception:
+        return 0
+    return int(aipl_dist.pool_size(args[0]))
+
+
+def _b_pool_destroy(args, frame, interp):
+    """pool_destroy(pool_name) -> bool.  Stops every member."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("pool_destroy(pool_name)")
+    try:
+        import aipl_dist
+    except Exception:
+        return False
+    return bool(aipl_dist.pool_destroy(args[0]))
+
+
 # ---------------------------------------------------------------------------
 # Standard library (string + I/O + misc).  Keep these synchronous and
 # total — anything that can hit the filesystem returns "" / False on
@@ -2720,6 +2799,11 @@ _BUILTINS = {
     "ws_status":                     _b_ws_status,
     # Per-node persistent state
     "save_state":                    _b_save_state,
+    # DR-13: auto-scaling actor pool
+    "pool_create":                   _b_pool_create,
+    "pool_pick":                     _b_pool_pick,
+    "pool_size":                     _b_pool_size,
+    "pool_destroy":                  _b_pool_destroy,
     # Introspection
     "inspect":                       _b_inspect,
     "inspect_all":                   _b_inspect_all,

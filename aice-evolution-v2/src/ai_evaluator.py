@@ -92,15 +92,34 @@ def evaluate_ai(
     if not _AI_OK:
         return base
 
-    per_task: dict[str, float] = {}
+    # Parallelize the (task × reviewer) call grid via a thread pool.
+    # OpenAI tier-1 (500 RPM, 200k TPM) easily tolerates 8 concurrent
+    # calls; this collapses the original O(T*R) sequential wall-clock
+    # to O(T*R / max_workers).  Override with AIPL_AI_EVAL_WORKERS.
+    import os as _os
+    from concurrent.futures import ThreadPoolExecutor
+    max_workers = int(_os.environ.get("AIPL_AI_EVAL_WORKERS", "8"))
+
+    pairs = []  # (task, reviewer_idx, persona, weight, profile)
     for t in tasks:
         prof = TASK_PROFILES.get(t, {})
-        scores: list[tuple[float, float]] = []  # (score, weight)
-        for r in reviewers:
+        for ri, r in enumerate(reviewers):
             persona = r.get("persona", "あなたは評価レビュアーです。")
             weight = float(r.get("weight", 1.0 / max(1, len(reviewers))))
-            s = reviewer_score_ai(persona, genome, t, prof)
-            scores.append((s, weight))
+            pairs.append((t, ri, persona, weight, prof))
+
+    def _score_one(p):
+        t, _ri, persona, weight, prof = p
+        s = reviewer_score_ai(persona, genome, t, prof)
+        return (t, s, weight)
+
+    per_task_acc: dict[str, list[tuple[float, float]]] = {t: [] for t in tasks}
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for t, s, w in ex.map(_score_one, pairs):
+            per_task_acc[t].append((s, w))
+
+    per_task: dict[str, float] = {}
+    for t, scores in per_task_acc.items():
         wsum = sum(w for _, w in scores) or 1.0
         weighted = sum(s * w for s, w in scores) / wsum
         per_task[f"task::{t}"] = weighted

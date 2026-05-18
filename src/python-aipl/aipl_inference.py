@@ -927,6 +927,17 @@ def infer_method(class_decl: Any, m: Any,
     if pre_sig:
         return_type = apply(infer.subst, pre_sig[1])
     infer.current_method = saved_method
+    # CE-10: inferred side-effects.  Walk the method body once more
+    # (cheap — the AST is small) accumulating the BUILTIN_EFFECTS of
+    # every primitive call site.  declared_effects comes straight off
+    # the MethodDecl from the parser if a `!{eff1, eff2}` clause was
+    # written; the render() helper surfaces a mismatch warning.
+    inferred_effects = _collect_effects_from_ast(m.body)
+    declared_eff = None
+    decl_list = getattr(m, "effects", None)
+    if decl_list is not None:
+        declared_eff = set(decl_list)
+
     return InferenceResult(
         class_name=cls_name,
         method_name=m.name,
@@ -937,6 +948,8 @@ def infer_method(class_decl: Any, m: Any,
                           + _check_refined_decls(infer.refined_decls))
                           if standalone else [],
         return_type=return_type,
+        effects=inferred_effects,
+        declared_effects=declared_eff,
     )
 
 
@@ -949,6 +962,13 @@ class InferenceResult:
     issues: list                # list of InferenceIssue
     refinement_issues: list     # list of refinement violations from Z3
     return_type: Any = None     # D-1: method's return type from reply()
+    # CE-10: inferred side-effect set ({fs, ai, net, mut, ...}).  None
+    # means "not computed for this result"; the empty set means "pure".
+    # Uses the BUILTIN_EFFECTS table from aipl_typeck for primitives;
+    # user-function call chains are NOT yet transitively walked here
+    # (the static --type-check pass in aipl_typeck does that).
+    effects: Optional[set] = None
+    declared_effects: Optional[set] = None  # `!{eff1, eff2}` if present
 
     def render(self) -> str:
         head = f"=== {self.class_name}.{self.method_name} ==="
@@ -959,6 +979,15 @@ class InferenceResult:
                 lines.append(f"    {n} : {t}")
         if self.return_type is not None:
             lines.append(f"  return : {self.return_type}")
+        if self.effects is not None:
+            eff_str = "{}" if not self.effects else "{" + ", ".join(sorted(self.effects)) + "}"
+            lines.append(f"  effects (inferred): {eff_str}")
+            if self.declared_effects is not None and self.declared_effects != self.effects:
+                dcl_str = "{}" if not self.declared_effects else "{" + ", ".join(sorted(self.declared_effects)) + "}"
+                lines.append(f"  effects (declared): {dcl_str}")
+                missing = self.effects - self.declared_effects
+                if missing:
+                    lines.append(f"    ⚠ inferred but not declared: {sorted(missing)}")
         if self.local_types:
             lines.append("  locals:")
             for n, t in self.local_types.items():
@@ -972,6 +1001,48 @@ class InferenceResult:
             for ri in self.refinement_issues:
                 lines.append(f"    {ri}")
         return "\n".join(lines)
+
+
+# ── CE-10: side-effect inference helpers ────────────────────────────
+# Walk a method's AST to collect the set of side-effect categories
+# implied by every primitive call site.  Uses the BUILTIN_EFFECTS
+# table maintained in aipl_typeck.py so the two passes agree on what
+# each primitive does.
+
+def _collect_effects_from_ast(node) -> set:
+    """Recurse through any AST node (Stmt or Expr) accumulating the
+    BUILTIN_EFFECTS of every `CallStmt`/`CallExpr` name encountered."""
+    try:
+        from aipl_typeck import BUILTIN_EFFECTS
+    except Exception:
+        BUILTIN_EFFECTS = {}
+
+    eff: set = set()
+
+    def visit(n):
+        if n is None:
+            return
+        kind = type(n)
+        kn = kind.__name__
+        # Look up by class name to avoid heavy AST imports.
+        if kn in ("CallStmt", "CallExpr"):
+            name = getattr(n, "name", None)
+            if isinstance(name, str) and name in BUILTIN_EFFECTS:
+                eff.update(BUILTIN_EFFECTS[name])
+        # Recurse into common children.
+        for attr in ("expr", "body", "then_body", "else_body",
+                     "cond", "lhs", "rhs", "inner", "args",
+                     "stmts", "items", "idxs"):
+            child = getattr(n, attr, None)
+            if child is None:
+                continue
+            if isinstance(child, list):
+                for c in child:
+                    visit(c)
+            else:
+                visit(child)
+    visit(node)
+    return eff
 
 
 # ════════════════════════════════════════════════════════════════════════

@@ -85,11 +85,16 @@ aice AIPL_PyI_NextGen {
   }
 
   // ── 探索パラメタ ──
+  // Reduced from 8 seed × 15 gen → 4 seed × 5 gen after a 6-minute
+  // dry-run showed `ai_evaluator.py` evaluates each individual
+  // serially (9 task × 6 reviewer = 54 LLM calls = 4-5 min/indiv).
+  // The reduced scale yields ~32 individual evaluations (~45 min
+  // / ~$1 at gpt-4o-mini), enough to fill the 4×4=16 cell map.
   search {
     algorithm   = "map_elites";
     cell_axes   = "type_extension, distribution_extension";
-    generations = 15;
-    seed_count  = 8;
+    generations = 5;
+    seed_count  = 4;
     open_axes   = false;
     rng_seed    = 31415932;
   }

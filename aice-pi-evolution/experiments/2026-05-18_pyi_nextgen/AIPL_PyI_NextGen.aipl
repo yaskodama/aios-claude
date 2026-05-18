@@ -681,8 +681,8 @@ class Coordinator {
   var profiles = 0;
   var worker = 0;
 
-  var seed_count = 8;
-  var generations = 15;
+  var seed_count = 4;
+  var generations = 5;
   var cell_axes_csv = "type_extension,distribution_extension";
   var task_csv = "EffectTypeInference,CapabilityTypes,RefinementUnification,RecordVariantSubtyping,CRDTActorState,SagaOrchestration,MultiRegionFailover,AutoScalingActorPool,BackwardCompatExisting,OCamlPortability,ImplCostBudget";
   var next_id = 0;

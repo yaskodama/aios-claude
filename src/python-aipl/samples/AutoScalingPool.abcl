@@ -1,0 +1,45 @@
+// DR-13 — auto-scaling actor pool.
+//
+// `pool_create(cls, min, max, target_qlen)` spawns `min` Worker actors
+// and registers an auto-scaling pool.  Subsequent `pool_pick(name)`
+// rounds-robins through the members and decides whether to spawn
+// another (avg qlen > 2*target AND size < max) or retire one (avg
+// qlen < target/2 AND size > min).  Hysteresis prevents flapping.
+//
+// Run with:
+//   AIPL_DIST_ENABLE=1 \
+//   AIPL_DIST_LOG_FILE=/tmp/pool.ndjson \
+//   python3 src/python-aipl/aipl_main.py samples/AutoScalingPool.abcl
+//
+//   jq -r '.event' /tmp/pool.ndjson | sort -u
+//   #  pool_created
+//   #  pool_scale_up        (if load is high)
+//   #  pool_scale_down      (if load drops)
+
+class Worker {
+  method work(item) {
+    print("[worker] processing " + item);
+  }
+}
+
+class Driver {
+  method run() {
+    var p = pool_create("Worker", 2, 8, 4);
+    print("[pool] created: " + p + ", size=" + pool_size(p));
+    // Fire 12 jobs through the pool — round-robin picks a member each
+    // time, scaling decisions are made before every pick.
+    var i = 0;
+    while (i < 12) do {
+      var who = pool_pick(p);
+      send who.work("job-" + i);
+      i = i + 1;
+    }
+    // Let the workers drain; then check pool size.
+    wait(200);
+    print("[pool] final size=" + pool_size(p));
+    pool_destroy(p);
+  }
+}
+
+var d = new Driver();
+send d.run();

@@ -8,8 +8,8 @@
       "type_extension",
       "distribution_extension"
     ],
-    "generations": 15,
-    "seed_count": 8,
+    "generations": 5,
+    "seed_count": 4,
     "open_axes": false,
     "rng_seed": 31415932
   },

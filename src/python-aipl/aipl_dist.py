@@ -593,3 +593,156 @@ def call_ai_quorum(prompt: str,
             f"{p}={e}" for p, e in result_box["errors"])
         raise RuntimeError(msg)
     return result_box["value"]
+
+
+# ─── DR-13: Auto-Scaling Actor Pool ──────────────────────────────────
+# Maintain a dynamic pool of actor instances for a given class.  The
+# pool is sized by queue-length pressure: when the average mailbox
+# length across the pool exceeds `target_qlen * 2` (high watermark)
+# AND we're under `max`, spawn one more; when the average drops below
+# `target_qlen / 2` (low watermark) AND we're above `min`, retire one.
+# Hysteresis keeps the controller from flapping at the boundary.
+#
+# This is a pure aipl_dist utility — the interpreter wires
+# `pool_create` / `pool_send` / `pool_size` etc. as primitives that
+# invoke these functions.  No-op skeleton is exposed when
+# AIPL_DIST_ENABLE != 1.
+
+import threading as _threading
+
+_POOLS: Dict[str, "_PoolState"] = {}
+_POOLS_MU = _threading.Lock()
+
+class _PoolState:
+    __slots__ = ("cls", "members", "min", "max", "target", "spawn_cb",
+                 "retire_cb", "qlen_cb", "_rr_idx", "_lock")
+
+    def __init__(self, cls: str, min_n: int, max_n: int, target_qlen: int,
+                 spawn_cb, retire_cb, qlen_cb):
+        self.cls = cls
+        self.members: list = []   # actor names (strings)
+        self.min = min_n
+        self.max = max_n
+        self.target = target_qlen
+        self.spawn_cb = spawn_cb
+        self.retire_cb = retire_cb
+        self.qlen_cb = qlen_cb
+        self._rr_idx = 0
+        self._lock = _threading.Lock()
+
+
+def pool_create(cls_name: str,
+                min_n: int,
+                max_n: int,
+                target_qlen: int,
+                spawn_cb,
+                retire_cb,
+                qlen_cb,
+                pool_name: Optional[str] = None) -> str:
+    """Create a new auto-scaling pool of `cls_name` actors.
+
+    `spawn_cb(cls)` must instantiate a new actor and return its name.
+    `retire_cb(name)` retires one (stop + clean up).
+    `qlen_cb(name)` returns the current mailbox length.
+
+    Returns the pool's stable name (defaults to `pool::<cls>`).  Pool
+    starts at `min_n` members.  Caller dispatches messages via
+    `pool_send(pool_name, method, args)` (interpreter-side wrapper).
+    """
+    if not is_enabled():
+        return ""
+    name = pool_name or f"pool::{cls_name}"
+    with _POOLS_MU:
+        if name in _POOLS:
+            return name
+        st = _PoolState(cls_name, min_n, max_n, target_qlen,
+                        spawn_cb, retire_cb, qlen_cb)
+        _POOLS[name] = st
+    # Seed initial members.
+    for _ in range(min_n):
+        try:
+            actor = spawn_cb(cls_name)
+            with st._lock:
+                st.members.append(actor)
+        except Exception as e:
+            log_event("pool_spawn_error", pool=name, error=str(e))
+    log_event("pool_created", pool=name, cls=cls_name,
+              min=min_n, max=max_n, target=target_qlen,
+              initial=len(st.members))
+    return name
+
+
+def pool_pick(pool_name: str) -> Optional[str]:
+    """Round-robin select a member from the pool.  Triggers a
+    scaling-decision check (potentially spawns or retires one)
+    BEFORE returning the pick.  Returns the actor name, or None
+    if the pool doesn't exist or is empty."""
+    with _POOLS_MU:
+        st = _POOLS.get(pool_name)
+    if st is None:
+        return None
+    # Hysteresis check: average qlen across members.
+    with st._lock:
+        n = len(st.members)
+        if n == 0:
+            return None
+        qlens = []
+        for m in st.members:
+            try:
+                qlens.append(int(st.qlen_cb(m)))
+            except Exception:
+                qlens.append(0)
+        avg = sum(qlens) / max(1, n)
+    high = st.target * 2.0
+    low = st.target / 2.0
+    if avg > high and n < st.max:
+        try:
+            new_actor = st.spawn_cb(st.cls)
+            with st._lock:
+                st.members.append(new_actor)
+            log_event("pool_scale_up", pool=pool_name, size=n + 1, avg_qlen=avg)
+        except Exception as e:
+            log_event("pool_spawn_error", pool=pool_name, error=str(e))
+    elif avg < low and n > st.min:
+        with st._lock:
+            victim = st.members.pop()  # retire the most-recently-added
+        try:
+            st.retire_cb(victim)
+            log_event("pool_scale_down", pool=pool_name, size=n - 1, avg_qlen=avg)
+        except Exception as e:
+            log_event("pool_retire_error", pool=pool_name, error=str(e))
+    # Round-robin pick.
+    with st._lock:
+        if not st.members:
+            return None
+        idx = st._rr_idx % len(st.members)
+        st._rr_idx = (st._rr_idx + 1) % len(st.members)
+        return st.members[idx]
+
+
+def pool_size(pool_name: str) -> int:
+    """Number of currently-alive members in the pool."""
+    with _POOLS_MU:
+        st = _POOLS.get(pool_name)
+    if st is None:
+        return 0
+    with st._lock:
+        return len(st.members)
+
+
+def pool_destroy(pool_name: str) -> bool:
+    """Retire every member and remove the pool from the registry."""
+    with _POOLS_MU:
+        st = _POOLS.pop(pool_name, None)
+    if st is None:
+        return False
+    with st._lock:
+        victims = list(st.members)
+        st.members.clear()
+    for v in victims:
+        try:
+            st.retire_cb(v)
+        except Exception:
+            pass
+    log_event("pool_destroyed", pool=pool_name, retired=len(victims))
+    return True
