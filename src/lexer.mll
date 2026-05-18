@@ -47,6 +47,9 @@ rule token = parse
 | "do"         { DO }
 | "select"     { SELECT }
 | "case"       { CASE }
+| "saga"       { SAGA }
+| "step"       { STEP }
+| "compensate" { COMPENSATE }
 | "timeout"    { TIMEOUT }
 | "->"         { ARROW }
 | "=="         { EQ }

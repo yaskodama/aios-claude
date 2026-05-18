@@ -240,16 +240,22 @@ let rec unify ?(loc = Location.dummy) (t1 : ty) (t2 : ty) : unit =
         raise (Type_error (loc, "tuple arity mismatch"));
       List.iter2 (unify ~loc) ts1 ts2
   | TRecord fs1, TRecord fs2 ->
-      if List.length fs1 <> List.length fs2 then
-        raise (Type_error (loc, "record field count mismatch"));
-      let sort = List.sort (fun (a,_) (b,_) -> compare a b) in
-      let fs1' = sort fs1 and fs2' = sort fs2 in
-      List.iter2
-        (fun (l1,t1) (l2,t2) ->
-           if l1 <> l2 then
-             raise (Type_error (loc, "record label mismatch: " ^ l1 ^ " vs " ^ l2));
-           unify ~loc t1 t2)
-        fs1' fs2'
+      (* CE-13: record width subtyping.  Previously this required
+         identical field sets (length match + label match per
+         position).  Now we unify the intersection of fields
+         pairwise (depth subtyping per field) and ignore fields on
+         only one side.  Wholly-disjoint records still fail. *)
+      let labels_of fs = List.map fst fs in
+      let s1 = labels_of fs1 and s2 = labels_of fs2 in
+      let common = List.filter (fun l -> List.mem l s2) s1 in
+      if common = [] && fs1 <> [] && fs2 <> [] then
+        raise (Type_error
+          (loc, "record fields disjoint: [" ^ String.concat ", " s1
+                ^ "] vs [" ^ String.concat ", " s2 ^ "]"));
+      List.iter (fun l ->
+        let t1 = List.assoc l fs1 and t2 = List.assoc l fs2 in
+        unify ~loc t1 t2
+      ) common
   | TFun (ps1, r1), TFun (ps2, r2) ->
       if List.length ps1 <> List.length ps2 then
         raise (Type_error (loc, "arity mismatch"));

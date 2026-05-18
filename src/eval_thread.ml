@@ -1511,6 +1511,52 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
                loop ())
     in
     loop ()
+  | Saga steps ->
+    (* DR-11 saga orchestration.  Forward pass: run each step.body
+       in declared order.  On the first exception, walk back through
+       the completed steps in reverse and run each compensate block
+       (LIFO).  Then re-raise so the actor's normal error path
+       (`[FAILED] actor=…` + IQ quarantine) fires.  Emits structured-
+       log events when AIPL_DIST_ENABLE=1. *)
+    let n = List.length steps in
+    let _ = (try Aipl_dist.log_event "saga_started"
+              [("steps", Aipl_dist.LInt n)] with _ -> false) in
+    let completed = ref [] in
+    (try
+      List.iteri (fun i st ->
+        eval_stmt actor st.Ast.saga_body;
+        completed := i :: !completed;
+        let _ = (try Aipl_dist.log_event "saga_step_complete"
+                  [("index", Aipl_dist.LInt i); ("total", Aipl_dist.LInt n)]
+                  with _ -> false) in ()
+      ) steps;
+      let _ = (try Aipl_dist.log_event "saga_finished"
+                [("steps", Aipl_dist.LInt n)] with _ -> false) in ()
+    with e ->
+      let failed_idx = List.length !completed in
+      let _ = (try Aipl_dist.log_event "saga_step_failed"
+                [("index", Aipl_dist.LInt failed_idx);
+                 ("total", Aipl_dist.LInt n);
+                 ("error", Aipl_dist.LStr (Printexc.to_string e))]
+                with _ -> false) in
+      List.iter (fun i ->
+        try
+          eval_stmt actor (List.nth steps i).Ast.saga_compensate;
+          let _ = (try Aipl_dist.log_event "saga_compensated"
+                    [("index", Aipl_dist.LInt i); ("total", Aipl_dist.LInt n)]
+                    with _ -> false) in ()
+        with ce ->
+          let _ = (try Aipl_dist.log_event "saga_compensate_failed"
+                    [("index", Aipl_dist.LInt i);
+                     ("error", Aipl_dist.LStr (Printexc.to_string ce))]
+                    with _ -> false) in ()
+      ) !completed;   (* already in LIFO order — `completed` is reverse-built *)
+      let _ = (try Aipl_dist.log_event "saga_aborted"
+                [("completed", Aipl_dist.LInt failed_idx);
+                 ("total", Aipl_dist.LInt n);
+                 ("error", Aipl_dist.LStr (Printexc.to_string e))]
+                with _ -> false) in
+      raise e)
 and actor_loop actor = (
   while true do
     Mutex.lock actor.mutex;

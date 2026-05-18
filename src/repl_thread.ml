@@ -275,6 +275,9 @@ let run_static_check (mode : [`TypeCheck | `Infer | `Check]) (path : string)
     Printf.printf "\n=== --infer (refinement Z3 — set AIPL_REFINE_CHECK=1) ===\n%!";
     Printf.printf "(refinement warnings, if any, are emitted on stderr)\n%!"
   end;
+  (* CE-10: surface the inferred per-method side-effect sets. *)
+  if mode = `Check || mode = `Infer then
+    Infer.debug_print_class_method_effects ();
   if strict && issues > 0 then 3 else 0
 
 let parse_input (s : string) : Ast.program =

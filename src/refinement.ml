@@ -178,6 +178,53 @@ let is_vacuously_false ~base ~binder (pred : Ast.refine_pred) : bool =
   | Unsatisfiable -> true
   | _ -> false
 
+(* ──────────────────────────────────────────────────────────────── *)
+(* CE-12: refinement subset check (predicate-implication via Z3)    *)
+(* ──────────────────────────────────────────────────────────────── *)
+
+(* Build an SMT-LIB 2 script asserting `P_sub ∧ ¬P_sup` and asking
+   for satisfiability.  When the result is `unsat`, the implication
+   `P_sub ⇒ P_sup` holds — every value satisfying `P_sub`'s predicate
+   also satisfies `P_sup`'s.  Mirrors Py-I's `_refine_subset_z3`. *)
+let render_subset_smt ~(sort : smt_sort) ~(binder : string)
+                      (p_sub : Ast.refine_pred) (p_sup : Ast.refine_pred)
+                    : string =
+  (* Collect every free var across both predicates so each is declared
+     once.  The binder counts as a free var (sub and sup share it). *)
+  let vars = collect_vars (collect_vars [] p_sub) p_sup in
+  let vars = if List.mem binder vars then vars else binder :: vars in
+  let kw = sort_keyword sort in
+  let buf = Buffer.create 256 in
+  List.iter (fun v ->
+    Buffer.add_string buf (Printf.sprintf "(declare-const %s %s)\n" v kw)
+  ) vars;
+  Buffer.add_string buf
+    (Printf.sprintf "(assert (and %s (not %s)))\n"
+       (render_pred ~sort p_sub) (render_pred ~sort p_sup));
+  Buffer.add_string buf "(check-sat)\n";
+  Buffer.contents buf
+
+(* Check `P_sub ⇒ P_sup`.  Returns:
+   - Unsatisfiable    : subset relation holds (implication is valid)
+   - Satisfiable      : counterexample exists; subset does NOT hold
+   - Deferred reason  : couldn't decide (no Z3, non-numeric base, …) *)
+let check_subset ~(base : ty) ~(binder : string)
+                 (p_sub : Ast.refine_pred) (p_sup : Ast.refine_pred)
+               : check_result =
+  let base = match base with TVar { contents = { link = Some t; _ } } -> t | _ -> base in
+  let with_sort sort =
+    let script = render_subset_smt ~sort ~binder p_sub p_sup in
+    match run_z3_check script with
+    | None         -> Deferred "z3 not available"
+    | Some "sat"   -> Satisfiable
+    | Some "unsat" -> Unsatisfiable
+    | Some other   -> Deferred ("z3 said: " ^ other)
+  in
+  match base with
+  | TInt   -> with_sort SMT_Int
+  | TFloat -> with_sort SMT_Real
+  | _      -> Deferred "non-numeric refinement deferred"
+
 (* Pretty-print for issue messages. *)
 let rec string_of_pred = function
   | Ast.RpInt n -> string_of_int n

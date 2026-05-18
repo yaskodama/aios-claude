@@ -20,6 +20,7 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token ASSIGN PLUS MINUS TIMES DIV LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COLON SEMICOLON COMMA
 %token GE LE GT LT SELF SENDER CLASS
 %token SELECT CASE TIMEOUT
+%token SAGA STEP COMPENSATE   /* DR-11: saga orchestration */
 %token ARROW /* -> */
 %token EOF NEW
 %token VAR EQ NEQ DOT BECOME FUNCTION RETURN
@@ -213,6 +214,7 @@ stmt:
   | ID LPAREN args RPAREN SEMICOLON { mk_stmt1 1 (CallStmt ($1, $3)) }
   | BECOME ID LPAREN args RPAREN SEMICOLON { mk_stmt1 2 (Become ($2, $4)) }
   | SELECT LBRACE select_cases select_timeout_opt RBRACE { mk_stmt1 3 (Select($3, $4)) }
+  | SAGA LBRACE saga_steps RBRACE                      { mk_stmt1 3 (Saga $3) }
   | RETURN expr SEMICOLON                              { mk_stmt1 1 (Return (Some $2)) }
   | RETURN SEMICOLON                                   { mk_stmt1 1 (Return None) }
 
@@ -235,6 +237,17 @@ opt_id_list:
 id_list:
     ID                   { [$1] }
   | id_list COMMA ID  { $1 @ [$3] }
+
+/* DR-11 saga orchestration — see ast.ml saga_step + Saga.
+   Each step is a `step { ... } compensate { ... }` arm. */
+saga_steps:
+    saga_steps saga_step { $1 @ [$2] }
+  | /* empty */          { [] }
+
+saga_step:
+    STEP LBRACE stmts RBRACE COMPENSATE LBRACE stmts RBRACE
+      { { saga_body       = mk_stmt1 3 (Seq $3);
+          saga_compensate = mk_stmt1 7 (Seq $7) } }
 
 select_timeout_opt:
     TIMEOUT INTLIT ARROW LBRACE stmts RBRACE

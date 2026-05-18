@@ -588,3 +588,406 @@ let call_ai_quorum
                 String.concat "; "
                   (List.rev_map (fun (p, e) -> p ^ "=" ^ e) !errors) in
       failwith msg
+
+
+(* ───────────────────────────────────────────────────────────────── *)
+(* DR-12: Multi-Region Failover                                      *)
+(* ───────────────────────────────────────────────────────────────── *)
+(* Geo-aware actor placement layered on the DR-1 route table.  Each
+   runtime node sets AIPL_REGION=<name> (default "local"); per-region
+   tables live in AIPL_ROUTE_REGION_<name>="Actor:tag,...".  The
+   failover chain comes from AIPL_REGION_FAILOVER="r1,r2,...". *)
+
+let current_region () : string =
+  let v = env_get "AIPL_REGION" in
+  if v = "" then "local" else v
+
+let region_chain () : string list =
+  let raw = env_get "AIPL_REGION_FAILOVER" in
+  if raw = "" then []
+  else
+    raw |> String.split_on_char ','
+        |> List.filter_map (fun s ->
+             let t = String.trim s in
+             if t = "" then None else Some t)
+
+let route_table_for_region (region : string) : (string * string) list =
+  let key = "AIPL_ROUTE_REGION_" ^ region in
+  let raw = env_get key in
+  let raw = if raw = "" then env_get "AIPL_ROUTE" else raw in
+  parse_route_table raw
+
+let route_for_region ?(region : string option = None) (actor : string) : string option =
+  if not (is_enabled ()) then None
+  else
+    let r = match region with Some r -> r | None -> current_region () in
+    try Some (List.assoc actor (route_table_for_region r))
+    with Not_found -> None
+
+let failover_region ?(primary : string option = None) (actor : string) : string option =
+  if not (is_enabled ()) then None
+  else
+    let chain = match region_chain () with [] -> [current_region ()] | xs -> xs in
+    let pri = match primary with Some p -> p | None -> List.hd chain in
+    let rec walk seen = function
+      | [] ->
+          let _ = log_event "region_failover_failed"
+            [("actor", LStr actor); ("tried", LStr (String.concat "," (List.rev seen)))] in
+          None
+      | r :: rest ->
+          let seen' = r :: seen in
+          (match route_for_region ~region:(Some r) actor with
+           | Some _ ->
+               if r <> pri then
+                 (let _ = log_event "region_failover"
+                    [("actor", LStr actor);
+                     ("from_region", LStr pri);
+                     ("to_region", LStr r);
+                     ("chain", LStr (String.concat "," (List.rev seen')))] in ());
+               Some r
+           | None -> walk seen' rest)
+    in
+    walk [] chain
+
+let regions_available () : string list =
+  let entries = Unix.environment () |> Array.to_list in
+  let prefix = "AIPL_ROUTE_REGION_" in
+  let plen = String.length prefix in
+  let regs = List.filter_map (fun kv ->
+    match String.index_opt kv '=' with
+    | None -> None
+    | Some i ->
+        let k = String.sub kv 0 i in
+        let v = String.sub kv (i + 1) (String.length kv - i - 1) in
+        if String.length k > plen
+           && String.sub k 0 plen = prefix
+           && String.trim v <> ""
+        then Some (String.sub k plen (String.length k - plen))
+        else None) entries in
+  List.sort compare regs
+
+
+(* ───────────────────────────────────────────────────────────────── *)
+(* CE-11: Capability Types                                           *)
+(* ───────────────────────────────────────────────────────────────── *)
+(* Run-time capability tracking layered on the Phase-12 effect
+   system.  Each thread carries a set of held capabilities (seeded
+   from AIPL_CAP_GRANT="fs,ai,net,mut").  When AIPL_CAP_STRICT=1 a
+   missing cap raises Capability_error from `check_capability`. *)
+
+exception Capability_error of string
+
+module CapSet = Set.Make(String)
+
+let _cap_tls : CapSet.t ref Domain.DLS.key =
+  Domain.DLS.new_key (fun () ->
+    let raw = env_get "AIPL_CAP_GRANT" in
+    let seed =
+      if raw = "" then CapSet.empty
+      else
+        raw |> String.split_on_char ','
+            |> List.filter_map (fun s ->
+                 let t = String.trim s in
+                 if t = "" then None else Some t)
+            |> CapSet.of_list
+    in
+    ref seed)
+
+let _caps () : CapSet.t ref = Domain.DLS.get _cap_tls
+
+let cap_strict () : bool =
+  env_get "AIPL_CAP_STRICT" = "1"
+
+let grant_cap (name : string) : bool =
+  let s = _caps () in
+  if CapSet.mem name !s then false
+  else begin
+    s := CapSet.add name !s;
+    let _ = log_event "cap_granted" [("cap", LStr name)] in
+    true
+  end
+
+let revoke_cap (name : string) : bool =
+  let s = _caps () in
+  if not (CapSet.mem name !s) then false
+  else begin
+    s := CapSet.remove name !s;
+    let _ = log_event "cap_revoked" [("cap", LStr name)] in
+    true
+  end
+
+let has_cap (name : string) : bool =
+  CapSet.mem name !(_caps ())
+
+let current_caps () : string list =
+  CapSet.elements !(_caps ())
+
+let check_capability (required : string list) : unit =
+  let s = !(_caps ()) in
+  let missing = List.filter (fun c -> not (CapSet.mem c s)) required in
+  if missing <> [] then begin
+    let _ = log_event "cap_violation"
+      [("missing", LStr (String.concat "," missing));
+       ("held",    LStr (String.concat "," (CapSet.elements s)))] in
+    if cap_strict () then
+      raise (Capability_error
+        (Printf.sprintf "capability denied: missing [%s] (held: [%s])"
+           (String.concat "; " missing)
+           (String.concat "; " (CapSet.elements s))))
+  end
+
+
+(* ───────────────────────────────────────────────────────────────── *)
+(* DR-10: CRDT actor state                                           *)
+(* ───────────────────────────────────────────────────────────────── *)
+(* Three classic CRDT data types backed by Hashtbl + small records.
+   Each carries its own merge function so the deployment layer can
+   safely combine values from independent replicas. *)
+
+let _replica_id () : string =
+  let v = env_get "AIPL_DIST_REPLICA_ID" in
+  if v <> "" then v
+  else try Unix.gethostname () with _ -> "node-0"
+
+(* G-Counter (grow-only counter) — per-replica integer Hashtbl. *)
+type gcounter = (string, int) Hashtbl.t
+
+let gcounter_new () : gcounter = Hashtbl.create 4
+
+let gcounter_inc (c : gcounter) ?(n : int = 1) () : gcounter =
+  if n < 0 then invalid_arg "gcounter_inc: G-Counter is grow-only";
+  let rid = _replica_id () in
+  let cur = try Hashtbl.find c rid with Not_found -> 0 in
+  Hashtbl.replace c rid (cur + n);
+  c
+
+let gcounter_value (c : gcounter) : int =
+  Hashtbl.fold (fun _ v acc -> acc + v) c 0
+
+let gcounter_merge (a : gcounter) (b : gcounter) : gcounter =
+  let out = Hashtbl.create (Hashtbl.length a + Hashtbl.length b) in
+  Hashtbl.iter (fun k v -> Hashtbl.replace out k v) a;
+  Hashtbl.iter (fun k vb ->
+    let va = try Hashtbl.find out k with Not_found -> 0 in
+    Hashtbl.replace out k (max va vb)) b;
+  out
+
+(* OR-Set (observed-remove set) — Hashtbl from element-key → list of
+   UUID add-tags + Hashtbl of remove-tags.  Element-keys are the
+   element values stringified (suitable for primitives). *)
+type orset = {
+  mutable adds : (string * string list) list;
+  mutable removes : (string * string list) list;
+}
+
+let orset_new () : orset = { adds = []; removes = [] }
+
+let _fresh_uuid () : string =
+  Printf.sprintf "%08x-%08x-%08x-%08x"
+    (Random.int 0x1000_0000) (Random.int 0x1000_0000)
+    (Random.int 0x1000_0000) (Random.int 0x1000_0000)
+
+let orset_add (s : orset) (elem : string) : orset =
+  let tag = _fresh_uuid () in
+  let cur = try List.assoc elem s.adds with Not_found -> [] in
+  s.adds <- (elem, tag :: cur) :: (List.remove_assoc elem s.adds);
+  s
+
+let orset_remove (s : orset) (elem : string) : orset =
+  let observed = try List.assoc elem s.adds with Not_found -> [] in
+  if observed <> [] then begin
+    let cur = try List.assoc elem s.removes with Not_found -> [] in
+    s.removes <- (elem, observed @ cur) :: (List.remove_assoc elem s.removes)
+  end;
+  s
+
+let orset_contains (s : orset) (elem : string) : bool =
+  let adds = try List.assoc elem s.adds with Not_found -> [] in
+  let rems = try List.assoc elem s.removes with Not_found -> [] in
+  List.exists (fun a -> not (List.mem a rems)) adds
+
+let orset_values (s : orset) : string list =
+  List.filter (fun (elem, _) -> orset_contains s elem) s.adds
+  |> List.map fst
+
+let orset_merge (a : orset) (b : orset) : orset =
+  let merge_bag a_bag b_bag =
+    let keys = List.sort_uniq compare
+                 (List.map fst a_bag @ List.map fst b_bag) in
+    List.map (fun k ->
+      let av = try List.assoc k a_bag with Not_found -> [] in
+      let bv = try List.assoc k b_bag with Not_found -> [] in
+      (k, List.sort_uniq compare (av @ bv))) keys
+  in
+  { adds = merge_bag a.adds b.adds; removes = merge_bag a.removes b.removes }
+
+(* LWW-Register (last-writer-wins) — value + Unix timestamp + replica id. *)
+type 'a lwwreg = {
+  mutable lww_value : 'a;
+  mutable lww_ts    : float;
+  mutable lww_replica : string;
+}
+
+let lww_new (initial : 'a) : 'a lwwreg =
+  { lww_value = initial; lww_ts = 0.0; lww_replica = _replica_id () }
+
+let lww_write (r : 'a lwwreg) (v : 'a) : 'a lwwreg =
+  r.lww_value <- v;
+  r.lww_ts <- Unix.gettimeofday ();
+  r.lww_replica <- _replica_id ();
+  r
+
+let lww_value (r : 'a lwwreg) : 'a = r.lww_value
+
+let lww_merge (a : 'a lwwreg) (b : 'a lwwreg) : 'a lwwreg =
+  if a.lww_ts > b.lww_ts then { a with lww_value = a.lww_value }
+  else if a.lww_ts < b.lww_ts then { b with lww_value = b.lww_value }
+  else if a.lww_replica >= b.lww_replica then { a with lww_value = a.lww_value }
+  else { b with lww_value = b.lww_value }
+
+(* crdt_replicate hook — logs an event for the deployment-layer
+   replicator to subscribe to.  No-op unless DR is enabled. *)
+let crdt_replicate (name : string) (kind : string) : unit =
+  if is_enabled () then
+    let _ = log_event "crdt_replicate"
+      [("actor", LStr name);
+       ("kind",  LStr kind);
+       ("replica", LStr (_replica_id ()))] in ()
+
+
+(* ───────────────────────────────────────────────────────────────── *)
+(* DR-13: Auto-Scaling Actor Pool                                    *)
+(* ───────────────────────────────────────────────────────────────── *)
+(* Hysteresis-driven dynamic actor pool.  spawn_cb / retire_cb /
+   qlen_cb let the interpreter inject its `spawn_actor` /
+   `actor.stop` / mailbox-length helpers without aipl_dist depending
+   on the interp module. *)
+
+type pool_state = {
+  cls : string;
+  mutable members : string list;
+  min_n : int;
+  max_n : int;
+  target : int;
+  spawn_cb  : string -> string;
+  retire_cb : string -> unit;
+  qlen_cb   : string -> int;
+  mutable rr_idx : int;
+  lock : Mutex.t;
+}
+
+let _pools : (string, pool_state) Hashtbl.t = Hashtbl.create 4
+let _pools_mu = Mutex.create ()
+
+let pool_create ?(pool_name : string option = None)
+                ~(cls : string) ~(min_n : int) ~(max_n : int) ~(target : int)
+                ~(spawn_cb : string -> string)
+                ~(retire_cb : string -> unit)
+                ~(qlen_cb   : string -> int)
+                () : string =
+  if not (is_enabled ()) then ""
+  else
+    let name = match pool_name with Some n -> n | None -> "pool::" ^ cls in
+    Mutex.lock _pools_mu;
+    if Hashtbl.mem _pools name then begin
+      Mutex.unlock _pools_mu;
+      name
+    end else begin
+      let st = { cls; members = []; min_n; max_n; target;
+                 spawn_cb; retire_cb; qlen_cb;
+                 rr_idx = 0; lock = Mutex.create () } in
+      Hashtbl.replace _pools name st;
+      Mutex.unlock _pools_mu;
+      for _ = 1 to min_n do
+        (try
+           let a = spawn_cb cls in
+           Mutex.lock st.lock;
+           st.members <- st.members @ [a];
+           Mutex.unlock st.lock
+         with e ->
+           let _ = log_event "pool_spawn_error"
+             [("pool", LStr name); ("error", LStr (Printexc.to_string e))] in ())
+      done;
+      let _ = log_event "pool_created"
+        [("pool", LStr name); ("cls", LStr cls);
+         ("min", LInt min_n); ("max", LInt max_n); ("target", LInt target);
+         ("initial", LInt (List.length st.members))] in
+      name
+    end
+
+let pool_pick (pool_name : string) : string option =
+  Mutex.lock _pools_mu;
+  let st_opt = Hashtbl.find_opt _pools pool_name in
+  Mutex.unlock _pools_mu;
+  match st_opt with
+  | None -> None
+  | Some st ->
+      Mutex.lock st.lock;
+      let n = List.length st.members in
+      let qlens = List.map st.qlen_cb st.members in
+      Mutex.unlock st.lock;
+      let avg = if n = 0 then 0.0
+                else float_of_int (List.fold_left (+) 0 qlens) /. float_of_int n in
+      let high = float_of_int st.target *. 2.0 in
+      let low  = float_of_int st.target /. 2.0 in
+      if avg > high && n < st.max_n then begin
+        try
+          let a = st.spawn_cb st.cls in
+          Mutex.lock st.lock;
+          st.members <- st.members @ [a];
+          Mutex.unlock st.lock;
+          let _ = log_event "pool_scale_up"
+            [("pool", LStr pool_name); ("size", LInt (n + 1));
+             ("avg_qlen", LFloat avg)] in ()
+        with e ->
+          let _ = log_event "pool_spawn_error"
+            [("pool", LStr pool_name); ("error", LStr (Printexc.to_string e))] in ()
+      end
+      else if avg < low && n > st.min_n then begin
+        Mutex.lock st.lock;
+        let victim = List.hd (List.rev st.members) in
+        st.members <- List.filter (fun a -> a <> victim) st.members;
+        Mutex.unlock st.lock;
+        (try st.retire_cb victim with _ -> ());
+        let _ = log_event "pool_scale_down"
+          [("pool", LStr pool_name); ("size", LInt (n - 1));
+           ("avg_qlen", LFloat avg)] in ()
+      end;
+      Mutex.lock st.lock;
+      if st.members = [] then begin Mutex.unlock st.lock; None end
+      else begin
+        let len = List.length st.members in
+        let idx = st.rr_idx mod len in
+        st.rr_idx <- (st.rr_idx + 1) mod len;
+        let pick = List.nth st.members idx in
+        Mutex.unlock st.lock;
+        Some pick
+      end
+
+let pool_size (pool_name : string) : int =
+  Mutex.lock _pools_mu;
+  let r = match Hashtbl.find_opt _pools pool_name with
+    | None -> 0
+    | Some st ->
+        Mutex.lock st.lock;
+        let n = List.length st.members in
+        Mutex.unlock st.lock; n
+  in
+  Mutex.unlock _pools_mu; r
+
+let pool_destroy (pool_name : string) : bool =
+  Mutex.lock _pools_mu;
+  let r = match Hashtbl.find_opt _pools pool_name with
+    | None -> false
+    | Some st ->
+        Hashtbl.remove _pools pool_name;
+        Mutex.lock st.lock;
+        let victims = st.members in
+        st.members <- [];
+        Mutex.unlock st.lock;
+        List.iter (fun v -> try st.retire_cb v with _ -> ()) victims;
+        let _ = log_event "pool_destroyed"
+          [("pool", LStr pool_name); ("retired", LInt (List.length victims))] in
+        true
+  in
+  Mutex.unlock _pools_mu; r

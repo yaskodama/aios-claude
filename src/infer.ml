@@ -5,6 +5,132 @@ open Ast
 
 let in_preinfer = ref false
 
+(* CE-10: effect type inference — mirrors Py-I's
+   `aipl_inference._collect_effects_from_ast`.  Walks a method body
+   accumulating the side-effect categories of every primitive call
+   site, using the same vocabulary as the Phase-12 effect system
+   (fs / ai / net / mut). *)
+
+module SS = Set.Make(String)
+
+let builtin_effects : (string * string list) list = [
+  "read_file",                    ["fs"];
+  "write_file",                   ["fs"];
+  "append_file",                  ["fs"];
+  "file_exists",                  ["fs"];
+  "read_bytes",                   ["fs"];
+  "write_bytes",                  ["fs"];
+  "list_dir",                     ["fs"];
+  "mkdir",                        ["fs"];
+  "rm_file",                      ["fs"];
+  "image_load",                   ["fs"];
+  "image_save",                   ["fs"];
+  "save_state",                   ["fs"];
+  "ai_call",                      ["ai"; "net"];
+  "ai_call_with_system",          ["ai"; "net"];
+  "ai_call_priority",             ["ai"; "net"];
+  "ai_call_priority_with_system", ["ai"; "net"];
+  "ai_call_retry",                ["ai"; "net"];
+  "ai_call_image",                ["ai"; "net"];
+  "ai_stream",                    ["ai"; "net"];
+  "ai_stream_with_system",        ["ai"; "net"];
+  "web_listen",                   ["net"];
+  "web_expose",                   ["net"];
+  "remote_call",                  ["net"];
+  "remote_now",                   ["net"];
+  "remote_future",                ["net"];
+  "ws_listen",                    ["net"];
+  "ws_send",                      ["net"];
+  "ws_close",                     ["net"];
+  "compile",                      ["mut"];
+  "spawn",                        ["mut"];
+  "add_method",                   ["mut"];
+  "remove_method",                ["mut"];
+]
+
+let effects_table : (string, string list) Hashtbl.t =
+  let h = Hashtbl.create 64 in
+  List.iter (fun (n, eff) -> Hashtbl.replace h n eff) builtin_effects;
+  h
+
+let rec collect_effects_expr (e : Ast.expr) (acc : SS.t) : SS.t =
+  match e.Ast.desc with
+  | Ast.Call (f, args) ->
+      let acc' = match Hashtbl.find_opt effects_table f with
+        | Some eff -> List.fold_left (fun a e -> SS.add e a) acc eff
+        | None -> acc
+      in
+      List.fold_left (fun a x -> collect_effects_expr x a) acc' args
+  | Ast.Binop (_, a, b) ->
+      let acc = collect_effects_expr a acc in
+      collect_effects_expr b acc
+  | Ast.Now (_, _, args) | Ast.Future (_, _, args) ->
+      List.fold_left (fun a x -> collect_effects_expr x a) acc args
+  | Ast.Await x -> collect_effects_expr x acc
+  | Ast.RecordLit fs ->
+      List.fold_left (fun a (_, x) -> collect_effects_expr x a) acc fs
+  | Ast.TupleLit xs ->
+      List.fold_left (fun a x -> collect_effects_expr x a) acc xs
+  | Ast.FieldAccess (x, _) -> collect_effects_expr x acc
+  | Ast.ArraySized (xs, opt) ->
+      let acc = List.fold_left (fun a x -> collect_effects_expr x a) acc xs in
+      (match opt with Some x -> collect_effects_expr x acc | None -> acc)
+  | _ -> acc
+
+let rec collect_effects_stmt (s : Ast.stmt) (acc : SS.t) : SS.t =
+  match s.Ast.sdesc with
+  | Ast.Assign (_, e) -> collect_effects_expr e acc
+  | Ast.CallStmt (f, args) ->
+      let acc' = match Hashtbl.find_opt effects_table f with
+        | Some eff -> List.fold_left (fun a e -> SS.add e a) acc eff
+        | None -> acc
+      in
+      List.fold_left (fun a x -> collect_effects_expr x a) acc' args
+  | Ast.Send (_, _, args) | Ast.UnsafeSend (_, _, args) ->
+      List.fold_left (fun a x -> collect_effects_expr x a) acc args
+  | Ast.Become (_, args) ->
+      List.fold_left (fun a x -> collect_effects_expr x a) acc args
+  | Ast.Seq xs -> List.fold_left (fun a x -> collect_effects_stmt x a) acc xs
+  | Ast.If (c, t, e) ->
+      let acc = collect_effects_expr c acc in
+      let acc = collect_effects_stmt t acc in
+      collect_effects_stmt e acc
+  | Ast.While (c, b) ->
+      let acc = collect_effects_expr c acc in
+      collect_effects_stmt b acc
+  | Ast.VarDecl (_, e) | Ast.TypedVarDecl (_, _, e) ->
+      collect_effects_expr e acc
+  | Ast.Select (cases, (_to_ms, to_body)) ->
+      let acc = List.fold_left
+        (fun a (c : Ast.select_case) -> collect_effects_stmt c.body a)
+        acc cases in
+      (match to_body with Some s -> collect_effects_stmt s acc | None -> acc)
+  | Ast.Saga steps ->
+      List.fold_left (fun a (st : Ast.saga_step) ->
+        let a = collect_effects_stmt st.saga_body a in
+        collect_effects_stmt st.saga_compensate a) acc steps
+  | Ast.Return (Some e) -> collect_effects_expr e acc
+  | Ast.Return None -> acc
+
+let collect_effects_method (m : Ast.method_decl) : string list =
+  let s = collect_effects_stmt m.Ast.body SS.empty in
+  SS.elements s
+
+let class_method_effects : (string, (string * string list) list) Hashtbl.t =
+  Hashtbl.create 32
+
+let register_class_method_effects (cls : string) (effs : (string * string list) list) : unit =
+  Hashtbl.replace class_method_effects cls effs
+
+let debug_print_class_method_effects () : unit =
+  print_endline "[class_method_effects]";
+  Hashtbl.iter (fun cls effs ->
+    Printf.printf "class %s\n" cls;
+    List.iter (fun (m, eff) ->
+      let s = if eff = [] then "{}" else "{" ^ String.concat ", " eff ^ "}" in
+      Printf.printf "  %s effects: %s\n" m s)
+      effs) class_method_effects
+
 (* Heuristic: treat a single uppercase identifier (T, U, A, …, T1, T2) as
    a user-declared type variable.  Anything else lowers to TAny. *)
 let is_tvar_name (n : string) : bool =
@@ -531,7 +657,13 @@ let rec check_stmt (env:env) (s:stmt) : unit =
         check_stmt env' c.body
       )
       cases
-      
+  | Saga steps ->
+      (* DR-11: type-check each step's body + compensate.  No new
+         bindings; both blocks share the enclosing env. *)
+      List.iter (fun (st : Ast.saga_step) ->
+        check_stmt env st.saga_body;
+        check_stmt env st.saga_compensate) steps
+
 let check_decl (env:env) = function
   | Class c ->
     (* Use a class-local env so field names don't pollute the global env *)
@@ -736,7 +868,11 @@ let infer_method (m : Ast.method_decl) =
     List.iter (function
     | Ast.Class c ->
         let sigs = infer_one_class c in
-        Types.register_class_method_schemes c.Ast.cname sigs
+        Types.register_class_method_schemes c.Ast.cname sigs;
+        (* CE-10: collect each method's inferred side-effect set. *)
+        let effs = List.map (fun (m : Ast.method_decl) ->
+          (m.Ast.mname, collect_effects_method m)) c.Ast.methods in
+        register_class_method_effects c.Ast.cname effs
     | _ -> ()
   ) p
 

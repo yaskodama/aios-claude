@@ -71,6 +71,7 @@ type stmt_desc =
   | VarDecl of string * expr
   | TypedVarDecl of string * type_expr * expr  (* var x: T = e;  — runtime same as VarDecl *)
   | Select of select_case list * (int option * stmt option)
+  | Saga of saga_step list
   | Return of expr option            (* return [expr]; — top-level function body *)
 and stmt = {
   sloc : Location.t;
@@ -83,6 +84,14 @@ and select_pat = {
 and select_case = {
   pat  : select_pat;
   body : stmt;
+}
+(* DR-11 saga orchestration: each step is a (body, compensate) pair.
+   Forward pass runs each body in order; if any body raises, the
+   runtime walks the completed steps in reverse and runs each
+   compensate block (LIFO) before re-raising. *)
+and saga_step = {
+  saga_body       : stmt;
+  saga_compensate : stmt;
 }
 
 type method_decl = {
@@ -166,6 +175,11 @@ let rec normalize_stmt (s : stmt) : stmt =
           | None -> None
         in
         Select (cases', (to_ms, to_body'))
+    | Saga steps ->
+        let steps' = List.map (fun (st : saga_step) ->
+          { saga_body       = normalize_stmt st.saga_body;
+            saga_compensate = normalize_stmt st.saga_compensate }) steps in
+        Saga steps'
     | other -> other
   in
   { s with sdesc = new_desc }
@@ -366,6 +380,7 @@ let label_of_stmt (s:stmt) : string =
   | VarDecl (x,_)        -> "VarDecl " ^ x
   | TypedVarDecl (x,t,_) -> "TypedVarDecl " ^ x ^ ": " ^ string_of_type_expr t
   | Select (_,_)         -> "Select "
+  | Saga _               -> "Saga"
   | Return None          -> "Return"
   | Return (Some _)      -> "Return"
 
@@ -429,6 +444,17 @@ let rec dump_stmt ?(prefix="") ?(is_last=true) (s : stmt) =
            let t_pref = child_pref ^ (if child_is_last i then "   " else "│  ") in
            dump_stmt ~prefix:t_pref ~is_last:true tb
        | _ -> ())
+    | Saga steps ->
+      let n = List.length steps in
+      List.iteri (fun i (st : saga_step) ->
+        let last = (i = n - 1) in
+        Printf.printf "%s%sstep[%d]\n" child_pref (if last then "└─ " else "├─ ") i;
+        let step_pref = child_pref ^ (if last then "   " else "│  ") in
+        Printf.printf "%s├─ body\n" step_pref;
+        dump_stmt ~prefix:(step_pref ^ "│  ") ~is_last:true st.saga_body;
+        Printf.printf "%s└─ compensate\n" step_pref;
+        dump_stmt ~prefix:(step_pref ^ "   ") ~is_last:true st.saga_compensate
+      ) steps
 end
 
 let dump_decl ?(prefix="") ?(is_last=true) = function
