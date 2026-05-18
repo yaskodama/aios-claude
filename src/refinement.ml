@@ -234,3 +234,17 @@ let rec string_of_pred = function
   | Ast.RpBinop (op, a, b) ->
       Printf.sprintf "%s %s %s" (string_of_pred a) op (string_of_pred b)
   | Ast.RpParen q -> Printf.sprintf "(%s)" (string_of_pred q)
+
+(* CE-12: register the subset check as the unify-time hook so
+   `Types.unify` can flag a refinement violation early when
+   AIPL_REFINE_UNIFY=1.  Returns `Some <reason>` to abort, `None`
+   to proceed.  Tied at module load via a top-level side effect. *)
+let () =
+  Types.refinement_check_hook :=
+    (fun ~base ~binder p_sub p_sup ->
+      match check_subset ~base ~binder p_sub p_sup with
+      | Satisfiable ->
+          Some (Printf.sprintf
+                  "(%s) ⊅ (%s)"
+                  (string_of_pred p_sub) (string_of_pred p_sup))
+      | _ -> None)

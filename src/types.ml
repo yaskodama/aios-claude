@@ -15,10 +15,38 @@ and ty =
   | TAny
   | TRecord of (string * ty) list
   | TTuple of ty list
+  (* CE-12: refinement type — base + binder name + predicate.
+     `ty_of_type_expr` produces this when the surface syntax is
+     `T where <pred>`.  All match sites elsewhere treat it as a
+     see-through of the base; unify uses the predicate for the
+     early subset check under AIPL_REFINE_UNIFY=1. *)
+  | TRefined of ty * string * refine_pred
+
+(* CE-12 / Phase O-2.a: refinement predicate AST.  Moved here from
+   Ast.ml so Types can reference it without a circular dep; Ast
+   re-exports the constructors so existing `Ast.RpInt 5` etc. keep
+   compiling. *)
+and refine_pred =
+  | RpInt of int
+  | RpFloat of float
+  | RpVar of string
+  | RpUnary of string * refine_pred
+  | RpBinop of string * refine_pred * refine_pred
+  | RpParen of refine_pred
+
 and scheme = Forall of int list * ty
 
 exception Type_error of Location.t * string
 let type_error ?(loc=Location.dummy) msg = raise (Type_error (loc, msg))
+
+(* CE-12: refinement subset check hook, populated by `refinement.ml`
+   at startup.  Returning `Some reason` triggers a unify-time error;
+   returning `None` means subset relation holds or could not be
+   determined (deferred to runtime). *)
+let refinement_check_hook :
+    (base:ty -> binder:string -> refine_pred -> refine_pred ->
+       string option) ref =
+  ref (fun ~base:_ ~binder:_ _ _ -> None)
 
 let counter = ref 0
 let next_scheme_var = ref 0
@@ -204,7 +232,9 @@ let rec string_of_ty (t : ty) : string =
        | None ->
            (* 未束縛の型変数は 'a1, 'a2 ... のように表示 *)
            Printf.sprintf "'a%d" (!vref).id)
-  | TAny      -> "any"                   
+  | TAny      -> "any"
+  | TRefined (base, binder, _pred) ->
+      Printf.sprintf "%s where <%s>" (string_of_ty base) binder
 
 (* occurs check: v が t 中に出現するか？ *)
 let rec occurs (v : tvar ref) (t : ty) : bool =
@@ -214,6 +244,7 @@ let rec occurs (v : tvar ref) (t : ty) : bool =
   | TRecord fs   -> List.exists (fun (_,t) -> occurs v t) fs
   | TTuple ts    -> List.exists (occurs v) ts
   | TFun(ps,r)   -> List.exists (occurs v) ps || occurs v r
+  | TRefined (b, _, _) -> occurs v b
   | _            -> false
 
 let rec unify ?(loc = Location.dummy) (t1 : ty) (t2 : ty) : unit =
@@ -261,6 +292,24 @@ let rec unify ?(loc = Location.dummy) (t1 : ty) (t2 : ty) : unit =
         raise (Type_error (loc, "arity mismatch"));
       List.iter2 (unify ~loc) ps1 ps2;  (* ★ ここも loc 付き *)
       unify ~loc r1 r2                  (* ★ ここも loc 付き *)
+  (* CE-12: refinement-aware unification.  Base types unify recursively.
+     When both sides carry a predicate AND AIPL_REFINE_UNIFY=1 is set,
+     the runtime invokes `refinement_check_hook` (populated by
+     `refinement.ml` at startup — see avoiding the cyclic dep).  A
+     counterexample (`Some ex`) raises Type_error.  Without the env
+     var or without a hook installed, the refinement is dropped and
+     bases unify normally. *)
+  | TRefined (b1, _, p1), TRefined (b2, _, p2) ->
+      unify ~loc b1 b2;
+      (try if Sys.getenv "AIPL_REFINE_UNIFY" = "1" then begin
+        match !refinement_check_hook ~base:b1 ~binder:"x" p1 p2 with
+        | Some why ->
+            raise (Type_error
+              (loc, "refinement subtype check failed: " ^ why))
+        | None -> ()
+      end with Not_found -> ())
+  | TRefined (b1, _, _), t2 -> unify ~loc b1 t2
+  | t1, TRefined (b2, _, _) -> unify ~loc t1 b2
   | _ ->
     if loc == Location.dummy then
       Printf.eprintf "DEBUG: type mismatch raised with Location.dummy\n%!";
@@ -293,6 +342,7 @@ let rec prune t =
   | TTuple ts -> TTuple (List.map prune ts)
   | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,prune t1)) ms)
   | TFun (ps,r) -> TFun (List.map prune ps, prune r)
+  | TRefined (b, binder, pred) -> TRefined (prune b, binder, pred)
   | _ -> t
 
 let string_of_ty_pretty (t : ty) : string =
@@ -338,6 +388,7 @@ let string_of_ty_pretty (t : ty) : string =
     | TString     -> "string"
     | TUnit       -> "unit"
     | TAny 	  -> "any"
+    | TRefined (b, binder, _) -> go b ^ " where <" ^ binder ^ ">"
 in
   go t
 
@@ -374,6 +425,7 @@ let instantiate (Forall (qs, t)) : ty =
     | TTuple ts -> TTuple (List.map inst ts)
     | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,inst t1)) ms)
     | TFun (ps,r) -> TFun (List.map inst ps, inst r)
+    | TRefined (b, binder, pred) -> TRefined (inst b, binder, pred)
     | TVar tv ->
         let id = (!tv).id in
         match Hashtbl.find_opt tbl id with

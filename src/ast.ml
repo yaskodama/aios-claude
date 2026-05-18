@@ -24,7 +24,10 @@ type type_expr =
    arithmetic, identifiers (binders), literals, plus the keyword bool
    ops and / or / not.  Kept as its own AST node so we can later
    translate it 1:1 to a Z3 formula. *)
-and refine_pred =
+(* CE-12: refine_pred is defined in Types.ml so Types.ty can name it
+   in TRefined.  Re-exported here so existing `Ast.RpInt 5` etc.
+   keep compiling. *)
+and refine_pred = Types.refine_pred =
   | RpInt of int
   | RpFloat of float
   | RpVar of string

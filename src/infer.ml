@@ -197,7 +197,12 @@ let rec ty_of_type_expr_with_tbl
                   (Refinement.string_of_pred pred)
             with _ -> ())
         | _ -> ());
-      base_ty
+      (* CE-12: preserve the refinement in the type instead of dropping
+         it.  The Types.unify TRefined arm will pick this up and run
+         the early Z3 subset check when AIPL_REFINE_UNIFY=1.  Without
+         the env var, unify falls through to the base type — bit-
+         compatible with the pre-CE-12 path. *)
+      Types.TRefined (base_ty, "x", pred)
 
 let ty_of_type_expr ?tvar_table te =
   ty_of_type_expr_with_tbl tvar_table te
