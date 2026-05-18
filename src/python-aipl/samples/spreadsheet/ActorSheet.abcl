@@ -1,0 +1,185 @@
+// Round 3 Phase 2 — CA4 HybridSpawn + FE4 ActorEval (no deadlock).
+//
+// Round 2's RESULTS.md flagged FE4 ActorEval with the note
+// "synchronous formula chain で deadlock 可能性".  We hit exactly
+// that on the first try — Sheet.print_all calling Cell.read,
+// which called back into Sheet.read_cell while Sheet was busy.
+//
+// The fix: cut the back-edge.  Cells reach their dependencies
+// *directly* (cell→cell via `now`) by holding shared references
+// to the dependency table.  AIPL arrays are by-reference, so when
+// Sheet pushes a new cell into cell_refs, all existing Cells see
+// the update through the same array binding.
+//
+// Component map vs round 2:
+//   CA4 HybridSpawn   — eager-spawn 9 cells in this console demo
+//                       (no scroll viewport).  Lazy-spawn would
+//                       kick in once the UI adds boundary events.
+//   FE4 ActorEval     — each cell evals its own AST; Refs use
+//                       cell→cell `now`, not back-through-Sheet.
+//   IT2 EventBus      — left for Phase 4.  Coordinator Sheet (lite
+//                       IT1) is enough for the demo.
+
+class Cell {
+  var id        = "";
+  var kind      = "Value";
+  var val       = 0;
+  var expr      = {tag: "none"};
+  var dep_ids   = [];     // shared with Sheet.cell_ids
+  var dep_refs  = [];     // shared with Sheet.cell_refs
+
+  // `new Cell(id, dep_ids, dep_refs)` — AIPL binds positionals.
+  method init(my_id, ids, refs) {
+    id       = my_id;
+    dep_ids  = ids;
+    dep_refs = refs;
+    reply(0);
+  }
+
+  method set_value(v) {
+    kind = "Value";
+    val  = v;
+    expr = {tag: "none"};
+    reply(0);
+  }
+
+  method set_formula(ast) {
+    kind = "Formula";
+    expr = ast;
+    val  = 0;
+    reply(0);
+  }
+
+  method read() {
+    if (kind == "Formula") {
+      // AIPL actors can't `now self.X` re-entrantly while mid-method
+      // (Phase-2 design lesson) — so the recursive eval lives in a
+      // top-level function.  Ref nodes still cross actor boundaries
+      // via `now other.read()`, which is the FE4 ActorEval
+      // observable behavior.
+      var v = eval_one(expr, dep_ids, dep_refs);
+      reply(v);
+    }
+    reply(val);
+  }
+}
+
+// ── recursive eval as a plain function (no `self` actor) ──────
+function lookup_actor(target_id, dep_ids, dep_refs) {
+  var i = 0;
+  var n = array_len(dep_ids);
+  while (i < n) do {
+    if (array_get(dep_ids, i) == target_id) {
+      return array_get(dep_refs, i);
+    }
+    i = i + 1;
+  }
+  return 0;
+}
+
+function eval_one(node, dep_ids, dep_refs) {
+  if (node.tag == "Lit") { return node.val; }
+  if (node.tag == "Ref") {
+    var target = lookup_actor(node.id, dep_ids, dep_refs);
+    if (target == 0) { return 0; }
+    // Cross-actor send — Cell→Cell, not Cell→self.  No deadlock.
+    var v = now target.read();
+    return v;
+  }
+  if (node.tag == "Bin") {
+    var l = eval_one(node.lhs, dep_ids, dep_refs);
+    var r = eval_one(node.rhs, dep_ids, dep_refs);
+    if (node.op == "+") { return l + r; }
+    if (node.op == "-") { return l - r; }
+    if (node.op == "*") { return l * r; }
+    if (node.op == "/") { return l / r; }
+    return 0;
+  }
+  if (node.tag == "Call") {
+    if (node.name == "SUM") {
+      var total = 0;
+      var i = 0;
+      var n = array_len(node.args);
+      while (i < n) do {
+        total = total + eval_one(array_get(node.args, i), dep_ids, dep_refs);
+        i = i + 1;
+      }
+      return total;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+class Sheet {
+  var cell_ids  = [];
+  var cell_refs = [];
+
+  method add_value(id, v) {
+    var c = new Cell(id, cell_ids, cell_refs);
+    var r = now c.set_value(v);
+    array_push(cell_ids, id);
+    array_push(cell_refs, c);
+    reply(0);
+  }
+
+  method add_formula(id, ast) {
+    var c = new Cell(id, cell_ids, cell_refs);
+    var r = now c.set_formula(ast);
+    array_push(cell_ids, id);
+    array_push(cell_refs, c);
+    reply(0);
+  }
+
+  method print_all() {
+    var i = 0;
+    var n = array_len(cell_ids);
+    while (i < n) do {
+      var id = array_get(cell_ids, i);
+      var c  = array_get(cell_refs, i);
+      var v  = now c.read();
+      print("[sheet] " + id + " = " + v);
+      i = i + 1;
+    }
+    reply(0);
+  }
+}
+
+// ── 3x3 sheet ──────────────────────────────────────────────────
+function build_and_print() {
+  var s = new Sheet();
+
+  var r1 = now s.add_value("A1", 10);
+  var r2 = now s.add_value("B1", 20);
+  var r3 = now s.add_formula("C1",
+    {tag: "Bin", op: "+",
+     lhs: {tag: "Ref", id: "A1"},
+     rhs: {tag: "Ref", id: "B1"}});
+
+  var r4 = now s.add_value("A2", 30);
+  var r5 = now s.add_value("B2", 40);
+  var r6 = now s.add_formula("C2",
+    {tag: "Bin", op: "*",
+     lhs: {tag: "Ref", id: "A2"},
+     rhs: {tag: "Ref", id: "B2"}});
+
+  var r7 = now s.add_formula("A3",
+    {tag: "Bin", op: "*",
+     lhs: {tag: "Ref", id: "A1"},
+     rhs: {tag: "Lit", val: 2}});
+  var r8 = now s.add_formula("B3",
+    {tag: "Bin", op: "*",
+     lhs: {tag: "Ref", id: "B1"},
+     rhs: {tag: "Lit", val: 2}});
+  var r9 = now s.add_formula("C3",
+    {tag: "Call", name: "SUM",
+     args: [ {tag: "Ref", id: "A1"}, {tag: "Ref", id: "B1"},
+             {tag: "Ref", id: "A2"}, {tag: "Ref", id: "B2"},
+             {tag: "Ref", id: "C1"}, {tag: "Ref", id: "C2"} ]});
+
+  print("=== ActorSheet 3x3 (9 cell actors) ===");
+  var done = now s.print_all();
+  print("=== done ===");
+}
+
+build_and_print();

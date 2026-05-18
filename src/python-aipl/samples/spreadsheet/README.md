@@ -25,7 +25,7 @@
 |---|---|---|---|
 | 0 | AST-formula eval (parser なし) | `HelloSheet.abcl` | ✅ 5 assertion |
 | 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | ✅ 4 assertion |
-| 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ⏳ |
+| 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ✅ 5 assertion |
 | 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ⏳ |
 | 4 | R3 renderer + IT2 event bus | browser-abcl 統合 | ⏳ |
 
@@ -33,8 +33,21 @@
 
 ```sh
 bash src/python-aipl/samples/spreadsheet/_smoke.sh
-# → pass=9  fail=0 (Phase 0 + 1)
+# → pass=14  fail=0 (Phase 0 + 1 + 2)
 ```
+
+## 学んだこと (Phase 2)
+
+Round 2 RESULTS.md は FE4 ActorEval について「synchronous formula chain で deadlock 可能性」と
+警告していた.第一次実装で正確にこの問題に当たった: `Sheet → Cell.read → Sheet.read_cell`
+の back-edge が Sheet を busy のまま自分自身に send → deadlock.
+
+修正: **Sheet を経由しない**.各 Cell が `dep_ids` / `dep_refs` 配列 (Sheet が
+新規 cell を push し続ける同じ配列を by-ref で共有) を持ち、Ref node 解決は
+ローカル lookup → `now other.read()` で **Cell→Cell 直接**.
+
+もう一つの教訓: AIPL actor は `now self.X()` を再帰的にできない.再帰 eval は
+プレーンな top-level 関数として書く必要あり (`eval_one(node, dep_ids, dep_refs)`).
 
 ## 進化計算 → 実装の橋渡し
 

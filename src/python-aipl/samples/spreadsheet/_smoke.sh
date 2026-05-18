@@ -54,6 +54,18 @@ check_contains "StringFormula" "$SFS_LOG" "C1 = 30"        # parsed "A1+B1"
 check_contains "StringFormula" "$SFS_LOG" "C2 = 1200"      # parsed "A2*B2"
 check_contains "StringFormula" "$SFS_LOG" "C3 = 1330"      # parsed "SUM(...)"
 
+# ── Phase 2: ActorSheet (CA4 + FE4) ──────────────────────────
+echo
+echo "[Phase 2] ActorSheet (cell actors + actor eval)"
+AS_LOG="$LOGDIR/ActorSheet.log"
+timeout 25 python3 aipl_main.py samples/spreadsheet/ActorSheet.abcl > "$AS_LOG" 2>&1
+
+check_contains "ActorSheet"    "$AS_LOG" "A1 = 10"
+check_contains "ActorSheet"    "$AS_LOG" "C1 = 30"          # cell-to-cell now
+check_contains "ActorSheet"    "$AS_LOG" "C2 = 1200"
+check_contains "ActorSheet"    "$AS_LOG" "C3 = 1330"
+check_contains "ActorSheet"    "$AS_LOG" "=== done ==="
+
 echo
 echo "==== WebSpreadsheet smoke summary ===="
 echo "  pass=$pass  fail=$fail  (logs: $LOGDIR/)"
