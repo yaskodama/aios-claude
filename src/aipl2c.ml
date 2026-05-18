@@ -1,7 +1,7 @@
 (* aipl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog | --llvm | --openmp] [--no-typecheck]";
+  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog | --llvm | --openmp] [--no-typecheck] [--dump-types] [--dump-effects] [--check]";
   exit 1
 
 let () =
@@ -18,6 +18,8 @@ let () =
   let openmp = ref false in
   let no_typecheck = ref false in
   let dump_types = ref false in
+  let dump_effects = ref false in
+  let check_only = ref false in
   let args = Array.to_list Sys.argv |> List.tl in
   let rec loop = function
     | [] -> ()
@@ -33,6 +35,8 @@ let () =
     | "--openmp" :: rest -> openmp := true; loop rest
     | "--no-typecheck" :: rest -> no_typecheck := true; loop rest
     | "--dump-types" :: rest -> dump_types := true; loop rest
+    | "--dump-effects" :: rest -> dump_effects := true; loop rest
+    | "--check" :: rest -> check_only := true; dump_types := true; dump_effects := true; loop rest
     | "-h" :: _ | "--help" :: _ -> usage ()
     | f :: rest when !input = None -> input := Some f; loop rest
     | x :: _ -> Printf.eprintf "unknown arg: %s\n" x; usage ()
@@ -84,6 +88,17 @@ let () =
         Printf.printf "  %s : %s\n" mname (Types.string_of_ty t)
       ) methods
     ) Types.class_method_schemes;
+  end;
+  (* CE-10: surface the inferred per-method side-effect sets so the C-codegen
+     CLI matches the OCaml runtime's `repl_thread --check` output.  Effects
+     are populated as a side effect of `Typecheck.run` above. *)
+  if !dump_effects then begin
+    Printf.printf "=== inferred method effects ===\n";
+    Infer.debug_print_class_method_effects ()
+  end;
+  if !check_only then begin
+    Printf.printf "[aipl2c] --check: no C generated (type-check + dump only)\n";
+    exit 0
   end;
   let c_code =
     if !pony      then C_translator.gen_program_pony                       prog
