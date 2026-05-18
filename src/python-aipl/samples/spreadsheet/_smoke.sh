@@ -32,7 +32,7 @@ check_contains() {
   fi
 }
 
-# ── HelloSheet ───────────────────────────────────────────────
+# ── Phase 0: HelloSheet ──────────────────────────────────────
 echo "[Phase 0] HelloSheet (AST-formula eval)"
 HELLO_LOG="$LOGDIR/HelloSheet.log"
 timeout 20 python3 aipl_main.py samples/spreadsheet/HelloSheet.abcl > "$HELLO_LOG" 2>&1
@@ -42,6 +42,17 @@ check_contains "HelloSheet"  "$HELLO_LOG" "C1 = 30"        # A1 + B1
 check_contains "HelloSheet"  "$HELLO_LOG" "C2 = 1200"      # A2 * B2
 check_contains "HelloSheet"  "$HELLO_LOG" "A3 = 20"        # A1 * 2
 check_contains "HelloSheet"  "$HELLO_LOG" "C3 = 1330"      # SUM(...)
+
+# ── Phase 1: StringFormulaSheet (PA4 parser) ─────────────────
+echo
+echo "[Phase 1] StringFormulaSheet (lex + parse + eval)"
+SFS_LOG="$LOGDIR/StringFormulaSheet.log"
+timeout 20 python3 aipl_main.py samples/spreadsheet/StringFormulaSheet.abcl > "$SFS_LOG" 2>&1
+
+check_contains "StringFormula" "$SFS_LOG" "A1 = 10"
+check_contains "StringFormula" "$SFS_LOG" "C1 = 30"        # parsed "A1+B1"
+check_contains "StringFormula" "$SFS_LOG" "C2 = 1200"      # parsed "A2*B2"
+check_contains "StringFormula" "$SFS_LOG" "C3 = 1330"      # parsed "SUM(...)"
 
 echo
 echo "==== WebSpreadsheet smoke summary ===="

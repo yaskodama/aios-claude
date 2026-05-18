@@ -23,8 +23,8 @@
 
 | Phase | 内容 | サンプル | 状態 |
 |---|---|---|---|
-| 0 | AST-formula eval (parser なし) | `HelloSheet.abcl` | ✅ 5/5 smoke PASS |
-| 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | 🔄 着手中 |
+| 0 | AST-formula eval (parser なし) | `HelloSheet.abcl` | ✅ 5 assertion |
+| 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | ✅ 4 assertion |
 | 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ⏳ |
 | 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ⏳ |
 | 4 | R3 renderer + IT2 event bus | browser-abcl 統合 | ⏳ |
@@ -33,7 +33,7 @@
 
 ```sh
 bash src/python-aipl/samples/spreadsheet/_smoke.sh
-# → pass=5  fail=0 (Phase 0)
+# → pass=9  fail=0 (Phase 0 + 1)
 ```
 
 ## 進化計算 → 実装の橋渡し
