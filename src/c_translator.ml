@@ -10,40 +10,46 @@ open Ast
 (* AIPL ty → C 型表現
    - 確定型 (TInt/TFloat/TString/TActor) は具体的な C 型に
    - 不定 (TVar/TAny/TUnit) は value_t (汎用箱) に fallback           *)
-let c_type_of_ty (t : Types.ty) : string =
+let rec c_type_of_ty (t : Types.ty) : string =
   match Types.repr t with
   | Types.TInt    -> "long"
   | Types.TFloat  -> "double"
   | Types.TString -> "const char*"
   | Types.TActor _ -> "int"  (* object id *)
   | Types.TBool   -> "long"  (* C does not have bool primitive in this runtime; use long 0/1 *)
+  (* CE-12: refinement is a static-only annotation; for code-gen
+     purposes the C type is the base type's C type. *)
+  | Types.TRefined (b, _, _) -> c_type_of_ty b
   | Types.TUnit | Types.TAny | Types.TVar _ | Types.TFun _
-  | Types.TArray _ | Types.TRecord _ -> "value_t"
+  | Types.TArray _ | Types.TRecord _ | Types.TTuple _ -> "value_t"
 
 (* AIPL ty が「具体的に特殊化できる」かどうか *)
-let is_concrete (t : Types.ty) : bool =
+let rec is_concrete (t : Types.ty) : bool =
   match Types.repr t with
   | Types.TInt | Types.TFloat | Types.TString | Types.TActor _ | Types.TBool -> true
+  | Types.TRefined (b, _, _) -> is_concrete b
   | _ -> false
 
 (* 任意の C 式を value_t に箱詰めする C 式を返す *)
-let box_to_value (t : Types.ty) (c_expr : string) : string =
+let rec box_to_value (t : Types.ty) (c_expr : string) : string =
   match Types.repr t with
   | Types.TInt    -> Printf.sprintf "mk_int((long)(%s))" c_expr
   | Types.TFloat  -> Printf.sprintf "mk_float((double)(%s))" c_expr
   | Types.TString -> Printf.sprintf "mk_str(%s)" c_expr
   | Types.TActor _ -> Printf.sprintf "mk_obj((int)(%s))" c_expr
   | Types.TBool   -> Printf.sprintf "mk_int((long)(%s))" c_expr
+  | Types.TRefined (b, _, _) -> box_to_value b c_expr
   | _ -> c_expr  (* 既に value_t と仮定 *)
 
 (* value_t の C 式から typed C 値を取り出す *)
-let unbox_from_value (t : Types.ty) (v_expr : string) : string =
+let rec unbox_from_value (t : Types.ty) (v_expr : string) : string =
   match Types.repr t with
   | Types.TInt    -> Printf.sprintf "((%s).tag == V_INT ? (%s).i : (long)((%s).f))" v_expr v_expr v_expr
   | Types.TFloat  -> Printf.sprintf "((%s).tag == V_FLOAT ? (%s).f : (double)((%s).i))" v_expr v_expr v_expr
   | Types.TString -> Printf.sprintf "((%s).s ? (%s).s : \"\")" v_expr v_expr
   | Types.TActor _ -> Printf.sprintf "((%s).obj_id)" v_expr
   | Types.TBool   -> Printf.sprintf "((%s).tag == V_INT ? (%s).i : 0L)" v_expr v_expr
+  | Types.TRefined (b, _, _) -> unbox_from_value b v_expr
   | _ -> v_expr
 
 (* ローカル var / param のスコープ別型情報を 1 つにまとめる             *)

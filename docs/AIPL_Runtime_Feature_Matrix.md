@@ -393,7 +393,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: codegen wire pending; OCaml samples: `abclc/o2_typeinf/ce_10_effects/sample{1..3}_*.abcl` |
 | **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: `src/abcl_nextgen_runtime.{c,h}` (pthread TLS, 5 prims)¹⁶ |
 | **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: codegen wire pending; OCaml samples: `abclc/o2_typeinf/ce_13_record_subtyping/sample{1..3}_*.abcl` |
-| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | OCaml/JS-O: `Types.TRefined` + `unify` TRefined arm + `refinement_check_hook`; C: `abcl_refine_subset_check` via z3 fork+exec¹⁶ |
+| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | OCaml/JS-O/C: `Types.TRefined` + `unify` TRefined arm + `refinement_check_hook` (shared); C also has `abcl_refine_subset_check` runtime helper via z3 fork+exec¹⁶ |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -796,4 +796,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after **CE-12 OCaml unify-side wire-up** — `Types.ty` gains `TRefined` constructor, `unify` consults `Refinement.check_subset` via callback hook to avoid the cyclic `types.ml ↔ refinement.ml` dep.  OCaml + JS-O now ✅ on CE-12; C stays 🟡 since the c_translator integration of refinement unify is a separate cycle.  Regression: 27/27 o2_typeinf + 36/36 o1_distributed + 15/15 C-codegen smoke all PASS.*
+*Last regenerated: 2026-05-18 (after **CE-12 ✅ across all 4 OCaml-derived runtimes**.  Py-I 26/26 ✅ + OCaml 26/26 ✅ + JS-O 26/26 ✅ + C 26/26 ✅.  c_translator's `c_type_of_ty / box_to_value / unbox_from_value` made recursive so TRefined sees-through to its base for code-gen, while the unify-time subset check fires earlier through the shared `Types.refinement_check_hook`.  Regression: 27/27 o2_typeinf + 36/36 o1_distributed + 15/15 C-codegen smoke all PASS.*
