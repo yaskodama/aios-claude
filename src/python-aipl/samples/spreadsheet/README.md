@@ -27,13 +27,22 @@
 | 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | ✅ 4 assertion |
 | 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ✅ 5 assertion |
 | 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ✅ 5 assertion |
-| 4 | R3 renderer + IT2 event bus | `src/browser-abcl/spreadsheet.{html,abcl}` | 🔄 着手中 |
+| 4 | R3 renderer + IT2 event bus | `src/browser-abcl/spreadsheet.{html,abcl}` | ✅ 8 assertion |
 
 ## smoke
 
 ```sh
 bash src/python-aipl/samples/spreadsheet/_smoke.sh
 # → pass=19  fail=0 (Phase 0 + 1 + 2 + 3)
+
+bash src/browser-abcl/_smoke_spreadsheet.sh
+# → pass=8  fail=0 (Phase 4 — browser UI via node-side bridge)
+```
+
+Phase 4 の HTML を実際にブラウザで開く:
+```sh
+cd src/browser-abcl && npx serve .
+# → http://localhost:3000/spreadsheet.html
 ```
 
 ## 学んだこと (Phase 2)

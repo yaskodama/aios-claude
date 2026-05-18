@@ -1,0 +1,94 @@
+// Round 3 Phase 4 — Web UI spreadsheet (browser-abcl).
+//
+// R3 LayerComposite (3 sub-layers in one canvas: selection / grid /
+// text) + IT2 EventBus topology (Bus actor + 1 subscriber for the
+// MVP demo).  Drawing prims `sheet_init / sheet_cell / sheet_select`
+// live in src/browser-abcl/src/runtime.js.
+//
+// Note: browser-abcl AIPL has no array-literal `[]` or array_push
+// primitive — its arrays are fixed-size `var x[N]`.  So instead of
+// a vector of subscribers, the Bus holds a single subscriber slot
+// (enough to demo IT2's fan-out invariant on a 3x3 sheet).  In a
+// production sheet, multiple subscribers would be stored as N fixed
+// slots or, alternatively, the publisher could iterate a chain of
+// `subscriber.next` links.
+
+class Bus {
+  var sub = 0;
+  method subscribe(s) {
+    sub = s;
+    reply(0);
+  }
+  method publish_cell(row, col, val, kind) {
+    if (sub != 0) {
+      send sub.on_cell(row, col, val, kind);
+    }
+    reply(0);
+  }
+}
+
+class View {
+  method init(r, c, bus) {
+    sheet_init(r, c);
+    var _ = now bus.subscribe(self);
+    reply(0);
+  }
+  method on_cell(row, col, val, kind) {
+    sheet_cell(row, col, val, kind);
+  }
+  method highlight(row, col) {
+    sheet_select(row, col);
+    reply(0);
+  }
+}
+
+class Cell {
+  var row  = 0;
+  var col  = 0;
+  var val  = 0;
+  var kind = "Value";
+  var bus_ref = 0;
+
+  method init(r, c, b) {
+    row = r;
+    col = c;
+    bus_ref = b;
+    reply(0);
+  }
+  method set_value(v) {
+    val  = v;
+    kind = "Value";
+    send bus_ref.publish_cell(row, col, val, kind);
+    reply(0);
+  }
+  method set_formula(label, computed) {
+    val  = computed;
+    kind = "Formula";
+    send bus_ref.publish_cell(row, col, val, kind);
+    reply(0);
+  }
+}
+
+// ── Build a 3x3 sheet matching the console samples ────────────
+var bus  = new Bus();
+var view = new View();
+var _vi  = now view.init(3, 3, bus);
+
+// Row 1: literals + simple sum
+var a1 = new Cell(0, 0, bus); var _a1 = now a1.set_value(10);
+var b1 = new Cell(0, 1, bus); var _b1 = now b1.set_value(20);
+var c1 = new Cell(0, 2, bus); var _c1 = now c1.set_formula("A1+B1", 30);
+
+// Row 2: literals + product
+var a2 = new Cell(1, 0, bus); var _a2 = now a2.set_value(30);
+var b2 = new Cell(1, 1, bus); var _b2 = now b2.set_value(40);
+var c2 = new Cell(1, 2, bus); var _c2 = now c2.set_formula("A2*B2", 1200);
+
+// Row 3: derived formulas
+var a3 = new Cell(2, 0, bus); var _a3 = now a3.set_formula("A1*2", 20);
+var b3 = new Cell(2, 1, bus); var _b3 = now b3.set_formula("B1*2", 40);
+var c3 = new Cell(2, 2, bus); var _c3 = now c3.set_formula("SUM(...)", 1330);
+
+// Highlight C3 (the SUM result) as the focus.
+var _h = now view.highlight(2, 2);
+print("[spreadsheet] 3x3 grid rendered (R3 LayerComposite + IT2 EventBus)");

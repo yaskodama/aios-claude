@@ -32,6 +32,9 @@ export class Runtime {
     // ---- Bounded buffer visualization state -------------------------
     this.bufState = null;                // null until `call buf_init(cap);`
 
+    // ---- Spreadsheet visualization state (Round 3 Phase 4) ----------
+    this.sheetState = null;              // null until `call sheet_init(r,c);`
+
     // ---- Slider-driven runtime variables ----------------------------
     // Read by AIPL programs via the prod_speed() / cons_speed()
     // builtins. The console UI binds sliders to these fields so timings
@@ -71,6 +74,7 @@ export class Runtime {
     this.droneStates.clear();
     this.droneKnowledge.clear();
     this.bufState = null;
+    this.sheetState = null;
     this._aiosServices.clear();
     this._aiosEvents.length = 0;
     this._protoDefs.clear();
@@ -518,6 +522,44 @@ export class Runtime {
         this.print(args[0]);
         break;
 
+      // ---------------- Spreadsheet visualization (Round 3 Phase 4) ----------
+      // R3 LayerComposite: a single canvas with grid + content + selection
+      // sub-layers drawn in order.  AIPL calls:
+      //   sheet_init(rows, cols)           — reset grid metrics
+      //   sheet_cell(row, col, val, kind)  — push one cell payload
+      //   sheet_select(row, col)           — highlight a cell (or -1,-1)
+      // After every call, _redrawCanvas re-paints all 3 layers.
+      case "sheet_init": {
+        this.sheetState = {
+          rows: Number(args[0]) || 3,
+          cols: Number(args[1]) || 3,
+          cells: [],
+          sel: { row: -1, col: -1 },
+        };
+        this._redrawCanvas();
+        break;
+      }
+      case "sheet_cell": {
+        if (!this.sheetState) break;
+        this.sheetState.cells.push({
+          row:  Number(args[0]),
+          col:  Number(args[1]),
+          val:  String(args[2]),
+          kind: String(args[3] || "Value"),
+        });
+        this._redrawCanvas();
+        break;
+      }
+      case "sheet_select": {
+        if (!this.sheetState) break;
+        this.sheetState.sel = {
+          row: Number(args[0]),
+          col: Number(args[1]),
+        };
+        this._redrawCanvas();
+        break;
+      }
+
       // ---------------- Bounded buffer visualization -------------
       case "buf_init": {
         const cap = Number(args[0]) || 4;
@@ -770,6 +812,104 @@ export class Runtime {
     if (this.bufState) {
       this._drawBufferState(ctx, W, H);
     }
+
+    // Spreadsheet (Round 3 Phase 4 — R3 LayerComposite)
+    if (this.sheetState) {
+      this._drawSheetState(ctx, W, H);
+    }
+  }
+
+  _drawSheetState(ctx, W, H) {
+    const s    = this.sheetState;
+    const cw   = Math.floor((W - 60) / (s.cols + 1));   // +1 for row-header column
+    const ch   = 32;
+    const x0   = 30;
+    const y0   = 30;
+    const totW = cw * (s.cols + 1);
+    const totH = ch * (s.rows + 1);
+
+    // Background panel
+    ctx.fillStyle = "#fdfdfd";
+    ctx.fillRect(x0 - 6, y0 - 6, totW + 12, totH + 12);
+
+    // ── Layer 1: selection highlight (drawn first so it sits under
+    //              grid lines and text). ───────────────────────
+    if (s.sel.row >= 0 && s.sel.col >= 0) {
+      ctx.fillStyle = "#d1e9ff";
+      ctx.fillRect(
+        x0 + (s.sel.col + 1) * cw,
+        y0 + (s.sel.row + 1) * ch,
+        cw, ch
+      );
+    }
+
+    // ── Layer 2: grid lines (the "wireframe"). ───────────────
+    ctx.strokeStyle = "#bbbbbb";
+    ctx.lineWidth   = 1;
+    for (let c = 0; c <= s.cols + 1; c++) {
+      ctx.beginPath();
+      ctx.moveTo(x0 + c * cw, y0);
+      ctx.lineTo(x0 + c * cw, y0 + totH);
+      ctx.stroke();
+    }
+    for (let r = 0; r <= s.rows + 1; r++) {
+      ctx.beginPath();
+      ctx.moveTo(x0,        y0 + r * ch);
+      ctx.lineTo(x0 + totW, y0 + r * ch);
+      ctx.stroke();
+    }
+
+    // Header row + column shading
+    ctx.fillStyle = "#eef0f4";
+    ctx.fillRect(x0, y0, totW, ch);                          // top header
+    ctx.fillRect(x0, y0, cw,   totH);                        // left header
+    // re-stroke borders that were just over-painted
+    ctx.strokeStyle = "#bbbbbb";
+    for (let c = 0; c <= s.cols + 1; c++) {
+      ctx.beginPath();
+      ctx.moveTo(x0 + c * cw, y0);
+      ctx.lineTo(x0 + c * cw, y0 + totH);
+      ctx.stroke();
+    }
+    for (let r = 0; r <= s.rows + 1; r++) {
+      ctx.beginPath();
+      ctx.moveTo(x0,        y0 + r * ch);
+      ctx.lineTo(x0 + totW, y0 + r * ch);
+      ctx.stroke();
+    }
+
+    // ── Layer 3: text content (col labels A B C, row labels 1 2 3,
+    //              and computed cell values). ─────────────────
+    ctx.textAlign    = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle    = "#444";
+    ctx.font         = "bold 13px monospace";
+    const colLabels  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (let c = 0; c < s.cols; c++) {
+      ctx.fillText(colLabels[c] || "?",
+        x0 + (c + 1) * cw + cw / 2, y0 + ch / 2);
+    }
+    for (let r = 0; r < s.rows; r++) {
+      ctx.fillText(String(r + 1),
+        x0 + cw / 2, y0 + (r + 1) * ch + ch / 2);
+    }
+
+    ctx.font = "13px monospace";
+    for (const c of s.cells) {
+      const px = x0 + (c.col + 1) * cw + cw / 2;
+      const py = y0 + (c.row + 1) * ch + ch / 2;
+      ctx.fillStyle = c.kind === "Formula" ? "#2255aa" : "#222";
+      ctx.fillText(c.val, px, py);
+    }
+
+    // Footer caption
+    ctx.fillStyle = "#666";
+    ctx.font      = "11px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(
+      "Round 3 Phase 4 — R3 LayerComposite (selection / grid / text)",
+      x0, y0 + totH + 18
+    );
   }
 
   _drawBufferState(ctx, W, H) {
@@ -1494,6 +1634,13 @@ export class Runtime {
       case "StringLit": return expr.value;
 
       case "Var":
+        // `self` inside a method body resolves to the current actor
+        // name (parity with the OCaml/Py-I runtimes).  Previously
+        // only `send self.foo()` worked because evalTarget knew the
+        // keyword — passing `self` as an argument failed.
+        if (expr.name === "self" && env.__currentActor) {
+          return env.__currentActor;
+        }
         if (expr.name in env) return env[expr.name];
         if (this.actors.has(expr.name)) return expr.name;
         throw new Error("Unknown var: " + expr.name);
