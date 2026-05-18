@@ -1936,6 +1936,38 @@ def _b_check_capability(args, frame, interp):
     return True
 
 
+# ─── DR-12: Multi-Region Failover primitives ────────────────────────
+
+def _b_current_region(args, frame, interp):
+    import aipl_dist
+    return aipl_dist.current_region()
+
+def _b_region_chain(args, frame, interp):
+    import aipl_dist
+    return list(aipl_dist.region_chain())
+
+def _b_route_for_region(args, frame, interp):
+    """route_for_region(actor[, region]) -> string ('' when no entry)."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("route_for_region(actor[, region])")
+    import aipl_dist
+    region = args[1] if len(args) > 1 and isinstance(args[1], str) else None
+    return aipl_dist.route_for_region(args[0], region) or ""
+
+def _b_failover_region(args, frame, interp):
+    """failover_region(actor[, primary]) -> string ('' when chain
+    exhausted).  Logs `region_failover` / `region_failover_failed`."""
+    if not args or not isinstance(args[0], str):
+        raise ValueError("failover_region(actor[, primary])")
+    import aipl_dist
+    primary = args[1] if len(args) > 1 and isinstance(args[1], str) else None
+    return aipl_dist.failover_region(args[0], primary) or ""
+
+def _b_regions_available(args, frame, interp):
+    import aipl_dist
+    return list(aipl_dist.regions_available())
+
+
 # ---------------------------------------------------------------------------
 # Standard library (string + I/O + misc).  Keep these synchronous and
 # total — anything that can hit the filesystem returns "" / False on
@@ -2962,6 +2994,12 @@ _BUILTINS = {
     "has_cap":                       _b_has_cap,
     "current_caps":                  _b_current_caps,
     "check_capability":              _b_check_capability,
+    # DR-12: Multi-region failover (geo-aware route + lineage)
+    "current_region":                _b_current_region,
+    "region_chain":                  _b_region_chain,
+    "route_for_region":              _b_route_for_region,
+    "failover_region":               _b_failover_region,
+    "regions_available":             _b_regions_available,
     # Introspection
     "inspect":                       _b_inspect,
     "inspect_all":                   _b_inspect_all,

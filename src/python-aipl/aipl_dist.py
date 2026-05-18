@@ -1016,3 +1016,90 @@ def check_capability(required: Any) -> None:
     if cap_strict():
         raise CapabilityError(
             f"capability denied: missing {sorted(missing)} (held: {sorted(s)})")
+
+
+# ─── DR-12: Multi-Region Failover ──────────────────────────────────
+# Geo-aware actor placement layered on the existing DR-1 route table.
+# Each runtime node belongs to a region (AIPL_REGION, default "local");
+# the route table is extended to per-region entries:
+#
+#   AIPL_ROUTE_REGION_us-east-1="Greeter:fast,Bench:slow"
+#   AIPL_ROUTE_REGION_eu-west-1="Greeter:fast"
+#
+# `route_for_region(actor, region)` consults the region's local table
+# first.  When the operator declares secondary regions via
+# `AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-1"` the
+# `failover_region(actor, primary)` helper walks the chain to find
+# the first region that has a route entry for the actor.
+#
+# Lineage replication picks up a `region` field from every log_event
+# automatically (see `log_event` body — it appends `region` whenever
+# AIPL_REGION is set), so a post-failure forensic tail can correlate
+# events across regions.
+
+def current_region() -> str:
+    """Current node's region — `AIPL_REGION` or 'local'."""
+    return os.environ.get("AIPL_REGION", "local") or "local"
+
+
+def region_chain() -> list:
+    """Primary + secondary chain from `AIPL_REGION_FAILOVER`.
+    Comma-separated; the first entry is treated as primary.  Empty
+    list when unset."""
+    raw = os.environ.get("AIPL_REGION_FAILOVER", "")
+    return [r.strip() for r in raw.split(",") if r.strip()]
+
+
+def _route_table_for_region(region: str) -> Dict[str, str]:
+    """Per-region route table: env var
+    `AIPL_ROUTE_REGION_<region>="Actor:tag,..."`.  Falls back to the
+    global `AIPL_ROUTE` when no per-region table is set."""
+    key = f"AIPL_ROUTE_REGION_{region}"
+    raw = os.environ.get(key, "")
+    if raw:
+        return parse_route_table(raw)
+    # Fallback to the legacy single-region table for this region too.
+    return parse_route_table(os.environ.get("AIPL_ROUTE", ""))
+
+
+def route_for_region(actor_name: str, region: Optional[str] = None) -> Optional[str]:
+    """DR-12: like `route_for`, but consults the region-scoped table
+    first.  When `region` is None, uses `current_region()`."""
+    if not is_enabled():
+        return None
+    r = region or current_region()
+    return _route_table_for_region(r).get(actor_name)
+
+
+def failover_region(actor_name: str, primary: Optional[str] = None) -> Optional[str]:
+    """Walk the `AIPL_REGION_FAILOVER` chain looking for the first
+    region that has a route entry for `actor_name`.  Returns the
+    winning region name, or None if no fallback succeeds.  A
+    `region_failover` event is logged whenever this returns a
+    non-primary region (so post-mortem queries can spot every
+    cross-region jump)."""
+    if not is_enabled():
+        return None
+    chain = region_chain() or [current_region()]
+    pri = primary or chain[0]
+    # Try primary first, then each secondary.
+    seen = []
+    for r in chain:
+        seen.append(r)
+        if route_for_region(actor_name, r):
+            if r != pri:
+                log_event("region_failover", actor=actor_name,
+                          from_region=pri, to_region=r, chain=seen)
+            return r
+    log_event("region_failover_failed", actor=actor_name,
+              tried=seen)
+    return None
+
+
+def regions_available() -> list:
+    """List of regions that have a route table configured."""
+    out = []
+    for k, v in os.environ.items():
+        if k.startswith("AIPL_ROUTE_REGION_") and v.strip():
+            out.append(k[len("AIPL_ROUTE_REGION_"):])
+    return sorted(out)

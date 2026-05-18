@@ -221,6 +221,21 @@ Sample: `src/python-aipl/samples/CapabilityTypes.abcl`.  Picked by
 the 2026-05-18 round-2 MAP-Elites (reviewer avg 0.430 — top of the
 type-extension axis; CapabilityTypes=0.73 in the top elite I0012).
 
+¹² DR-12 multi-region failover: geo-aware actor placement layered
+on the DR-1 route table.  Each node sets `AIPL_REGION=<name>`
+(defaults to `local`); the route table is partitioned per-region
+via `AIPL_ROUTE_REGION_<name>="Actor:tag,..."`.  When a primary
+region is silent for an actor, `failover_region(actor[, primary])`
+walks `AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-1"` to find
+the first region that knows the actor.  Logs
+`region_failover` (cross-region hit) /
+`region_failover_failed` (chain exhausted) for forensic queries.
+5 primitives: `current_region`, `region_chain`, `route_for_region`,
+`failover_region`, `regions_available`.  Sample:
+`src/python-aipl/samples/MultiRegionFailover.abcl`.  Picked by
+round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
+axis, top elite I0012 had 0.70 for this task).
+
 ¹¹ DR-10 CRDT actor state: three classic conflict-free replicated
 data types implemented as plain dicts so they survive
 `save_actor_state` / `restore_actor_state` round-trips for free.
@@ -370,6 +385,7 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
 | **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.pool_*` + `_b_pool_*` primitives  |
 | **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{gcounter,orset,lww}_*` + 15 primitives |
+| **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{current_region,region_chain,route_for_region,failover_region}` + 5 primitives |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -698,4 +714,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
+*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
