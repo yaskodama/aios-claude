@@ -1,0 +1,137 @@
+{
+  "name": "AIPL_JSBJSN_NextGenPort",
+  "task": "Py-I / OCaml / JS-O / C で 26/26 ✅ となった 8 個の次世代機能 (CE-10〜13 + DR-10〜13) を JS-Browser (~2575 LOC, src/browser-abcl/src/runtime.js + typecheck.js + interpreter.js) と JS-Node (~338 LOC, src/node-aipl-server/server.mjs) の 2 つの JS-codebase に直訳する。JS-B はブラウザ制約 (no fs / no child_process / Web Worker のみ) で機能の半分は別 idiom (OPFS / SharedWorker / WebAssembly z3) が必要、JS-N は Node.js の full API でほぼ Py-I 同等の実装が可能。後方互換 hard floor: 既存 _smoke_test.sh / _smoke_pptr.mjs の sample が無変更で動作。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "effect_handling",
+      "concurrency_model"
+    ],
+    "generations": 6,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 31415936
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "PortEffectInferenceJSB",
+      "PortCapabilityTypesJSB",
+      "PortRefinementUnificationJSB",
+      "PortRecordSubtypingJSB",
+      "PortCRDTStateJSB",
+      "PortSagaOrchestrationJSB",
+      "PortMultiRegionFailoverJSB",
+      "PortAutoScalingPoolJSB",
+      "PortEffectInferenceJSN",
+      "PortCapabilityTypesJSN",
+      "PortRefinementUnificationJSN",
+      "PortRecordSubtypingJSN",
+      "PortCRDTStateJSN",
+      "PortSagaOrchestrationJSN",
+      "PortMultiRegionFailoverJSN",
+      "PortAutoScalingPoolJSN",
+      "BackwardCompatJSBJSN",
+      "FourWayParityJSBJSN",
+      "ImplCostBudgetJSBJSN"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "JSBFeasibility",
+        "persona": "あなたは JS-Browser 実装可能性レビュアーです。Web Worker / OPFS / IndexedDB / postMessage / BroadcastChannel の制約下で 8 機能を src/browser-abcl/src/*.js (~2575 LOC) に追加できるか評価。z3-wasm bundle vs skip の trade-off も加味。1.0 = ≤700 行で実装可、0.7 = ≤1000 行、0.3 = ≤1400 行 + 機能の一部 deferred、0.0 = ブラウザ環境で本質的に不可。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "JSNFeasibility",
+        "persona": "あなたは JS-Node 実装可能性レビュアーです。Node.js の full POSIX + worker_threads + child_process API なら Py-I と 1:1 マッピング近い。src/node-aipl-server/server.mjs (338 LOC) を中心に 8 機能を追加できるか評価。1.0 = ≤600 行で実装可、0.7 = ≤900 行、0.3 = ≤1200 行、0.0 = node 環境で本質的に不可。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "BackwardCompatJSBJSN",
+        "persona": "あなたは JS 後方互換性レビュアーです。既存 src/browser-abcl/_smoke_test.sh + _smoke_pptr.mjs (headless Chrome) と src/node-aipl-server/_smoke_test.sh の samples が無変更で動作するか。新機能は全て opt-in (URL クエリ / env var / config) で発火。1.0 = 完全 opt-in、0.7 = 1-2 例で軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "FourWayParity",
+        "persona": "あなたは 4-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "JSIdiomaticity",
+        "persona": "あなたは JS イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を JS で書き直す妥当性。Map / async-mutex / AsyncLocalStorage (Node) / WeakMap / postMessage (Browser)。CRDT は Plain Object + JSON-merge が JS 流。Saga は async/await + try/catch が自然。1.0 = JS idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = JS 的でない。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ImplCostEstimateJSBJSN",
+        "persona": "あなたは JS 実装コスト見積もりレビュアーです。Py-I (~700 LOC) + OCaml (~795 LOC) + C (~880 LOC) の実績を踏まえ、JS-B (~1100 行) + JS-N (~1000 行) が現実的か。1.0 = ≤1900 行合計、0.7 = ≤2200 行、0.3 = ≤2500 行、0.0 = >2500 行。1 行で返答。",
+        "weight": 0.16666666666666666
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.1,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.15,
+    "implementability": 0.55
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "type_first",
+      "dist_first",
+      "impl_cost_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "type_first": {},
+      "dist_first": {},
+      "impl_cost_first": {}
+    },
+    "top_k": 5
+  }
+}

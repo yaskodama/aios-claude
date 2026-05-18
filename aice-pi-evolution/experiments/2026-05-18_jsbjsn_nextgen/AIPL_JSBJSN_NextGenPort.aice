@@ -1,0 +1,146 @@
+// AIPL_JSBJSN_NextGenPort.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (7) — port the 8
+// next-gen features (CE-10〜13 + DR-10〜13) to BOTH JS-Browser and
+// JS-Node runtimes.  Py-I / OCaml / JS-O / C are all 26/26 ✅; this
+// .aice plans the last two legs.
+//
+// Two distinct JS targets, two distinct constraint sets:
+//
+//   JS-B (browser, src/browser-abcl/src/*.js, ~2575 LOC):
+//     • No filesystem (`fs` cap is moot or via OPFS / Origin Private FS)
+//     • No pthread → Web Worker for concurrency
+//     • No child_process → z3 unavailable for CE-12 (or via WebAssembly)
+//     • localStorage / IndexedDB for actor state persistence
+//     • DR-12 region: only meaningful if multi-tab via SharedWorker
+//     • DR-13 pool: Web Worker pool, dyn-resize via terminate()/new
+//
+//   JS-N (node, src/node-aipl-server/server.mjs, ~338 LOC + Express):
+//     • Full `fs` + `child_process` (z3 via spawn)
+//     • Worker Threads for pool spawning
+//     • DR-12 region works natively via `process.env`
+//     • CE-12 fully fork+exec'able (parity with C / OCaml)
+//
+// JS-O (the OCaml-backed JS target) already has 26/26 via the
+// OCaml backend; these two new runtimes are *separate* JS code-bases
+// that don't share the OCaml compiler, so each needs its own port.
+
+aice AIPL_JSBJSN_NextGenPort {
+  dialect = "aice_evolution_v2";
+
+  task = "Py-I / OCaml / JS-O / C で 26/26 ✅ となった 8 個の次世代機能 (CE-10〜13 + DR-10〜13) を JS-Browser (~2575 LOC, src/browser-abcl/src/runtime.js + typecheck.js + interpreter.js) と JS-Node (~338 LOC, src/node-aipl-server/server.mjs) の 2 つの JS-codebase に直訳する。JS-B はブラウザ制約 (no fs / no child_process / Web Worker のみ) で機能の半分は別 idiom (OPFS / SharedWorker / WebAssembly z3) が必要、JS-N は Node.js の full API でほぼ Py-I 同等の実装が可能。後方互換 hard floor: 既存 _smoke_test.sh / _smoke_pptr.mjs の sample が無変更で動作。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  // ── 評価タスク群 ──
+  evaluation_tasks {
+    // ── JS-B 軸 ──
+    task PortEffectInferenceJSB {
+      spec = "src/browser-abcl/src/typecheck.js (~431 LOC) に primitives ごとの effect set テーブル (ai, fs, net, mut) + walk_method を追加。`fs` は OPFS API か禁止扱い。inferred effects は --check-style output に表示。見込み 50-90 行。";
+    }
+    task PortCapabilityTypesJSB {
+      spec = "src/browser-abcl/src/runtime.js に Web Worker-local capability set (no pthread TLS なので per-worker global) + 5 prim。`AIPL_CAP_GRANT` 相当は ?cap=fs,ai URL クエリで seed。strict mode は throw Error。見込み 80-130 行。";
+    }
+    task PortRefinementUnificationJSB {
+      spec = "src/browser-abcl/src/typecheck.js に refinement subset 判定を追加。z3 は ブラウザでは fork+exec できないため (a) z3-wasm を bundle (~5MB)、(b) skip して post-hoc check のみ、の 2 択。OCaml が `Types.TRefined` を選んだのと同じく、JS の type も refinement 保持。見込み 100-180 行 (option (b))。";
+    }
+    task PortRecordSubtypingJSB {
+      spec = "src/browser-abcl/src/typecheck.js の record unify を intersection-based に。OCaml の `Types.unify` の record arm と同等修正。見込み 20-40 行。";
+    }
+    task PortCRDTStateJSB {
+      spec = "src/browser-abcl/src/runtime.js に G-Counter / OR-Set / LWW-Register を Plain JS Object として実装。merge は JSON-merge。crdt_replicate は BroadcastChannel API で multi-tab 同期。見込み 150-220 行。";
+    }
+    task PortSagaOrchestrationJSB {
+      spec = "src/browser-abcl/src/interpreter.js に saga statement の AST + 評価ロジック。JS の try/catch + LIFO compensate。Worker boundary 越しでは postMessage で sub-saga を伝搬。見込み 130-180 行。";
+    }
+    task PortMultiRegionFailoverJSB {
+      spec = "src/browser-abcl/src/runtime.js に AIPL_REGION 相当 (URL クエリ ?region=us-east-1 + ?route_region_us-east-1=Greeter:fast) + chain walk。`failover_region` は同 origin か CORS 経由でメタデータ取得。見込み 80-120 行。";
+    }
+    task PortAutoScalingPoolJSB {
+      spec = "src/browser-abcl/src/runtime.js に Web Worker pool。spawn = new Worker(\"worker_actor.mjs\"), retire = worker.terminate()、qlen = MessageChannel の outstanding。hysteresis controller は setInterval。見込み 130-200 行。";
+    }
+    // ── JS-N 軸 ──
+    task PortEffectInferenceJSN {
+      spec = "src/node-aipl-server/server.mjs に primitive effect table。Express route handler で --check 相当を提供。見込み 50-80 行。";
+    }
+    task PortCapabilityTypesJSN {
+      spec = "Node.js の AsyncLocalStorage で capability set TLS 相当を実装 (per-request scope)。AIPL_CAP_GRANT env var + AIPL_CAP_STRICT で throw。5 prim。見込み 80-130 行。";
+    }
+    task PortRefinementUnificationJSN {
+      spec = "child_process.spawn('z3', ['-in']) で OCaml の Refinement.check_subset 相当。SMT-LIB 2 文字列を stdin に流して stdout を読む。見込み 100-150 行。";
+    }
+    task PortRecordSubtypingJSN {
+      spec = "server.mjs のたぶん typecheck pass に intersection-based 緩和。見込み 20-40 行。";
+    }
+    task PortCRDTStateJSN {
+      spec = "Node.js の Map ベースで G-Counter / OR-Set / LWW-Register。crdt_replicate は WebSocket or HTTP POST で multi-node 同期 (DR-12 と統合)。見込み 200-280 行。";
+    }
+    task PortSagaOrchestrationJSN {
+      spec = "Express middleware で saga 実行。try/catch + LIFO compensate。失敗時 actor error path (server-side actor の log + HTTP 500)。見込み 150-200 行。";
+    }
+    task PortMultiRegionFailoverJSN {
+      spec = "process.env.AIPL_REGION + AIPL_ROUTE_REGION_* で OCaml と同 idiom。failover は HTTP 経由で他 region に query。見込み 100-150 行。";
+    }
+    task PortAutoScalingPoolJSN {
+      spec = "Node.js Worker Threads (worker_threads) ベースの pool。hysteresis controller は setInterval。spawn = new Worker(), retire = worker.terminate()。見込み 150-200 行。";
+    }
+    // ── cross-cutting ──
+    task BackwardCompatJSBJSN {
+      spec = "src/browser-abcl/_smoke_test.sh + src/browser-abcl/_smoke_pptr.mjs (headless Chrome 経由) + src/node-aipl-server/_smoke_test.sh の既存 sample が無変更で動作。新機能は全て opt-in (URL クエリ / env var)。";
+    }
+    task FourWayParityJSBJSN {
+      spec = "同一の .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出す。DR-* は構造化ログ JSON のイベント名 + フィールド が等価。CE-* は --check / --infer 出力 が等価。Phase O での 18/18 mirror の 8-feature 版。";
+    }
+    task ImplCostBudgetJSBJSN {
+      spec = "JS-B 合計 ≤ 1100 行 (Py-I 700 + JS overhead +25-30% + Web Worker workaround で +ボーナス)、JS-N 合計 ≤ 1000 行 (Py-I/Node API がほぼ 1:1 マッピング)。両方合わせて ≤ 2100 行。";
+    }
+  }
+
+  // ── 探索パラメタ ──
+  // OCaml / C round と同じ軸を継続。JS は web 系制約が独自なので
+  // reviewer が C と差別化して判定するか興味深い。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "effect_handling, concurrency_model";
+    generations = 6;
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 31415936;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.10;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.15;
+    implementability      = 0.55;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "type_first", "dist_first", "impl_cost_first"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer JSBFeasibility {
+      persona = "あなたは JS-Browser 実装可能性レビュアーです。Web Worker / OPFS / IndexedDB / postMessage / BroadcastChannel の制約下で 8 機能を src/browser-abcl/src/*.js (~2575 LOC) に追加できるか評価。z3-wasm bundle vs skip の trade-off も加味。1.0 = ≤700 行で実装可、0.7 = ≤1000 行、0.3 = ≤1400 行 + 機能の一部 deferred、0.0 = ブラウザ環境で本質的に不可。1 行で返答。";
+    }
+    reviewer JSNFeasibility {
+      persona = "あなたは JS-Node 実装可能性レビュアーです。Node.js の full POSIX + worker_threads + child_process API なら Py-I と 1:1 マッピング近い。src/node-aipl-server/server.mjs (338 LOC) を中心に 8 機能を追加できるか評価。1.0 = ≤600 行で実装可、0.7 = ≤900 行、0.3 = ≤1200 行、0.0 = node 環境で本質的に不可。1 行で返答。";
+    }
+    reviewer BackwardCompatJSBJSN {
+      persona = "あなたは JS 後方互換性レビュアーです。既存 src/browser-abcl/_smoke_test.sh + _smoke_pptr.mjs (headless Chrome) と src/node-aipl-server/_smoke_test.sh の samples が無変更で動作するか。新機能は全て opt-in (URL クエリ / env var / config) で発火。1.0 = 完全 opt-in、0.7 = 1-2 例で軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
+    }
+    reviewer FourWayParity {
+      persona = "あなたは 4-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+    }
+    reviewer JSIdiomaticity {
+      persona = "あなたは JS イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を JS で書き直す妥当性。Map / async-mutex / AsyncLocalStorage (Node) / WeakMap / postMessage (Browser)。CRDT は Plain Object + JSON-merge が JS 流。Saga は async/await + try/catch が自然。1.0 = JS idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = JS 的でない。1 行で返答。";
+    }
+    reviewer ImplCostEstimateJSBJSN {
+      persona = "あなたは JS 実装コスト見積もりレビュアーです。Py-I (~700 LOC) + OCaml (~795 LOC) + C (~880 LOC) の実績を踏まえ、JS-B (~1100 行) + JS-N (~1000 行) が現実的か。1.0 = ≤1900 行合計、0.7 = ≤2200 行、0.3 = ≤2500 行、0.0 = >2500 行。1 行で返答。";
+    }
+  }
+}
