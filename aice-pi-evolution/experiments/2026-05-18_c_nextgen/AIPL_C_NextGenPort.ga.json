@@ -1,0 +1,129 @@
+{
+  "name": "AIPL_C_NextGenPort",
+  "task": "Py-I / OCaml で実装済の 8 個の次世代機能 (CE-10 effect inference / CE-11 capability types / CE-12 refinement unification / CE-13 record subtyping / DR-10 CRDT state / DR-11 saga / DR-12 multi-region / DR-13 auto-scaling pool) を C 言語 codegen ターゲットに直訳する。`c_translator.ml` (3225 LOC) の codegen 拡張 + 新規 `abcl_nextgen_runtime.{c,h}` (target ~600 LOC) で実装。Phase O / Phase O-3 / Round 1+2 で確立された 1 セッション × 数機能の直訳パターンに従う。後方互換 hard floor: 既存 abclc smoke の Xinu / Gui / Py 系 sample が無変更で動作。C は dynamic typing 不在 + reply slot 無しのため、機能ごとに C 流のイディオム調整が必要。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "effect_handling",
+      "concurrency_model"
+    ],
+    "generations": 6,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 31415935
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "PortEffectInferenceC",
+      "PortCapabilityTypesC",
+      "PortRefinementUnificationC",
+      "PortRecordSubtypingC",
+      "PortCRDTStateC",
+      "PortSagaOrchestrationC",
+      "PortMultiRegionFailoverC",
+      "PortAutoScalingPoolC",
+      "BackwardCompatC",
+      "PyIOCamlParityC",
+      "ImplCostBudgetC"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "CCodegenFeasibility",
+        "persona": "あなたは C codegen 実装可能性レビュアーです。CE-10 / CE-13 (compile-time) と DR-11 saga (codegen + runtime) の C 言語実装可能性を評価。`c_translator.ml` (3225 LOC、現状 SDL/Xinu/Python/Pony/Erlang/Go/Prolog/LLVM/OpenMP の多 backend) にどれくらいの拡張で済むかを判定。1.0 = ≤200 行 + 既存 backend を破壊しない、0.7 = ≤350 行、0.3 = ≤500 行、0.0 = codegen pipeline 再設計レベル。'OK: <根拠>' / 'NG: <欠落>' の 1 行返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "CRuntimeFeasibility",
+        "persona": "あなたは C runtime 実装可能性レビュアーです。CE-11 capability (TLS) / CE-12 refinement (Z3) / DR-10 CRDT (手書き hash table) / DR-12 region (getenv + strcat) / DR-13 pool (pthread + dyn array) を新規 `abcl_nextgen_runtime.{c,h}` で実装可能か。C99 + pthread + 最低限の POSIX のみ、libz3 オプショナル。1.0 = ≤500 行、0.7 = ≤800 行、0.3 = ≤1000 行、0.0 = >1000 行。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "BackwardCompatC",
+        "persona": "あなたは C 版後方互換性レビュアーです。abclc/_smoke_test.sh の Xinu (BoundedBufferXinu / Philosophers5Xinu / Rotate4LinesXinu / BBXinu) と Gui (BoundedBufferGui / Rotate4LinesGui / BBGui) と Py (BoundedBufferPy / BBPy) 系の cross-compile が無変更で通るか。c_translator.ml の既存 backend (--xinu / --python / --pony / --erlang / --go / --prolog / --llvm / --openmp) を新機能が壊さないか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "PyIOCamlParityC",
+        "persona": "あなたは 3-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "CIdiomaticity",
+        "persona": "あなたは C イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を C で書き直す妥当性を評価。CRDT の opaque ID Hashtbl → khash or 手書き open-addressing、Capability TLS → __thread or pthread_setspecific、Saga → setjmp/longjmp スタック、Pool members → dyn-array realloc。1.0 = C idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = C 的でない。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ImplCostEstimateC",
+        "persona": "あなたは C 実装コスト見積もりレビュアーです。Py-I (~700 LOC) と OCaml (~795 LOC) の実績を参照しつつ、C は dynamic typing 不在 + 手書きデータ構造で +25-30% 程度の overhead を想定し、合計 ≤ 1000 行で済むかを評価。1.0 = ≤800 行、0.7 = ≤1000 行、0.3 = ≤1200 行、0.0 = >1200 行。1 行で返答。",
+        "weight": 0.16666666666666666
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.1,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.15,
+    "implementability": 0.55
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "type_first",
+      "dist_first",
+      "impl_cost_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "type_first": {},
+      "dist_first": {},
+      "impl_cost_first": {}
+    },
+    "top_k": 5
+  }
+}

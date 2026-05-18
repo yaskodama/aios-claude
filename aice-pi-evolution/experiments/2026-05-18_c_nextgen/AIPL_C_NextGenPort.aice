@@ -1,0 +1,135 @@
+// AIPL_C_NextGenPort.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (6) — port Py-I and
+// OCaml's "next-gen" feature set (CE-10〜13 + DR-10〜13) to the
+// C-codegen target.  All 8 features ship today on Py-I (Round 1+2:
+// commits 3edfa30 / adb57a0 / c045095 / baaa653 / fc2dc04 / 3a7aae7)
+// AND on OCaml (commits 871ae6e / 17a37f6).  This experiment plans
+// the third leg.
+//
+// C-target landing zones:
+//
+//   src/aipl2c.ml          (102 LOC, CLI wrapper — no changes expected)
+//   src/c_translator.ml    (3225 LOC, AIPL → C codegen)
+//   src/abcl_ws_runtime.c  (295 LOC, WebSocket primitives)
+//   src/abcl_gui_runtime.c (1178 LOC, SDL GUI primitives)
+//   src/abcl_nextgen_runtime.c (NEW, ~600 LOC target,
+//                               holds: capability TLS, CRDT
+//                               structs + helpers, region lookup,
+//                               pool state, saga frame)
+//   src/abcl_nextgen_runtime.h (NEW, ~80 LOC, function decls)
+//
+// Constraints unique to the C target:
+//   • No GC / closures / dynamic dispatch.  CRDTs are explicit
+//     structs with manual lifetime management (caller frees).
+//   • No reply slots in the existing C runtime (Feature Matrix
+//     rows 29b/29c/29d are ❌ for C).  Saga still works because it
+//     only needs synchronous step execution — `setjmp` / `longjmp`
+//     for compensate-on-failure is the natural fit.
+//   • Refinement (CE-12) needs Z3 — either a libz3.so link or
+//     fork+exec the same z3 CLI the OCaml side uses.  The latter
+//     keeps the C runtime dependency-free; the former is faster.
+//   • Effects (CE-10) live entirely in `c_translator.ml` as a
+//     compile-time pass that prints the inferred set into the
+//     generated comment header.  No runtime cost.
+
+aice AIPL_C_NextGenPort {
+  dialect = "aice_evolution_v2";
+
+  task = "Py-I / OCaml で実装済の 8 個の次世代機能 (CE-10 effect inference / CE-11 capability types / CE-12 refinement unification / CE-13 record subtyping / DR-10 CRDT state / DR-11 saga / DR-12 multi-region / DR-13 auto-scaling pool) を C 言語 codegen ターゲットに直訳する。`c_translator.ml` (3225 LOC) の codegen 拡張 + 新規 `abcl_nextgen_runtime.{c,h}` (target ~600 LOC) で実装。Phase O / Phase O-3 / Round 1+2 で確立された 1 セッション × 数機能の直訳パターンに従う。後方互換 hard floor: 既存 abclc smoke の Xinu / Gui / Py 系 sample が無変更で動作。C は dynamic typing 不在 + reply slot 無しのため、機能ごとに C 流のイディオム調整が必要。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  // ── 評価タスク群 ──
+  evaluation_tasks {
+    // ── 型推論軸 (CE-10〜13) — compile-time pass in c_translator.ml ──
+    task PortEffectInferenceC {
+      spec = "Py-I の collect_effects + OCaml の builtin_effects table を c_translator.ml の compile-time pass として実装。各メソッドの inferred effects を生成 C ヘッダコメントに `/* effects: {ai, fs, net, mut} */` の形で埋め込む。Runtime cost ゼロ。見込み 40-70 行。";
+    }
+    task PortCapabilityTypesC {
+      spec = "C runtime に thread-local capability set (pthread_setspecific or __thread) を追加。`grant_cap` / `revoke_cap` / `has_cap` / `current_caps` / `check_capability` の 5 prim を C で実装。`AIPL_CAP_STRICT=1` で `abort()` or stderr error + exit。見込み 100-160 行。";
+    }
+    task PortRefinementUnificationC {
+      spec = "OCaml `Refinement.check_subset` 相当を C で。z3 を fork+exec する thin wrapper (`run_z3_subset_check`) として実装。または libz3.so に link する fast path (Option B、依存性増)。Py-I/OCaml の SMT-LIB 2 render を C string formatter で再現。見込み 150-220 行。";
+    }
+    task PortRecordSubtypingC {
+      spec = "c_translator.ml の TRecord codegen を intersection-based unify に変更。C は struct で record を表すが、ABI が違うので runtime 検証は静的型に乗せる (compile-time)。見込み 30-60 行。";
+    }
+    // ── 分散軸 (DR-10〜13) — abcl_nextgen_runtime.c ──
+    task PortCRDTStateC {
+      spec = "abcl_nextgen_runtime.c に G-Counter (Hashtbl相当 = open-addressing array) + OR-Set + LWW-Register を実装。OCaml の Hashtbl.t は C で `khash` or 手書き hash table に置換。string ids は char* 直持ち。15 primitives 全部 export。見込み 280-380 行 (3 構造体 × 4-6 関数 + replicate hook + table)。";
+    }
+    task PortSagaOrchestrationC {
+      spec = "c_translator.ml の codegen に Saga arm 追加。step body → 通常関数呼び出し、failure 時の rewind は `setjmp` / `longjmp` で実装 (compensate を逆順で呼ぶ)。OCaml の actor-loop の `try/with` は C にないので jmpbuf スタックを使う。abcl_nextgen_runtime.c に saga frame stack を持つ。見込み 180-260 行 (codegen 80 + runtime 100 + sample 50)。";
+    }
+    task PortMultiRegionFailoverC {
+      spec = "abcl_nextgen_runtime.c に per-region route table パーザ + chain walk + 5 prim。`getenv(\"AIPL_REGION\")` + `AIPL_ROUTE_REGION_<name>` を strcat で動的キー化。見込み 100-150 行。";
+    }
+    task PortAutoScalingPoolC {
+      spec = "abcl_nextgen_runtime.c に pool state (struct + dyn-array members) + hysteresis logic。spawn_cb / retire_cb / qlen_cb は function pointer。OCaml の Thread.create は pthread_create に対応。見込み 150-220 行。";
+    }
+    // ── cross-cutting ──
+    task BackwardCompatC {
+      spec = "既存 abclc/_smoke_test.sh の Xinu / Gui / Py 系 cross-compile sample (BoundedBufferXinu, BoundedBufferPy, BoundedBufferGui, Philosophers5Xinu, Rotate4Lines* 等) が無変更で動作。新機能は全て opt-in (linker flag or env var) で発火。";
+    }
+    task PyIOCamlParityC {
+      spec = "同一の .abcl ソースが Py-I / OCaml / C codegen で同じ観測結果を出す。CE-* は --check / --infer 相当の C-compile time 出力に反映。DR-* は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での 3-way mirror (Py-A vs OCaml vs JS-O) の C 版。";
+    }
+    task ImplCostBudgetC {
+      spec = "8 機能合計 1000 行以内 (Py-I ~700 行、OCaml ~795 行、C は ~1000 行が現実的: 動的データ構造を手書きする分 + libz3 fork wrapper + jmpbuf スタック)。c_translator.ml + abcl_nextgen_runtime.{c,h} の 3 ファイル想定。既存 .c ファイルへの変更は最小限。";
+    }
+  }
+
+  // ── 探索パラメタ ──
+  // OCaml round-3 と同じ軸 (effect_handling × concurrency_model) を
+  // 再利用。C の制約 (no closures, no GC, manual lifetime) を LLM 評価
+  // が反映するかも興味深い。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "effect_handling, concurrency_model";
+    generations = 6;
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 31415935;
+  }
+
+  // ── meta fitness 配分 ──
+  // 実装可能性 (implementability) を重視。C-specific の制約があるため
+  // 既存先例との整合 (cross_task_generality) を OCaml run より低めに。
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.10;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.15;
+    implementability      = 0.55;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "type_first", "dist_first", "impl_cost_first"];
+    top_k     = 5;
+  }
+
+  // ── レビュアー (LLM persona) ──
+  reviewers {
+    reviewer CCodegenFeasibility {
+      persona = "あなたは C codegen 実装可能性レビュアーです。CE-10 / CE-13 (compile-time) と DR-11 saga (codegen + runtime) の C 言語実装可能性を評価。`c_translator.ml` (3225 LOC、現状 SDL/Xinu/Python/Pony/Erlang/Go/Prolog/LLVM/OpenMP の多 backend) にどれくらいの拡張で済むかを判定。1.0 = ≤200 行 + 既存 backend を破壊しない、0.7 = ≤350 行、0.3 = ≤500 行、0.0 = codegen pipeline 再設計レベル。'OK: <根拠>' / 'NG: <欠落>' の 1 行返答。";
+    }
+    reviewer CRuntimeFeasibility {
+      persona = "あなたは C runtime 実装可能性レビュアーです。CE-11 capability (TLS) / CE-12 refinement (Z3) / DR-10 CRDT (手書き hash table) / DR-12 region (getenv + strcat) / DR-13 pool (pthread + dyn array) を新規 `abcl_nextgen_runtime.{c,h}` で実装可能か。C99 + pthread + 最低限の POSIX のみ、libz3 オプショナル。1.0 = ≤500 行、0.7 = ≤800 行、0.3 = ≤1000 行、0.0 = >1000 行。1 行で返答。";
+    }
+    reviewer BackwardCompatC {
+      persona = "あなたは C 版後方互換性レビュアーです。abclc/_smoke_test.sh の Xinu (BoundedBufferXinu / Philosophers5Xinu / Rotate4LinesXinu / BBXinu) と Gui (BoundedBufferGui / Rotate4LinesGui / BBGui) と Py (BoundedBufferPy / BBPy) 系の cross-compile が無変更で通るか。c_translator.ml の既存 backend (--xinu / --python / --pony / --erlang / --go / --prolog / --llvm / --openmp) を新機能が壊さないか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
+    }
+    reviewer PyIOCamlParityC {
+      persona = "あなたは 3-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+    }
+    reviewer CIdiomaticity {
+      persona = "あなたは C イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を C で書き直す妥当性を評価。CRDT の opaque ID Hashtbl → khash or 手書き open-addressing、Capability TLS → __thread or pthread_setspecific、Saga → setjmp/longjmp スタック、Pool members → dyn-array realloc。1.0 = C idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = C 的でない。1 行で返答。";
+    }
+    reviewer ImplCostEstimateC {
+      persona = "あなたは C 実装コスト見積もりレビュアーです。Py-I (~700 LOC) と OCaml (~795 LOC) の実績を参照しつつ、C は dynamic typing 不在 + 手書きデータ構造で +25-30% 程度の overhead を想定し、合計 ≤ 1000 行で済むかを評価。1.0 = ≤800 行、0.7 = ≤1000 行、0.3 = ≤1200 行、0.0 = >1200 行。1 行で返答。";
+    }
+  }
+}
