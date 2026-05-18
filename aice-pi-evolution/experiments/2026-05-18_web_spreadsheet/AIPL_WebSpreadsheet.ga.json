@@ -1,0 +1,149 @@
+{
+  "name": "AIPL_WebSpreadsheet",
+  "task": "AIPL ランタイム (JS-B + JS-N + WebSocket + DR-10/11/12/13 + CE-10/11/13/16) の上に Web スプレッドシートを実装するための最適設計を探索する.4 つの軸 (T セル表現、C 計算ロケーション、S 同期モデル、U UI レンダリング) それぞれ 4 variant; MAP-Elites で組合せ空間を探索し、AIPL の既存機能を最大限再利用しつつ MVP コスト (Py-I + JS の 2-runtime 合計 ≤4000 LOC) で実装可能な (T, C, S, U) 4-tuple を top-5 として推薦する.既存 26 機能との後方互換 hard floor、Excel/Google Sheets level の中核機能 (cell edit, formula, multi-sheet, share link) を MVP で達成可能なことを必須条件とする.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "state_representation",
+      "concurrency_model"
+    ],
+    "generations": 8,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 27182818
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "T1_DenseMatrix",
+      "T2_SparseMap",
+      "T3_Columnar",
+      "T4_ActorPerCell",
+      "C1_ClientFull",
+      "C2_ServerFull",
+      "C3_Hybrid",
+      "C4_ActorDistributed",
+      "S1_SingleUser",
+      "S2_CRDT_LWW",
+      "S3_OperationalTransform",
+      "S4_ServerAuthoritative",
+      "U1_DOM_VirtualScroll",
+      "U2_Canvas_2D",
+      "U3_SVG",
+      "U4_WebGL",
+      "FormulaCore",
+      "PersistenceLayer",
+      "ShareLinkAndPermissions",
+      "ImportExportCSV",
+      "BackwardCompat26",
+      "TwoRuntimeFloor",
+      "ImplCostMVP",
+      "ExcelSheetsParity"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "FrontendFeasibility",
+        "persona": "あなたは frontend 実装可能性レビュアーです.提案 (T 表現, U UI) ペアが browser で実装可能、60fps 編集体感を維持できるか.U1 DOM は accessibility / U2 Canvas は perf / U3 SVG は印刷 / U4 WebGL は scale.1.0 = MVP として最良、0.7 = 良、0.3 = 妥協必要、0.0 = 不適.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackendAIPLFit",
+        "persona": "あなたは AIPL backend 適合性レビュアーです.既存 JS-N (node-aipl-server) + DR-10 CRDT + DR-11 saga + DR-12 region + DR-13 pool + CE-11 cap がどの程度自然に再利用できるか.T4 actor-per-cell + S2 CRDT は AIPL の強みど真ん中、T1 dense + S1 single は AIPL を活かしてない.1.0 = AIPL の強みフル活用、0.7 = いくつか活用、0.3 = 既存機能を素通り、0.0 = AIPL でやる意味薄い.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "CollaborationModel",
+        "persona": "あなたは collaboration モデル設計レビュアーです.S2 CRDT-LWW / S3 OT / S4 server-auth の各 trade-off.cell-level edit の semantic は LWW で十分か、それともリッチ操作 (range insert/delete) で OT が必要か.Google Sheets は OT, Figma は CRDT (Yjs).1.0 = ベスト fit、0.7 = ok、0.3 = 限定的、0.0 = 破綻.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "FormulaEngineLocation",
+        "persona": "あなたは formula engine 配置レビュアーです.C1 client-full は UX 即時 / C2 server-full は collab fair / C3 hybrid は best UX but double impl / C4 actor-distributed は AIPL native だが debug 困難.AIPL の Level-A metacircular eval が流用しやすい配置を高評価.1.0 = 最良、0.7 = 良、0.3 = 妥協、0.0 = 不適.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ImplCostEstimator",
+        "persona": "あなたは MVP 実装コスト見積もりレビュアーです.先行 round (Py-I/OCaml/C で各 700-880 LOC で 8 機能、JS-B 310 LOC で 4 機能) を踏まえ、選ばれた (T, C, S, U) クワドルプル + FormulaCore + PersistenceLayer + ShareLink + ImportExportCSV の合計を予測.1.0 = ≤2500、0.7 = ≤4000、0.3 = ≤6000、0.0 = >6000.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換レビュアーです.既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke + 47 self-host smoke + node-aipl-server 10/10 smoke が無修正で動作するか.新機能は opt-in (新 url path / 別 server subcommand / 新 sample dir).1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ProductionShowcase",
+        "persona": "あなたは production showcase レビュアーです.この実装が AIPL の language showcase として効くか.AIPL の DR-10 CRDT + actor model + WebSocket + capability の組合せが Excel/Sheets では真似できない unique value を出すか.1.0 = killer-app 級、0.7 = good demo、0.3 = 教科書例、0.0 = なぜ AIPL でやるのか説明困難.1 行で返答.",
+        "weight": 0.14285714285714285
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.1,
+    "novelty": 0.1,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.2,
+    "implementability": 0.45
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "mvp_minimal",
+      "collab_first",
+      "performance_first",
+      "ai_features_first",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "mvp_minimal": {},
+      "collab_first": {},
+      "performance_first": {},
+      "ai_features_first": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}

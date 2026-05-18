@@ -1,0 +1,157 @@
+// AIPL_WebSpreadsheet.aice  (2026-05-18 draft, new direction)
+//
+// 目的: AIPL の上に「Web 版スプレッドシート」を実装するための
+// 設計選択肢を MAP-Elites で探索する.AIPL は既に持っている:
+//
+//   - JS-B/JS-N ランタイム (browser-abcl + node-aipl-server)
+//   - WebSocket (server.mjs の /ws エンドポイント, 既存 smoke 10/10)
+//   - DR-10 CRDT (G-Counter / OR-Set / LWW-Register, 6 ランタイム ✅)
+//   - DR-11 saga (LIFO compensate, bulk-paste / undo 向き)
+//   - DR-12 multi-region failover (collab 用)
+//   - DR-13 auto-scaling pool (formula re-eval 用 worker pool)
+//   - CE-10 effect 推論 (formula が pure / fs / ai を区別)
+//   - CE-11 capability (sheet 単位の share/read/write/admin)
+//   - CE-13 / CE-16 record subtyping + row poly (cell store vs display schema)
+//
+// スプレッドシート設計は 4 つの直交軸を含む.各軸 4 variant ずつ
+// 用意し、4×4×4×4 = 256 cell の組合せから MAP-Elites で MVP に
+// 最適な (T, C, S, U) のクワドルプルを採掘する.実装ではなく
+// 設計選択が今回のゴール (round 6 と同じスタイル).
+
+aice AIPL_WebSpreadsheet {
+  dialect = "aice_evolution_v2";
+
+  task = "AIPL ランタイム (JS-B + JS-N + WebSocket + DR-10/11/12/13 + CE-10/11/13/16) の上に Web スプレッドシートを実装するための最適設計を探索する.4 つの軸 (T セル表現、C 計算ロケーション、S 同期モデル、U UI レンダリング) それぞれ 4 variant; MAP-Elites で組合せ空間を探索し、AIPL の既存機能を最大限再利用しつつ MVP コスト (Py-I + JS の 2-runtime 合計 ≤4000 LOC) で実装可能な (T, C, S, U) 4-tuple を top-5 として推薦する.既存 26 機能との後方互換 hard floor、Excel/Google Sheets level の中核機能 (cell edit, formula, multi-sheet, share link) を MVP で達成可能なことを必須条件とする.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── T 軸: セル表現 ──
+    task T1_DenseMatrix {
+      spec = "2D 配列 (row-major).最も単純、ベンチマーク有利、ただし sparse data (実 sheet の 95%+ は empty) でメモリ無駄.AIPL の `var a[1000][26]` で簡単に表現可能.見積もり 50-100 LOC.";
+    }
+    task T2_SparseMap {
+      spec = "Map<CellId, CellValue> の sparse 表現.実 sheet (95% empty) で空間効率最高.iter-row, iter-col に O(n_nonzero) ペナルティ.AIPL の record/hash で表現.見積もり 150-250 LOC.";
+    }
+    task T3_Columnar {
+      spec = "per-column 配列 (Apache Arrow 風).analytics-friendly, SIMD/vectorize 向き.formula が同一列の集計 (SUM, AVG) に絞られる場合だけ有利.AIPL の TArray を column ごとに.見積もり 200-300 LOC.";
+    }
+    task T4_ActorPerCell {
+      spec = "各 cell を AIPL actor として spawn.超並列 formula 評価可能、CRDT 結合とも自然 (1 cell = 1 LWW).100×100 = 10k actor で actor system 限界に挑む.DR-13 pool 必須.見積もり 300-500 LOC.";
+    }
+    // ── C 軸: 計算ロケーション ──
+    task C1_ClientFull {
+      spec = "全 formula 評価を browser 内 (JS-B + AIPL evaluator) で実行.オフライン可能、レスポンス即時、ただし重い formula で UI スレッドブロック.Web Worker で逃がす設計.見積もり 200-300 LOC.";
+    }
+    task C2_ServerFull {
+      spec = "全 formula 評価を JS-N サーバ側 (Node + AIPL) で.client は thin (DOM/Canvas のみ).WebSocket で差分 push.collab 自然だがオフライン不可、レイテンシ感あり.見積もり 250-350 LOC.";
+    }
+    task C3_Hybrid {
+      spec = "簡単な算術は client、AI / fs / 重い formula は server へ offload (CE-10 effects 軸で自動振り分け).最良の UX だが double impl コスト.見積もり 400-600 LOC.";
+    }
+    task C4_ActorDistributed {
+      spec = "T4 と組合せ前提.各 cell actor がローカル / リモート region (DR-12) どちらかに置かれ、formula 評価はその actor へ send.超並列だが debug 困難.見積もり 500-800 LOC.";
+    }
+    // ── S 軸: 同期モデル ──
+    task S1_SingleUser {
+      spec = "collab 無し.MVP として最小.localStorage に dump → restore.見積もり 50-100 LOC.";
+    }
+    task S2_CRDT_LWW {
+      spec = "DR-10 LWW-Register を 1 cell = 1 CRDT として、複数 client が並行編集.merge は ts-based last-write-wins.write conflict 自動解決.AIPL の crdt_lww_* prim をそのまま使う.見積もり 150-250 LOC.";
+    }
+    task S3_OperationalTransform {
+      spec = "OT (Google Docs 系).中央サーバが op 配列を rebase.実装複雑、確実な収束保証.AIPL は OT 未提供なので 0 から書く.見積もり 400-600 LOC.";
+    }
+    task S4_ServerAuthoritative {
+      spec = "client は optimistic 反映 → server へ patch 送信 → server が CRDT merge → broadcast.S2 と S3 の中間.JS-N server.mjs に 1 endpoint 追加で MVP 可.見積もり 200-300 LOC.";
+    }
+    // ── U 軸: UI レンダリング ──
+    task U1_DOM_VirtualScroll {
+      spec = "visible cell だけ DOM 要素生成 (~50 行 × 20 列 = 1000 要素), recycling で scroll に追従.styling 自由、accessibility 良.formula bar / context menu も DOM.見積もり 300-500 LOC HTML+JS+CSS.";
+    }
+    task U2_Canvas_2D {
+      spec = "single 2D canvas, change で full repaint (or dirty-rect).100k cells でも軽量、styling は描画コード側.text input オーバーレイは DOM 併用.見積もり 200-300 LOC.";
+    }
+    task U3_SVG {
+      spec = "1 cell = 1 <rect>+<text>.scalable, styling CSS、ただし >10k 要素で perf 劣化.print/export に強い.見積もり 250-400 LOC.";
+    }
+    task U4_WebGL {
+      spec = "GPU instanced rect + text atlas.million-cell sheet を 60fps で.実装最重、custom font renderer 必要.見積もり 600-1000 LOC.";
+    }
+    // ── 横断的タスク ──
+    task FormulaCore {
+      spec = "MVP formula セット: 算術 (+,-,*,/,^), ref (A1), range (A1:B10), 5 関数 (SUM, AVG, MIN, MAX, IF).循環参照検出 + topological recompute.AIPL の Level-A metacircular eval を流用可能.見積もり 250-400 LOC.";
+    }
+    task PersistenceLayer {
+      spec = "sheet を save/load.fs (local file), localStorage (browser), AIPL_DIST_CHECKPOINT_DIR (DR-4 既存) のどれを使うか.MVP は AIPL_CAP_GRANT='fs' + read/write_file (CE-11 ごし).見積もり 100-200 LOC.";
+    }
+    task ShareLinkAndPermissions {
+      spec = "URL ベースのシート共有 + CE-11 capability で read/write/admin の権限分離.HMAC-signed URL (既存 hmac_sha256.ml + Py 同等) で改竄防止.見積もり 200-300 LOC.";
+    }
+    task ImportExportCSV {
+      spec = "CSV 読込 + 書出し.AIPL の read_file/write_file + 文字列 split で MVP.見積もり 100-150 LOC.";
+    }
+    task BackwardCompat26 {
+      spec = "既存 26 next-gen 機能 + 71 abclc sample + 14 JS nextgen smoke + 47 self-host smoke が無修正で動作.spreadsheet は完全 opt-in (新 url path or 別 server サブコマンド).";
+    }
+    task TwoRuntimeFloor {
+      spec = "選ばれた (T, C, S, U) クワドルプルが Py-I + JS-N の 2 runtime で実装可能 (browser-abcl は U の描画担当のみ).";
+    }
+    task ImplCostMVP {
+      spec = "MVP 合計 LOC.1.0 = ≤2500、0.7 = ≤4000、0.3 = ≤6000、0.0 = >6000.";
+    }
+    task ExcelSheetsParity {
+      spec = "Excel/Google Sheets と比べた core 機能カバレッジ.1.0 = cell+formula+collab+share の 4 軸完備、0.7 = collab だけ弱い、0.3 = 単独編集だけ、0.0 = formula 未実装.";
+    }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    // cell_axes は schema-valid な軸のみ (round 6 で `?|?` 崩壊した教訓).
+    // T 軸は state_representation, C 軸は concurrency_model にマップ.
+    cell_axes   = "state_representation, concurrency_model";
+    generations = 8;
+    seed_count  = 8;
+    open_axes   = false;
+    rng_seed    = 27182818;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.10;
+    novelty               = 0.10;
+    evolvability          = 0.10;
+    cross_task_generality = 0.20;
+    implementability      = 0.45;   // ← MVP 重視
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["mvp_minimal", "collab_first", "performance_first", "ai_features_first", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer FrontendFeasibility {
+      persona = "あなたは frontend 実装可能性レビュアーです.提案 (T 表現, U UI) ペアが browser で実装可能、60fps 編集体感を維持できるか.U1 DOM は accessibility / U2 Canvas は perf / U3 SVG は印刷 / U4 WebGL は scale.1.0 = MVP として最良、0.7 = 良、0.3 = 妥協必要、0.0 = 不適.1 行で返答.";
+    }
+    reviewer BackendAIPLFit {
+      persona = "あなたは AIPL backend 適合性レビュアーです.既存 JS-N (node-aipl-server) + DR-10 CRDT + DR-11 saga + DR-12 region + DR-13 pool + CE-11 cap がどの程度自然に再利用できるか.T4 actor-per-cell + S2 CRDT は AIPL の強みど真ん中、T1 dense + S1 single は AIPL を活かしてない.1.0 = AIPL の強みフル活用、0.7 = いくつか活用、0.3 = 既存機能を素通り、0.0 = AIPL でやる意味薄い.1 行で返答.";
+    }
+    reviewer CollaborationModel {
+      persona = "あなたは collaboration モデル設計レビュアーです.S2 CRDT-LWW / S3 OT / S4 server-auth の各 trade-off.cell-level edit の semantic は LWW で十分か、それともリッチ操作 (range insert/delete) で OT が必要か.Google Sheets は OT, Figma は CRDT (Yjs).1.0 = ベスト fit、0.7 = ok、0.3 = 限定的、0.0 = 破綻.1 行で返答.";
+    }
+    reviewer FormulaEngineLocation {
+      persona = "あなたは formula engine 配置レビュアーです.C1 client-full は UX 即時 / C2 server-full は collab fair / C3 hybrid は best UX but double impl / C4 actor-distributed は AIPL native だが debug 困難.AIPL の Level-A metacircular eval が流用しやすい配置を高評価.1.0 = 最良、0.7 = 良、0.3 = 妥協、0.0 = 不適.1 行で返答.";
+    }
+    reviewer ImplCostEstimator {
+      persona = "あなたは MVP 実装コスト見積もりレビュアーです.先行 round (Py-I/OCaml/C で各 700-880 LOC で 8 機能、JS-B 310 LOC で 4 機能) を踏まえ、選ばれた (T, C, S, U) クワドルプル + FormulaCore + PersistenceLayer + ShareLink + ImportExportCSV の合計を予測.1.0 = ≤2500、0.7 = ≤4000、0.3 = ≤6000、0.0 = >6000.1 行で返答.";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換レビュアーです.既存 26 機能 + 71 abclc sample + 14 JS nextgen smoke + 47 self-host smoke + node-aipl-server 10/10 smoke が無修正で動作するか.新機能は opt-in (新 url path / 別 server subcommand / 新 sample dir).1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.";
+    }
+    reviewer ProductionShowcase {
+      persona = "あなたは production showcase レビュアーです.この実装が AIPL の language showcase として効くか.AIPL の DR-10 CRDT + actor model + WebSocket + capability の組合せが Excel/Sheets では真似できない unique value を出すか.1.0 = killer-app 級、0.7 = good demo、0.3 = 教科書例、0.0 = なぜ AIPL でやるのか説明困難.1 行で返答.";
+    }
+  }
+}
