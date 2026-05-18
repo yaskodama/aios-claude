@@ -1472,6 +1472,38 @@ export class Runtime {
           case "image_pixel":     return this._imagePixel(args[0], args[1], args[2]);
           case "image_set_pixel": return this._imageSetPixel(args);
 
+          // ── Next-gen primitives (CE-11 + DR-10/11/12/13) ─────
+          // CallExpr path: returns value (CallStmt path is in the
+          // other switch, around line 414).
+          case "grant_cap":        return this._nextgen_grant_cap(args);
+          case "revoke_cap":       return this._nextgen_revoke_cap(args);
+          case "has_cap":          return this._nextgen_has_cap(args);
+          case "current_caps":     return this._nextgen_current_caps();
+          case "check_capability": return this._nextgen_check_capability(args);
+          case "current_region":     return this._nextgen_current_region();
+          case "region_chain":       return this._nextgen_region_chain();
+          case "route_for_region":   return this._nextgen_route_for_region(args);
+          case "failover_region":    return this._nextgen_failover_region(args);
+          case "regions_available":  return this._nextgen_regions_available();
+          case "pool_create":        return this._nextgen_pool_create(args);
+          case "pool_pick":          return this._nextgen_pool_pick(args);
+          case "pool_size":          return this._nextgen_pool_size(args);
+          case "pool_destroy":       return this._nextgen_pool_destroy(args);
+          case "crdt_gcounter_new":      return this._nextgen_crdt_gcounter_new();
+          case "crdt_gcounter_inc":      return this._nextgen_crdt_gcounter_inc(args);
+          case "crdt_gcounter_value":    return this._nextgen_crdt_gcounter_value(args);
+          case "crdt_gcounter_merge":    return this._nextgen_crdt_gcounter_merge(args);
+          case "crdt_orset_new":         return this._nextgen_crdt_orset_new();
+          case "crdt_orset_add":         return this._nextgen_crdt_orset_add(args);
+          case "crdt_orset_remove":      return this._nextgen_crdt_orset_remove(args);
+          case "crdt_orset_contains":    return this._nextgen_crdt_orset_contains(args);
+          case "crdt_orset_values":      return this._nextgen_crdt_orset_values(args);
+          case "crdt_orset_merge":       return this._nextgen_crdt_orset_merge(args);
+          case "crdt_lww_new":           return this._nextgen_crdt_lww_new(args);
+          case "crdt_lww_write":         return this._nextgen_crdt_lww_write(args);
+          case "crdt_lww_value":         return this._nextgen_crdt_lww_value(args);
+          case "crdt_lww_merge":         return this._nextgen_crdt_lww_merge(args);
+
           default: {
             // AIOS / protocol builtins (shared with CallStmt)
             const ap = this._dispatchAiosProtocol(expr.name, args, env);
@@ -1554,5 +1586,308 @@ export class Runtime {
       default:
         throw new Error("Unsupported expr: " + expr.type);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Next-gen primitives (CE-11 + DR-10/11/12/13) — shared by both
+  // JS-Browser and JS-Node runtimes since server.mjs reuses this
+  // file.  Mirror Py-I's aipl_dist.py / OCaml's aipl_dist.ml
+  // shapes; web idioms substitute pthread/TLS with per-Runtime
+  // state.
+  // ─────────────────────────────────────────────────────────────
+
+  // CE-11: capability set is per-Runtime-instance (one set per
+  // tab / one set per Node process worker).  Seeded from
+  // AIPL_CAP_GRANT in Node, or the runtime's `?cap=…` URL query
+  // in the browser bootstrap (see main.js for the URL plumbing).
+  _ng_caps() {
+    if (!this._cap_set) {
+      const seed = (typeof process !== "undefined" && process.env && process.env.AIPL_CAP_GRANT)
+                   || (typeof window !== "undefined" && window.__AIPL_CAP_GRANT)
+                   || "";
+      this._cap_set = new Set(seed.split(",").map(s => s.trim()).filter(Boolean));
+    }
+    return this._cap_set;
+  }
+  _ng_cap_strict() {
+    const v = (typeof process !== "undefined" && process.env && process.env.AIPL_CAP_STRICT)
+              || (typeof window !== "undefined" && window.__AIPL_CAP_STRICT)
+              || "0";
+    return v === "1";
+  }
+  _ng_log_event(event, fields) {
+    /* Best-effort structured log: in Node, append NDJSON to
+       AIPL_DIST_LOG_FILE; in browser, console.debug as JSON. */
+    const ts_ns = (Date.now() * 1e6) | 0;
+    const rec = Object.assign({ ts_ns, event }, fields || {});
+    if (typeof process !== "undefined" && process.env && process.env.AIPL_DIST_LOG_FILE) {
+      try {
+        // Lazy require so the browser bundle doesn't drag fs in.
+        const fs = require("node:fs");
+        fs.appendFileSync(process.env.AIPL_DIST_LOG_FILE, JSON.stringify(rec) + "\n");
+      } catch (_) { /* ignore */ }
+    } else if (typeof console !== "undefined" && console.debug) {
+      console.debug("[aipl_log]", rec);
+    }
+  }
+  _nextgen_grant_cap(args) {
+    const name = String(args[0] || "");
+    const s = this._ng_caps();
+    if (s.has(name)) return false;
+    s.add(name);
+    this._ng_log_event("cap_granted", { cap: name });
+    return true;
+  }
+  _nextgen_revoke_cap(args) {
+    const name = String(args[0] || "");
+    const s = this._ng_caps();
+    if (!s.has(name)) return false;
+    s.delete(name);
+    this._ng_log_event("cap_revoked", { cap: name });
+    return true;
+  }
+  _nextgen_has_cap(args) {
+    return this._ng_caps().has(String(args[0] || ""));
+  }
+  _nextgen_current_caps() {
+    return [...this._ng_caps()].sort().join(" ");
+  }
+  _nextgen_check_capability(args) {
+    const name = String(args[0] || "");
+    const s = this._ng_caps();
+    if (s.has(name)) return true;
+    this._ng_log_event("cap_violation", { missing: name, held: [...s].join(",") });
+    if (this._ng_cap_strict()) {
+      throw new Error(`capability denied: missing [${name}] (held: [${[...s].join("; ")}])`);
+    }
+    return true;
+  }
+
+  // DR-12: multi-region failover via env / window globals.
+  _nextgen_current_region() {
+    return (typeof process !== "undefined" && process.env && process.env.AIPL_REGION)
+        || (typeof window !== "undefined" && window.__AIPL_REGION)
+        || "local";
+  }
+  _nextgen_region_chain() {
+    const raw = (typeof process !== "undefined" && process.env && process.env.AIPL_REGION_FAILOVER)
+             || (typeof window !== "undefined" && window.__AIPL_REGION_FAILOVER)
+             || "";
+    return raw;
+  }
+  _nextgen_route_for_region(args) {
+    const actor  = String(args[0] || "");
+    const region = String(args[1] || this._nextgen_current_region());
+    const key    = `AIPL_ROUTE_REGION_${region}`;
+    const raw    = (typeof process !== "undefined" && process.env && process.env[key])
+                || (typeof window !== "undefined" && window["__" + key])
+                || "";
+    for (const spec of raw.split(",")) {
+      const [n, tag] = spec.split(":").map(s => s && s.trim());
+      if (n === actor && tag) return tag;
+    }
+    return "";
+  }
+  _nextgen_failover_region(args) {
+    const actor = String(args[0] || "");
+    const chain = (this._nextgen_region_chain() || this._nextgen_current_region())
+                  .split(",").map(s => s.trim()).filter(Boolean);
+    const primary = String(args[1] || (chain[0] || "local"));
+    const tried = [];
+    for (const r of chain) {
+      tried.push(r);
+      const tag = this._nextgen_route_for_region([actor, r]);
+      if (tag) {
+        if (r !== primary) {
+          this._ng_log_event("region_failover", {
+            actor, from_region: primary, to_region: r,
+            chain: tried.join(","),
+          });
+        }
+        return r;
+      }
+    }
+    this._ng_log_event("region_failover_failed", { actor, tried: tried.join(",") });
+    return "";
+  }
+  _nextgen_regions_available() {
+    const env = (typeof process !== "undefined" && process.env) || {};
+    const wnd = (typeof window !== "undefined" && window) || {};
+    const out = new Set();
+    const prefix = "AIPL_ROUTE_REGION_";
+    for (const k of Object.keys(env)) if (k.startsWith(prefix) && env[k]) out.add(k.slice(prefix.length));
+    for (const k of Object.keys(wnd)) if (k.startsWith("__" + prefix) && wnd[k]) out.add(k.slice(("__" + prefix).length));
+    return [...out].sort().join(" ");
+  }
+
+  // DR-10: CRDTs as opaque ids backed by an internal Map.
+  _ng_crdt_table() {
+    if (!this._crdt_t) this._crdt_t = new Map();
+    if (this._crdt_n === undefined) this._crdt_n = 0;
+    return this._crdt_t;
+  }
+  _ng_crdt_replica() {
+    return (typeof process !== "undefined" && process.env && process.env.AIPL_DIST_REPLICA_ID)
+        || (typeof window !== "undefined" && window.__AIPL_DIST_REPLICA_ID)
+        || (typeof process !== "undefined" && process.title)
+        || "node-0";
+  }
+  _ng_crdt_fresh(prefix, obj) {
+    const id = `${prefix}#${++this._crdt_n}`;
+    this._ng_crdt_table().set(id, obj);
+    return id;
+  }
+  _nextgen_crdt_gcounter_new() {
+    return this._ng_crdt_fresh("gc", { kind: "GCounter", counts: {} });
+  }
+  _nextgen_crdt_gcounter_inc(args) {
+    const id = String(args[0] || ""); const n = Number(args[1] !== undefined ? args[1] : 1);
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "GCounter" || n < 0) return id;
+    const r = this._ng_crdt_replica();
+    o.counts[r] = (o.counts[r] | 0) + (n | 0);
+    return id;
+  }
+  _nextgen_crdt_gcounter_value(args) {
+    const o = this._ng_crdt_table().get(String(args[0] || ""));
+    return (o && o.kind === "GCounter")
+      ? Object.values(o.counts).reduce((a, b) => a + b, 0) : 0;
+  }
+  _nextgen_crdt_gcounter_merge(args) {
+    const a = this._ng_crdt_table().get(String(args[0] || ""));
+    const b = this._ng_crdt_table().get(String(args[1] || ""));
+    if (!a || !b) return "";
+    const out = { kind: "GCounter", counts: {} };
+    for (const k of new Set([...Object.keys(a.counts), ...Object.keys(b.counts)])) {
+      out.counts[k] = Math.max(a.counts[k] | 0, b.counts[k] | 0);
+    }
+    return this._ng_crdt_fresh("gc", out);
+  }
+  _nextgen_crdt_orset_new() {
+    return this._ng_crdt_fresh("os", { kind: "ORSet", adds: {}, removes: {} });
+  }
+  _nextgen_crdt_orset_add(args) {
+    const id = String(args[0] || ""); const e = String(args[1] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "ORSet") return id;
+    if (!o.adds[e]) o.adds[e] = [];
+    o.adds[e].push(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    return id;
+  }
+  _nextgen_crdt_orset_remove(args) {
+    const id = String(args[0] || ""); const e = String(args[1] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "ORSet" || !o.adds[e]) return id;
+    if (!o.removes[e]) o.removes[e] = [];
+    o.removes[e].push(...o.adds[e]);
+    return id;
+  }
+  _nextgen_crdt_orset_contains(args) {
+    const id = String(args[0] || ""); const e = String(args[1] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "ORSet") return false;
+    const adds = new Set(o.adds[e] || []);
+    const rems = new Set(o.removes[e] || []);
+    for (const tag of adds) if (!rems.has(tag)) return true;
+    return false;
+  }
+  _nextgen_crdt_orset_values(args) {
+    const id = String(args[0] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "ORSet") return "";
+    const out = [];
+    for (const e of Object.keys(o.adds)) {
+      if (this._nextgen_crdt_orset_contains([id, e])) out.push(e);
+    }
+    return out.join(" ");
+  }
+  _nextgen_crdt_orset_merge(args) {
+    const a = this._ng_crdt_table().get(String(args[0] || ""));
+    const b = this._ng_crdt_table().get(String(args[1] || ""));
+    if (!a || !b) return "";
+    const out = { kind: "ORSet", adds: {}, removes: {} };
+    const mergeBag = (x, y) => {
+      const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
+      const res = {};
+      for (const k of keys) res[k] = [...new Set([...(x[k] || []), ...(y[k] || [])])];
+      return res;
+    };
+    out.adds = mergeBag(a.adds, b.adds);
+    out.removes = mergeBag(a.removes, b.removes);
+    return this._ng_crdt_fresh("os", out);
+  }
+  _nextgen_crdt_lww_new(args) {
+    return this._ng_crdt_fresh("lv", {
+      kind: "LWWReg",
+      value: String(args[0] !== undefined ? args[0] : ""),
+      ts: 0, replica: this._ng_crdt_replica(),
+    });
+  }
+  _nextgen_crdt_lww_write(args) {
+    const id = String(args[0] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o || o.kind !== "LWWReg") return id;
+    o.value = String(args[1] !== undefined ? args[1] : "");
+    o.ts = Date.now();
+    o.replica = this._ng_crdt_replica();
+    return id;
+  }
+  _nextgen_crdt_lww_value(args) {
+    const o = this._ng_crdt_table().get(String(args[0] || ""));
+    return (o && o.kind === "LWWReg") ? o.value : "";
+  }
+  _nextgen_crdt_lww_merge(args) {
+    const a = this._ng_crdt_table().get(String(args[0] || ""));
+    const b = this._ng_crdt_table().get(String(args[1] || ""));
+    if (!a || !b) return "";
+    let w = a;
+    if (b.ts > a.ts) w = b;
+    else if (b.ts === a.ts && b.replica > a.replica) w = b;
+    return this._ng_crdt_fresh("lv", Object.assign({}, w));
+  }
+  _nextgen_crdt_replicate(args) {
+    const id = String(args[0] || "");
+    const o = this._ng_crdt_table().get(id);
+    if (!o) return;
+    this._ng_log_event("crdt_replicate", {
+      actor: id, kind: o.kind, replica: this._ng_crdt_replica(),
+    });
+  }
+
+  // DR-13: pool with stub spawn / retire (the underlying actor
+  // system varies between JS-B Worker and JS-N worker_threads;
+  // wiring those callbacks is left to a follow-up).
+  _ng_pool_table() {
+    if (!this._pools) this._pools = new Map();
+    return this._pools;
+  }
+  _nextgen_pool_create(args) {
+    const cls = String(args[0] || ""); const minN = +args[1] || 0;
+    const maxN = +args[2] || Math.max(minN, 4); const target = +args[3] || 4;
+    const name = `pool::${cls}`;
+    const t = this._ng_pool_table();
+    if (t.has(name)) return name;
+    t.set(name, { cls, members: [], minN, maxN, target, rr: 0 });
+    this._ng_log_event("pool_created", { pool: name, cls, min: minN, max: maxN, target });
+    return name;
+  }
+  _nextgen_pool_pick(args) {
+    const p = this._ng_pool_table().get(String(args[0] || ""));
+    if (!p || p.members.length === 0) return "";
+    const i = p.rr % p.members.length;
+    p.rr = (p.rr + 1) % p.members.length;
+    return p.members[i];
+  }
+  _nextgen_pool_size(args) {
+    const p = this._ng_pool_table().get(String(args[0] || ""));
+    return p ? p.members.length : 0;
+  }
+  _nextgen_pool_destroy(args) {
+    const name = String(args[0] || "");
+    const t = this._ng_pool_table();
+    if (!t.has(name)) return false;
+    t.delete(name);
+    this._ng_log_event("pool_destroyed", { pool: name });
+    return true;
   }
 }
