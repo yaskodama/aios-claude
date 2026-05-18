@@ -13,7 +13,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall, Scope, SelectStmt, SelectCase,
+    NowCall, FutureCall, Scope, SelectStmt, SelectCase, SagaStmt, SagaStep,
 )
 
 
@@ -201,6 +201,18 @@ class _Builder(Transformer):
             elif isinstance(x, tuple) and len(x) == 2:
                 timeout_ms, timeout_body = x
         return SelectStmt(cases, timeout_ms, timeout_body)
+
+    # DR-11 saga orchestration — see grammar.lark / aipl_ast.SagaStmt.
+    @v_args(inline=False)
+    def saga_block(self, stmts):
+        return Block(list(stmts))
+
+    def saga_step(self, body_block, compensate_block):
+        return SagaStep(body_block, compensate_block)
+
+    @v_args(inline=False)
+    def saga_stmt(self, items):
+        return SagaStmt(list(items))
 
     @v_args(inline=False)
     def block(self, stmts):

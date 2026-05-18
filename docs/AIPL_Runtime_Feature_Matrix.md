@@ -236,6 +236,24 @@ the first region that knows the actor.  Logs
 round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
 axis, top elite I0012 had 0.70 for this task).
 
+¹³ DR-11 saga orchestration: declarative compensating-action
+orchestration as a new top-level statement.  `grammar.lark` gains
+`saga_stmt: "saga" "{" saga_step+ "}"` and
+`saga_step: "step" saga_block "compensate" saga_block`.  `aipl_ast`
+gains `SagaStmt` + `SagaStep`; the parser builder + `aipl_interp.
+_do_saga` complete the wiring.  Forward pass runs each `step.body`
+in declared order; on the first exception, the runtime walks
+back through every previously-completed step running its
+`compensate` block (LIFO), then re-raises so the calling actor's
+normal error path (`[actor X.m] error: ...` + IQ quarantine)
+fires.  Eight structured-log events emitted when AIPL_DIST_ENABLE=1:
+`saga_started`, `saga_step_complete`, `saga_step_failed`,
+`saga_compensated`, `saga_compensate_failed`, `saga_finished`,
+`saga_aborted`, plus the existing `actor_quarantined` from IQ.
+Sample: `src/python-aipl/samples/SagaOrchestration.abcl`.  Picked by
+round-2 MAP-Elites (reviewer avg 0.406 — top of the dist axis after
+the already-implemented DR-10/12/13).
+
 ¹¹ DR-10 CRDT actor state: three classic conflict-free replicated
 data types implemented as plain dicts so they survive
 `save_actor_state` / `restore_actor_state` round-trips for free.
@@ -386,6 +404,7 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.pool_*` + `_b_pool_*` primitives  |
 | **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{gcounter,orset,lww}_*` + 15 primitives |
 | **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `aipl_dist.{current_region,region_chain,route_for_region,failover_region}` + 5 primitives |
+| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | ❌ | ❌ | ❌ | ❌ | ❌ | `grammar.lark` saga_stmt + `aipl_interp._do_saga` |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -714,4 +733,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*
+*Last regenerated: 2026-05-18 (after Py-I CE-10/CE-11 + DR-10/DR-11/DR-12/DR-13 from `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2).*

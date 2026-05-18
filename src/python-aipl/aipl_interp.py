@@ -19,6 +19,7 @@ from aipl_ast import (
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
     NowCall, FutureCall, Scope, Spawn, SelectStmt, SelectCase,
+    SagaStmt, SagaStep,
 )
 from aipl_runtime import Actor, Future, Scheduler
 
@@ -683,8 +684,62 @@ class Interpreter:
             self._do_spawn(s.target, s.method, s.args, frame)
         elif kind is SelectStmt:
             self._do_select(s, frame)
+        elif kind is SagaStmt:
+            self._do_saga(s, frame)
         else:
             raise RuntimeError(f"unknown stmt: {s!r}")
+
+    def _do_saga(self, s: 'SagaStmt', frame: Frame):
+        """DR-11 saga orchestration.  Run each `step.body` in declared
+        order; on the first exception, walk back through the completed
+        steps in reverse and run each `compensate` block, then re-raise.
+
+        Emits `saga_started` / `saga_step_complete` / `saga_step_failed`
+        / `saga_compensated` / `saga_finished` / `saga_aborted` events
+        when AIPL_DIST_ENABLE=1; otherwise no observable side effects
+        beyond running the bodies and (possibly) compensates.
+        """
+        try:
+            import aipl_dist
+        except Exception:
+            aipl_dist = None
+
+        def _log(event, **fields):
+            if aipl_dist is not None:
+                try:
+                    aipl_dist.log_event(event, **fields)
+                except Exception:
+                    pass
+
+        n_steps = len(s.steps)
+        _log("saga_started", steps=n_steps)
+
+        completed: list[int] = []
+        try:
+            for i, st in enumerate(s.steps):
+                self.exec_block(st.body, frame)
+                completed.append(i)
+                _log("saga_step_complete", index=i, total=n_steps)
+            _log("saga_finished", steps=n_steps)
+        except Exception as e:
+            # A step raised — walk back through every completed step
+            # and run its compensate body in reverse order.  Errors
+            # inside a compensate are logged but DO NOT stop the walk
+            # (best-effort cleanup).
+            _log("saga_step_failed", index=len(completed),
+                 total=n_steps, error=str(e))
+            for i in reversed(completed):
+                try:
+                    self.exec_block(s.steps[i].compensate, frame)
+                    _log("saga_compensated", index=i, total=n_steps)
+                except Exception as ce:
+                    _log("saga_compensate_failed", index=i,
+                         total=n_steps, error=str(ce))
+            _log("saga_aborted", completed=len(completed), total=n_steps,
+                 error=str(e))
+            # Re-raise so the calling actor's normal error handler
+            # (printing `[actor X.m] error: ...` + IQ quarantine) fires.
+            raise
 
     def _do_select(self, s: 'SelectStmt', frame: Frame):
         """Erlang-style mailbox receive — mirrors OCaml eval_thread.ml

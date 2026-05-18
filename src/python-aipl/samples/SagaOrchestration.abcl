@@ -1,0 +1,60 @@
+// DR-11 — saga orchestration.
+//
+// Declarative compensating-action orchestration.  Each `step` runs
+// in declared order; if a step raises, the runtime walks back
+// through every previously-completed step running its `compensate`
+// block (LIFO).  Then the original exception is re-raised so the
+// calling actor's normal error handler fires.
+//
+//   saga {
+//     step { ... } compensate { ... }
+//     step { ... } compensate { ... }
+//     ...
+//   }
+//
+// Events emitted when AIPL_DIST_ENABLE=1 (no-op otherwise):
+//   saga_started / saga_step_complete / saga_step_failed
+//   saga_compensated / saga_compensate_failed
+//   saga_finished / saga_aborted
+//
+// Run:
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/saga.ndjson \
+//   python3 src/python-aipl/aipl_main.py samples/SagaOrchestration.abcl
+//
+//   jq -r '.event' /tmp/saga.ndjson | sort | uniq -c
+
+class Demo {
+  method success_path() {
+    print("=== success path ===");
+    saga {
+      step { print("[saga] reserving funds"); }
+        compensate { print("[saga] [undo] release funds"); }
+      step { print("[saga] charging card"); }
+        compensate { print("[saga] [undo] refund card"); }
+      step { print("[saga] shipping order"); }
+        compensate { print("[saga] [undo] cancel shipment"); }
+    }
+    print("[saga] success: order complete");
+  }
+
+  // Caller of this method will see the actor error path.
+  method failure_path() {
+    print("=== failure path ===");
+    saga {
+      step { print("[saga] reserving funds"); }
+        compensate { print("[saga] [undo] release funds"); }
+      step { print("[saga] charging card"); }
+        compensate { print("[saga] [undo] refund card"); }
+      step { var x = 1 / 0; }   // simulated failure
+        compensate { print("[saga] [undo] (this never runs — its step raised)"); }
+      step { print("[saga] shipping (should NOT run)"); }
+        compensate { print("[saga] [undo] cancel shipment (should NOT run)"); }
+    }
+    print("(this line should NOT print — exception re-raised)");
+  }
+}
+
+var d = new Demo();
+send d.success_path();
+wait(100);
+send d.failure_path();

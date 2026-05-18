@@ -226,9 +226,27 @@ class SelectStmt:
     timeout_body: Optional['Block']
 
 
+# DR-11 saga orchestration.
+@dataclass
+class SagaStep:
+    """One `step { stmts } compensate { stmts }` arm of a saga.
+    `body` is run during the forward pass; `compensate` is run if
+    a *later* step raises, walking back in LIFO order."""
+    body: 'Block'
+    compensate: 'Block'
+
+@dataclass
+class SagaStmt:
+    """`saga { step ... compensate ... ; ... }` — Saga orchestration.
+    Forward pass runs each `step.body` in order.  If any body raises,
+    the runtime walks the completed steps in reverse and runs each
+    `compensate` block before re-raising.  See `aipl_interp._do_saga`."""
+    steps: List[SagaStep]
+
+
 Stmt = Union[
     VarDecl, VarNew, Assign, Send, CallStmt,
-    If, While, Become, Block, Scope, SelectStmt,
+    If, While, Become, Block, Scope, SelectStmt, SagaStmt,
 ]
 
 

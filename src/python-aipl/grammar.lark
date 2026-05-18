@@ -110,6 +110,7 @@ global_stmt: var_new_stmt
      | return_stmt
      | scope_stmt
      | select_stmt
+     | saga_stmt
      | block
 
 return_stmt: "return" expr ";"   -> return_value
@@ -148,6 +149,20 @@ select_stmt: "select" "{" select_case* select_timeout? "}"      -> select_stmt
 select_case: "case" NAME "(" select_params ")" "->" "{" stmt* "}"  -> select_case
 select_params: (NAME ("," NAME)*)?
 select_timeout: "timeout" INT "->" "{" stmt* "}"                -> select_timeout
+
+// `saga { step { stmts } compensate { stmts } ... }`
+// DR-11 saga orchestration.  Each `step` runs in order; if any step
+// raises, the runtime walks back through every previously-completed
+// step running its `compensate` block (in reverse).  Logs
+// `saga_step_*` events when AIPL_DIST_ENABLE=1.
+//
+// The bodies are wrapped in explicit `saga_block` non-terminals so
+// the transformer sees two Block children per step (the alternative
+// of `"{" stmt* "}"` inlined produces a flat list that can't be
+// split back).
+saga_stmt: "saga" "{" saga_step+ "}"                            -> saga_stmt
+saga_step: "step" saga_block "compensate" saga_block            -> saga_step
+saga_block: "{" stmt* "}"                                       -> saga_block
 
 block: "{" stmt* "}"
 
