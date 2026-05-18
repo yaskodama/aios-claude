@@ -61,7 +61,10 @@ Number of `.abcl` sample programs reachable by each runtime
 | **total**              | **52** | **52** | **66** | **66** | **5** | **5** | **66** |
 
 Cross-cutting / not tied to a specific runtime:
-- `aipl-self-host/`: 48 AIPL-in-AIPL self-host programs
+- `aipl-self-host/`: **41 AIPL-in-AIPL self-host programs** across 10 levels
+  (level-a metacircular, level-c{,2,3} lexer/parser/eval/scheduler,
+   level-b{,2,3,4,5} typeck/effects/channels/linear/owned, **level-z**
+   integrated full self-host). Master smoke: 47/47 assertions PASS.
 - `docker/cross/samples/`: 4 cross-language interop samples
 
 The C runtime processes the same `.abcl` files as OCaml via
@@ -490,6 +493,64 @@ MAP-Elites で 24 min × 2 run。詳細は `IMPL_I0003_MVP/IMPL_DESIGN.md` 〜
 > Py-I 側で env var を ON にすれば同じ機能群を共有できる構造。
 > OCaml 側への移植は run-time hooks 層を別途設計する必要があり、今後の課題。
 
+## Self-host bootstrap (`aipl-self-host/`, completed 2026-05-18)
+
+AIPL を AIPL 自身で書く 10 層ブートストラップ.進化計算で探索した
+`aice-evolution-v2/examples/AIPLSelfHost{,_A_Metacircular,_B_PhaseChase,_C_FullHost}.aice`
+の設計を実装に落とした.最下層 (Level C) で「AIPL ソースを AIPL でパース」、
+中段 (Level B-1〜B-5) で「AIPL 検査器を AIPL で書く」、上段 (Level A) で
+「AIPL を解釈する AIPL eval」を実現し、Level Z で全部をまとめて
+**≤20 行の Python bootstrap loader** から起動できる状態に到達.
+
+| Level | 役割 | 主要ファイル (.abcl) | samples | smoke |
+|---|---|---|---:|:-:|
+| **C**     | lexer + parser + eval パイプライン | `lexer.abcl` (185) + `parser.abcl` (318) + `eval.abcl` (101) | 3 | ✅ |
+| **C-2**   | アクタースケジューラ (Phase 11+) | `scheduler.abcl` | 6 | ✅ |
+| **C-3**   | スケジューラ + now/future | `scheduler.abcl` | 1 | ✅ |
+| **B-1**   | Phase 11 型検査 | `typeck.abcl` | 6 | ✅ |
+| **B-2**   | Phase 12 効果検査 | `typeck.abcl` | 4 | ✅ |
+| **B-3**   | Phase 13 チャネル検査 | `typeck.abcl` | 5 | ✅ |
+| **B-4**   | Phase 14 linear 検査 | `typeck.abcl` | 4 | ✅ |
+| **B-5**   | Phase 15 owned 検査 | `typeck.abcl` | 4 | ✅ |
+| **A**     | メタサーキュラ eval | `metacircular.abcl` (216) | 4 | ✅ |
+| **Z**     | **統合: Level C + IO bridge + 最小 bootstrap** | `driver_head.abcl` + `io_bridge.abcl` + `bootstrap.py` (**18 行**) | 4 | ✅ (10/10) |
+| **total** |   | 9 AIPL モジュール (~1500 LOC) + 18 行 Python | **41** | **47/47** |
+
+### Level Z = self-host complete の証明
+
+`bootstrap.py` は **18 行** で (`.aice` 仕様の ≤20 行制約内):
+
+1. ユーザの `.abcl` ファイルを読む
+2. `level-c/lexer.abcl` + `parser.abcl` + `eval.abcl` + `driver_head.abcl` を連結
+3. ホスト AIPL に渡す
+
+…だけ. 構文解析と評価は **全て AIPL 側で完結**. ホスト Python に
+残るのは AIPL ランタイム本体 (組込みプリミティブ + スケジューラ) と
+この 18 行の loader のみ.
+
+`io_bridge.abcl` は fs / ai / net プリミティブを **CE-11 capability check
+ごし** に再エクスポートするので、ホスト権限とユーザコードの間に
+capability 境界が立つ. smoke は `AIPL_CAP_STRICT=1` 下で missing-grant が
+`capability denied` で停止することも確認.
+
+### Run
+
+```sh
+bash aipl-self-host/_smoke_all.sh
+# → total: 47  pass: 47  fail: 0
+```
+
+### サポートしている AIPL サブセット (Level Z 経由で動くもの)
+
+```
+program  := stmt*
+stmt     := var_decl | assign | print | if | while | block | call_stmt
+expr     := add_expr (rel_op add_expr)? — + - * / == != < > <= >=
+```
+
+class / actor / select / saga / generic / linear / owned は host AIPL のみ
+(self-hosted parser 拡張が将来の課題).
+
 ## Networking / AI / infrastructure
 
 | #   | Feature                                       | Py-A                       | Py-I                | OCaml         | JS-O          | JS-B         | JS-N                          | C        |
@@ -796,4 +857,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after **CE-10 / CE-13 also surfaced in C-codegen `--check`**: `aipl2c --check` now calls `Infer.debug_print_class_method_effects` + uses `Typecheck.run` (which already routes through the intersection-based `Types.unify` record arm).  Combined with the JS-B/JS-N closeout from the same day (CE-10 / CE-12 / CE-13 / DR-11), every runtime row is **all-✅** across the 26 next-gen features.  Regression: browser-abcl smoke 7+4+4 PASS, browser-abcl nextgen smoke 14/14 PASS, abclc C-codegen smoke 15/15 PASS.*
+*Last regenerated: 2026-05-18 (after **Self-host bootstrap Level Z completed**: 10-level chain wraps up with `aipl-self-host/level-z/` — an 18-line Python `bootstrap.py` + AIPL-side `driver_head.abcl` + CE-11 capability-checked `io_bridge.abcl` + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in `aipl2c --check`, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = 103 next-gen / self-host assertions all PASS.*

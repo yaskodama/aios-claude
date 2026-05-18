@@ -131,7 +131,7 @@ Number of \texttt{.abcl} sample programs reachable by each runtime
 \noindent
 Cross-cutting / not tied to a specific runtime:
 \begin{itemize}[leftmargin=*,itemsep=0pt]
-  \item \texttt{aipl-self-host/}: 48 AIPL-in-AIPL self-host programs
+  \item \texttt{aipl-self-host/}: \textbf{41 AIPL-in-AIPL self-host programs} across 10 levels (level-a metacircular, level-c\{,2,3\} lexer/parser/eval/scheduler, level-b\{,2,3,4,5\} typeck/effects/channels/linear/owned, \textbf{level-z} integrated full self-host).  Master smoke 47/47 PASS.
   \item \texttt{docker/cross/samples/}: 4 cross-language interop samples
 \end{itemize}
 
@@ -492,6 +492,66 @@ mock 両方で動作確認済.\texttt{.aice} 仕様書:
 
 \clearpage
 
+\section*{Self-host bootstrap (\texttt{aipl-self-host/}, completed 2026-05-18)}
+
+AIPL を AIPL 自身で書く 10 層ブートストラップ.進化計算で探索した
+\texttt{aice-evolution-v2/examples/AIPLSelfHost\{,\_A\_Metacircular,\_B\_PhaseChase,\_C\_FullHost\}.aice}
+の設計を実装に落とした.最下層 (Level C) で「AIPL ソースを AIPL でパース」、
+中段 (Level B-1〜B-5) で「AIPL 検査器を AIPL で書く」、上段 (Level A) で
+「AIPL を解釈する AIPL eval」を実現し、Level Z で全部をまとめて
+\textbf{≤20 行の Python bootstrap loader} から起動できる状態に到達.
+
+\begin{center}
+\small
+\begin{tabular}{cp{4.5cm}p{4cm}rc}
+\toprule
+\textbf{Level} & \textbf{役割} & \textbf{主要ファイル} & \textbf{samples} & \textbf{smoke} \\
+\midrule
+\textbf{C}     & lexer + parser + eval pipeline & \texttt{lexer/parser/eval.abcl} & 3  & \Yes \\
+\textbf{C-2}   & actor scheduler                 & \texttt{scheduler.abcl}        & 6  & \Yes \\
+\textbf{C-3}   & scheduler + now/future          & \texttt{scheduler.abcl}        & 1  & \Yes \\
+\textbf{B-1}   & Phase 11 type check             & \texttt{typeck.abcl}           & 6  & \Yes \\
+\textbf{B-2}   & Phase 12 effects                & \texttt{typeck.abcl}           & 4  & \Yes \\
+\textbf{B-3}   & Phase 13 channels               & \texttt{typeck.abcl}           & 5  & \Yes \\
+\textbf{B-4}   & Phase 14 linear                 & \texttt{typeck.abcl}           & 4  & \Yes \\
+\textbf{B-5}   & Phase 15 owned                  & \texttt{typeck.abcl}           & 4  & \Yes \\
+\textbf{A}     & metacircular eval               & \texttt{metacircular.abcl}     & 4  & \Yes \\
+\textbf{Z}     & \textbf{integrated full self-host} & \texttt{driver\_head.abcl} + \texttt{io\_bridge.abcl} + \texttt{bootstrap.py} (\textbf{18 lines}) & 4 & \Yes \textbf{(10/10)} \\
+\midrule
+\textbf{total} & 10 levels                        & 9 AIPL modules (\textasciitilde 1500 LOC) + 18 lines Python & \textbf{41} & \textbf{47/47} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Level Z = self-host complete}.  \texttt{bootstrap.py} は 18 行
+(\texttt{.aice} 仕様の $\le$20 行制約内) でユーザ \texttt{.abcl} を読み、
+\texttt{level-c/lexer.abcl} + \texttt{parser.abcl} + \texttt{eval.abcl} +
+\texttt{driver\_head.abcl} を連結してホスト AIPL に渡すだけ.構文解析と
+評価は全て AIPL 側で完結.ホスト Python に残るのは AIPL ランタイム本体
+(組込みプリミティブ + スケジューラ) と 18 行の loader のみ.
+
+\texttt{io\_bridge.abcl} は fs / ai / net プリミティブを CE-11
+capability check ごしに再エクスポートし、ホスト権限と self-hosted
+コードの間に capability 境界を確立.smoke は \texttt{AIPL\_CAP\_STRICT=1}
+下で missing-grant が \texttt{capability denied} で停止することも検証.
+
+\begin{verbatim}
+$ bash aipl-self-host/_smoke_all.sh
+  level-a       4 pass / 0 fail   (metacircular eval)
+  level-c       3 pass / 0 fail   (lexer + parser + eval)
+  level-c2      6 pass / 0 fail   (actor scheduler)
+  level-c3      1 pass / 0 fail   (scheduler + now/future)
+  level-b       6 pass / 0 fail   (Phase 11 typeck)
+  level-b2      4 pass / 0 fail   (Phase 12 effects)
+  level-b3      5 pass / 0 fail   (Phase 13 channels)
+  level-b4      4 pass / 0 fail   (Phase 14 linear)
+  level-b5      4 pass / 0 fail   (Phase 15 owned)
+  level-z      10 pass / 0 fail   (full self-host, NEW)
+total: 47  pass: 47  fail: 0
+\end{verbatim}
+
+\clearpage
+
 \section*{Networking, AI, infrastructure}
 
 \begin{longtable}{F C C C C C C C}
@@ -797,6 +857,6 @@ For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
 \bigskip
-\noindent\textit{Last regenerated: 2026-05-18 (after \textbf{C-codegen CE-10 / CE-13 surfaced}: \texttt{aipl2c --check} now calls \texttt{Infer.debug\_print\_class\_method\_effects} and routes typecheck through the intersection-based record \texttt{unify} arm.  Combined with the JS-B/JS-N closeout from the same day, every runtime row is all-\Yes across the 26 next-gen features.  Regression: browser-abcl smoke 7+4+4 PASS, browser-abcl nextgen smoke 14/14 PASS, abclc C-codegen smoke 15/15 PASS).}
+\noindent\textit{Last regenerated: 2026-05-18 (after \textbf{Self-host bootstrap Level Z completed}: 10-level chain wraps up with \texttt{aipl-self-host/level-z/} --- an 18-line Python \texttt{bootstrap.py} + AIPL-side \texttt{driver\_head.abcl} + CE-11 capability-checked \texttt{io\_bridge.abcl} + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in \texttt{aipl2c --check}, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = \textbf{103 next-gen / self-host assertions all PASS}.)}
 
 \end{document}
