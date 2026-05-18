@@ -1,0 +1,20 @@
+// DR-11 / sample 1 — saga happy path.
+//
+// Expected stdout:
+//   step1
+//   step2
+//   step3
+//   after saga (success)
+
+class D {
+  method run() {
+    saga {
+      step { print("step1"); } compensate { print("undo1"); }
+      step { print("step2"); } compensate { print("undo2"); }
+      step { print("step3"); } compensate { print("undo3"); }
+    }
+    print("after saga (success)");
+  }
+}
+var d = new D();
+send d.run();

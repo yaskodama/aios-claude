@@ -1,0 +1,2 @@
+load sample3_chain_exhausted.abcl
+compile

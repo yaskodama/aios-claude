@@ -1,0 +1,18 @@
+// DR-13 / sample 2 — pick from empty pool returns empty string.
+//
+// Expected stdout:
+//   [demo] pool name: pool::Worker
+//   [demo] pick #1: ''
+//   [demo] pick #2: ''
+
+class D {
+  method run() {
+    var p = pool_create("Worker", 0, 4, 2);
+    print("[demo] pool name: " + p);
+    print("[demo] pick #1: '" + pool_pick(p) + "'");
+    print("[demo] pick #2: '" + pool_pick(p) + "'");
+    pool_destroy(p);
+  }
+}
+var d = new D();
+send d.run();

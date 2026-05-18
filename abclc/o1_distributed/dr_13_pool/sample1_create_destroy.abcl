@@ -1,0 +1,22 @@
+// DR-13 / sample 1 — pool create + size + destroy.
+//
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/dr13_pool.ndjson \
+//   _build/default/src/repl_thread.exe \
+//     -f abclc/o1_distributed/dr_13_pool/run_sample1_create_destroy.bat
+//
+// Expected stdout:
+//   [demo] pool name: pool::Worker
+//   [demo] initial size: 0    (spawn_cb is a stub — pool starts empty)
+//   [demo] destroyed: true
+// Events: pool_created, pool_destroyed
+
+class D {
+  method run() {
+    var p = pool_create("Worker", 2, 8, 4);
+    print("[demo] pool name: " + p);
+    print("[demo] initial size: " + pool_size(p));
+    print("[demo] destroyed: " + pool_destroy(p));
+  }
+}
+var d = new D();
+send d.run();

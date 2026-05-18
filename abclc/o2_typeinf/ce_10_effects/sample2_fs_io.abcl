@@ -1,0 +1,19 @@
+// CE-10 / sample 2 — filesystem effects inferred from read/write primitives.
+//
+// Expected `[class_method_effects]`:
+//   peek      effects: {fs}        ← read_file
+//   audit     effects: {fs}        ← write_file
+//   roundtrip effects: {fs}        ← both read + write
+
+class FsBound {
+  method peek(path: string) -> string {
+    return read_file(path);
+  }
+  method audit(path: string, msg: string) -> int {
+    return write_file(path, msg);
+  }
+  method roundtrip(path: string, msg: string) -> string {
+    var _ = write_file(path, msg);
+    return read_file(path);
+  }
+}

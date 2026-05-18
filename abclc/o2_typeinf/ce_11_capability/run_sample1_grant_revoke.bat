@@ -1,0 +1,2 @@
+load sample1_grant_revoke.abcl
+compile

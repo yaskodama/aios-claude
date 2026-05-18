@@ -1,0 +1,20 @@
+// CE-10 / sample 3 — mixed effect categories (fs / ai+net / mut).
+//
+// Expected `[class_method_effects]`:
+//   classify_local  effects: {ai, fs, net}   ← read_file + ai_call_with_system
+//   broadcast       effects: {net}           ← ws_send only
+//   self_modify     effects: {mut}           ← compile + add_method
+
+class Mixed {
+  method classify_local(path: string) -> string {
+    var raw = read_file(path);
+    return ai_call_with_system("Categorize in one word.", raw);
+  }
+  method broadcast(sid: string, msg: string) -> int {
+    return ws_send(sid, msg);
+  }
+  method self_modify(src: string, m: string, body: string) -> int {
+    var _ = compile(src);
+    return add_method("Mixed", m, body);
+  }
+}

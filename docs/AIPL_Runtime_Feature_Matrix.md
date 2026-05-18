@@ -357,10 +357,10 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-7  | Phase E-2: typeck × inference 統合 CLI `--check`   |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | `PHASE_E_2_REPORT.md`                 |
 | CE-8  | `--infer` standalone CLI                           |  ✅  |  ❌  |  ✅⁵  |  ✅⁵ |  ❌  |  ❌  | ❌  | (Phase D-4)                           |
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
-| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_inference._collect_effects_from_ast` · OCaml: `infer.ml builtin_effects + collect_effects_*` |
-| **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_dist.{grant,revoke,has,check}_*` · OCaml: `aipl_dist.ml` TLS CapSet + 5 helpers |
-| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_inference.unify` · OCaml: `types.unify` TRecord arm |
-| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **🟡** | **🟡** | ❌ | ❌ | ❌ | Py-I: `aipl_inference._refine_subset_z3` · OCaml: `refinement.check_subset` API (unify hook deferred — see ¹⁵) |
+| **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o2_typeinf/ce_10_effects/sample{1..3}_*.abcl` |
+| **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o2_typeinf/ce_11_capability/sample{1..3}_*.abcl` |
+| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o2_typeinf/ce_13_record_subtyping/sample{1..3}_*.abcl` |
+| **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **🟡** | **🟡** | ❌ | ❌ | ❌ | OCaml samples (via `AIPL_REFINE_CHECK=1`): `abclc/o2_typeinf/ce_12_refinement_unify/sample{1..3}_*.abcl` |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
 
@@ -431,10 +431,10 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | DR-7  | IM-2 `subtree_quarantine` (Erlang OTP blast-radius)  |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_SUBTREE_QUARANTINE=1`              |
 | DR-8  | spawn-tree tracking (parent inference, TLS-auto)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
 | DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
-| **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_dist.pool_*` · OCaml: `aipl_dist.ml` pool_state + 4 helpers |
-| **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_dist.{gcounter,orset,lww}_*` · OCaml: `aipl_dist.ml` gcounter/orset/lww + replicate |
-| **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_dist.{current_region,region_chain,route_for_region,failover_region}` · OCaml: same names in `aipl_dist.ml` |
-| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | Py-I: `aipl_interp._do_saga` · OCaml: `parser.mly saga_stmt` + `eval_thread.ml Saga arm` |
+| **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o1_distributed/dr_13_pool/sample{1..3}_*.abcl` |
+| **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o1_distributed/dr_10_crdt/sample{1..3}_*.abcl` |
+| **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o1_distributed/dr_12_multi_region/sample{1..3}_*.abcl` |
+| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | ❌ | OCaml samples: `abclc/o1_distributed/dr_11_saga/sample{1..3}_*.abcl` |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -763,4 +763,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I → **OCaml port of all 8 next-gen features**: CE-10/CE-11/CE-12/CE-13 + DR-10/DR-11/DR-12/DR-13. CE-12 OCaml is 🟡 — Z3-subset API shipped but the unify-side early-flag hook is deferred since OCaml lowers `TyERefined` to base types before unification).*
+*Last regenerated: 2026-05-18 (after Py-I → **OCaml port of all 8 next-gen features** + **24 OCaml samples (3 per feature) all PASS**: CE-10/CE-11/CE-12/CE-13 + DR-10/DR-11/DR-12/DR-13. CE-12 OCaml is 🟡 — Z3-subset API shipped but the unify-side early-flag hook is deferred since OCaml lowers `TyERefined` to base types before unification).*

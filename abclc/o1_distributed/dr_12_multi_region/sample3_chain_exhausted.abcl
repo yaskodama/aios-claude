@@ -1,0 +1,13 @@
+// DR-12 / sample 3 — failover chain exhausted (actor in NO region).
+//
+// Expected stdout:
+//   [demo] failover NoSuch -> ''
+// Events: region_failover_failed×1
+
+class D {
+  method run() {
+    print("[demo] failover NoSuch -> '" + failover_region("NoSuch") + "'");
+  }
+}
+var d = new D();
+send d.run();

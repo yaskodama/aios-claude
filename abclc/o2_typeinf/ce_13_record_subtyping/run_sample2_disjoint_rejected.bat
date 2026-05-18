@@ -1,0 +1,2 @@
+load sample2_disjoint_rejected.abcl
+compile

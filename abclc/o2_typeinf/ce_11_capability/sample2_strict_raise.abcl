@@ -1,0 +1,19 @@
+// CE-11 / sample 2 — strict mode raises Capability_error.
+//
+// Run with AIPL_CAP_STRICT=1 and no `ai` cap granted:
+//   AIPL_DIST_ENABLE=1 AIPL_CAP_STRICT=1 AIPL_CAP_GRANT="fs" \
+//   _build/default/src/repl_thread.exe -f abclc/o2_typeinf/ce_11_capability/run2.bat
+//
+// Expected:
+//   [demo] before check, held: fs
+//   [FAILED] actor=d msg_id=… reason=Capability_error("capability denied: missing [ai] …")
+
+class Demo {
+  method run() {
+    print("[demo] before check, held: " + current_caps());
+    check_capability("ai");
+    print("[demo] should not reach here under strict mode");
+  }
+}
+var d = new Demo();
+send d.run();

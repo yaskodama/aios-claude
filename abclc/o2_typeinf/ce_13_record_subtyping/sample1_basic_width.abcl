@@ -1,0 +1,20 @@
+// CE-13 / sample 1 — record width subtyping (extra fields allowed).
+//
+// Run:
+//   _build/default/src/repl_thread.exe --check \
+//     abclc/o2_typeinf/ce_13_record_subtyping/sample1_basic_width.abcl
+//
+// Expected: `[type] no issues.` despite the record literal carrying
+// more fields than the method parameter type expects.  Before CE-13
+// this would raise `record field count mismatch`.
+
+class Greeter {
+  method greet(p: {name: string}) -> string {
+    return "Hello, " + p.name;
+  }
+}
+
+var g = new Greeter();
+var u = {name: "Alice", age: 30, email: "alice@example.com"};
+var hi = now g.greet(u);
+print(hi);

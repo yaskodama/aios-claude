@@ -1,0 +1,23 @@
+// CE-11 / sample 1 — capability grant + revoke + advisory check.
+//
+// Run with the runtime in advisory mode (AIPL_CAP_STRICT not set):
+//   AIPL_DIST_ENABLE=1 AIPL_CAP_GRANT="net,mut" \
+//   _build/default/src/repl_thread.exe -f abclc/o2_typeinf/ce_11_capability/run1.bat
+//
+// Expected stdout:
+//   [demo] held initially: net mut
+//   [demo] after grants:   ai fs mut net
+//   [demo] held finally:   fs mut net    (ai revoked)
+
+class Demo {
+  method run() {
+    print("[demo] held initially: " + current_caps());
+    grant_cap("fs");
+    grant_cap("ai");
+    print("[demo] after grants:   " + current_caps());
+    revoke_cap("ai");
+    print("[demo] held finally:   " + current_caps());
+  }
+}
+var d = new Demo();
+send d.run();

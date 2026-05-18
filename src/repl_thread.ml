@@ -1381,6 +1381,177 @@ let () =
                  ~system:(Some sys) ~max_attempts:n prompt)
   | _ -> failwith "ai_call_retry_with_system([provider:int,] max_attempts:int, system:string, prompt:string)");
 						    
+  (* ── CE-11 Capability Types — 5 primitives ───────────────────── *)
+  add_prim "grant_cap" (function
+  | [VString s] -> VBool (Aipl_dist.grant_cap s)
+  | _ -> failwith "grant_cap(name)");
+  add_prim "revoke_cap" (function
+  | [VString s] -> VBool (Aipl_dist.revoke_cap s)
+  | _ -> failwith "revoke_cap(name)");
+  add_prim "has_cap" (function
+  | [VString s] -> VBool (Aipl_dist.has_cap s)
+  | _ -> failwith "has_cap(name)");
+  add_prim "current_caps" (function
+  | [] -> VString (String.concat " " (Aipl_dist.current_caps ()))
+  | _ -> failwith "current_caps()");
+  add_prim "check_capability" (function
+  | [VString s] -> Aipl_dist.check_capability [s]; VBool true
+  | _ -> failwith "check_capability(name)");
+
+  (* ── DR-12 Multi-Region Failover — 5 primitives ──────────────── *)
+  add_prim "current_region" (function
+  | [] -> VString (Aipl_dist.current_region ())
+  | _ -> failwith "current_region()");
+  add_prim "region_chain" (function
+  | [] -> VString (String.concat " " (Aipl_dist.region_chain ()))
+  | _ -> failwith "region_chain()");
+  add_prim "route_for_region" (function
+  | [VString a] -> VString (Option.value (Aipl_dist.route_for_region a) ~default:"")
+  | [VString a; VString r] -> VString (Option.value (Aipl_dist.route_for_region ~region:(Some r) a) ~default:"")
+  | _ -> failwith "route_for_region(actor[, region])");
+  add_prim "failover_region" (function
+  | [VString a] -> VString (Option.value (Aipl_dist.failover_region a) ~default:"")
+  | [VString a; VString p] -> VString (Option.value (Aipl_dist.failover_region ~primary:(Some p) a) ~default:"")
+  | _ -> failwith "failover_region(actor[, primary])");
+  add_prim "regions_available" (function
+  | [] -> VString (String.concat " " (Aipl_dist.regions_available ()))
+  | _ -> failwith "regions_available()");
+
+  (* ── DR-13 Auto-Scaling Pool — 4 primitives ──────────────────── *)
+  add_prim "pool_size" (function
+  | [VString p] -> VInt (Aipl_dist.pool_size p)
+  | _ -> failwith "pool_size(pool)");
+  add_prim "pool_destroy" (function
+  | [VString p] -> VBool (Aipl_dist.pool_destroy p)
+  | _ -> failwith "pool_destroy(pool)");
+  add_prim "pool_pick" (function
+  | [VString p] -> VString (Option.value (Aipl_dist.pool_pick p) ~default:"")
+  | _ -> failwith "pool_pick(pool)");
+  add_prim "pool_create" (function
+  | [VString cls; VInt min_n; VInt max_n; VInt target] ->
+      let spawn_cb _c = "" in
+      let retire_cb _ = () in
+      let qlen_cb _ = 0 in
+      VString (Aipl_dist.pool_create ~cls ~min_n ~max_n ~target ~spawn_cb ~retire_cb ~qlen_cb ())
+  | _ -> failwith "pool_create(cls, min, max, target_qlen)");
+
+  (* ── DR-10 CRDT Actor State — 15 primitives ──────────────────── *)
+  let _crdt_table : (string, [
+    | `GC of Aipl_dist.gcounter
+    | `OS of Aipl_dist.orset
+    | `LV of string Aipl_dist.lwwreg
+  ]) Hashtbl.t = Hashtbl.create 32 in
+  let _crdt_id = ref 0 in
+  let _fresh_crdt_id (prefix : string) =
+    incr _crdt_id; Printf.sprintf "%s#%d" prefix !_crdt_id
+  in
+  add_prim "crdt_gcounter_new" (function
+  | [] ->
+      let id = _fresh_crdt_id "gc" in
+      Hashtbl.replace _crdt_table id (`GC (Aipl_dist.gcounter_new ()));
+      VString id
+  | _ -> failwith "crdt_gcounter_new()");
+  add_prim "crdt_gcounter_inc" (function
+  | [VString id] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`GC c) -> let _ = Aipl_dist.gcounter_inc c ~n:1 () in VString id
+       | _ -> failwith "crdt_gcounter_inc: not a G-Counter")
+  | [VString id; VInt n] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`GC c) -> let _ = Aipl_dist.gcounter_inc c ~n () in VString id
+       | _ -> failwith "crdt_gcounter_inc: not a G-Counter")
+  | _ -> failwith "crdt_gcounter_inc(c[, n])");
+  add_prim "crdt_gcounter_value" (function
+  | [VString id] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`GC c) -> VInt (Aipl_dist.gcounter_value c)
+       | _ -> failwith "crdt_gcounter_value: not a G-Counter")
+  | _ -> failwith "crdt_gcounter_value(c)");
+  add_prim "crdt_gcounter_merge" (function
+  | [VString a; VString b] ->
+      (match Hashtbl.find_opt _crdt_table a, Hashtbl.find_opt _crdt_table b with
+       | Some (`GC ca), Some (`GC cb) ->
+           let id = _fresh_crdt_id "gc" in
+           Hashtbl.replace _crdt_table id (`GC (Aipl_dist.gcounter_merge ca cb));
+           VString id
+       | _ -> failwith "crdt_gcounter_merge: not G-Counters")
+  | _ -> failwith "crdt_gcounter_merge(a, b)");
+  add_prim "crdt_orset_new" (function
+  | [] ->
+      let id = _fresh_crdt_id "os" in
+      Hashtbl.replace _crdt_table id (`OS (Aipl_dist.orset_new ()));
+      VString id
+  | _ -> failwith "crdt_orset_new()");
+  add_prim "crdt_orset_add" (function
+  | [VString id; VString e] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`OS s) -> let _ = Aipl_dist.orset_add s e in VString id
+       | _ -> failwith "crdt_orset_add: not an OR-Set")
+  | _ -> failwith "crdt_orset_add(s, elem)");
+  add_prim "crdt_orset_remove" (function
+  | [VString id; VString e] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`OS s) -> let _ = Aipl_dist.orset_remove s e in VString id
+       | _ -> failwith "crdt_orset_remove: not an OR-Set")
+  | _ -> failwith "crdt_orset_remove(s, elem)");
+  add_prim "crdt_orset_contains" (function
+  | [VString id; VString e] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`OS s) -> VBool (Aipl_dist.orset_contains s e)
+       | _ -> failwith "crdt_orset_contains: not an OR-Set")
+  | _ -> failwith "crdt_orset_contains(s, elem)");
+  add_prim "crdt_orset_values" (function
+  | [VString id] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`OS s) -> VString (String.concat " " (Aipl_dist.orset_values s))
+       | _ -> failwith "crdt_orset_values: not an OR-Set")
+  | _ -> failwith "crdt_orset_values(s)");
+  add_prim "crdt_orset_merge" (function
+  | [VString a; VString b] ->
+      (match Hashtbl.find_opt _crdt_table a, Hashtbl.find_opt _crdt_table b with
+       | Some (`OS sa), Some (`OS sb) ->
+           let id = _fresh_crdt_id "os" in
+           Hashtbl.replace _crdt_table id (`OS (Aipl_dist.orset_merge sa sb));
+           VString id
+       | _ -> failwith "crdt_orset_merge: not OR-Sets")
+  | _ -> failwith "crdt_orset_merge(a, b)");
+  add_prim "crdt_lww_new" (function
+  | [VString v] ->
+      let id = _fresh_crdt_id "lv" in
+      Hashtbl.replace _crdt_table id (`LV (Aipl_dist.lww_new v));
+      VString id
+  | _ -> failwith "crdt_lww_new(initial)");
+  add_prim "crdt_lww_write" (function
+  | [VString id; VString v] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`LV r) -> let _ = Aipl_dist.lww_write r v in VString id
+       | _ -> failwith "crdt_lww_write: not an LWW-Register")
+  | _ -> failwith "crdt_lww_write(r, v)");
+  add_prim "crdt_lww_value" (function
+  | [VString id] ->
+      (match Hashtbl.find_opt _crdt_table id with
+       | Some (`LV r) -> VString (Aipl_dist.lww_value r)
+       | _ -> failwith "crdt_lww_value: not an LWW-Register")
+  | _ -> failwith "crdt_lww_value(r)");
+  add_prim "crdt_lww_merge" (function
+  | [VString a; VString b] ->
+      (match Hashtbl.find_opt _crdt_table a, Hashtbl.find_opt _crdt_table b with
+       | Some (`LV ra), Some (`LV rb) ->
+           let id = _fresh_crdt_id "lv" in
+           Hashtbl.replace _crdt_table id (`LV (Aipl_dist.lww_merge ra rb));
+           VString id
+       | _ -> failwith "crdt_lww_merge: not LWW-Registers")
+  | _ -> failwith "crdt_lww_merge(a, b)");
+  add_prim "crdt_replicate" (function
+  | [VString id] ->
+      let kind = match Hashtbl.find_opt _crdt_table id with
+        | Some (`GC _) -> "GCounter"
+        | Some (`OS _) -> "ORSet"
+        | Some (`LV _) -> "LWWReg"
+        | None -> "?" in
+      Aipl_dist.crdt_replicate id kind; VUnit
+  | _ -> failwith "crdt_replicate(crdt)");
+
   let repl_thr = Thread.create (fun () -> repl_thread_fun ()) () in
 
   Sdl_helper.main_loop ();

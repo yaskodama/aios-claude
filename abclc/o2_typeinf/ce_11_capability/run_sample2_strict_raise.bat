@@ -1,0 +1,2 @@
+load sample2_strict_raise.abcl
+compile

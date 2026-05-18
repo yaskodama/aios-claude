@@ -1,0 +1,15 @@
+// DR-12 / sample 2 — actor lives only on secondary region.
+//
+// Expected stdout:
+//   [demo] failover Logger -> eu-west-1
+//   [demo] failover Bench -> ap-1
+// Events: region_failover×2
+
+class D {
+  method run() {
+    print("[demo] failover Logger -> " + failover_region("Logger"));
+    print("[demo] failover Bench -> " + failover_region("Bench"));
+  }
+}
+var d = new D();
+send d.run();

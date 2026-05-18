@@ -1,0 +1,23 @@
+// CE-11 / sample 3 — advisory mode logs `cap_violation` event without raising.
+//
+// Run (advisory: AIPL_CAP_STRICT unset):
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/cap3.ndjson \
+//   AIPL_CAP_GRANT="fs" \
+//   _build/default/src/repl_thread.exe -f abclc/o2_typeinf/ce_11_capability/run3.bat
+//
+//   jq -r '.event' /tmp/cap3.ndjson | sort | uniq -c
+//   #  ≥1 cap_violation
+//
+// Expected stdout:
+//   [demo] before check
+//   [demo] after check (advisory passed)
+
+class Demo {
+  method run() {
+    print("[demo] before check");
+    check_capability("ai");  // missing — logged, not raised
+    print("[demo] after check (advisory passed)");
+  }
+}
+var d = new Demo();
+send d.run();

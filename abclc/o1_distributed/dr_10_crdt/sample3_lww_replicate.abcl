@@ -1,0 +1,21 @@
+// DR-10 / sample 3 — LWW-Register last-write + replicate event.
+//
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_REPLICA_ID=node-a \
+//   AIPL_DIST_LOG_FILE=/tmp/dr10_lww.ndjson \
+//   _build/default/src/repl_thread.exe \
+//     -f abclc/o1_distributed/dr_10_crdt/run_sample3_lww_replicate.bat
+//
+//   jq -r '.event' /tmp/dr10_lww.ndjson | sort | uniq -c   # ≥1 crdt_replicate
+
+class D {
+  method run() {
+    var r = crdt_lww_new("v0");
+    crdt_lww_write(r, "v1");
+    crdt_lww_write(r, "v2");
+    print("[demo] value: " + crdt_lww_value(r));
+    crdt_replicate(r);
+    print("[demo] replicated");
+  }
+}
+var d = new D();
+send d.run();

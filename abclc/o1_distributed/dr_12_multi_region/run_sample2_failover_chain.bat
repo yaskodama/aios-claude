@@ -1,0 +1,2 @@
+load sample2_failover_chain.abcl
+compile

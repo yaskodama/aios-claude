@@ -1,0 +1,22 @@
+// DR-11 / sample 2 — failure path; LIFO compensate then re-raise.
+//
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_LOG_FILE=/tmp/dr11_fail.ndjson \
+//   _build/default/src/repl_thread.exe \
+//     -f abclc/o1_distributed/dr_11_saga/run_sample2_compensate.bat
+//
+// Expected stdout: step1 → step2 → undo2 → undo1 → [FAILED] actor=d
+// Events: saga_started / saga_step_complete×2 / saga_step_failed
+//         / saga_compensated×2 / saga_aborted
+
+class D {
+  method run() {
+    saga {
+      step { print("step1"); } compensate { print("undo1"); }
+      step { print("step2"); } compensate { print("undo2"); }
+      step { var _ = read_file("/nonexistent/path/_dr11_fail"); } compensate { print("undo3 (not run)"); }
+    }
+    print("after saga (not run)");
+  }
+}
+var d = new D();
+send d.run();

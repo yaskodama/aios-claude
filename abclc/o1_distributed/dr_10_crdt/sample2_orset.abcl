@@ -1,0 +1,21 @@
+// DR-10 / sample 2 — OR-Set add / remove / contains.
+//
+// Expected stdout:
+//   [demo] contains apple: true
+//   [demo] contains banana: false
+//   [demo] values: apple cherry
+
+class D {
+  method run() {
+    var s = crdt_orset_new();
+    crdt_orset_add(s, "apple");
+    crdt_orset_add(s, "banana");
+    crdt_orset_add(s, "cherry");
+    crdt_orset_remove(s, "banana");
+    print("[demo] contains apple: " + crdt_orset_contains(s, "apple"));
+    print("[demo] contains banana: " + crdt_orset_contains(s, "banana"));
+    print("[demo] values: " + crdt_orset_values(s));
+  }
+}
+var d = new D();
+send d.run();

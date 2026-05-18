@@ -1,0 +1,2 @@
+load sample3_destroy_idempotent.abcl
+compile

@@ -1,0 +1,17 @@
+// DR-13 / sample 3 — destroy of unknown pool returns false.
+//
+// Expected stdout:
+//   [demo] destroyed real: true
+//   [demo] destroyed again: false
+//   [demo] destroyed bogus: false
+
+class D {
+  method run() {
+    var p = pool_create("Worker", 1, 4, 2);
+    print("[demo] destroyed real: " + pool_destroy(p));
+    print("[demo] destroyed again: " + pool_destroy(p));
+    print("[demo] destroyed bogus: " + pool_destroy("pool::DoesNotExist"));
+  }
+}
+var d = new D();
+send d.run();

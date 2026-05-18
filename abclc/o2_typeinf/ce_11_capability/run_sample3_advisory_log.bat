@@ -1,0 +1,2 @@
+load sample3_advisory_log.abcl
+compile

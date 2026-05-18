@@ -1,0 +1,18 @@
+// CE-10 / sample 1 — pure method vs ai_call method.
+//
+// Verify with:
+//   _build/default/src/repl_thread.exe --check \
+//     abclc/o2_typeinf/ce_10_effects/sample1_pure_vs_ai.abcl
+//
+// Expected `[class_method_effects]` output:
+//   add  effects: {}            ← pure, no primitives that imply effects
+//   ask  effects: {ai, net}     ← ai_call_with_system → ai + net
+
+class Demo {
+  method add(x: int, y: int) -> int {
+    return x + y;
+  }
+  method ask(q: string) -> string {
+    return ai_call_with_system("Be brief.", q);
+  }
+}

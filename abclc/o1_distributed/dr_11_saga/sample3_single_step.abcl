@@ -1,0 +1,16 @@
+// DR-11 / sample 3 — single-step saga (legal but trivial).
+//
+// Expected stdout:
+//   doing the one and only thing
+//   after saga
+
+class D {
+  method run() {
+    saga {
+      step { print("doing the one and only thing"); } compensate { print("undo"); }
+    }
+    print("after saga");
+  }
+}
+var d = new D();
+send d.run();

@@ -1,0 +1,2 @@
+load sample1_create_destroy.abcl
+compile

@@ -1,0 +1,20 @@
+// DR-12 / sample 1 — primary-region hit (no failover).
+//
+//   env AIPL_DIST_ENABLE=1 AIPL_REGION=us-east-1 \
+//       AIPL_REGION_FAILOVER="us-east-1,eu-west-1" \
+//       AIPL_ROUTE_REGION_us-east-1="Greeter:fast" \
+//       _build/default/src/repl_thread.exe \
+//         -f abclc/o1_distributed/dr_12_multi_region/run_sample1_primary_hit.bat
+//
+// Expected stdout:
+//   [demo] region: us-east-1
+//   [demo] failover Greeter -> us-east-1
+
+class D {
+  method run() {
+    print("[demo] region: " + current_region());
+    print("[demo] failover Greeter -> " + failover_region("Greeter"));
+  }
+}
+var d = new D();
+send d.run();

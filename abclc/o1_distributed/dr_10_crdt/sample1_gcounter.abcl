@@ -1,0 +1,25 @@
+// DR-10 / sample 1 — G-Counter inc + merge.
+//
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_REPLICA_ID=node-a \
+//   AIPL_DIST_LOG_FILE=/tmp/dr10_gc.ndjson \
+//   _build/default/src/repl_thread.exe \
+//     -f abclc/o1_distributed/dr_10_crdt/run_sample1_gcounter.bat
+//
+// Expected stdout:
+//   [demo] local value: 7
+//   [demo] merged value: 10
+
+class D {
+  method run() {
+    var c = crdt_gcounter_new();
+    crdt_gcounter_inc(c, 3);
+    crdt_gcounter_inc(c, 4);
+    print("[demo] local value: " + crdt_gcounter_value(c));
+    var c2 = crdt_gcounter_new();
+    crdt_gcounter_inc(c2, 10);
+    var m = crdt_gcounter_merge(c, c2);
+    print("[demo] merged value: " + crdt_gcounter_value(m));
+  }
+}
+var d = new D();
+send d.run();
