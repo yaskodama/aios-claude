@@ -236,8 +236,9 @@ the first region that knows the actor.  Logs
 round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
 axis, top elite I0012 had 0.70 for this task).
 
-¹⁶ C-runtime port of the 8 next-gen features (commit landing this
-note): `src/abcl_nextgen_runtime.{c,h}` (~880 LOC, C99 + pthread,
+¹⁶ C-runtime port + c_translator wire-up for the 8 next-gen
+features (commits ea356d2 + this one): `src/abcl_nextgen_runtime.
+{c,h}` (~880 LOC, C99 + pthread,
 standalone-compilable with `cc -O2 -Wall -pthread`).  Mirrors the
 OCaml `aipl_dist.ml` shapes:
   - CE-11 capability: pthread TLS-backed `cap_set_t` seeded from
@@ -258,10 +259,15 @@ OCaml `aipl_dist.ml` shapes:
     1=UNSAT(subset)/0=SAT(violation)/-1=undecidable, matching
     the OCaml `Refinement.check_subset` API.
 The 4/4 spot-check covered CE-11 + DR-12 + DR-10 + DR-13 end-to-
-end (`/tmp/_test_nextgen` smoke pass).  All 8 cells in the C
-column are 🟡 because the `c_translator.ml` builtin-map wire
-that surfaces these to the AIPL surface (the equivalent of
-`add_prim` in OCaml's REPL) is deferred to a follow-up cycle.
+end (`/tmp/_test_nextgen` smoke pass).  After the c_translator
+wire-up (commit landing this note), CE-11/DR-10/DR-12/DR-13
+reach AIPL-surface via the existing `collect_externs` auto-
+extern path — no separate prim map needed.  DR-11 saga gains
+explicit codegen (`gen_stmt | Saga steps ->` emits
+`setjmp(__saga.env)` + per-step bodies + LIFO compensate switch
++ `saga_aborted` call); verified by compiling a 2-step saga
+sample (`/tmp/_ce_saga.abcl`) and running the binary — step1 /
+step2 print as expected.
 
 ¹⁵ CE-12 refinement unification: HM's `unify` previously dropped
 refinement predicates and relied on a post-hoc Z3 sweep
@@ -458,10 +464,10 @@ Z3 backend には対応していない。OCaml への移植は今後の課題。
 | DR-7  | IM-2 `subtree_quarantine` (Erlang OTP blast-radius)  |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | `AIPL_DIST_SUBTREE_QUARANTINE=1`              |
 | DR-8  | spawn-tree tracking (parent inference, TLS-auto)     |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto, AIPL_DIST_ENABLE=1)                    |
 | DR-9  | runtime hooks (interp / actor / call_ai) — opt-in    |  ✅  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  | ❌  | (auto)                                        |
-| **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: `abcl_nextgen_runtime.c` `pool_create/pick/size/destroy` (4 prims)¹⁶ |
-| **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: `abcl_nextgen_runtime.c` GC/OR/LWW + 15 prims (open-addressing tables)¹⁶ |
-| **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: `abcl_nextgen_runtime.c` `current_region/region_chain/route_for_region/failover_region/regions_available` (5 prims)¹⁶ |
-| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **🟡** | C: `saga_begin / saga_step_complete / saga_compensated / saga_aborted` (codegen wire pending)¹⁶ |
+| **DR-13** | **auto-scaling actor pool** (`pool_create(cls, min, max, target_qlen)` with hysteresis)⁹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | C: `abcl_nextgen_runtime.c` 4 prims; auto-extern by c_translator¹⁶ |
+| **DR-10** | **CRDT actor state** (G-Counter / OR-Set / LWW-Register, `crdt_replicate` hook)¹¹ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | C: `abcl_nextgen_runtime.c` GC/OR/LWW + 15 prims; auto-extern by c_translator¹⁶ |
+| **DR-12** | **multi-region failover** (`AIPL_REGION` + per-region route + `failover_region(actor)` chain walk)¹² | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | C: `abcl_nextgen_runtime.c` 5 prims; auto-extern by c_translator¹⁶ |
+| **DR-11** | **saga orchestration** (`saga { step { ... } compensate { ... } ... }` with LIFO compensate-on-failure)¹³ | ❌ | **✅** | **✅** | **✅** | ❌ | ❌ | **✅** | C: `c_translator.gen_stmt` Saga arm emits `setjmp/longjmp` wrap + `saga_begin/complete/aborted` runtime helpers¹⁶ |
 
 OCaml は Phase O-1.5 で全 9 機能 ✅ 達成 (DR-3/6 の auto-wiring
 into `Ai.call_gemini` 完了, DR-8 は per-thread `current_actor` TLS
@@ -790,4 +796,4 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Py-I → OCaml port + **C runtime API for all 8 next-gen features**: `src/abcl_nextgen_runtime.{c,h}` (~880 LOC, standalone-compilable, 4/4 spot-check pass).  All 8 C cells are 🟡 — runtime API is shipped and self-tests pass, but the c_translator.ml `builtin map` wire-up is deferred to a follow-up cycle.  See footnote ¹⁶.*
+*Last regenerated: 2026-05-18 (after Py-I → OCaml → **C runtime + c_translator wire-up for all 8 next-gen features**.  CE-11/DR-10/DR-12/DR-13 → AIPL surface via `collect_externs` auto-extern; DR-11 saga → explicit `gen_stmt` codegen with setjmp/longjmp wrap.  CE-10/CE-13 are type-system level (compile-time).  CE-12 OCaml/JS-O/C all 🟡 — Z3-subset API shipped, unify-side early-flag hook deferred.  See footnote ¹⁶.*

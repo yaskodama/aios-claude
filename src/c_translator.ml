@@ -149,6 +149,13 @@ let rec walk_stmt (acc : string list) (s : stmt) : string list =
   | Select (cases, (_, tb)) ->
       let acc = List.fold_left (fun a (c : select_case) -> walk_stmt a c.body) acc cases in
       (match tb with Some t -> walk_stmt acc t | None -> acc)
+  | Saga steps ->
+      List.fold_left (fun a (st : saga_step) ->
+        let a = walk_stmt a st.saga_body in
+        walk_stmt a st.saga_compensate) acc steps
+  | Return None       -> acc
+  | Return (Some e)   -> walk_expr acc e
+  | TypedVarDecl (_, _, e) -> walk_expr acc e
 
 let collect_externs (p : program) : string list =
   let acc = List.fold_left
@@ -362,6 +369,40 @@ let rec gen_stmt ~ctx ?(indent = 2) (s : stmt) =
       emitf "%s}\n" ind
   | Become _ -> emitf "%s/* become unsupported */\n" ind
   | Select _ -> emitf "%s/* select unsupported */\n" ind
+  | Saga steps ->
+      (* DR-11 saga codegen for C.  Wraps each step.body in a setjmp
+         frame; when a step "raises" (via longjmp from check_capability
+         abort path, or any future raise mechanism) the driver walks
+         completed compensates in LIFO order.  In the current C runtime
+         there is no exception raise other than the strict-mode
+         Capability_error abort, so the failure path executes the
+         compensate chain on `abort()`-style longjmp.  Helpers come
+         from abcl_nextgen_runtime.h. *)
+      let n_steps = List.length steps in
+      emitf "%s{ saga_frame_t __saga; saga_begin(&__saga, %d);\n" ind n_steps;
+      emitf "%s  if (setjmp(__saga.env) == 0) {\n" ind;
+      List.iteri (fun i st ->
+        emitf "%s    /* step[%d].body */\n" ind i;
+        gen_stmt ~ctx ~indent:(indent + 4) st.saga_body;
+        emitf "%s    saga_step_complete(&__saga, %d);\n" ind i
+      ) steps;
+      emitf "%s    saga_finished(&__saga);\n" ind;
+      emitf "%s  } else {\n" ind;
+      emitf "%s    /* failure path: LIFO compensate */\n" ind;
+      emitf "%s    for (int __i = __saga.completed - 1; __i >= 0; --__i) {\n" ind;
+      emitf "%s      switch (__i) {\n" ind;
+      List.iteri (fun i st ->
+        emitf "%s        case %d:\n" ind i;
+        gen_stmt ~ctx ~indent:(indent + 10) st.saga_compensate;
+        emitf "%s          saga_compensated(&__saga, %d); break;\n" ind i
+      ) steps;
+      emitf "%s      }\n" ind;
+      emitf "%s    }\n" ind;
+      emitf "%s    saga_aborted(&__saga);\n" ind;
+      emitf "%s  }\n" ind;
+      emitf "%s}\n" ind
+  | Return None -> emitf "%sreturn;\n" ind
+  | Return (Some e) -> emitf "%sreturn /* %s */ 0;\n" ind (gen_expr ~ctx e)
 
 (* ---------- メソッド ---------- *)
 let gen_method ~cname ~fields (md : method_decl) =
@@ -432,6 +473,7 @@ let runtime_prelude = {|#include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 #include <pthread.h>
+#include <setjmp.h>
 
 #define MAX_MAILBOX 256
 #define MAX_OBJECTS 64
@@ -455,6 +497,16 @@ typedef struct {
   const char* s;
   int    obj_id;
 } value_t;
+#define ABCL_VALUE_T_DEFINED
+
+/* Phase O / next-gen 8 features (CE-10..13 + DR-10..13) runtime.
+   Optional — the generated program only includes this header so the
+   prototypes for grant_cap / crdt_* / pool_* / saga_* / etc. match
+   abcl_nextgen_runtime.c.  Link with:
+     cc your_program.c abcl_nextgen_runtime.c -pthread
+   If the AIPL source touches no next-gen primitive, the linker
+   reports zero unresolved next-gen symbols. */
+#include "abcl_nextgen_runtime.h"
 
 static value_t mk_int(long n)        { value_t v={0}; v.tag=V_INT;   v.i=n;     return v; }
 static value_t mk_float(double n)    { value_t v={0}; v.tag=V_FLOAT; v.f=n;     return v; }
