@@ -41,7 +41,7 @@
 | 5.2 | G3 VirtualizedInfinite (viewport spawn) | `GSheetsVirtualized.abcl` | ✅ 10 assertion |
 | 5.3 | E1 FormulaBar (DOM input) | `src/browser-abcl/spreadsheet.html` | ✅ (browser-only, smoke unchanged) |
 | 5.4 | C2 ServerFile (JS-N /api/sheet/...) | `src/node-aipl-server/server.mjs` + `spreadsheet.html` | ✅ 4 server smoke |
-| 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | (次) | ⏳ |
+| 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | `src/browser-abcl/spreadsheet.html` + `runtime.js` cell-replace fix | ✅ |
 
 ## smoke
 

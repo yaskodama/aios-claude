@@ -541,12 +541,21 @@ export class Runtime {
       }
       case "sheet_cell": {
         if (!this.sheetState) break;
-        this.sheetState.cells.push({
-          row:  Number(args[0]),
-          col:  Number(args[1]),
+        const row  = Number(args[0]);
+        const col  = Number(args[1]);
+        const cell = {
+          row, col,
           val:  String(args[2]),
           kind: String(args[3] || "Value"),
-        });
+        };
+        // Phase 5.5 fix: REPLACE the existing (row, col) entry instead
+        // of pushing a duplicate.  Previously every commit grew the
+        // cells array; the renderer drew the old + new on top of each
+        // other, leaving fragments of the older value visible.
+        const cells = this.sheetState.cells;
+        const idx = cells.findIndex(c => c.row === row && c.col === col);
+        if (idx >= 0) cells[idx] = cell;
+        else          cells.push(cell);
         this._redrawCanvas();
         break;
       }

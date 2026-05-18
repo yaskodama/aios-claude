@@ -20,7 +20,25 @@
     #controls { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
     button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446; cursor: pointer; font-family: monospace; }
     button:hover { background: #334; }
-    #log { width: 720px; height: 140px; background: #050510; color: #9aa; font-size: 0.75rem; overflow-y: auto; padding: 8px; margin-top: 6px; white-space: pre-wrap; border: 1px solid #223; }
+    /* Phase 5.5: bumped readability — line-height for log entry
+       separation, larger font, taller box, word-wrap for long lines. */
+    #log {
+      width: 720px;
+      height: 240px;
+      background: #050510;
+      color: #cbd5e8;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      overflow-y: auto;
+      padding: 10px 12px;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      tab-size: 2;
+      border: 1px solid #334;
+      border-radius: 3px;
+    }
     nav { margin: 8px; font-size: 0.8rem; }
     nav a { color: #6af; margin: 0 6px; }
     .legend { font-size: 0.72rem; color: #779; margin: 4px 0; }
@@ -61,6 +79,9 @@
     <button id="btnStop">■ Stop</button>
     <button id="btnSave" title="POST /api/sheet/&lt;id&gt;/save">💾 Save</button>
     <button id="btnLoad" title="GET /api/sheet/&lt;id&gt;/load">📂 Load</button>
+    <button id="btnRecompute" title="Re-evaluate every Formula cell">🔄 Recompute</button>
+    <button id="btnUndo"      title="Undo last commit (DR-11 compensate)">↶ Undo</button>
+    <button id="btnRedo"      title="Redo last undo">↷ Redo</button>
     <button id="btnShowSrc">Show ABCL source</button>
   </div>
   <div id="log"></div>
@@ -86,6 +107,18 @@
     let sheetState    = null;                       // grid metrics, populated post-Run
     let selectedRC    = null;                       // {row, col} of clicked cell
     let cellValues    = new Map();                  // id → numeric value (mirror)
+    let cellFormulas  = new Map();                  // id → formula source string (null = literal)
+
+    // Phase 5.5: history stack ── each entry mirrors a DR-11 saga
+    // step: {id, before:{val,kind,formula}, after:{val,kind,formula}}.
+    // Undo runs `before` (the "compensate" of the saga step);
+    // Redo replays `after`.
+    let historyStack = [];
+    let redoStack    = [];
+    function refreshUndoRedoButtons() {
+      document.getElementById("btnUndo").disabled = historyStack.length === 0;
+      document.getElementById("btnRedo").disabled = redoStack.length === 0;
+    }
 
     const _origSetTimeout = window.setTimeout.bind(window);
     window.setTimeout = function(fn, ms, ...rest) {
@@ -228,24 +261,47 @@
       }
     });
 
+    // ─── apply_cell_change: the single sheet-mutation entry point.
+    // Both the Enter-key commit path and Undo/Redo route through
+    // this so history bookkeeping stays consistent.
+    function applyCellChange(row, col, val, kind, formula) {
+      const id = cellId(row, col);
+      cellValues.set(id, Number(val));
+      if (formula === null || formula === undefined) cellFormulas.delete(id);
+      else cellFormulas.set(id, formula);
+      const runtime = interp && interp.runtime;
+      if (runtime) {
+        runtime._callBuiltin("sheet_cell",
+                             [row, col, String(val), kind],
+                             { __currentActor: null });
+      }
+    }
+
     formulaBar.addEventListener("keydown", e => {
       if (e.key !== "Enter" || !selectedRC) return;
       e.preventDefault();
       const src = formulaBar.value.trim();
-      let val, kind;
+      let val, kind, formula;
       try {
         const ast = parseFormula(src);
         val = evalAst(ast);
+        // "Value" only if the entire input was a plain int literal;
+        // anything else (refs, ops, function calls) is a Formula.
         kind = (ast.tag === "Lit" && String(ast.val) === src) ? "Value" : "Formula";
+        formula = (kind === "Formula") ? src : null;
       } catch (err) { appendLog("[parse-error] " + err); return; }
       const id = cellId(selectedRC.row, selectedRC.col);
-      cellValues.set(id, val);
-      // Forward to the AIPL Sheet via the View bus path: just call
-      // sheet_cell directly — the AIPL state already lives there.
-      const runtime = interp.runtime;
-      runtime._callBuiltin("sheet_cell",
-                           [selectedRC.row, selectedRC.col, String(val), kind],
-                           { __currentActor: null });
+      // Capture pre-image for the history-stack "compensate" arm.
+      const before = {
+        val:     cellValues.get(id),
+        kind:    cellFormulas.has(id) ? "Formula" : "Value",
+        formula: cellFormulas.get(id) || null,
+      };
+      const after = { val, kind, formula };
+      applyCellChange(selectedRC.row, selectedRC.col, val, kind, formula);
+      historyStack.push({ row: selectedRC.row, col: selectedRC.col, id, before, after });
+      redoStack = [];   // new commit invalidates redo branch
+      refreshUndoRedoButtons();
       appendLog(`[commit] ${id} = ${val}  (${kind})`);
     });
 
@@ -265,6 +321,9 @@
       stopAll();
       logDiv.textContent = "";
       cellValues.clear();
+      cellFormulas.clear();
+      historyStack = [];
+      redoStack = [];
       selectedRC = null;
       cellLabel.textContent = "(none)";
       formulaBar.value = "";
@@ -340,6 +399,7 @@
         const runtime = interp && interp.runtime;
         if (!runtime) { appendLog("[load error] no interpreter"); return; }
         cellValues.clear();
+        cellFormulas.clear();
         // Re-init the canvas so stale cells from the current view
         // get wiped before we replay.
         runtime._callBuiltin("sheet_init", [j.rows, j.cols],
@@ -351,9 +411,82 @@
           cellValues.set(cellId(c.row, c.col), Number(c.val));
         }
         appendLog(`[load] ${id}.json — restored ${j.cells.length} cells`);
+        // Load invalidates history (the user's now editing a
+        // freshly-restored sheet, not extending the prior session).
+        historyStack = []; redoStack = []; refreshUndoRedoButtons();
       } catch (e) { appendLog(`[load error] ${e}`); }
     });
 
+    // ─── Phase 5.5: Recompute / Undo / Redo ─────────────────────
+    // Recompute walks every cell that has a formula source and
+    // re-evaluates it against the current cellValues mirror.  This
+    // is order-insensitive for the simple grids the demo handles;
+    // a real Sheet would topo-sort by dependency graph.
+    document.getElementById("btnRecompute").addEventListener("click", () => {
+      let n = 0;
+      for (const [id, src] of cellFormulas.entries()) {
+        if (!src) continue;
+        let val;
+        try { val = evalAst(parseFormula(src)); }
+        catch (err) { appendLog(`[recompute error @ ${id}] ${err}`); continue; }
+        // Find the (row, col) for the id by reverse-lookup in sheetState.
+        const s = interp && interp.runtime && interp.runtime.sheetState;
+        if (!s) continue;
+        const cell = s.cells.find(c => cellId(c.row, c.col) === id);
+        if (!cell) continue;
+        cellValues.set(id, val);
+        interp.runtime._callBuiltin("sheet_cell",
+                                    [cell.row, cell.col, String(val), "Formula"],
+                                    { __currentActor: null });
+        n++;
+      }
+      appendLog(`[recompute] re-evaluated ${n} formula cell(s)`);
+    });
+
+    // If `entry`'s cell is currently selected, sync the formula bar +
+    // cell label with the cell's restored value so the user has
+    // immediate UX feedback that Undo/Redo took effect.
+    function syncBarIfSelected(entry, displayVal, displaySrc) {
+      if (selectedRC && selectedRC.row === entry.row && selectedRC.col === entry.col) {
+        cellLabel.textContent = entry.id;
+        formulaBar.value = (displaySrc !== null && displaySrc !== undefined)
+          ? displaySrc
+          : (displayVal === undefined ? "" : String(displayVal));
+      }
+    }
+
+    document.getElementById("btnUndo").addEventListener("click", () => {
+      if (historyStack.length === 0) { appendLog("[undo] nothing to undo"); return; }
+      const entry = historyStack.pop();
+      // DR-11 "compensate" semantics: restore the pre-image.
+      const b = entry.before;
+      if (b.val === undefined) {
+        // Cell didn't exist before — best effort: clear by writing 0
+        // (the AIPL Sheet doesn't expose a delete primitive yet).
+        applyCellChange(entry.row, entry.col, 0, "Value", null);
+        syncBarIfSelected(entry, 0, null);
+      } else {
+        applyCellChange(entry.row, entry.col, b.val,
+                        b.kind || "Value", b.formula);
+        syncBarIfSelected(entry, b.val, b.formula);
+      }
+      redoStack.push(entry);
+      refreshUndoRedoButtons();
+      appendLog(`[undo] ${entry.id} ← ${b.val === undefined ? "(empty)" : b.val}`);
+    });
+
+    document.getElementById("btnRedo").addEventListener("click", () => {
+      if (redoStack.length === 0) { appendLog("[redo] nothing to redo"); return; }
+      const entry = redoStack.pop();
+      const a = entry.after;
+      applyCellChange(entry.row, entry.col, a.val, a.kind, a.formula);
+      syncBarIfSelected(entry, a.val, a.formula);
+      historyStack.push(entry);
+      refreshUndoRedoButtons();
+      appendLog(`[redo] ${entry.id} → ${a.val}`);
+    });
+
+    refreshUndoRedoButtons();
     window.addEventListener("load", runProgram);
   </script>
 </body>
