@@ -1,0 +1,154 @@
+{
+  "name": "AIPL_GoogleSheetsClone",
+  "task": "AIPL ランタイム (browser-abcl + JS-N + Py-I + WebSocket + DR-10 CRDT + DR-11 saga + DR-13 pool + CE-11 cap) の上に Google Sheets ライクなフル機能 Web スプレッドシートを実装する設計を採掘する.MVP は Round 3 で動作 (3x3, hardcoded formulas).本 round は (G スケール / E 編集 / F 関数セット / R 参照 / C コラボ / U UI) の 6 軸を各 4 variant 探索し、Excel/Google Sheets ユーザが違和感なく使える MVP-2 (≤2000 LOC 増分、Round 3 の +200% 以内) を 6-tuple として推薦.既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host smoke + 14 JS nextgen smoke + 71 abclc は absolute compat floor.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "ownership_model",
+      "effect_handling"
+    ],
+    "generations": 6,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 19951031
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "G1_Fixed_10x10",
+      "G2_Dynamic_100x26",
+      "G3_VirtualizedInfinite",
+      "G4_MultiSheetWorkbook",
+      "E1_FormulaBarOnly",
+      "E2_InCellOverlay",
+      "E3_DualBarAndCell",
+      "E4_ModalEditor",
+      "F1_ArithSumOnly",
+      "F2_Core12",
+      "F3_TextAndDate",
+      "F4_FullGSheetsParity",
+      "R1_RelativeOnly",
+      "R2_AbsoluteRelative",
+      "R3_RangesAndCOL",
+      "R4_NamedAndCrossSheet",
+      "C1_LocalStorage",
+      "C2_ServerFile",
+      "C3_WebSocketRealtime",
+      "C4_CRDTCollaborative",
+      "U1_BarePlusInput",
+      "U2_Toolbar",
+      "U3_FormatMenu",
+      "U4_ChartsAndSort",
+      "RoundCompat",
+      "BackwardCompat",
+      "ImplCostEstimate",
+      "GoogleSheetsParity",
+      "AIPLInfraReuse"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "GoogleSheetsParityReviewer",
+        "persona": "あなたは Google Sheets parity レビュアーです.選ばれた 6-tuple が Sheets の core UX (スクロールするグリッド / クリック+タイプで編集 / formula bar / 多数の関数 / 絶対参照 + 範囲 / ファイル保存) のどれだけをカバーするか.1.0 = 80% 以上、0.7 = 50% 以上 (基本+一部高度)、0.3 = MVP のまま、0.0 = 認識されない.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ImplCostEstimator",
+        "persona": "あなたは MVP-2 実装コスト見積もりレビュアーです.選ばれた 6-tuple の LOC 増分合計 (Round 3 base から).Round 3 は 900 LOC で 5 phase 完了.1.0 = ≤800、0.7 = ≤1500、0.3 = ≤2500、0.0 = >2500.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "RoundConsistencyReviewer",
+        "persona": "あなたは Round 1-3 整合性レビュアーです.既決定 10 軸 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) と矛盾しないか.S1 → C2/C3/C4 への collab 昇格は Round 1 の段階的拡張戦略どおりで OK.1.0 = 完全整合、0.7 = 軽微逸脱、0.3 = 主要逸脱、0.0 = 矛盾.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換レビュアーです.既存 27 spreadsheet + 30 Py-I nextgen + 47 self-host + 14 JS nextgen + 71 abclc smoke が無修正で動作するか.新機能は全て opt-in (新 URL / 新 endpoint / 新 dir).1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "InfraReuseReviewer",
+        "persona": "あなたは既存 AIPL infra 再利用レビュアーです.選ばれた 6-tuple が以下の何個を活用するか: DR-4 checkpoint / DR-10 LWW / DR-11 saga / DR-13 pool / CE-11 cap / Level-A eval / WebSocket / HMAC URL.1.0 = ≥5 件、0.7 = 3-4、0.3 = 1-2、0.0 = 全部新規.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ProductionUXReviewer",
+        "persona": "あなたは production UX レビュアーです.選ばれた 6-tuple で実際に使えるレベルか.スクロール / 編集 / 関数 / コラボ / save の各セクションで MVP-quality か Google parity か.1.0 = production-ready、0.7 = beta、0.3 = α、0.0 = demo.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ScalabilityReviewer",
+        "persona": "あなたは scalability レビュアーです.選ばれた G (グリッドスケール) variant が 1000+ rows で 60fps を維持できるか.AIPL actor model + browser-abcl の制約下で.G3 virtualized 必須、G2 だと 2600 actor が actor scheduler に厳しい.1.0 = ≥10k cells smooth、0.7 = ≥1k、0.3 = ≥100、0.0 = ≤100.1 行で返答.",
+        "weight": 0.14285714285714285
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.05,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.25,
+    "implementability": 0.5
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "mvp2_minimal",
+      "gsheets_parity_first",
+      "collab_first",
+      "function_rich",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "mvp2_minimal": {},
+      "gsheets_parity_first": {},
+      "collab_first": {},
+      "function_rich": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}

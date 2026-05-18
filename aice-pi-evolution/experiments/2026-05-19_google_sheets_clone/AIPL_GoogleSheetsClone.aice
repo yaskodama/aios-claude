@@ -1,0 +1,181 @@
+// AIPL_GoogleSheetsClone.aice  (2026-05-19 draft, production target)
+//
+// Round 3 で WebSpreadsheet MVP (3x3, hardcoded formulas, browser
+// canvas) が動作した.本 round はそこから一気にスケールアップし、
+// **Google Sheets と同等の Web スプレッドシート** を目指す.
+//
+// 違い (MVP → 本物):
+//   - 3x3 → スクロールする 1000x26 (Z 列まで) 以上
+//   - hardcoded → ユーザがクリック+タイプで編集
+//   - SUM 1 関数 → 50+ 関数 (SUM/AVG/IF/COUNT/CONCAT/...)
+//   - A1 ref → 絶対参照 ($A$1) / 範囲 (A1:B10) / シート参照 (Sheet1!A1)
+//   - 1 シート → タブで複数シート
+//   - localStorage save → サーバ保存 + リアルタイム collab
+//
+// Round 3 までの確定軸 (本 round では所与として保持):
+//   T4 ActorPerCell + C1 ClientFull + S1 SingleUser + U2 Canvas_2D
+//   CA4 HybridSpawn + FE4 ActorEval + P3 DistCheckpoint
+//   R3 LayerComposite + PA4 LevelCPort + IT2 EventBus
+//
+// 本 round で探索する 6 軸 × 4 variant = 4096 cell:
+//   G グリッドスケール
+//   E 編集モデル
+//   F 関数セット
+//   R 参照モデル
+//   C コラボ/永続化
+//   U UI 完成度
+
+aice AIPL_GoogleSheetsClone {
+  dialect = "aice_evolution_v2";
+
+  task = "AIPL ランタイム (browser-abcl + JS-N + Py-I + WebSocket + DR-10 CRDT + DR-11 saga + DR-13 pool + CE-11 cap) の上に Google Sheets ライクなフル機能 Web スプレッドシートを実装する設計を採掘する.MVP は Round 3 で動作 (3x3, hardcoded formulas).本 round は (G スケール / E 編集 / F 関数セット / R 参照 / C コラボ / U UI) の 6 軸を各 4 variant 探索し、Excel/Google Sheets ユーザが違和感なく使える MVP-2 (≤2000 LOC 増分、Round 3 の +200% 以内) を 6-tuple として推薦.既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host smoke + 14 JS nextgen smoke + 71 abclc は absolute compat floor.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── G 軸: グリッドスケール ──
+    task G1_Fixed_10x10 {
+      spec = "10x10 固定. canvas に全描画.実装最簡だが Google Sheets には程遠い.見積もり 30-50 LOC.";
+    }
+    task G2_Dynamic_100x26 {
+      spec = "100x26 (1 画面分) 固定だがスクロール可能.virtualization 無し (全 cell actor 常駐). actor 数 2600 で AIPL 限界に近い.見積もり 100-150 LOC.";
+    }
+    task G3_VirtualizedInfinite {
+      spec = "Google Sheets 流の virtualization: viewport (~50x20 visible) だけ cell actor を spawn、scroll で actor を recycle.CA4 HybridSpawn の本領発揮.列ヘッダ A..Z..AA..AZ.見積もり 250-350 LOC.";
+    }
+    task G4_MultiSheetWorkbook {
+      spec = "G3 + 複数シート (タブ).各シートが独立 actor cluster、cross-sheet ref (Sheet1!A1) サポート.見積もり 400-500 LOC.";
+    }
+    // ── E 軸: 編集モデル ──
+    task E1_FormulaBarOnly {
+      spec = "上部 formula bar のみ.選択 cell を bar で編集、Enter で commit.実装簡単 (in-cell の座標計算不要).見積もり 80-120 LOC.";
+    }
+    task E2_InCellOverlay {
+      spec = "選択 cell の canvas 位置に <input> overlay.直接タイプで上書き.Excel/Sheets で最も自然な UX.見積もり 200-300 LOC.";
+    }
+    task E3_DualBarAndCell {
+      spec = "Formula bar + in-cell overlay の両方.bar で長い式、in-cell で簡易編集.bar と cell の同期が必要.見積もり 250-350 LOC.";
+    }
+    task E4_ModalEditor {
+      spec = "ダブルクリックで modal dialog が開いて編集.UX 重い.見積もり 100-150 LOC.";
+    }
+    // ── F 軸: 関数セット ──
+    task F1_ArithSumOnly {
+      spec = "Round 3 MVP のまま: 算術 + SUM のみ.Google Sheets 比較で大幅劣後.見積もり追加 LOC ~0.";
+    }
+    task F2_Core12 {
+      spec = "+ AVG, MIN, MAX, COUNT, COUNTA, IF, ROUND, FLOOR, CEIL, ABS, MOD, POWER.最小実用セット.見積もり 100-150 LOC (各 5-15 LOC).";
+    }
+    task F3_TextAndDate {
+      spec = "F2 + 文字列関数 (CONCAT, LEN, UPPER, LOWER, TRIM, SUBSTITUTE) + 日付関数 (TODAY, NOW, DATE, YEAR).見積もり 200-300 LOC.";
+    }
+    task F4_FullGSheetsParity {
+      spec = "F3 + VLOOKUP, INDEX, MATCH, SUMIF, COUNTIF, ARRAYFORMULA, etc. (50-200 関数).Google Sheets parity.見積もり 800-1500 LOC.";
+    }
+    // ── R 軸: 参照モデル ──
+    task R1_RelativeOnly {
+      spec = "A1 相対参照のみ.Round 3 MVP.見積もり 0 (既存).";
+    }
+    task R2_AbsoluteRelative {
+      spec = "+ $A$1 絶対参照, $A1 / A$1 半固定.copy/paste で behaviour 変わる.parser 拡張.見積もり 50-80 LOC.";
+    }
+    task R3_RangesAndCOL {
+      spec = "R2 + ranges (A1:B10), COL/ROW arithmetic (OFFSET, INDIRECT).SUM(A1:A10) など.parser + eval 拡張.見積もり 150-200 LOC.";
+    }
+    task R4_NamedAndCrossSheet {
+      spec = "R3 + 名前付き範囲 (`name_box`) + cross-sheet (Sheet1!A1).多シート前提.見積もり 200-300 LOC.";
+    }
+    // ── C 軸: コラボ/永続化 ──
+    task C1_LocalStorage {
+      spec = "localStorage 保存のみ.S1 SingleUser のまま.オフライン可能だが collab 無し.見積もり 50 LOC.";
+    }
+    task C2_ServerFile {
+      spec = "JS-N server の /api/sheet/save と /load.URL に sheet_id.オフライン編集 + 手動 sync.見積もり 150-200 LOC.";
+    }
+    task C3_WebSocketRealtime {
+      spec = "WebSocket で server 経由のリアルタイム同期.S4 ServerAuthoritative.既存 src/node-aipl-server/server.mjs の /ws を流用.見積もり 250-350 LOC.";
+    }
+    task C4_CRDTCollaborative {
+      spec = "DR-10 LWW-Register を per-cell + WebSocket でブロードキャスト.S2 CRDT-LWW.複数ユーザが同時編集可能.見積もり 350-500 LOC.";
+    }
+    // ── U 軸: UI 完成度 ──
+    task U1_BarePlusInput {
+      spec = "canvas + formula bar のみ.ボタンは Run/Stop のみ.見積もり 0 (Round 3 base).";
+    }
+    task U2_Toolbar {
+      spec = "+ ツールバー (Save / Load / Recompute / Undo / Redo).DR-11 saga を undo stack に流用.見積もり 200-300 LOC.";
+    }
+    task U3_FormatMenu {
+      spec = "U2 + cell format menu (number / date / currency / percent).cell 値に format string を attach.見積もり 250-350 LOC.";
+    }
+    task U4_ChartsAndSort {
+      spec = "U3 + chart 挿入 (棒/折れ線/円) + 範囲 sort/filter.見積もり 600-900 LOC.";
+    }
+    // ── 横断的タスク ──
+    task RoundCompat {
+      spec = "Round 1-3 で確定した 10 軸 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) と矛盾しない.S1→C2/C3/C4 への昇格は OK (round 1 の段階的 collab 戦略どおり).";
+    }
+    task BackwardCompat {
+      spec = "既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host + 14 JS nextgen + 71 abclc が無修正で動作.全機能 opt-in (新 URL / 新 endpoint / 新 dir).";
+    }
+    task ImplCostEstimate {
+      spec = "選ばれた 6-tuple の LOC 増分合計 (Round 3 base から).1.0 = ≤800、0.7 = ≤1500、0.3 = ≤2500、0.0 = >2500.MVP-2 を 1-2 セッションで実装可能なボリューム.";
+    }
+    task GoogleSheetsParity {
+      spec = "Google Sheets ユーザが「これは Sheets だ」と認識する core features の完備度.1.0 = ≥80% parity、0.7 = ≥50% (基本+一部高度)、0.3 = MVP のまま、0.0 = 認識されない.";
+    }
+    task AIPLInfraReuse {
+      spec = "選ばれた 6-tuple が既存 AIPL infra (DR-4 checkpoint, DR-10 CRDT, DR-11 saga, DR-13 pool, CE-11 cap, Level-A eval, WebSocket, HMAC URL) をどれだけ再利用.1.0 = ≥5 件、0.7 = 3-4、0.3 = 1-2、0.0 = 全部新規.";
+    }
+  }
+
+  // 探索軸 (round 1=state_repr×concurrency, 2=type_safety×ownership,
+  // 3=paradigm×effect の既存軸を避けて、最大限多様な ownership 軸を再利用).
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "ownership_model, effect_handling";
+    generations = 6;     // 短く (前 round の OpenAI throttle 教訓を踏まえ縮小)
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 19951031;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.05;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.25;
+    implementability      = 0.50;   // MVP-2 として実装可能性最重視
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["mvp2_minimal", "gsheets_parity_first", "collab_first", "function_rich", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer GoogleSheetsParityReviewer {
+      persona = "あなたは Google Sheets parity レビュアーです.選ばれた 6-tuple が Sheets の core UX (スクロールするグリッド / クリック+タイプで編集 / formula bar / 多数の関数 / 絶対参照 + 範囲 / ファイル保存) のどれだけをカバーするか.1.0 = 80% 以上、0.7 = 50% 以上 (基本+一部高度)、0.3 = MVP のまま、0.0 = 認識されない.1 行で返答.";
+    }
+    reviewer ImplCostEstimator {
+      persona = "あなたは MVP-2 実装コスト見積もりレビュアーです.選ばれた 6-tuple の LOC 増分合計 (Round 3 base から).Round 3 は 900 LOC で 5 phase 完了.1.0 = ≤800、0.7 = ≤1500、0.3 = ≤2500、0.0 = >2500.1 行で返答.";
+    }
+    reviewer RoundConsistencyReviewer {
+      persona = "あなたは Round 1-3 整合性レビュアーです.既決定 10 軸 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) と矛盾しないか.S1 → C2/C3/C4 への collab 昇格は Round 1 の段階的拡張戦略どおりで OK.1.0 = 完全整合、0.7 = 軽微逸脱、0.3 = 主要逸脱、0.0 = 矛盾.1 行で返答.";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換レビュアーです.既存 27 spreadsheet + 30 Py-I nextgen + 47 self-host + 14 JS nextgen + 71 abclc smoke が無修正で動作するか.新機能は全て opt-in (新 URL / 新 endpoint / 新 dir).1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.";
+    }
+    reviewer InfraReuseReviewer {
+      persona = "あなたは既存 AIPL infra 再利用レビュアーです.選ばれた 6-tuple が以下の何個を活用するか: DR-4 checkpoint / DR-10 LWW / DR-11 saga / DR-13 pool / CE-11 cap / Level-A eval / WebSocket / HMAC URL.1.0 = ≥5 件、0.7 = 3-4、0.3 = 1-2、0.0 = 全部新規.1 行で返答.";
+    }
+    reviewer ProductionUXReviewer {
+      persona = "あなたは production UX レビュアーです.選ばれた 6-tuple で実際に使えるレベルか.スクロール / 編集 / 関数 / コラボ / save の各セクションで MVP-quality か Google parity か.1.0 = production-ready、0.7 = beta、0.3 = α、0.0 = demo.1 行で返答.";
+    }
+    reviewer ScalabilityReviewer {
+      persona = "あなたは scalability レビュアーです.選ばれた G (グリッドスケール) variant が 1000+ rows で 60fps を維持できるか.AIPL actor model + browser-abcl の制約下で.G3 virtualized 必須、G2 だと 2600 actor が actor scheduler に厳しい.1.0 = ≥10k cells smooth、0.7 = ≥1k、0.3 = ≥100、0.0 = ≤100.1 行で返答.";
+    }
+  }
+}

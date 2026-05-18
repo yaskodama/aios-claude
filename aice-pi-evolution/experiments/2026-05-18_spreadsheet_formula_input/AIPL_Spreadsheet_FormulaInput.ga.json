@@ -1,0 +1,150 @@
+{
+  "name": "AIPL_Spreadsheet_FormulaInput",
+  "task": "Round 3 で動作する WebSpreadsheet MVP (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2 で 27/27 smoke PASS) に、ブラウザ画面から数式を入力できる機能を追加するための最適設計を探索する.5 軸 (I 入力 / P parse / T recompute / C cycle 検出 / E エラー表示) 各 4 variant の中から (I, P, T, C, E) 5-tuple を MAP-Elites で採掘.既存 27 smoke + 既存 46 nextgen sample + 47 self-host smoke が無修正で動作する後方互換は absolute floor.実装 LOC 増分は ≤500 LOC (round 3 の MVP +20% 以内).",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm",
+      "effect_handling"
+    ],
+    "generations": 8,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 23456789
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "I1_FormulaBarSingle",
+      "I2_InCellInput",
+      "I3_KeyboardShortcut",
+      "I4_DOMTableOverlay",
+      "P1_BrowserParser",
+      "P2_ServerParseEval",
+      "P3_HybridLexClientParseServer",
+      "P4_PreParseOnSubmit",
+      "T1_OnKeystroke",
+      "T2_OnCommit",
+      "T3_ExplicitButton",
+      "T4_DirtyFlagIdleCb",
+      "C1_DepthLimit",
+      "C2_TopologicalUpfront",
+      "C3_MarkSweep",
+      "C4_TarjanSCC",
+      "E1_RedText",
+      "E2_TooltipHover",
+      "E3_LogPanel",
+      "E4_BorderHighlight",
+      "RoundCompat",
+      "BackwardCompat",
+      "TotalImplCost",
+      "ExcelLikeUX",
+      "ImplementabilityInOneSession"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "PinnedRound3Reviewer",
+        "persona": "あなたは round 1-3 pinning レビュアーです.既決定 10 軸 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) に矛盾しない 5-tuple を高評価.特に I4 DOMTableOverlay は U2 Canvas を投げ捨てるので penalty -0.3.1.0 = 完全整合、0.0 = 矛盾.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "InputUXReviewer",
+        "persona": "あなたは入力 UX レビュアーです.I1 formula bar / I2 in-cell input / I3 F2 shortcut / I4 DOM table のうち、Excel/Sheets ユーザの mental model に最も合うものを高評価.MVP では simplicity > completeness.1.0 = 直感的、0.7 = ok、0.3 = 違和感、0.0 = 不適.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ParserLocationReviewer",
+        "persona": "あなたは parse 場所レビュアーです.既存 self-host Level-C parser + Py-I StringFormulaSheet の PA4 parser がそのまま使えるか.P1 browser inline / P2 server / P3 hybrid / P4 pre-parse-on-submit のうち、既存資産の再利用が最大の variant を高評価.1.0 = 既存 parser 完全再利用、0.7 = 多少修正、0.3 = 部分新規、0.0 = 完全新規.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "RecomputeUXReviewer",
+        "persona": "あなたは再計算 UX レビュアーです.T1 onKeystroke / T2 onCommit / T3 button / T4 dirty-flag のうち、Excel-like UX と performance のバランスが最良.1.0 = ベスト UX、0.7 = ok、0.3 = いまいち、0.0 = 不適.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "CycleDetectionReviewer",
+        "persona": "あなたは cycle 検出設計レビュアーです.C1 depth-limit / C2 topological / C3 mark-sweep / C4 Tarjan-SCC のうち、AIPL actor model での実装容易性 + ユーザへの情報量のバランスが良い variant.1.0 = ベスト、0.7 = 良、0.3 = 妥協、0.0 = 不適.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "ImplCostEstimator",
+        "persona": "あなたは実装コスト見積もりレビュアーです.選ばれた 5-tuple 合計 LOC 増分.先行 round-3 が +900 LOC で 5 phase 完了したことを踏まえる.1.0 = ≤300、0.7 = ≤500、0.3 = ≤800、0.0 = >800.1 行で返答.",
+        "weight": 0.14285714285714285
+      },
+      {
+        "name": "BackwardCompatReviewer",
+        "persona": "あなたは後方互換レビュアーです.既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host + 14 JS nextgen + 71 abclc が無修正で動作するか.全て opt-in (新 dir / 新 endpoint / 新 URL query) で発火.1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.",
+        "weight": 0.14285714285714285
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.05,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.25,
+    "implementability": 0.5
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "mvp_minimal",
+      "excel_familiar",
+      "live_preview",
+      "offline_first",
+      "balanced"
+    ],
+    "scenario_weights": {
+      "mvp_minimal": {},
+      "excel_familiar": {},
+      "live_preview": {},
+      "offline_first": {},
+      "balanced": {}
+    },
+    "top_k": 5
+  }
+}

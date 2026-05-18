@@ -1,0 +1,165 @@
+// AIPL_Spreadsheet_FormulaInput.aice  (2026-05-18 draft, round 4 follow-on)
+//
+// Round 1-3 で WebSpreadsheet MVP の design+impl が確定し、
+// Phase 4 で 3x3 sheet が browser 内で render される所まで到達.
+// しかし現状は formulas が `spreadsheet.abcl` に hardcoded されており、
+// ユーザは画面から数式を入力できない.
+//
+// Round 4 (本仕様) は **runtime formula input** を導入する設計
+// 探索.5 つの直交軸を 4 variant ずつ並べ、4^5 = 1024 cell の
+// 組合せ空間から MAP-Elites でベスト 5-tuple を採掘する.
+//
+// 前提条件 (round 1-3 の固定収束):
+//   T4 ActorPerCell + C1 ClientFull + S1 SingleUser + U2 Canvas_2D
+//   CA4 HybridSpawn + FE4 ActorEval + P3 DistCheckpoint +
+//   R3 LayerComposite + PA4 LevelCPort + IT2 EventBus
+//
+// 新規軸:
+//   I 入力モダリティ (どう入力する?)
+//   P parse 場所 (どこで lex/parse する?)
+//   T 再計算トリガ (いつ recompute する?)
+//   C 循環参照検出 (どう cycle を弾く?)
+//   E エラー表示 (どう失敗を見せる?)
+
+aice AIPL_Spreadsheet_FormulaInput {
+  dialect = "aice_evolution_v2";
+
+  task = "Round 3 で動作する WebSpreadsheet MVP (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2 で 27/27 smoke PASS) に、ブラウザ画面から数式を入力できる機能を追加するための最適設計を探索する.5 軸 (I 入力 / P parse / T recompute / C cycle 検出 / E エラー表示) 各 4 variant の中から (I, P, T, C, E) 5-tuple を MAP-Elites で採掘.既存 27 smoke + 既存 46 nextgen sample + 47 self-host smoke が無修正で動作する後方互換は absolute floor.実装 LOC 増分は ≤500 LOC (round 3 の MVP +20% 以内).";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  evaluation_tasks {
+    // ── I 軸: 入力モダリティ ──
+    task I1_FormulaBarSingle {
+      spec = "canvas 下に 1 つの text input を置く.ユーザは選択中の cell を text input で編集.Enter で commit.Excel の formula bar UX に近い.見積もり 80-120 LOC (HTML + event bus).";
+    }
+    task I2_InCellInput {
+      spec = "選択 cell の位置に <input> を canvas overlay として配置.直接 typing で編集.実 sheet UX に最も近いが、座標計算とフォーカス管理が複雑.見積もり 200-300 LOC.";
+    }
+    task I3_KeyboardShortcut {
+      spec = "F2 で formula bar を開く / Esc で閉じる.キーボード中心の UX (Excel/vim 流).input は canvas 外の floating panel.見積もり 150-200 LOC.";
+    }
+    task I4_DOMTableOverlay {
+      spec = "canvas を捨て、HTML <table> + contenteditable で UI を組み直す.canvas は visual layer のみに保持、HTML table が input layer.UX 完成度高い、ただし round 1 で U2 Canvas を選択した方針からは逸脱.見積もり 300-400 LOC.";
+    }
+    // ── P 軸: parse 場所 ──
+    task P1_BrowserParser {
+      spec = "browser-abcl の `spreadsheet.abcl` 内に PA4 LevelCPort parser を inline 配置.parse + eval 全て client-side、JS-N 不要.オフライン可能.見積もり parser 自体 ~250 LOC, integration 50 LOC.";
+    }
+    task P2_ServerParseEval {
+      spec = "JS-N (node-aipl-server) に POST /api/spreadsheet/eval を生やし、formula string を渡すと AST + 評価値を返す.既存 Py-I の StringFormulaSheet.abcl の parser を再利用、browser 側は thin.見積もり server 50 LOC, client 30 LOC.";
+    }
+    task P3_HybridLexClientParseServer {
+      spec = "client で lex (高速), server で parse + eval.余計な round-trip があるが、unparseable な input を早期検出可能.見積もり 200 LOC.";
+    }
+    task P4_PreParseOnSubmit {
+      spec = "input typing 中は raw string、Enter で submit したときだけ client parser が走り、AST が actor に流れる.parser コストを最小化.見積もり parser 250 LOC, integration 30 LOC.";
+    }
+    // ── T 軸: 再計算トリガ ──
+    task T1_OnKeystroke {
+      spec = "1 文字打つ度に全 cell recompute.Live preview UX.重い formula で UI 重くなりがち.見積もり 30-50 LOC.";
+    }
+    task T2_OnCommit {
+      spec = "Enter / blur (focus 外し) で recompute.Excel 流.シンプル、信頼性高い.見積もり 50-80 LOC.";
+    }
+    task T3_ExplicitButton {
+      spec = "「Recompute」ボタンを設置し、明示クリックで再計算.デバッグ用には良いが UX として弱い.見積もり 30 LOC.";
+    }
+    task T4_DirtyFlagIdleCb {
+      spec = "dirty cells を mark し、requestIdleCallback / setTimeout(0) で batch 再計算.Live preview と performance のバランス.見積もり 100-150 LOC.";
+    }
+    // ── C 軸: 循環参照検出 ──
+    task C1_DepthLimit {
+      spec = "eval の再帰深さに limit (例: 1000).超えたら `#CYCLE!` エラー.シンプル、ただし limit に当たっただけの正常 formula も誤検出可能.見積もり 20-40 LOC.";
+    }
+    task C2_TopologicalUpfront {
+      spec = "commit 時に依存グラフを構築し、topological sort 実行.cycle があれば commit を拒否.Excel と同じ流儀.見積もり 100-150 LOC.";
+    }
+    task C3_MarkSweep {
+      spec = "eval 中に `_visiting` set を保持し、入った cell に既存 mark あれば cycle 判定.実装シンプル、ランタイム発見.見積もり 50-80 LOC.";
+    }
+    task C4_TarjanSCC {
+      spec = "Tarjan の strongly-connected components で cycle component を集合として検出.error reporting で「どの cells が cycle に絡んでいるか」を明示できる.見積もり 150-200 LOC.";
+    }
+    // ── E 軸: エラー表示 ──
+    task E1_RedText {
+      spec = "失敗した cell に赤文字で `#ERR!` を表示.Excel/Sheets 流.見積もり 20-30 LOC (renderer 修正).";
+    }
+    task E2_TooltipHover {
+      spec = "cell hover でツールチップにエラー詳細表示.UX 上等だが mouse 座標ヒットテストが必要.見積もり 80-120 LOC.";
+    }
+    task E3_LogPanel {
+      spec = "side panel にエラーログを stream 表示.デバッグ向き、すべてのエラーが残る.見積もり 50-80 LOC.";
+    }
+    task E4_BorderHighlight {
+      spec = "失敗 cell の border を赤色に.値はそのまま表示.subtle、UI clutter なし.見積もり 30-50 LOC.";
+    }
+    // ── 横断的タスク ──
+    task RoundCompat {
+      spec = "Round 1-3 の選定 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) と矛盾しない.特に I4 DOMTableOverlay は U2 Canvas を投げ捨てるので penalty.";
+    }
+    task BackwardCompat {
+      spec = "既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host + 14 JS nextgen smoke + 71 abclc が無修正で動作.spreadsheet 拡張は全て新 dir / 新 endpoint で opt-in.";
+    }
+    task TotalImplCost {
+      spec = "5 variant 合計 LOC 増分 (parser を再使用するか新規実装するかで大きく変動).1.0 = ≤300、0.7 = ≤500、0.3 = ≤800、0.0 = >800.";
+    }
+    task ExcelLikeUX {
+      spec = "Excel/Google Sheets ユーザが違和感なく使えるか.formula bar の有無、Enter で commit、F2 で edit mode などの conventional UX.";
+    }
+    task ImplementabilityInOneSession {
+      spec = "選ばれた 5-tuple が 1 セッション (~1 時間) で実装可能か.5 phase の round-3 と類似の incremental 進め方が可能か.";
+    }
+  }
+
+  search {
+    algorithm   = "map_elites";
+    // round 1 で `state_representation × concurrency_model`、
+    // round 2 で `type_safety × ownership_model` を使ったので、
+    // round 4 は残った schema 軸 `paradigm × effect_handling` を使う.
+    cell_axes   = "paradigm, effect_handling";
+    generations = 8;
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 23456789;
+  }
+
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.05;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.25;
+    implementability      = 0.50;   // ← MVP コスト重視 (round 2 と同じ)
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["mvp_minimal", "excel_familiar", "live_preview", "offline_first", "balanced"];
+    top_k     = 5;
+  }
+
+  reviewers {
+    reviewer PinnedRound3Reviewer {
+      persona = "あなたは round 1-3 pinning レビュアーです.既決定 10 軸 (T4/C1/S1/U2 + CA4/FE4/P3/R3/PA4/IT2) に矛盾しない 5-tuple を高評価.特に I4 DOMTableOverlay は U2 Canvas を投げ捨てるので penalty -0.3.1.0 = 完全整合、0.0 = 矛盾.1 行で返答.";
+    }
+    reviewer InputUXReviewer {
+      persona = "あなたは入力 UX レビュアーです.I1 formula bar / I2 in-cell input / I3 F2 shortcut / I4 DOM table のうち、Excel/Sheets ユーザの mental model に最も合うものを高評価.MVP では simplicity > completeness.1.0 = 直感的、0.7 = ok、0.3 = 違和感、0.0 = 不適.1 行で返答.";
+    }
+    reviewer ParserLocationReviewer {
+      persona = "あなたは parse 場所レビュアーです.既存 self-host Level-C parser + Py-I StringFormulaSheet の PA4 parser がそのまま使えるか.P1 browser inline / P2 server / P3 hybrid / P4 pre-parse-on-submit のうち、既存資産の再利用が最大の variant を高評価.1.0 = 既存 parser 完全再利用、0.7 = 多少修正、0.3 = 部分新規、0.0 = 完全新規.1 行で返答.";
+    }
+    reviewer RecomputeUXReviewer {
+      persona = "あなたは再計算 UX レビュアーです.T1 onKeystroke / T2 onCommit / T3 button / T4 dirty-flag のうち、Excel-like UX と performance のバランスが最良.1.0 = ベスト UX、0.7 = ok、0.3 = いまいち、0.0 = 不適.1 行で返答.";
+    }
+    reviewer CycleDetectionReviewer {
+      persona = "あなたは cycle 検出設計レビュアーです.C1 depth-limit / C2 topological / C3 mark-sweep / C4 Tarjan-SCC のうち、AIPL actor model での実装容易性 + ユーザへの情報量のバランスが良い variant.1.0 = ベスト、0.7 = 良、0.3 = 妥協、0.0 = 不適.1 行で返答.";
+    }
+    reviewer ImplCostEstimator {
+      persona = "あなたは実装コスト見積もりレビュアーです.選ばれた 5-tuple 合計 LOC 増分.先行 round-3 が +900 LOC で 5 phase 完了したことを踏まえる.1.0 = ≤300、0.7 = ≤500、0.3 = ≤800、0.0 = >800.1 行で返答.";
+    }
+    reviewer BackwardCompatReviewer {
+      persona = "あなたは後方互換レビュアーです.既存 27 spreadsheet smoke + 30 Py-I nextgen + 47 self-host + 14 JS nextgen + 71 abclc が無修正で動作するか.全て opt-in (新 dir / 新 endpoint / 新 URL query) で発火.1.0 = 完全 opt-in、0.7 = 1-2 軽微、0.3 = 多数影響、0.0 = 致命的.1 行で返答.";
+    }
+  }
+}
