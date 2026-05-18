@@ -206,9 +206,29 @@ class Spawn:
     args: List[Expr]
 
 
+@dataclass
+class SelectCase:
+    """One arm of a `select { case method(p1, p2) -> { body } }`.
+    `params` are the variable names that get bound to the matched
+    message's arg values when the actor's mailbox yields a method
+    call of that name and arity."""
+    method: str
+    params: List[str]
+    body: 'Block'
+
+@dataclass
+class SelectStmt:
+    """Erlang-style mailbox receive — see grammar comment for
+    `select_stmt`.  `timeout_ms` is None for an unbounded wait;
+    `timeout_body` is the block run when the wait elapses."""
+    cases: List[SelectCase]
+    timeout_ms: Optional[int]
+    timeout_body: Optional['Block']
+
+
 Stmt = Union[
     VarDecl, VarNew, Assign, Send, CallStmt,
-    If, While, Become, Block, Scope,
+    If, While, Become, Block, Scope, SelectStmt,
 ]
 
 

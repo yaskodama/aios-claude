@@ -13,7 +13,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall, Scope,
+    NowCall, FutureCall, Scope, SelectStmt, SelectCase,
 )
 
 
@@ -176,6 +176,31 @@ class _Builder(Transformer):
     @v_args(inline=False)
     def scope_stmt(self, stmts):
         return Scope(Block(list(stmts)))
+
+    # Erlang-style mailbox receive — see grammar.lark / aipl_ast.SelectStmt.
+    @v_args(inline=False)
+    def select_params(self, names):
+        return [str(n) for n in names]
+
+    def select_case(self, method, params, *body_stmts):
+        return SelectCase(str(method), list(params), Block(list(body_stmts)))
+
+    def select_timeout(self, ms, *body_stmts):
+        return (int(ms), Block(list(body_stmts)))
+
+    @v_args(inline=False)
+    def select_stmt(self, items):
+        # `items` is a list of SelectCase nodes possibly followed by a
+        # single (ms, Block) tuple from select_timeout (or nothing).
+        cases = []
+        timeout_ms = None
+        timeout_body = None
+        for x in items:
+            if isinstance(x, SelectCase):
+                cases.append(x)
+            elif isinstance(x, tuple) and len(x) == 2:
+                timeout_ms, timeout_body = x
+        return SelectStmt(cases, timeout_ms, timeout_body)
 
     @v_args(inline=False)
     def block(self, stmts):

@@ -109,6 +109,7 @@ global_stmt: var_new_stmt
      | become_stmt
      | return_stmt
      | scope_stmt
+     | select_stmt
      | block
 
 return_stmt: "return" expr ";"   -> return_value
@@ -135,6 +136,18 @@ become_stmt: "become" NAME "(" args ")" ";"
 // expression evaluated inside a scope is registered on the scope's
 // join-set automatically.
 scope_stmt: "scope" "{" stmt* "}"           -> scope_stmt
+
+// `select { case method(args) -> { stmts } ... timeout NNN -> { stmts } }`
+// — Erlang-style mailbox receive.  Scans the actor's mailbox for the
+// first message whose method name + arity matches one of the cases,
+// binds the param names from the matched message, and runs the case
+// body.  `timeout NNN` (milliseconds) is optional; without it the
+// statement blocks until a matching message arrives.  Mirrors the
+// OCaml `select` (parser.mly select_cases / select_pat / select_timeout).
+select_stmt: "select" "{" select_case* select_timeout? "}"      -> select_stmt
+select_case: "case" NAME "(" select_params ")" "->" "{" stmt* "}"  -> select_case
+select_params: (NAME ("," NAME)*)?
+select_timeout: "timeout" INT "->" "{" stmt* "}"                -> select_timeout
 
 block: "{" stmt* "}"
 

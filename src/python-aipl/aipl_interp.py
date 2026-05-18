@@ -18,7 +18,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall, Scope, Spawn,
+    NowCall, FutureCall, Scope, Spawn, SelectStmt, SelectCase,
 )
 from aipl_runtime import Actor, Future, Scheduler
 
@@ -681,8 +681,78 @@ class Interpreter:
             self._do_scope(s, frame)
         elif kind is Spawn:
             self._do_spawn(s.target, s.method, s.args, frame)
+        elif kind is SelectStmt:
+            self._do_select(s, frame)
         else:
             raise RuntimeError(f"unknown stmt: {s!r}")
+
+    def _do_select(self, s: 'SelectStmt', frame: Frame):
+        """Erlang-style mailbox receive — mirrors OCaml eval_thread.ml
+        Select handler.  Drains the calling actor's mailbox, scans for
+        a message whose method name + arity matches one of the case
+        arms, binds the params and runs the matched case body.  Non-
+        matching messages are re-queued (FIFO preserved).  If no match
+        is found within `timeout_ms` milliseconds, runs `timeout_body`
+        if present; otherwise blocks indefinitely.
+        """
+        import time
+        actor = frame.actor
+        if actor is None:
+            # `select` outside any actor body (e.g. used at top-level).
+            # There's no mailbox to drain — just take the timeout arm.
+            if s.timeout_body is not None:
+                self.exec_block(s.timeout_body, frame)
+            return
+
+        start = time.monotonic()
+        timeout_s = (s.timeout_ms / 1000.0) if s.timeout_ms is not None else None
+
+        while True:
+            drained = actor.mailbox.drain()
+            matched_idx = None
+            matched_case = None
+            for i, m in enumerate(drained):
+                method_name, m_args, _sender, _msg_id, _reply_future = m
+                for case in s.cases:
+                    if case.method == method_name and len(case.params) == len(m_args):
+                        matched_idx = i
+                        matched_case = case
+                        break
+                if matched_idx is not None:
+                    break
+
+            if matched_idx is not None:
+                # Re-queue everything except the matched message (FIFO).
+                for j, m in enumerate(drained):
+                    if j != matched_idx:
+                        actor.mailbox.put(m)
+                # The matched message is consumed here without going
+                # through Actor._run — manually decrement the outstanding
+                # counter so wait_idle still terminates correctly.
+                actor.scheduler.message_done()
+
+                # Bind the matched-message args and run the case body in
+                # a child frame.  We deliberately keep `frame.sender` as
+                # the outer message's sender (OCaml does likewise — the
+                # select handler does not overwrite actor.last_sender).
+                _, m_args, _, _, _ = drained[matched_idx]
+                child = Frame(actor=actor, sender=frame.sender, parent=frame)
+                for pname, pval in zip(matched_case.params, m_args):
+                    child.locals[pname] = pval
+                self.exec_block(matched_case.body, child)
+                return
+
+            # No match — push everything back in the original order.
+            for m in drained:
+                actor.mailbox.put(m)
+
+            if timeout_s is not None and (time.monotonic() - start) >= timeout_s:
+                if s.timeout_body is not None:
+                    self.exec_block(s.timeout_body, frame)
+                return
+
+            # Don't spin — yield to other actor threads.
+            time.sleep(0.02)
 
     def _do_scope(self, scope: 'Scope', frame: Frame):
         """Phase 17: enter a structured-concurrency scope.  Spawns
