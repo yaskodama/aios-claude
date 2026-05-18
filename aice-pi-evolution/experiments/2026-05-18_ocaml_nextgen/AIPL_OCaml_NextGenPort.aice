@@ -1,0 +1,120 @@
+// AIPL_OCaml_NextGenPort.aice  (2026-05-18 draft)
+//
+// Series: AIPL bootstrap v2, sub-experiment (5) — port Py-I's
+// "next-gen" feature set (CE-10〜13 + DR-10〜13) to the OCaml AIPL
+// runtime.  All 8 features are already shipping in Py-I from the
+// `AIPL_PyI_NextGen.aice` MAP-Elites rounds 1+2 (commits 3edfa30,
+// adb57a0, c045095, baaa653, fc2dc04, 3a7aae7); the porting target
+// is OCaml's `src/aipl_dist.ml` (590 LOC) + `refinement.ml` (189
+// LOC) + `infer.ml` (773 LOC) + `eval_thread.ml` (1820 LOC) +
+// `repl_thread.ml`.
+//
+// Direct-translation lineage (already verified at this scale):
+//   - Phase O      (OCaml 18 CE/DR features, ~1305 LOC)
+//   - Phase O-3    (3 send/select fixes both ways, ~95 LOC OCaml +
+//                   ~97 LOC Py-I + ~134 LOC `select` syntax)
+//   - This run     (8 next-gen features → OCaml, target ~600-900 LOC)
+//
+// Each Py-I feature has a clear OCaml landing zone (see below).
+// MAP-Elites here is mostly about ordering / batching the 8
+// translations — the design space is narrow because the Py-I
+// implementation is the ground truth.
+
+aice AIPL_OCaml_NextGenPort {
+  dialect = "aice_evolution_v2";
+
+  task = "Py-I (Python 型推論) AIPL に実装済の 8 個の次世代機能 (CE-10 effect inference / CE-11 capability types / CE-12 refinement unification / CE-13 record subtyping / DR-10 CRDT state / DR-11 saga / DR-12 multi-region / DR-13 auto-scaling pool) を OCaml AIPL に直訳する。各機能は Py-I で 50〜170 行で実装済 (合計 ~700 行) で OCaml にも対応物がある (aipl_dist.ml / refinement.ml / infer.ml / eval_thread.ml)。Phase O / Phase O-3 / Round 1+2 で確立された 1 セッション 30-45 分 × 数機能の直訳パターンに従う。MAP-Elites で実装順序とバッチサイズを探索し、後方互換 hard floor (既存 75/75 abclc smoke + 39 o2_typeinf/o1_distributed smoke) を維持する。";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  // ── 評価タスク群 (8 個の機能 + 3 個の cross-cutting) ──
+  evaluation_tasks {
+    // ── 型推論軸 (CE-10〜13) ──
+    task PortEffectInference {
+      spec = "Py-I の `aipl_inference._collect_effects_from_ast` を OCaml `infer.ml` に直訳。OCaml の Phase 12 effect machinery は既に effect annotation を AST に持つ (`Ast.method_decl.effects: string list option`)。primitive ごとの BUILTIN_EFFECTS 相当テーブルを `infer.ml` に持ち、method body 走査時に accumulate。`InferenceResult` に effects フィールドを追加し --infer 出力に反映。見込み 50-80 行。";
+    }
+    task PortCapabilityTypes {
+      spec = "Py-I の TLS capability set + 5 prim (grant_cap/revoke_cap/has_cap/current_caps/check_capability) を OCaml `aipl_dist.ml` に直訳。OCaml には既に TLS パターン (set_current_actor / get_current_actor) があるので同形写像可。`AIPL_CAP_GRANT` / `AIPL_CAP_STRICT` env var で seed + 強制モード。見込み 80-120 行 (aipl_dist 100 + interp/repl prim wire 20)。";
+    }
+    task PortRefinementUnification {
+      spec = "Py-I の `_refine_subset_z3(P_sub, P_sup)` を OCaml `refinement.ml` に追加。OCaml の Refinement は既に SMT-LIB 2 + Z3 CLI backend を持つので、P_actual ∧ ¬P_expected を build → run_z3_check で UNSAT 判定。unify 時に AIPL_REFINE_UNIFY=1 で early-flag。見込み 60-100 行 (refinement.ml 50 + infer.ml 30)。";
+    }
+    task PortRecordSubtyping {
+      spec = "Py-I の `unify` record arm を intersection-based に緩和した変更を OCaml `infer.ml` の TRecord unify (Types.unify_record) に同等適用。1 関数の数行修正で済む可能性。見込み 10-30 行。";
+    }
+    // ── 分散軸 (DR-10〜13) ──
+    task PortCRDTState {
+      spec = "Py-I の G-Counter / OR-Set / LWW-Register + crdt_replicate (15 prim) を OCaml `aipl_dist.ml` に直訳。OCaml の Hashtbl と record で表現可。JSON serialize/restore は既存 save_actor_state / restore_actor_state パターンと整合。見込み 200-280 行 (dist 180 + interp wire 30 + 各 prim 10)。";
+    }
+    task PortSagaOrchestration {
+      spec = "Py-I の saga 文 (grammar 拡張 + AST + parser + _do_saga) を OCaml に直訳。OCaml の parser.mly に saga_stmt + saga_step + saga_block を追加 (Phase O-3 で select 文を追加した経験あり)。`Ast` に SagaStmt + SagaStep。`eval_thread.eval_stmt` の Select arm 後ろに Saga arm。Forward run + LIFO compensate-on-failure。見込み 150-220 行 (parser 25 + ast 15 + eval 100 + smoke samples)。";
+    }
+    task PortMultiRegionFailover {
+      spec = "Py-I の AIPL_REGION + per-region route + failover_region chain walk (5 prim) を OCaml `aipl_dist.ml` に直訳。既存 route_for / parse_route_table を per-region 化。`AIPL_ROUTE_REGION_<name>` env var をパース。region_failover / region_failover_failed events。見込み 80-130 行 (dist 70 + interp wire 25)。";
+    }
+    task PortAutoScalingPool {
+      spec = "Py-I の Pool record (members/min/max/target/callbacks) + hysteresis logic + 4 prim を OCaml `aipl_dist.ml` に直訳。OCaml は既に Thread.create で per-actor thread を立てるので spawn_cb は eval_thread.spawn_actor へのコールバック、retire は Stop シグナル、qlen は Queue.length。見込み 130-180 行 (dist 110 + interp wire 40)。";
+    }
+    // ── cross-cutting ──
+    task BackwardCompatExisting {
+      spec = "既存 75/75 abclc smoke + 39/39 o2_typeinf/o1_distributed smoke + Phase 13 Channels / Phase 17 Scope などの complex samples が無変更で動作。新機能は全て opt-in (`AIPL_DIST_ENABLE=1` + 機能別 env var) で発火。";
+    }
+    task PyIParity {
+      spec = "OCaml 側と Py-I 側で同一の .abcl ソースが同じ観測結果を出す (mock provider 越し)。CE-* 系は --infer 出力の effects / 型表示が同等。DR-* 系は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での Py-A vs OCaml の同等性 (18/18 mirror) と同様。";
+    }
+    task ImplCostBudget {
+      spec = "8 機能合計 800 行以内 (Py-I 合計 ~700 行 + OCaml syntax overhead で +15%)。最も難い PortSaga (grammar) と PortCRDT (大規模 data structures) で全体の 50% を占める想定。AST / parser 修正は parser.mly + ast.ml の 2 ファイルのみ。";
+    }
+  }
+
+  // ── 探索パラメタ ──
+  // 軸選択は Py-I round-2 で機能した `effect_handling × concurrency_model`
+  // をそのまま再利用。同じ cell ラベルが OCaml port にも当てはまるかを
+  // LLM 評価で確認できる。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "effect_handling, concurrency_model";
+    generations = 6;
+    seed_count  = 6;
+    open_axes   = false;
+    rng_seed    = 31415934;
+  }
+
+  // ── meta fitness 配分 ──
+  meta_fitness {
+    trend_alignment       = 0.05;
+    frontier_coverage     = 0.10;
+    novelty               = 0.05;
+    evolvability          = 0.10;
+    cross_task_generality = 0.20;
+    implementability      = 0.50;
+  }
+
+  ranking {
+    strategy  = "pareto_then_pairwise";
+    scenarios = ["balanced", "type_first", "dist_first", "impl_cost_first"];
+    top_k     = 5;
+  }
+
+  // ── レビュアー (LLM persona) ──
+  reviewers {
+    reviewer TypeImplFeasibility {
+      persona = "あなたは OCaml 型推論実装可能性レビュアーです。CE-10 / CE-11 / CE-12 / CE-13 の OCaml への直訳が `infer.ml` (773 行) と `refinement.ml` (189 行) にどの程度の追加で組み込めるかを評価。Py-I 同等実装は合計 ~250 行で済んだので OCaml も同等規模が target。1.0 = ≤200 行 + 既存 unify を破壊しない、0.7 = ≤350 行、0.3 = ≤500 行、0.0 = type system 再設計レベル。'OK: <根拠>' / 'NG: <欠落>' の 1 行返答。";
+    }
+    reviewer DistImplFeasibility {
+      persona = "あなたは OCaml 分散ランタイム実装可能性レビュアーです。DR-10 / DR-11 / DR-12 / DR-13 を `aipl_dist.ml` (590 行) + `eval_thread.ml` の追加で実装できるかを評価。Py-I 合計 ~450 行 (CRDT 270 + Saga 165 + Region 125 + Pool 207 のうち各 dist 部分)。1.0 = ≤500 行 + 既存 DR-1〜9 維持、0.7 = ≤700 行、0.3 = ≤900 行、0.0 = 完全新設計。1 行で返答。";
+    }
+    reviewer BackwardCompat {
+      persona = "あなたは後方互換性レビュアーです。OCaml AIPL の 75 abclc smoke samples (Counter / BoundedBuffer / AIChain / Channels / Phase11+ 型付き / Phase 13 channels / Phase 17 scope) + 15 o2_typeinf + 24 o1_distributed samples が無変更で動作するか。OCaml の Phase O で確立された opt-in パターン (AIPL_DIST_ENABLE=1) を全 8 機能で踏襲するか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
+    }
+    reviewer PyIParity {
+      persona = "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.abcl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+    }
+    reviewer OCamlIdiomaticity {
+      persona = "あなたは OCaml イディオム性レビュアーです。Py-I の Python idiom (dict / TLS via threading.local / class-with-methods) を OCaml らしく書き直す妥当性を評価。Hashtbl vs Map / Mutex 付き ref vs Atomic / module-local mutable / record. Py-I の dict-based CRDT を OCaml で variant + record にするべきか dict のまま JSON 持ちにするべきか等。1.0 = OCaml idiom 完璧、0.7 = 大半 idiom、0.3 = Python の直訳を持ち込み過ぎ、0.0 = OCaml 的でない。1 行で返答。";
+    }
+    reviewer ImplCostEstimate {
+      persona = "あなたは実装コスト見積もりレビュアーです。Phase O (~1305 LOC for 18 features) と Phase O-3 (95 行 for 3 fixes) の LOC 効率を参照しつつ、8 機能合計が aipl_dist.ml + refinement.ml + infer.ml + eval_thread.ml + parser.mly + ast.ml に 800 行以内で済むかを評価。Py-I は ~700 行 + OCaml syntax overhead +15% で目算 ~800 行。1.0 = ≤600 行、0.7 = ≤800 行、0.3 = ≤1000 行、0.0 = >1000 行。1 行で返答。";
+    }
+  }
+}

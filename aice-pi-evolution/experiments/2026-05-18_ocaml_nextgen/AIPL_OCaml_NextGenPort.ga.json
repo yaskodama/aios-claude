@@ -1,0 +1,129 @@
+{
+  "name": "AIPL_OCaml_NextGenPort",
+  "task": "Py-I (Python 型推論) AIPL に実装済の 8 個の次世代機能 (CE-10 effect inference / CE-11 capability types / CE-12 refinement unification / CE-13 record subtyping / DR-10 CRDT state / DR-11 saga / DR-12 multi-region / DR-13 auto-scaling pool) を OCaml AIPL に直訳する。各機能は Py-I で 50〜170 行で実装済 (合計 ~700 行) で OCaml にも対応物がある (aipl_dist.ml / refinement.ml / infer.ml / eval_thread.ml)。Phase O / Phase O-3 / Round 1+2 で確立された 1 セッション 30-45 分 × 数機能の直訳パターンに従う。MAP-Elites で実装順序とバッチサイズを探索し、後方互換 hard floor (既存 75/75 abclc smoke + 39 o2_typeinf/o1_distributed smoke) を維持する。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "effect_handling",
+      "concurrency_model"
+    ],
+    "generations": 6,
+    "seed_count": 6,
+    "open_axes": false,
+    "rng_seed": 31415934
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "PortEffectInference",
+      "PortCapabilityTypes",
+      "PortRefinementUnification",
+      "PortRecordSubtyping",
+      "PortCRDTState",
+      "PortSagaOrchestration",
+      "PortMultiRegionFailover",
+      "PortAutoScalingPool",
+      "BackwardCompatExisting",
+      "PyIParity",
+      "ImplCostBudget"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": [
+      {
+        "name": "TypeImplFeasibility",
+        "persona": "あなたは OCaml 型推論実装可能性レビュアーです。CE-10 / CE-11 / CE-12 / CE-13 の OCaml への直訳が `infer.ml` (773 行) と `refinement.ml` (189 行) にどの程度の追加で組み込めるかを評価。Py-I 同等実装は合計 ~250 行で済んだので OCaml も同等規模が target。1.0 = ≤200 行 + 既存 unify を破壊しない、0.7 = ≤350 行、0.3 = ≤500 行、0.0 = type system 再設計レベル。'OK: <根拠>' / 'NG: <欠落>' の 1 行返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "DistImplFeasibility",
+        "persona": "あなたは OCaml 分散ランタイム実装可能性レビュアーです。DR-10 / DR-11 / DR-12 / DR-13 を `aipl_dist.ml` (590 行) + `eval_thread.ml` の追加で実装できるかを評価。Py-I 合計 ~450 行 (CRDT 270 + Saga 165 + Region 125 + Pool 207 のうち各 dist 部分)。1.0 = ≤500 行 + 既存 DR-1〜9 維持、0.7 = ≤700 行、0.3 = ≤900 行、0.0 = 完全新設計。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "BackwardCompat",
+        "persona": "あなたは後方互換性レビュアーです。OCaml AIPL の 75 abclc smoke samples (Counter / BoundedBuffer / AIChain / Channels / Phase11+ 型付き / Phase 13 channels / Phase 17 scope) + 15 o2_typeinf + 24 o1_distributed samples が無変更で動作するか。OCaml の Phase O で確立された opt-in パターン (AIPL_DIST_ENABLE=1) を全 8 機能で踏襲するか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "PyIParity",
+        "persona": "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.abcl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "OCamlIdiomaticity",
+        "persona": "あなたは OCaml イディオム性レビュアーです。Py-I の Python idiom (dict / TLS via threading.local / class-with-methods) を OCaml らしく書き直す妥当性を評価。Hashtbl vs Map / Mutex 付き ref vs Atomic / module-local mutable / record. Py-I の dict-based CRDT を OCaml で variant + record にするべきか dict のまま JSON 持ちにするべきか等。1.0 = OCaml idiom 完璧、0.7 = 大半 idiom、0.3 = Python の直訳を持ち込み過ぎ、0.0 = OCaml 的でない。1 行で返答。",
+        "weight": 0.16666666666666666
+      },
+      {
+        "name": "ImplCostEstimate",
+        "persona": "あなたは実装コスト見積もりレビュアーです。Phase O (~1305 LOC for 18 features) と Phase O-3 (95 行 for 3 fixes) の LOC 効率を参照しつつ、8 機能合計が aipl_dist.ml + refinement.ml + infer.ml + eval_thread.ml + parser.mly + ast.ml に 800 行以内で済むかを評価。Py-I は ~700 行 + OCaml syntax overhead +15% で目算 ~800 行。1.0 = ≤600 行、0.7 = ≤800 行、0.3 = ≤1000 行、0.0 = >1000 行。1 行で返答。",
+        "weight": 0.16666666666666666
+      }
+    ]
+  },
+  "meta_fitness": {
+    "trend_alignment": 0.05,
+    "frontier_coverage": 0.1,
+    "novelty": 0.05,
+    "evolvability": 0.1,
+    "cross_task_generality": 0.2,
+    "implementability": 0.5
+  },
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "balanced",
+      "type_first",
+      "dist_first",
+      "impl_cost_first"
+    ],
+    "scenario_weights": {
+      "balanced": {},
+      "type_first": {},
+      "dist_first": {},
+      "impl_cost_first": {}
+    },
+    "top_k": 5
+  }
+}
