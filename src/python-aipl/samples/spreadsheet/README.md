@@ -39,7 +39,7 @@
 | 5.0 | F2 Core12 functions (12 新関数) | `GSheetsCore12.abcl` | ✅ 12 assertion |
 | 5.1 | R3 Ranges + Absolute (`A1:B10`, `$A$1`) | `GSheetsRanges.abcl` | ✅ 10 assertion |
 | 5.2 | G3 VirtualizedInfinite (viewport spawn) | `GSheetsVirtualized.abcl` | ✅ 10 assertion |
-| 5.3 | E1 FormulaBar (DOM input) | (次) | ⏳ |
+| 5.3 | E1 FormulaBar (DOM input) | `src/browser-abcl/spreadsheet.html` | ✅ (browser-only, smoke unchanged) |
 | 5.4 | C2 ServerFile (JS-N /api/sheet/...) | (次) | ⏳ |
 | 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | (次) | ⏳ |
 

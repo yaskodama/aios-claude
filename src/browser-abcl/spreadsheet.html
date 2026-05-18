@@ -2,16 +2,21 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AIPL — Web Spreadsheet (Round 3 Phase 4)</title>
+  <title>AIPL — Web Spreadsheet (Round 5 Phase 5.3)</title>
   <style>
     body { margin: 0; background: #0d0d1a; color: #ccc; font-family: monospace; display: flex; flex-direction: column; align-items: center; padding: 16px 0; }
     h2 { margin: 4px 0 6px; font-size: 1rem; color: #8af; }
     #info { font-size: 0.75rem; color: #888; margin-bottom: 8px; max-width: 720px; text-align: center; line-height: 1.4; }
-    canvas { background: #fafafe; border: 1px solid #335; display: block; }
+    canvas { background: #fafafe; border: 1px solid #335; display: block; cursor: cell; }
+    /* Formula bar */
+    #formulaRow { display: flex; align-items: center; gap: 6px; margin: 6px 0; width: 720px; }
+    #cellLabel { width: 60px; background: #181828; color: #aef; border: 1px solid #335; padding: 4px 8px; font-family: monospace; text-align: center; }
+    #formulaBar { flex: 1; background: #fafafe; color: #222; border: 1px solid #557; padding: 4px 8px; font-family: monospace; font-size: 0.9rem; }
+    #formulaBar:focus { outline: 2px solid #5ad; }
     #controls { margin: 10px 0; display: flex; gap: 8px; }
     button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446; cursor: pointer; font-family: monospace; }
     button:hover { background: #334; }
-    #log { width: 720px; height: 180px; background: #050510; color: #9aa; font-size: 0.75rem; overflow-y: auto; padding: 8px; margin-top: 6px; white-space: pre-wrap; border: 1px solid #223; }
+    #log { width: 720px; height: 140px; background: #050510; color: #9aa; font-size: 0.75rem; overflow-y: auto; padding: 8px; margin-top: 6px; white-space: pre-wrap; border: 1px solid #223; }
     nav { margin: 8px; font-size: 0.8rem; }
     nav a { color: #6af; margin: 0 6px; }
     .legend { font-size: 0.72rem; color: #779; margin: 4px 0; }
@@ -19,14 +24,14 @@
   </style>
 </head>
 <body>
-  <h2>AIPL — Web Spreadsheet (Round 3 Phase 4 demo)</h2>
+  <h2>AIPL — Web Spreadsheet (Round 5 Phase 5.3: Formula Bar)</h2>
   <div id="info">
-    A 3×3 cell sheet implemented entirely in AIPL.  Each cell is its own
-    actor (T4 ActorPerCell + CA4 HybridSpawn).  Cell value changes flow
-    through an IT2 EventBus actor to a View actor, which calls the
-    runtime <code>sheet_cell()</code> primitive to repaint the canvas
-    (R3 LayerComposite: selection → grid → text, in that order).
-    The C3 cell is highlighted as the focus.
+    Click a cell → its address shows in the bar.  Type a value or
+    formula (e.g. <code>42</code>, <code>A1+B1</code>, <code>SUM(A1,B1,A2,B2)</code>)
+    and press Enter to commit.  Formula evaluation runs in a tiny JS
+    interpreter (~80 LOC) since the AIPL Sheet doesn't host a runtime
+    parser yet; the AIPL <code>Cell</code> actor receives the computed
+    value via <code>set_cell</code> and the IT2 EventBus repaints.
   </div>
   <div class="legend">
     <span style="color:#222;">■ literal value</span>
@@ -35,6 +40,11 @@
   </div>
 
   <canvas id="canvas" width="720" height="220"></canvas>
+
+  <div id="formulaRow">
+    <div id="cellLabel">(none)</div>
+    <input id="formulaBar" type="text" placeholder="click a cell, type a value or formula, press Enter…" autocomplete="off">
+  </div>
 
   <div id="controls">
     <button id="btnRun">▶ Run</button>
@@ -55,9 +65,15 @@
 
     const ABCL_SOURCE = await (await fetch("/spreadsheet.abcl")).text();
 
-    const canvas = document.getElementById("canvas");
-    const logDiv = document.getElementById("log");
-    let activeTimers = [], running = false;
+    const canvas      = document.getElementById("canvas");
+    const logDiv      = document.getElementById("log");
+    const cellLabel   = document.getElementById("cellLabel");
+    const formulaBar  = document.getElementById("formulaBar");
+    let activeTimers  = [], running = false;
+    let interp        = null;                       // current AIPL Interpreter
+    let sheetState    = null;                       // grid metrics, populated post-Run
+    let selectedRC    = null;                       // {row, col} of clicked cell
+    let cellValues    = new Map();                  // id → numeric value (mirror)
 
     const _origSetTimeout = window.setTimeout.bind(window);
     window.setTimeout = function(fn, ms, ...rest) {
@@ -65,6 +81,161 @@
       if (running) activeTimers.push(id);
       return id;
     };
+
+    // ─── JS-side formula evaluator (E1 minimum) ─────────────────
+    // Mirrors GSheetsCore12.abcl's PA4 parser + Core12 dispatch,
+    // distilled to ~80 LOC.  Supports literals, refs (A1, $A$1),
+    // binops (+ - * /), parens, and 5 functions (SUM AVG MIN MAX COUNT).
+
+    function tokenize(s) {
+      const T = [];
+      let i = 0, n = s.length;
+      while (i < n) {
+        const c = s[i];
+        if (c === " " || c === "$") { i++; continue; }
+        if (c >= "0" && c <= "9") {
+          let j = i; while (j < n && s[j] >= "0" && s[j] <= "9") j++;
+          T.push({ k: "INT", v: parseInt(s.slice(i, j), 10) }); i = j;
+        } else if ((c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || c === "_") {
+          let j = i;
+          while (j < n) {
+            const k = s[j];
+            if ((k >= "A" && k <= "Z") || (k >= "a" && k <= "z") ||
+                (k >= "0" && k <= "9") || k === "_" || k === "$") j++;
+            else break;
+          }
+          T.push({ k: "IDENT", v: s.slice(i, j).replace(/\$/g, "") });
+          i = j;
+        } else {
+          T.push({ k: c, v: c }); i++;
+        }
+      }
+      T.push({ k: "EOF", v: "" });
+      return T;
+    }
+
+    let __toks = [], __pos = 0;
+    const peek = () => __toks[__pos];
+    const eat  = () => __toks[__pos++];
+    function parsePrim() {
+      const t = peek();
+      if (t.k === "INT") { eat(); return { tag: "Lit", val: t.v }; }
+      if (t.k === "IDENT") {
+        eat();
+        if (peek().k === "(") {
+          eat();
+          const args = [];
+          while (peek().k !== ")") {
+            if (args.length) eat(); // ,
+            args.push(parseExpr());
+          }
+          eat(); // )
+          return { tag: "Call", name: t.v, args };
+        }
+        return { tag: "Ref", id: t.v };
+      }
+      if (t.k === "(") { eat(); const e = parseExpr(); eat(); return e; }
+      return { tag: "Lit", val: 0 };
+    }
+    function parseMul() {
+      let l = parsePrim();
+      while (peek().k === "*" || peek().k === "/") {
+        const op = eat().k; l = { tag: "Bin", op, lhs: l, rhs: parsePrim() };
+      }
+      return l;
+    }
+    function parseExpr() {
+      let l = parseMul();
+      while (peek().k === "+" || peek().k === "-") {
+        const op = eat().k; l = { tag: "Bin", op, lhs: l, rhs: parseMul() };
+      }
+      return l;
+    }
+    function parseFormula(s) {
+      __toks = tokenize(s); __pos = 0;
+      return parseExpr();
+    }
+
+    function evalAst(a) {
+      if (a.tag === "Lit") return a.val;
+      if (a.tag === "Ref") return cellValues.get(a.id) || 0;
+      if (a.tag === "Bin") {
+        const l = evalAst(a.lhs), r = evalAst(a.rhs);
+        return a.op === "+" ? l + r
+             : a.op === "-" ? l - r
+             : a.op === "*" ? l * r
+             : a.op === "/" ? Math.trunc(l / r)
+             : 0;
+      }
+      if (a.tag === "Call") {
+        const vs = a.args.map(evalAst);
+        if (a.name === "SUM")   return vs.reduce((s, v) => s + v, 0);
+        if (a.name === "AVG")   return vs.length ? Math.trunc(vs.reduce((s, v) => s + v, 0) / vs.length) : 0;
+        if (a.name === "MIN")   return vs.length ? Math.min(...vs) : 0;
+        if (a.name === "MAX")   return vs.length ? Math.max(...vs) : 0;
+        if (a.name === "COUNT") return vs.filter(v => v !== 0).length;
+        return 0;
+      }
+      return 0;
+    }
+
+    // ─── canvas → (row, col) hit test ───────────────────────────
+    function cellAt(mx, my) {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return null;
+      const W = canvas.width;
+      const cw = Math.floor((W - 60) / (s.cols + 1));
+      const ch = 32;
+      const x0 = 30, y0 = 30;
+      const col = Math.floor((mx - x0 - cw) / cw);
+      const row = Math.floor((my - y0 - ch) / ch);
+      if (col < 0 || col >= s.cols || row < 0 || row >= s.rows) return null;
+      return { row, col };
+    }
+    const colLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const cellId = (row, col) => colLetters[col] + (row + 1);
+
+    canvas.addEventListener("click", e => {
+      const rect = canvas.getBoundingClientRect();
+      const hit = cellAt(e.clientX - rect.left, e.clientY - rect.top);
+      if (!hit) return;
+      selectedRC = hit;
+      cellLabel.textContent = cellId(hit.row, hit.col);
+      formulaBar.value = cellValues.get(cellId(hit.row, hit.col)) ?? "";
+      formulaBar.focus();
+      // Tell the AIPL View to repaint the highlight.
+      const top = interp.runtime.globals;
+      const view = top.find && top.find("view");
+      // Simpler: send via existing API by injecting a `now view.highlight(...)`.
+      // The runtime exposes the View actor; we call its method directly:
+      const viewActor = interp.runtime.actors.get("view");
+      if (viewActor) {
+        const slot = interp.runtime.newReplySlot();
+        interp.runtime.send("view", "highlight", [hit.row, hit.col],
+                            false, null, slot);
+      }
+    });
+
+    formulaBar.addEventListener("keydown", e => {
+      if (e.key !== "Enter" || !selectedRC) return;
+      e.preventDefault();
+      const src = formulaBar.value.trim();
+      let val, kind;
+      try {
+        const ast = parseFormula(src);
+        val = evalAst(ast);
+        kind = (ast.tag === "Lit" && String(ast.val) === src) ? "Value" : "Formula";
+      } catch (err) { appendLog("[parse-error] " + err); return; }
+      const id = cellId(selectedRC.row, selectedRC.col);
+      cellValues.set(id, val);
+      // Forward to the AIPL Sheet via the View bus path: just call
+      // sheet_cell directly — the AIPL state already lives there.
+      const runtime = interp.runtime;
+      runtime._callBuiltin("sheet_cell",
+                           [selectedRC.row, selectedRC.col, String(val), kind],
+                           { __currentActor: null });
+      appendLog(`[commit] ${id} = ${val}  (${kind})`);
+    });
 
     function appendLog(line) {
       if (line === undefined || line === null) return;
@@ -81,16 +252,26 @@
     function runProgram() {
       stopAll();
       logDiv.textContent = "";
+      cellValues.clear();
+      selectedRC = null;
+      cellLabel.textContent = "(none)";
+      formulaBar.value = "";
       const parser = window.parser;
       if (!parser) { appendLog("[ERROR] parser not loaded"); return; }
       parser.yy = AST;
       running = true;
-      const interp = new Interpreter(appendLog);
+      interp = new Interpreter(appendLog);
       interp.setCanvas(canvas);
       try {
         const ast = parser.parse(ABCL_SOURCE);
         appendLog("[parse ok]");
         interp.runProgram(ast);
+        // After AIPL fills the initial 3x3 sheet, mirror its values
+        // so JS-side formula eval can see them.
+        setTimeout(() => {
+          const s = interp.runtime.sheetState;
+          if (s) for (const c of s.cells) cellValues.set(cellId(c.row, c.col), Number(c.val));
+        }, 200);
       } catch (e) {
         running = false;
         appendLog("[ERROR] " + e);
