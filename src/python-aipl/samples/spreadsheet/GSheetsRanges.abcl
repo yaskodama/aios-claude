@@ -1,0 +1,420 @@
+// Round 5 Phase 5.1 — R3 RangesAndCOL: A1:B10 ranges + $A$1 absolute.
+//
+// Extends Phase 5.0 (F2 Core12) with:
+//   - `A1:B10` range references (parse → Range AST → expand at eval)
+//   - `$A$1`, `$A1`, `A$1` absolute markers
+//
+// MVP simplification: at eval time, absolute and relative refs
+// behave identically.  The `$` prefix matters only at copy/paste,
+// which isn't a thing in a console demo — so the lexer simply
+// skips `$` characters and the parser sees `$A$1` as `A1`.  A
+// production impl would attach an `absolute` flag to the Ref AST
+// and use it during copy/paste relative-offset adjustment.
+//
+// Column letters are A-Z only in this MVP (max 26 cols).  Range
+// expansion enumerates every (col, row) inside the rectangle.
+
+// ── PA4 parser (with `:` range + `$` skip) ────────────────────
+function is_digit_ch(c) {
+  if (c == "0") { return 1; } if (c == "1") { return 1; }
+  if (c == "2") { return 1; } if (c == "3") { return 1; }
+  if (c == "4") { return 1; } if (c == "5") { return 1; }
+  if (c == "6") { return 1; } if (c == "7") { return 1; }
+  if (c == "8") { return 1; } if (c == "9") { return 1; }
+  return 0;
+}
+function digit_val(c) {
+  if (c == "0") { return 0; } if (c == "1") { return 1; }
+  if (c == "2") { return 2; } if (c == "3") { return 3; }
+  if (c == "4") { return 4; } if (c == "5") { return 5; }
+  if (c == "6") { return 6; } if (c == "7") { return 7; }
+  if (c == "8") { return 8; } if (c == "9") { return 9; }
+  return 0;
+}
+function is_alpha_ch(c) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
+  if (str_index(alpha, c) >= 0) { return 1; }
+  return 0;
+}
+function lex_int(s, i, n) {
+  var v: int = 0;
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var d = str_sub(s, j, j + 1);
+      if (is_digit_ch(d) == 1) { v = v * 10 + digit_val(d); j = j + 1; }
+      else { done = 1; }
+    }
+  }
+  return {val: v, end_pos: j};
+}
+function lex_ident(s, i, n) {
+  // R3: also absorb `$` characters silently — `$A$1` lexes the same
+  // as `A1`.  This is the minimal fix for the lexer that previously
+  // emitted IDENT/INT pairs for `$A$1` (skip-then-IDENT-then-INT).
+  var id: string = "";
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var k = str_sub(s, j, j + 1);
+      if (is_alpha_ch(k) == 1) { id = id + k; j = j + 1; }
+      else {
+        if (is_digit_ch(k) == 1) { id = id + k; j = j + 1; }
+        else {
+          if (k == "$") { j = j + 1; }   // skip `$` mid-ident
+          else { done = 1; }
+        }
+      }
+    }
+  }
+  return {val: id, end_pos: j};
+}
+function lex_formula(s) {
+  var tokens = [];
+  var i: int = 0;
+  var n: int = str_len(s);
+  while (i < n) do {
+    var c = str_sub(s, i, i + 1);
+    if (c == " ") { i = i + 1; }
+    else {
+      // R3: a leading `$` starts an absolute cell ref — delegate to
+      // lex_ident which now skips internal `$` chars.
+      if (c == "$") {
+        var r0 = lex_ident(s, i, n);
+        array_push(tokens, {kind: "IDENT", val: r0.val});
+        i = r0.end_pos;
+      } else {
+        if (is_digit_ch(c) == 1) {
+          var r = lex_int(s, i, n);
+          array_push(tokens, {kind: "INT", val: r.val});
+          i = r.end_pos;
+        } else {
+          if (is_alpha_ch(c) == 1) {
+            var r2 = lex_ident(s, i, n);
+            array_push(tokens, {kind: "IDENT", val: r2.val});
+            i = r2.end_pos;
+          } else {
+            array_push(tokens, {kind: c, val: c});
+            i = i + 1;
+          }
+        }
+      }
+    }
+  }
+  array_push(tokens, {kind: "EOF", val: ""});
+  return tokens;
+}
+function parse_primary(tokens, pos) {
+  var t = array_get(tokens, pos);
+  if (t.kind == "INT") {
+    return {ast: {tag: "Lit", val: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "IDENT") {
+    var nxt = array_get(tokens, pos + 1);
+    if (nxt.kind == "(") {
+      var args = [];
+      var p: int = pos + 2;
+      var first: int = 1;
+      var done: int = 0;
+      while (done == 0) do {
+        var ck = array_get(tokens, p);
+        if (ck.kind == ")") { done = 1; }
+        else {
+          if (first == 0) {
+            if (ck.kind == ",") { p = p + 1; }
+          }
+          first = 0;
+          var sub = parse_expr(tokens, p);
+          array_push(args, sub.ast);
+          p = sub.pos;
+        }
+      }
+      return {ast: {tag: "Call", name: t.val, args: args}, pos: p + 1};
+    }
+    // R3: detect `IDENT : IDENT` as a Range AST.
+    if (nxt.kind == ":") {
+      var end_tok = array_get(tokens, pos + 2);
+      if (end_tok.kind == "IDENT") {
+        return {ast: {tag: "Range", start_id: t.val, end_id: end_tok.val},
+                pos: pos + 3};
+      }
+    }
+    return {ast: {tag: "Ref", id: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "(") {
+    var inner = parse_expr(tokens, pos + 1);
+    return {ast: inner.ast, pos: inner.pos + 1};
+  }
+  return {ast: {tag: "Lit", val: 0}, pos: pos + 1};
+}
+function parse_mul(tokens, pos) {
+  var l = parse_primary(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "*") {
+      var r = parse_primary(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "*", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "/") {
+        var r2 = parse_primary(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "/", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+function parse_add(tokens, pos) {
+  var l = parse_mul(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "+") {
+      var r = parse_mul(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "+", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "-") {
+        var r2 = parse_mul(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "-", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+function parse_expr(tokens, pos) { return parse_add(tokens, pos); }
+function parse_formula(src) {
+  var toks = lex_formula(src);
+  var r = parse_expr(toks, 0);
+  return r.ast;
+}
+
+// ── cell-id <-> (col, row) helpers (A-Z columns only) ─────────
+function letter_to_col(c) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return str_index(alpha, c);
+}
+function col_to_letter(col) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return str_sub(alpha, col, col + 1);
+}
+function id_to_pair(id) {
+  // "A1" → {col: 0, row: 0}; "B23" → {col: 1, row: 22}
+  var col_char = str_sub(id, 0, 1);
+  var rest     = str_sub(id, 1, str_len(id));
+  var col      = letter_to_col(col_char);
+  // parse `rest` as 1-based int → 0-based row
+  var v = 0;
+  var i = 0;
+  var n = str_len(rest);
+  while (i < n) do {
+    v = v * 10 + digit_val(str_sub(rest, i, i + 1));
+    i = i + 1;
+  }
+  return {col: col, row: v - 1};
+}
+function pair_to_id(col, row) {
+  // row is 0-based → write 1-based; col is 0-based → letter.
+  var letter = col_to_letter(col);
+  var row1 = row + 1;
+  // int → string by string concat (AIPL ints stringify on `+ ""`)
+  return letter + row1;
+}
+
+// ── eval (+ Range expansion + reuse Core12 helpers) ───────────
+function sheet_get(sheet, id) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.id == id) { return c; }
+    i = i + 1;
+  }
+  return {id: id, kind: "Empty", val: 0, expr: {tag: "none"}};
+}
+
+function fn_min(vals) {
+  var n = array_len(vals); if (n == 0) { return 0; }
+  var m = array_get(vals, 0); var i = 1;
+  while (i < n) do {
+    var v = array_get(vals, i);
+    if (v < m) { m = v; } i = i + 1;
+  }
+  return m;
+}
+function fn_max(vals) {
+  var n = array_len(vals); if (n == 0) { return 0; }
+  var m = array_get(vals, 0); var i = 1;
+  while (i < n) do {
+    var v = array_get(vals, i);
+    if (v > m) { m = v; } i = i + 1;
+  }
+  return m;
+}
+function fn_sum(vals) {
+  var n = array_len(vals); var s = 0; var i = 0;
+  while (i < n) do { s = s + array_get(vals, i); i = i + 1; }
+  return s;
+}
+function fn_avg(vals) {
+  var n = array_len(vals); if (n == 0) { return 0; }
+  return fn_sum(vals) / n;
+}
+function fn_count(vals) {
+  var n = array_len(vals); var c = 0; var i = 0;
+  while (i < n) do {
+    if (array_get(vals, i) != 0) { c = c + 1; } i = i + 1;
+  }
+  return c;
+}
+
+// R3: expand a Range node to a list of values by enumerating the
+// rectangle and eval'ing each cell ref.
+function eval_range(node, sheet) {
+  var a = id_to_pair(node.start_id);
+  var b = id_to_pair(node.end_id);
+  var c0 = a.col; var c1 = b.col;
+  var r0 = a.row; var r1 = b.row;
+  if (c0 > c1) { var tmp = c0; c0 = c1; c1 = tmp; }
+  if (r0 > r1) { var tmp2 = r0; r0 = r1; r1 = tmp2; }
+  var vals = [];
+  var rr = r0;
+  while (rr <= r1) do {
+    var cc = c0;
+    while (cc <= c1) do {
+      var id = pair_to_id(cc, rr);
+      var cell = sheet_get(sheet, id);
+      var v = 0;
+      if (cell.kind == "Formula") { v = eval_expr(cell.expr, sheet); }
+      else { v = cell.val; }
+      array_push(vals, v);
+      cc = cc + 1;
+    }
+    rr = rr + 1;
+  }
+  return vals;
+}
+
+function eval_args(args, sheet) {
+  // Flatten Range args into per-cell values (Core12 functions take
+  // a flat values array).
+  var vals = [];
+  var i = 0;
+  var n = array_len(args);
+  while (i < n) do {
+    var arg = array_get(args, i);
+    if (arg.tag == "Range") {
+      var sub = eval_range(arg, sheet);
+      var j = 0;
+      var m = array_len(sub);
+      while (j < m) do {
+        array_push(vals, array_get(sub, j));
+        j = j + 1;
+      }
+    } else {
+      array_push(vals, eval_expr(arg, sheet));
+    }
+    i = i + 1;
+  }
+  return vals;
+}
+
+function eval_expr(ast, sheet) {
+  if (ast.tag == "Lit") { return ast.val; }
+  if (ast.tag == "Ref") {
+    var c = sheet_get(sheet, ast.id);
+    if (c.kind == "Formula") { return eval_expr(c.expr, sheet); }
+    return c.val;
+  }
+  if (ast.tag == "Range") {
+    // Bare range outside a function call — return the first cell's
+    // value as a degenerate fallback (Sheets shows #ERROR for this).
+    var vs = eval_range(ast, sheet);
+    if (array_len(vs) > 0) { return array_get(vs, 0); }
+    return 0;
+  }
+  if (ast.tag == "Bin") {
+    var l = eval_expr(ast.lhs, sheet);
+    var r = eval_expr(ast.rhs, sheet);
+    if (ast.op == "+") { return l + r; }
+    if (ast.op == "-") { return l - r; }
+    if (ast.op == "*") { return l * r; }
+    if (ast.op == "/") { return l / r; }
+    return 0;
+  }
+  if (ast.tag == "Call") {
+    var nm = ast.name;
+    if (nm == "IF") {
+      if (array_len(ast.args) < 3) { return 0; }
+      var cd = eval_expr(array_get(ast.args, 0), sheet);
+      if (cd != 0) { return eval_expr(array_get(ast.args, 1), sheet); }
+      return eval_expr(array_get(ast.args, 2), sheet);
+    }
+    var vs = eval_args(ast.args, sheet);
+    if (nm == "SUM")    { return fn_sum(vs); }
+    if (nm == "AVG")    { return fn_avg(vs); }
+    if (nm == "MIN")    { return fn_min(vs); }
+    if (nm == "MAX")    { return fn_max(vs); }
+    if (nm == "COUNT")  { return fn_count(vs); }
+    return 0;
+  }
+  return 0;
+}
+
+// ── sheet helpers ─────────────────────────────────────────────
+function add_value(sheet, id, v) {
+  array_push(sheet, {id: id, kind: "Value", val: v, expr: {tag: "none"}});
+}
+function add_formula(sheet, id, src) {
+  var ast = parse_formula(src);
+  array_push(sheet, {id: id, kind: "Formula", val: 0, expr: ast});
+}
+function recompute_and_print(sheet) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.kind == "Formula") {
+      var v = eval_expr(c.expr, sheet);
+      print("[sheet] " + c.id + " = " + v);
+    } else {
+      print("[sheet] " + c.id + " = " + c.val);
+    }
+    i = i + 1;
+  }
+}
+
+// ── demo: 5x5 grid + range / absolute / mixed formulas ────────
+var sheet = [];
+
+// 5x5 numeric grid: A1..E5 = (col*5 + row + 1) → 1..25 row-major
+add_value(sheet, "A1", 1);  add_value(sheet, "B1", 2);  add_value(sheet, "C1", 3);  add_value(sheet, "D1", 4);  add_value(sheet, "E1", 5);
+add_value(sheet, "A2", 6);  add_value(sheet, "B2", 7);  add_value(sheet, "C2", 8);  add_value(sheet, "D2", 9);  add_value(sheet, "E2", 10);
+add_value(sheet, "A3", 11); add_value(sheet, "B3", 12); add_value(sheet, "C3", 13); add_value(sheet, "D3", 14); add_value(sheet, "E3", 15);
+add_value(sheet, "A4", 16); add_value(sheet, "B4", 17); add_value(sheet, "C4", 18); add_value(sheet, "D4", 19); add_value(sheet, "E4", 20);
+add_value(sheet, "A5", 21); add_value(sheet, "B5", 22); add_value(sheet, "C5", 23); add_value(sheet, "D5", 24); add_value(sheet, "E5", 25);
+
+// Range-based formulas.
+add_formula(sheet, "F1", "SUM(A1:E1)");   // row 1 = 1+2+3+4+5      = 15
+add_formula(sheet, "F2", "SUM(A1:A5)");   // col A = 1+6+11+16+21   = 55
+add_formula(sheet, "F3", "SUM(A1:E5)");   // all 25 = 25*26/2       = 325
+add_formula(sheet, "F4", "AVG(A1:E5)");   // 325 / 25               = 13
+add_formula(sheet, "F5", "MIN(A1:E5)");   // = 1
+add_formula(sheet, "G1", "MAX(A1:E5)");   // = 25
+add_formula(sheet, "G2", "COUNT(A1:E5)"); // = 25 (all non-zero)
+
+// Absolute references: `$A$1` parses to plain "A1" after `$` skip.
+add_formula(sheet, "G3", "$A$1 + $B$1"); //  1 + 2                  = 3
+
+// Mixed: range + simple ref.
+add_formula(sheet, "G4", "SUM(A1:E1) + A2"); // 15 + 6              = 21
+
+// Cross-range arithmetic.
+add_formula(sheet, "G5", "SUM(A1:E5) - SUM(A1:E1)"); // 325 - 15    = 310
+
+print("=== GSheetsRanges 5x5 + range/absolute demo ===");
+recompute_and_print(sheet);
+print("=== done ===");

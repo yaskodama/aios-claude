@@ -103,6 +103,23 @@ check_contains "GSheetsCore12" "$GS_LOG" "C4 = 1024"     # POWER(2, 10)
 check_contains "GSheetsCore12" "$GS_LOG" "C5 = 2"        # MOD(17, 5)
 check_contains "GSheetsCore12" "$GS_LOG" "D1 = 100"      # AVG(B1=150, B4=50)
 
+# ── Phase 5.1: GSheetsRanges (R3 ranges + absolute refs) ─────
+echo
+echo "[Phase 5.1] GSheetsRanges (A1:B10 + \$A\$1 absolute)"
+GR_LOG="$LOGDIR/GSheetsRanges.log"
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsRanges.abcl > "$GR_LOG" 2>&1
+
+check_contains "GSheetsRanges" "$GR_LOG" "F1 = 15"       # SUM(A1:E1) row 1
+check_contains "GSheetsRanges" "$GR_LOG" "F2 = 55"       # SUM(A1:A5) col A
+check_contains "GSheetsRanges" "$GR_LOG" "F3 = 325"      # SUM(A1:E5) all
+check_contains "GSheetsRanges" "$GR_LOG" "F4 = 13"       # AVG(A1:E5) = 325/25
+check_contains "GSheetsRanges" "$GR_LOG" "F5 = 1"        # MIN(A1:E5)
+check_contains "GSheetsRanges" "$GR_LOG" "G1 = 25"       # MAX(A1:E5)
+check_contains "GSheetsRanges" "$GR_LOG" "G2 = 25"       # COUNT(A1:E5)
+check_contains "GSheetsRanges" "$GR_LOG" "G3 = 3"        # \$A\$1 + \$B\$1
+check_contains "GSheetsRanges" "$GR_LOG" "G4 = 21"       # SUM(A1:E1) + A2
+check_contains "GSheetsRanges" "$GR_LOG" "G5 = 310"      # 325 - 15
+
 echo
 echo "==== WebSpreadsheet smoke summary ===="
 echo "  pass=$pass  fail=$fail  (logs: $LOGDIR/)"
