@@ -84,6 +84,25 @@ else
   fail=$((fail+1)); printf '  FAIL  %-16s | expected 2 occurrences of C3=1330, got %d\n' "PersistedSheet" "$orig_count"
 fi
 
+# ── Phase 5.0: GSheetsCore12 (F2 Core12 functions) ───────────
+echo
+echo "[Phase 5.0] GSheetsCore12 (SUM/AVG/MIN/MAX/COUNT/IF/POWER/MOD/...)"
+GS_LOG="$LOGDIR/GSheetsCore12.log"
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsCore12.abcl > "$GS_LOG" 2>&1
+
+check_contains "GSheetsCore12" "$GS_LOG" "B1 = 150"      # SUM(A1..A5)
+check_contains "GSheetsCore12" "$GS_LOG" "B2 = 30"       # AVG(A1..A5)
+check_contains "GSheetsCore12" "$GS_LOG" "B3 = 10"       # MIN
+check_contains "GSheetsCore12" "$GS_LOG" "B4 = 50"       # MAX
+check_contains "GSheetsCore12" "$GS_LOG" "B5 = 5"        # COUNT (non-zero)
+check_contains "GSheetsCore12" "$GS_LOG" "B6 = 5"        # COUNTA
+check_contains "GSheetsCore12" "$GS_LOG" "C1 = 42"       # IF(1, 42, 99)
+check_contains "GSheetsCore12" "$GS_LOG" "C2 = 99"       # IF(0, 42, 99)
+check_contains "GSheetsCore12" "$GS_LOG" "C3 = 7"        # ABS(0-7)
+check_contains "GSheetsCore12" "$GS_LOG" "C4 = 1024"     # POWER(2, 10)
+check_contains "GSheetsCore12" "$GS_LOG" "C5 = 2"        # MOD(17, 5)
+check_contains "GSheetsCore12" "$GS_LOG" "D1 = 100"      # AVG(B1=150, B4=50)
+
 echo
 echo "==== WebSpreadsheet smoke summary ===="
 echo "  pass=$pass  fail=$fail  (logs: $LOGDIR/)"

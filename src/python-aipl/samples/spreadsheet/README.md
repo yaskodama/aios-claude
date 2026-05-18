@@ -29,11 +29,25 @@
 | 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ✅ 5 assertion |
 | 4 | R3 renderer + IT2 event bus | `src/browser-abcl/spreadsheet.{html,abcl}` | ✅ 8 assertion |
 
+## Round 5 (Google Sheets parity build-out)
+
+進化計算は OpenAI throttle で 2 連続失敗 → 工学的判断で手動 6-tuple 選定.
+詳細は `aice-pi-evolution/experiments/2026-05-19_google_sheets_clone/RESULTS.md`.
+
+| Phase | 内容 | サンプル | 状態 |
+|---|---|---|---|
+| 5.0 | F2 Core12 functions (12 新関数) | `GSheetsCore12.abcl` | ✅ 12 assertion |
+| 5.1 | R3 Ranges + Absolute (`A1:B10`, `$A$1`) | (次) | ⏳ |
+| 5.2 | G3 VirtualizedInfinite (viewport spawn) | (次) | ⏳ |
+| 5.3 | E1 FormulaBar (DOM input) | (次) | ⏳ |
+| 5.4 | C2 ServerFile (JS-N /api/sheet/...) | (次) | ⏳ |
+| 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | (次) | ⏳ |
+
 ## smoke
 
 ```sh
 bash src/python-aipl/samples/spreadsheet/_smoke.sh
-# → pass=19  fail=0 (Phase 0 + 1 + 2 + 3)
+# → pass=31  fail=0 (Phase 0 + 1 + 2 + 3 + 5.0)
 
 bash src/browser-abcl/_smoke_spreadsheet.sh
 # → pass=8  fail=0 (Phase 4 — browser UI via node-side bridge)
