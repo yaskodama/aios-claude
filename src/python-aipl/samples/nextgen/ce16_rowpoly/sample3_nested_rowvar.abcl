@@ -1,0 +1,18 @@
+// CE-16 V1 / sample 3 — nested row variable (record-in-record).
+//
+// `city_of` reads only p.addr.city.  Under CE-16 V1 the receiver
+// type ends up `{addr: {city: Str | ρ_addr} | ρ_p}` — each `.field`
+// access nests an open record.  At call time the caller passes a
+// 4-field record with a 3-field addr; both row tails absorb the rest.
+
+class Geo {
+  method city_of(p) { return p.addr.city; }
+}
+
+var g = new Geo();
+var u = {
+  name: "Alice",
+  addr: { city: "Tokyo", zip: "1000001", country: "JP" },
+  email: "alice@example.com"
+};
+print("[ce16/3] city = " + now g.city_of(u));

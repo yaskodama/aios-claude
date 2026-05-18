@@ -111,12 +111,24 @@ class TRecord:
     """Structural record type: {field: T, …}.
 
     Used for AIPL classes (since AIPL has nominal classes, we still
-    use structural types internally for now)."""
-    fields: tuple      # tuple of (name, Type)
+    use structural types internally for now).
+
+    CE-16 V1 (row-polymorphism, opt-in via AIPL_ROWPOLY=1):
+    an optional `tail` row-variable absorbs extra fields produced
+    on either side of a unification.  `tail=None` means the record
+    is "closed" — it must match exactly under unify.  When
+    AIPL_ROWPOLY is off, all records are constructed with tail=None
+    and the unify arm falls back to the CE-13 width-subtyping path.
+    """
+    fields: tuple                          # tuple of (name, Type)
+    tail: object = None                    # None | TVar (row variable)
 
     def __str__(self) -> str:
         body = ", ".join(f"{n}: {t}" for n, t in self.fields)
-        return f"{{{body}}}"
+        if self.tail is None:
+            return f"{{{body}}}"
+        sep = " | " if body else "| "
+        return f"{{{body}{sep}{self.tail}}}"
 
 
 @dataclass(frozen=True)
@@ -183,7 +195,20 @@ def apply(s: Subst, t: Any) -> Any:
     if isinstance(t, TTuple):
         return TTuple(tuple(apply(s, a) for a in t.items))
     if isinstance(t, TRecord):
-        return TRecord(tuple((n, apply(s, ft)) for n, ft in t.fields))
+        # CE-16: substitute through the row tail too; when the tail
+        # resolves to another TRecord, merge its fields in (this is
+        # how row variables unify).
+        new_fields = tuple((n, apply(s, ft)) for n, ft in t.fields)
+        if t.tail is None:
+            return TRecord(new_fields, None)
+        new_tail = apply(s, t.tail)
+        if isinstance(new_tail, TRecord):
+            merged = dict(new_fields)
+            for n, ft in new_tail.fields:
+                if n not in merged:
+                    merged[n] = ft
+            return TRecord(tuple(merged.items()), new_tail.tail)
+        return TRecord(new_fields, new_tail)
     if isinstance(t, TRefined):
         return TRefined(apply(s, t.base), t.binder, t.pred_src, t.pred_ast)
     return t
@@ -208,6 +233,7 @@ def free_vars(t: Any) -> set:
     if isinstance(t, TRecord):
         out = set()
         for _, ft in t.fields: out |= free_vars(ft)
+        if t.tail is not None: out |= free_vars(t.tail)
         return out
     if isinstance(t, TRefined):
         return free_vars(t.base)
@@ -258,6 +284,53 @@ def unify(t1: Any, t2: Any) -> Subst:
         s: Subst = {}
         for a, b in zip(t1.items, t2.items):
             s = compose(unify(apply(s, a), apply(s, b)), s)
+        return s
+    # CE-16 V1: row-polymorphic unify (opt-in via AIPL_ROWPOLY=1).
+    # When either side carries a row tail, label differences are
+    # absorbed into the tail variable.  This is the canonical
+    # row-polymorphic formulation that matches the OCaml-style
+    # `TRecord of fields * row_var` design picked in round 7.
+    if (isinstance(t1, TRecord) and isinstance(t2, TRecord)
+            and os.environ.get("AIPL_ROWPOLY", "0") == "1"
+            and (t1.tail is not None or t2.tail is not None)):
+        d1, d2 = dict(t1.fields), dict(t2.fields)
+        common  = sorted(set(d1) & set(d2))
+        only_1  = sorted(set(d1) - set(d2))   # fields only on lhs
+        only_2  = sorted(set(d2) - set(d1))   # fields only on rhs
+        s: Subst = {}
+        for name in common:
+            s = compose(unify(apply(s, d1[name]), apply(s, d2[name])), s)
+        # The lhs-only fields must be acceptable to rhs's tail; the
+        # rhs-only fields must be acceptable to lhs's tail.
+        if only_1 and t2.tail is None:
+            raise UnifyError(
+                f"closed record on rhs cannot accept extra fields {only_1}")
+        if only_2 and t1.tail is None:
+            raise UnifyError(
+                f"closed record on lhs cannot accept extra fields {only_2}")
+        # Shared fresh row variable for the "other rest" they agree
+        # is open.  When both tails are present we point them at a
+        # common fresh row, plumbing the unique fields into each
+        # side's view of that row.  When only one tail is present we
+        # close the gap by binding it to the leftovers.
+        only_1_fields = tuple((n, apply(s, d1[n])) for n in only_1)
+        only_2_fields = tuple((n, apply(s, d2[n])) for n in only_2)
+        if t1.tail is not None and t2.tail is not None:
+            # If both tails are already the same variable, they must
+            # be empty (no rhs-only and no lhs-only); else inconsistent.
+            if t1.tail == t2.tail:
+                if only_1_fields or only_2_fields:
+                    raise UnifyError(
+                        f"row tail {t1.tail} bound on both sides but "
+                        f"unique fields would conflict")
+                return s
+            rest = _row_fresh()
+            s = compose(_bind(t1.tail, TRecord(only_2_fields, rest)), s)
+            s = compose(_bind(t2.tail, TRecord(only_1_fields, rest)), s)
+        elif t1.tail is not None:
+            s = compose(_bind(t1.tail, TRecord(only_2_fields, None)), s)
+        elif t2.tail is not None:
+            s = compose(_bind(t2.tail, TRecord(only_1_fields, None)), s)
         return s
     # CE-13: width subtyping for records.  Previously this required
     # both records to have exactly the same set of field names; that
@@ -356,6 +429,19 @@ def _bind(v: TVar, t: Any) -> Subst:
     if v in free_vars(t):
         raise UnifyError(f"occurs check: {v} in {t}")
     return {v: t}
+
+
+# CE-16 V1: fresh row variables minted during unify (which can't see
+# the surrounding Inference instance).  Negative IDs keep them
+# distinct from inference-minted positive-ID TVars; subsequent
+# generalize/instantiate quantify them as ordinary type variables.
+_ROW_FRESH_COUNTER = [-1]
+
+
+def _row_fresh() -> TVar:
+    v = TVar(_ROW_FRESH_COUNTER[0])
+    _ROW_FRESH_COUNTER[0] -= 1
+    return v
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -570,13 +656,16 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
         return TCon("Future", (inner,))
     # E-1: record literals become TRecord with each field typed from
     # its RHS expression.  Sorted by name so structural equality is
-    # order-independent.
+    # order-independent.  CE-16 V1: when AIPL_ROWPOLY=1 the literal is
+    # *closed* (tail=None) — it carries exactly these fields — and a
+    # consumer with a row-variable tail will absorb the difference at
+    # unify time.
     if RecordLit and isinstance(e, RecordLit):
         ftypes = []
         for fname, fexpr in e.fields:
             ftypes.append((fname, _infer_expr(infer, env, fexpr)))
         ftypes.sort(key=lambda x: x[0])
-        return TRecord(tuple(ftypes))
+        return TRecord(tuple(ftypes), None)
     if FieldAccess and isinstance(e, FieldAccess):
         # E-3 (class fields) + E-1 (record fields): resolve the
         # receiver's type and walk the attr chain.  Falls back to
@@ -605,8 +694,14 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
                 cur = nxt
             elif isinstance(cur, TVar):
                 # Constrain receiver to a record containing this field.
+                # CE-16 V1: open the constraint with a fresh row tail
+                # under AIPL_ROWPOLY=1 so multiple `.field` reads on
+                # the same receiver each just constrain one field,
+                # and the receiver accumulates a row of {field1, field2}
+                # without forcing a closed record.
                 ft = infer.fresh()
-                infer.constrain(cur, TRecord(((attr, ft),)),
+                row_tail = _row_fresh() if os.environ.get("AIPL_ROWPOLY", "0") == "1" else None
+                infer.constrain(cur, TRecord(((attr, ft),), row_tail),
                                 where=f"{e.name}.{attr} access")
                 cur = ft
             else:

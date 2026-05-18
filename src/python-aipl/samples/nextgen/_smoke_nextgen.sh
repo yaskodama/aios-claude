@@ -24,6 +24,9 @@ env_for() {
     ce12_refinement/sample1_satisfiable.abcl)  echo "AIPL_REFINE_UNIFY=1" ;;
     ce12_refinement/sample2_window_unsat.abcl) echo "AIPL_REFINE_CHECK=1" ;;
     ce12_refinement/sample3_subset_implied.abcl) echo "AIPL_REFINE_UNIFY=1" ;;
+    ce16_rowpoly/sample1_basic_rowvar.abcl)    echo "AIPL_ROWPOLY=1" ;;
+    ce16_rowpoly/sample2_open_closed.abcl)     echo "AIPL_ROWPOLY=1" ;;
+    ce16_rowpoly/sample3_nested_rowvar.abcl)   echo "AIPL_ROWPOLY=1" ;;
     dr12_region/sample1_primary_hit.abcl)
       echo "AIPL_REGION=us-east-1 AIPL_REGION_FAILOVER=us-east-1,eu-west-1 AIPL_ROUTE_REGION_us-east-1=Greeter:fast" ;;
     dr12_region/sample2_failover_chain.abcl)

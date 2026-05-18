@@ -1,0 +1,19 @@
+// CE-16 V1 / sample 2 — open vs closed records.
+//
+// Two-step contrast that highlights what the row variable buys you
+// over CE-13's gradual intersection:
+//
+//   greet  is open — it constrains receiver to "at least .name"
+//   audit  is open — "at least .age"
+//   Caller passes a record with name+age+email; the row variable
+//   absorbs `email` and unify succeeds.
+
+class Greeter {
+  method greet(p) { return p.name; }
+  method idof(p)  { return p.id; }
+}
+
+var g = new Greeter();
+print("[ce16/2] open record:");
+print(now g.greet({name: "Alice", id: "u-001", email: "a@b"}));
+print(now g.idof({name: "Bob",  id: "u-002", role: "admin"}));
