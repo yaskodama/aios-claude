@@ -141,7 +141,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | 4   | `await` future block                                |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 5   | `send` fire-and-forget                              |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ✅  |
 | 6   | `become` actor class swap                           |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
-| 7   | `select` selective receive                          |  ✅  |  ✅  |  ✅   |  ✅  |  ✅  |  ✅  |  ❌  |
+| 7   | `select` selective receive                          |  ✅⁶ |  ✅⁶ |  ✅   |  ✅  |  ✅  |  ✅  |  ❌  |
 | 8   | top-level functions                                 |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ✅  |
 | 9   | signatures / overloads                              |  ❌  |  ❌  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
 | 10  | dynamic compile (`compile()`)                       |  ✅  |  ✅  |  ✅   |  ✅  |  ❌  |  ❌  |  ❌  |
@@ -158,6 +158,28 @@ automatically; in the browser the calls throw "not available").
 ³ OCaml / JS-O / JS-B / JS-N use a pure-runtime PPM (P6) backend (RGBA
 in memory, alpha dropped on save, viewable in Preview.app / GIMP /
 ImageMagick).  PNG would require an external decoder library.
+
+⁶ Python `select { case ... }` statement was added in commit
+`9aaf371` (2026-05-18) — `grammar.lark`, `aipl_ast.SelectStmt`,
+`aipl_parser._Builder.select_*`, `aipl_interp._do_select`.  Same
+shape and semantics as OCaml's `parser.mly` select_cases / select_pat
+/ select_timeout (mailbox drain → first matching `name + arity`
+→ rebind params → run body; non-matched FIFO re-queued; optional
+`timeout NNN -> { ... }`).  Channel-based `select_recv(...)` for
+typed CSP channels remains available as a separate builtin in Python.
+
+⁷ Rows 29e/29f are two equivalent receive shapes for the
+fire-and-forget send + reply pattern (`Worker.reply(r)` after
+`send w.ask(q)`), enabled by the reply-on-send routing introduced
+in commits `590e3aa` (OCaml) and `dd9d604` (Python).  Shape (e)
+uses a plain user-defined method `reply(r)` — the actor loop
+dispatches the synthetic `reply(r)` message just like any other
+incoming call; available on every runtime that has `reply(...)`
+(C runtime omits reply slots so 29e/29f are ❌ there too).  Shape
+(f) uses the explicit `select { case reply(r) -> ... }` form — see
+note ⁶ above.  Cross-runtime samples:
+`abclc/ai-samples/SendReplyMethod.abcl` (OCaml, commit `cbec37c`)
+and `src/python-aipl/samples-ai/_send_reply_demo/*.abcl` (Python).
 
 ## Type system
 
@@ -320,6 +342,8 @@ MAP-Elites で 24 min × 2 run。詳細は `IMPL_I0003_MVP/IMPL_DESIGN.md` 〜
 | 29b | `now actor.m(...)` + `ai_call(...)` inside method  → reply gets blocking reply | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no `reply()` in C runtime) |
 | 29c | `future actor.m(...)` + `await(f)` + `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ (no future slot in C runtime) |
 | 29d | `send` + callback pattern (`send a.ask(rcv); ...; send rcv.got(reply)`) with `ai_call(...)` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| 29e | `send` + user-defined `reply(r)` method — reply-on-send routes value back to sender's mailbox⁷ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| 29f | `send` + `select { case reply(r) -> ... }` — explicit OTP-style receive⁷ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | 30  | AI governance (budget / concurrent / fallback)| ✅                          | ✅                   | ✅            | ✅            | ❌           | ❌                            | ✅       |
 | 31  | HMAC-signed remote send                       | ✅                          | ✅                   | ✅²           | ✅²           | ❌           | ❌                            | ✅       |
 
@@ -552,6 +576,35 @@ OCaml の 🟡 (CE-1 / CE-6 / CE-9) は Z3 refinement check が
   と DR-6 (quorum) は AI client 層が必要。DR-7 (subtree) は spawn-tree
   registry が要る。
 
+### 2026-05-18: Phase O-3 — Send/Select 相互作用整合 (両ランタイム)
+
+OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
+の細部の挙動を完全対称化。OCaml で見つけた 3 バグの修正と、Python への
+逆移植 (`select { case ... }` 構文追加) で完結:
+
+| Fix | 内容 | OCaml | Python (型推論) | LOC |
+|---|---|:-:|:-:|---:|
+| (1) | `reply(v)` を send 経路で sender mailbox に `reply(v)` メッセージとして配送 | ✅ `590e3aa` | ✅ `dd9d604` | +25 |
+| (2) | `new X()` をメソッド本体内で実行時の actor_table キー = var 名 整合 | ✅ `590e3aa` | N/A (元から問題なし) | +5 |
+| (3) | script-mode actor quiescence (OCaml: `actor.busy` flag + 100ms stable + 5s cap / Python: defaults 引き上げ) | ✅ `590e3aa` | ✅ `dd9d604` | +60 |
+| (4) | Python `select { case method(args) -> { ... } timeout NNN -> { ... } }` 構文追加 (OCaml からの逆移植) | (元から ✅) | ✅ `9aaf371` | +134 |
+
+これにより両ランタイムで `send` 後の reply 受信に 2 つの等価 shape が成立:
+
+- **(e) user-defined `reply(r)` method** — Erlang プロセス風。Driver に
+  通常のメソッド `reply(r)` を定義するだけで OK (actor loop が自動 dispatch)。
+  サンプル: `abclc/ai-samples/SendReplyMethod.abcl` (OCaml `cbec37c`) /
+  `samples-ai/_send_reply_demo/send_reply_style.abcl` (Python `dd9d604`).
+- **(f) `select { case reply(r) -> ... }` block** — OTP / Erlang
+  receive 風。サンプル: `_ai_call_styles/send_select_style.abcl` (OCaml) /
+  `samples-ai/_send_reply_demo/send_select_style.abcl` (Python `9aaf371`).
+
+両ランタイムに 4 形態 (now / future+await / send+reply-method / send+select)
+の `ai_call` デモが揃った。実 OpenAI provider + mock 両方で動作確認済。
+
+`.aice` 仕様書: `aice-pi-evolution/experiments/2026-05-18_python_send_select_align/AIPL_Python_SendSelectAlignment.aice`
+(三段パイプライン .aice → .ga.json → .aipl まで lower 済、commit `f7eedb2`)。
+
 ---
 
 *Generated 2026-05-14, updated 2026-05-18.*  Cumulative through:
@@ -572,8 +625,16 @@ OCaml の 🟡 (CE-1 / CE-6 / CE-9) は Z3 refinement check が
   `src/aipl_dist.ml`, `src/refinement.ml`, and incremental hooks
   into `infer.ml` / `eval_thread.ml` / `ai.ml` / `repl_thread.ml`.
   JS-OCaml inherits all features through the OCaml backend.
+- **Phase O-3 send/select alignment (2026-05-18)**: 3 OCaml runtime
+  bugs in `send` / `now` / `future` / `select` / `reply` interaction
+  fixed (commit `590e3aa`); fix (1) (reply-on-send routing) and a
+  tightened fix (3) (script-mode quiescence) ported to Python type-
+  inferred runtime (commit `dd9d604`); Python gained the OCaml-style
+  `select { case method(args) -> ... }` statement (commit `9aaf371`).
+  Cross-runtime parity samples in `abclc/ai-samples/SendReplyMethod.abcl`
+  (commit `cbec37c`) and `src/python-aipl/samples-ai/_send_reply_demo/`.
 
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after Phase O-2.f).*
+*Last regenerated: 2026-05-18 (after Phase O-3 send/select alignment).*

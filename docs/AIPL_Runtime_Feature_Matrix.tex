@@ -225,7 +225,7 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
   \texttt{await} future block                                     & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{send} fire-and-forget                                   & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes \\
   \texttt{become} actor class swap                                & \Yes & \Yes & \Yes & \Yes & \No  & \No  & \No  \\
-  \texttt{select} selective receive                               & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No  \\
+  \texttt{select} selective receive\textsuperscript{f}            & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No  \\
   top-level functions                                             & \Yes & \Yes & \Yes & \Yes & \No  & \No  & \Yes \\
   signatures / overloads                                          & \No  & \No  & \Yes & \Yes & \No  & \No  & \No  \\
   dynamic compile (\texttt{compile()})                            & \Yes & \Yes & \Yes & \Yes & \No & \No & \No \\
@@ -237,7 +237,9 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
 
 \textsuperscript{a} \small JS-B / JS-N の I/O ビルトインは host が Node の \texttt{fs} を注入したとき (\texttt{server.mjs} が自動で行う) のみ動作。ブラウザ内では "not available" を投げる。\\
 \textsuperscript{b} \small Py-A / Py-I は Pillow 経由で PNG / JPEG / GIF / WebP を判定して読み書き。\\
-\textsuperscript{c} \small OCaml / JS-O / JS-B / JS-N は純ランタイムの PPM (P6) バックエンド (RGBA メモリ表現、保存時はアルファ破棄)。PNG は外部ライブラリが必要。
+\textsuperscript{c} \small OCaml / JS-O / JS-B / JS-N は純ランタイムの PPM (P6) バックエンド (RGBA メモリ表現、保存時はアルファ破棄)。PNG は外部ライブラリが必要。\\
+\textsuperscript{f} \small Python \texttt{select \{ case ... \}} 文は commit \texttt{9aaf371} (2026-05-18) で追加された (\texttt{grammar.lark}, \texttt{aipl\_ast.SelectStmt}, \texttt{aipl\_parser.\_Builder.select\_*}, \texttt{aipl\_interp.\_do\_select})。OCaml \texttt{parser.mly} の select\_cases / select\_pat / select\_timeout と同じ shape / semantics。チャネルベースの \texttt{select\_recv(...)} は Python では別ビルトインとして引き続き利用可能。\\
+\textsuperscript{g} \small 29e / 29f は send-and-receive の 2 つの等価 shape。reply-on-send routing (commits \texttt{590e3aa} OCaml / \texttt{dd9d604} Python) のおかげで、\texttt{Worker.reply(r)} は受信側 mailbox に \texttt{reply(r)} メッセージとして配送される。(e) は通常メソッド定義 \texttt{method reply(r) \{...\}}、(f) は明示 \texttt{select \{ case reply(r) -> ... \}}。C ランタイムは reply slot 自体無いため \No。サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) と \texttt{src/python-aipl/samples-ai/\_send\_reply\_demo/*.abcl}。
 
 \section*{Type system}
 
@@ -436,6 +438,42 @@ OCaml AIPL は Python (annotated) と **完全機能同等** に到達.実装規
 は当初推定 \textasciitilde 1925 LOC の \textbf{68\%} で済んだ.
 詳細は \texttt{docs/OCAML\_PORT\_ROADMAP.md}.
 
+\subsubsection*{Phase O-3 — Send/Select 相互作用整合 (2026-05-18)}
+
+OCaml と Python (型推論) で \texttt{send} / \texttt{now} / \texttt{future} /
+\texttt{select} / \texttt{reply} の細部の挙動を完全対称化.
+
+\begin{center}
+\begin{tabular}{clccr}
+\toprule
+Fix & 内容 & OCaml & Python (型推論) & LOC \\
+\midrule
+(1) & \texttt{reply(v)} を送信側 mailbox に配送 & \Yes \texttt{590e3aa} & \Yes \texttt{dd9d604} & +25 \\
+(2) & \texttt{new X()} in-method actor\_table key 整合 & \Yes \texttt{590e3aa} & N/A (元から OK) & +5 \\
+(3) & script-mode actor quiescence & \Yes \texttt{590e3aa} & \Yes \texttt{dd9d604} & +60 \\
+(4) & Python \texttt{select \{ case ... \}} 構文追加 & (元から \Yes) & \Yes \texttt{9aaf371} & +134 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+両ランタイムで成立する 2 つの receive shape:
+
+\begin{itemize}
+\item \textbf{(e)} user-defined \texttt{method reply(r) \{ ... \}} —
+  Erlang プロセス風,actor loop が自動 dispatch.
+  サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) /
+  \texttt{samples-ai/\_send\_reply\_demo/send\_reply\_style.abcl} (Python).
+\item \textbf{(f)} \texttt{select \{ case reply(r) -> ... \}} —
+  OTP / Erlang receive 風.
+  サンプル: \texttt{\_ai\_call\_styles/send\_select\_style.abcl} (OCaml) /
+  \texttt{samples-ai/\_send\_reply\_demo/send\_select\_style.abcl} (Python).
+\end{itemize}
+
+\noindent 両ランタイムに 4 形態 (now / future+await / send+reply-method
+/ send+select) の \texttt{ai\_call} デモが揃った.実 OpenAI provider +
+mock 両方で動作確認済.\texttt{.aice} 仕様書:
+\texttt{aice-pi-evolution/experiments/2026-05-18\_python\_send\_select\_align/}.
+
 \clearpage
 
 \section*{Networking, AI, infrastructure}
@@ -453,6 +491,8 @@ OCaml AIPL は Python (annotated) と **完全機能同等** に到達.実装規
   \quad \texttt{now actor.m(...)} + \texttt{ai\_call} inside method (blocking) & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   \quad \texttt{future actor.m(...)} + \texttt{await(f)} + \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   \quad \texttt{send}\,+\,callback pattern with \texttt{ai\_call} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
+  \quad \texttt{send}\,+\,user-defined \texttt{reply(r)} method\textsuperscript{g} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
+  \quad \texttt{send}\,+\,\texttt{select \{ case reply(r) -> ... \}}\textsuperscript{g} & \Yes & \Yes & \Yes & \Yes & \Yes & \Yes & \No \\
   AI governance (budget/concurrent/fallback)    & \Yes & \Yes & \Yes & \Yes & \No & \No & \Yes \\
   HMAC-signed remote send                       & \Yes & \Yes & \Yes\textsuperscript{e} & \Yes\textsuperscript{e} & \No & \No & \Yes \\
   persistent actor state                        & \Yes & \Yes & \No & \No & \No & \No & \No \\
@@ -741,6 +781,6 @@ For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
 \bigskip
-\noindent\textit{Last regenerated: 2026-05-18 (after Phase O-2.f).}
+\noindent\textit{Last regenerated: 2026-05-18 (after Phase O-3 send/select alignment).}
 
 \end{document}
