@@ -1,0 +1,123 @@
+// Round 3 minimal: Hello-Spreadsheet in pure AIPL (Py-I).
+//
+// 3x3 sheet (A1..C3).  Literal cells hold integer values; formula
+// cells hold a record-tagged AST.  Eval recurses through the AST,
+// dereferencing cell refs against the sheet array.  No parser yet —
+// formulas are constructed as ASTs directly (the parser comes in
+// the next commit per round-2 RESULTS.md).
+//
+// Expected output:
+//   [sheet] A1 = 10
+//   [sheet] B1 = 20
+//   [sheet] C1 = 30        ← A1 + B1
+//   [sheet] A2 = 30
+//   [sheet] B2 = 40
+//   [sheet] C2 = 1200      ← A2 * B2
+//   [sheet] A3 = 20        ← A1 * 2
+//   [sheet] B3 = 40        ← B1 * 2
+//   [sheet] C3 = 1330      ← SUM(A1,B1,A2,B2,C1,C2)  = 10+20+30+40+30+1200
+
+// ── sheet-array lookup helper ─────────────────────────────────
+function sheet_get(sheet, id) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.id == id) {
+      return c;
+    }
+    i = i + 1;
+  }
+  return {id: id, kind: "Empty", val: 0, expr: {tag: "none"}};
+}
+
+// ── formula evaluator (AST → number) ──────────────────────────
+function eval_expr(ast, sheet) {
+  if (ast.tag == "Lit") {
+    return ast.val;
+  }
+  if (ast.tag == "Ref") {
+    var c = sheet_get(sheet, ast.id);
+    if (c.kind == "Formula") {
+      return eval_expr(c.expr, sheet);
+    }
+    return c.val;
+  }
+  if (ast.tag == "Bin") {
+    var l = eval_expr(ast.lhs, sheet);
+    var r = eval_expr(ast.rhs, sheet);
+    if (ast.op == "+") { return l + r; }
+    if (ast.op == "-") { return l - r; }
+    if (ast.op == "*") { return l * r; }
+    if (ast.op == "/") { return l / r; }
+    return 0;
+  }
+  if (ast.tag == "Call") {
+    if (ast.name == "SUM") {
+      var total: int = 0;
+      var i: int = 0;
+      var n: int = array_len(ast.args);
+      while (i < n) do {
+        total = total + eval_expr(array_get(ast.args, i), sheet);
+        i = i + 1;
+      }
+      return total;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+// ── build a 3x3 sheet ─────────────────────────────────────────
+var sheet = [];
+
+// Row 1: A1=10, B1=20, C1=A1+B1
+array_push(sheet, {id: "A1", kind: "Value", val: 10, expr: {tag:"none"}});
+array_push(sheet, {id: "B1", kind: "Value", val: 20, expr: {tag:"none"}});
+array_push(sheet, {id: "C1", kind: "Formula", val: 0,
+  expr: {tag:"Bin", op:"+",
+         lhs:{tag:"Ref", id:"A1"},
+         rhs:{tag:"Ref", id:"B1"}}});
+
+// Row 2: A2=30, B2=40, C2=A2*B2
+array_push(sheet, {id: "A2", kind: "Value", val: 30, expr: {tag:"none"}});
+array_push(sheet, {id: "B2", kind: "Value", val: 40, expr: {tag:"none"}});
+array_push(sheet, {id: "C2", kind: "Formula", val: 0,
+  expr: {tag:"Bin", op:"*",
+         lhs:{tag:"Ref", id:"A2"},
+         rhs:{tag:"Ref", id:"B2"}}});
+
+// Row 3: A3=A1*2, B3=B1*2, C3=SUM(A1,B1,A2,B2,C1,C2)
+array_push(sheet, {id: "A3", kind: "Formula", val: 0,
+  expr: {tag:"Bin", op:"*",
+         lhs:{tag:"Ref", id:"A1"},
+         rhs:{tag:"Lit", val:2}}});
+array_push(sheet, {id: "B3", kind: "Formula", val: 0,
+  expr: {tag:"Bin", op:"*",
+         lhs:{tag:"Ref", id:"B1"},
+         rhs:{tag:"Lit", val:2}}});
+array_push(sheet, {id: "C3", kind: "Formula", val: 0,
+  expr: {tag:"Call", name:"SUM",
+         args:[ {tag:"Ref", id:"A1"}, {tag:"Ref", id:"B1"},
+                {tag:"Ref", id:"A2"}, {tag:"Ref", id:"B2"},
+                {tag:"Ref", id:"C1"}, {tag:"Ref", id:"C2"} ]}});
+
+// ── recompute + print every cell ──────────────────────────────
+function recompute_and_print(sheet) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.kind == "Formula") {
+      var v = eval_expr(c.expr, sheet);
+      print("[sheet] " + c.id + " = " + v);
+    } else {
+      print("[sheet] " + c.id + " = " + c.val);
+    }
+    i = i + 1;
+  }
+}
+
+print("=== HelloSheet 3x3 ===");
+recompute_and_print(sheet);
+print("=== done ===");
