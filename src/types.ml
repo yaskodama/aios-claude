@@ -13,7 +13,13 @@ and ty =
   | TActor of string * (string * ty) list
   | TArray of ty
   | TAny
-  | TRecord of (string * ty) list
+  (* CE-16 V1: row-polymorphic records.  The second component is an
+     optional tail row variable.  `None` = closed (the existing
+     behavior); `Some (TVar _)` = open — unify time can absorb
+     label differences into the tail.  Opt-in via AIPL_ROWPOLY=1
+     in the unify arm; all construction sites still pass `None` so
+     pre-CE-16 programs behave identically. *)
+  | TRecord of (string * ty) list * ty option
   | TTuple of ty list
   (* CE-12: refinement type — base + binder name + predicate.
      `ty_of_type_expr` produces this when the surface syntax is
@@ -208,13 +214,19 @@ let rec string_of_ty (t : ty) : string =
         |> String.concat "; "
       in
       "actor(" ^ name ^ ") {" ^ ms ^ "}"
-  | TRecord fields ->
+  | TRecord (fields, tail) ->
       let fs =
         fields
         |> List.map (fun (l,t) -> l ^ " : " ^ string_of_ty t)
         |> String.concat "; "
       in
-      "{" ^ fs ^ "}"
+      let tail_s = match tail with
+        | None    -> ""
+        | Some tv ->
+          let sep = if fields = [] then "" else "; " in
+          sep ^ "| " ^ string_of_ty tv
+      in
+      "{" ^ fs ^ tail_s ^ "}"
   | TTuple ts ->
       let xs = ts |> List.map string_of_ty |> String.concat " * " in
       "(" ^ xs ^ ")"
@@ -241,7 +253,9 @@ let rec occurs (v : tvar ref) (t : ty) : bool =
   match repr t with
   | TVar v'      -> v == v'
   | TArray t1    -> occurs v t1
-  | TRecord fs   -> List.exists (fun (_,t) -> occurs v t) fs
+  | TRecord (fs, tail) ->
+      List.exists (fun (_,t) -> occurs v t) fs
+      || (match tail with Some t -> occurs v t | None -> false)
   | TTuple ts    -> List.exists (occurs v) ts
   | TFun(ps,r)   -> List.exists (occurs v) ps || occurs v r
   | TRefined (b, _, _) -> occurs v b
@@ -270,23 +284,57 @@ let rec unify ?(loc = Location.dummy) (t1 : ty) (t2 : ty) : unit =
       if List.length ts1 <> List.length ts2 then
         raise (Type_error (loc, "tuple arity mismatch"));
       List.iter2 (unify ~loc) ts1 ts2
-  | TRecord fs1, TRecord fs2 ->
-      (* CE-13: record width subtyping.  Previously this required
-         identical field sets (length match + label match per
-         position).  Now we unify the intersection of fields
-         pairwise (depth subtyping per field) and ignore fields on
-         only one side.  Wholly-disjoint records still fail. *)
+  | TRecord (fs1, tail1), TRecord (fs2, tail2) ->
+      (* CE-16 V1: row-polymorphic unify (opt-in via AIPL_ROWPOLY=1).
+         When either side carries a row tail, label differences are
+         absorbed into the tail variable.  Falls back to the CE-13
+         width-subtyping path below when both records are closed or
+         the env var is unset. *)
       let labels_of fs = List.map fst fs in
       let s1 = labels_of fs1 and s2 = labels_of fs2 in
-      let common = List.filter (fun l -> List.mem l s2) s1 in
-      if common = [] && fs1 <> [] && fs2 <> [] then
-        raise (Type_error
-          (loc, "record fields disjoint: [" ^ String.concat ", " s1
-                ^ "] vs [" ^ String.concat ", " s2 ^ "]"));
-      List.iter (fun l ->
-        let t1 = List.assoc l fs1 and t2 = List.assoc l fs2 in
-        unify ~loc t1 t2
-      ) common
+      let common  = List.filter (fun l -> List.mem l s2) s1 in
+      let only_1  = List.filter (fun l -> not (List.mem l s2)) s1 in
+      let only_2  = List.filter (fun l -> not (List.mem l s1)) s2 in
+      let rowpoly =
+        (tail1 <> None || tail2 <> None)
+        && (try Sys.getenv "AIPL_ROWPOLY" = "1" with Not_found -> false)
+      in
+      if rowpoly then begin
+        List.iter (fun l ->
+          let t1 = List.assoc l fs1 and t2 = List.assoc l fs2 in
+          unify ~loc t1 t2
+        ) common;
+        if only_1 <> [] && tail2 = None then
+          raise (Type_error
+            (loc, "closed record on rhs cannot accept extra fields: "
+                  ^ String.concat ", " only_1));
+        if only_2 <> [] && tail1 = None then
+          raise (Type_error
+            (loc, "closed record on lhs cannot accept extra fields: "
+                  ^ String.concat ", " only_2));
+        let only_1_fields = List.map (fun l -> (l, List.assoc l fs1)) only_1 in
+        let only_2_fields = List.map (fun l -> (l, List.assoc l fs2)) only_2 in
+        match tail1, tail2 with
+        | Some _, Some _ ->
+            let rest = TVar (fresh_tvar ()) in
+            unify ~loc (Option.get tail1) (TRecord (only_2_fields, Some rest));
+            unify ~loc (Option.get tail2) (TRecord (only_1_fields, Some rest))
+        | Some _, None ->
+            unify ~loc (Option.get tail1) (TRecord (only_2_fields, None))
+        | None, Some _ ->
+            unify ~loc (Option.get tail2) (TRecord (only_1_fields, None))
+        | None, None -> ()  (* unreachable: rowpoly guard *)
+      end else begin
+        (* CE-13: width subtyping (intersection-based, fall-through path). *)
+        if common = [] && fs1 <> [] && fs2 <> [] then
+          raise (Type_error
+            (loc, "record fields disjoint: [" ^ String.concat ", " s1
+                  ^ "] vs [" ^ String.concat ", " s2 ^ "]"));
+        List.iter (fun l ->
+          let t1 = List.assoc l fs1 and t2 = List.assoc l fs2 in
+          unify ~loc t1 t2
+        ) common
+      end
   | TFun (ps1, r1), TFun (ps2, r2) ->
       if List.length ps1 <> List.length ps2 then
         raise (Type_error (loc, "arity mismatch"));
@@ -320,7 +368,7 @@ let rec lookup_method_type (tobj : ty) (mname : string) : ty option =
   match tobj with
   | TActor (_nm, ms) ->
       List.assoc_opt mname ms
-  | TRecord ms ->
+  | TRecord (ms, _) ->
       List.assoc_opt mname ms
   | _ ->
       None
@@ -338,7 +386,9 @@ let rec prune t =
            (!tv).link <- Some t'';
            t'')
   | TArray t1 -> TArray (prune t1)
-  | TRecord fs -> TRecord (List.map (fun (l,t1) -> (l, prune t1)) fs)
+  | TRecord (fs, tail) ->
+      TRecord (List.map (fun (l,t1) -> (l, prune t1)) fs,
+               Option.map prune tail)
   | TTuple ts -> TTuple (List.map prune ts)
   | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,prune t1)) ms)
   | TFun (ps,r) -> TFun (List.map prune ps, prune r)
@@ -367,8 +417,17 @@ let string_of_ty_pretty (t : ty) : string =
     match prune ty with
     | TVar v      -> name_of (!v).id
     | TArray t1   -> go t1 ^ "[]"
-    | TRecord fs  ->
-        "{" ^ (fs |> List.map (fun (l,t)-> l ^ " : " ^ go t) |> String.concat "; ") ^ "}"
+    | TRecord (fs, tail) ->
+        let body =
+          fs |> List.map (fun (l,t)-> l ^ " : " ^ go t) |> String.concat "; "
+        in
+        let tail_s = match tail with
+          | None -> ""
+          | Some t ->
+              let sep = if fs = [] then "" else "; " in
+              sep ^ "| " ^ go t
+        in
+        "{" ^ body ^ tail_s ^ "}"
     | TTuple ts   ->
         "(" ^ (ts |> List.map go |> String.concat " * ") ^ ")"
     | TActor(n,ms) ->
@@ -399,8 +458,13 @@ let rec ftv_ty t =
        | None -> ISet.singleton (!tv).id
        | Some t' -> ftv_ty t')
   | TArray t1 -> ftv_ty t1
-  | TRecord fs ->
-      List.fold_left (fun acc (_,t1)->ISet.union acc (ftv_ty t1)) ISet.empty fs
+  | TRecord (fs, tail) ->
+      let base =
+        List.fold_left (fun acc (_,t1)->ISet.union acc (ftv_ty t1)) ISet.empty fs
+      in
+      (match tail with
+       | None -> base
+       | Some t -> ISet.union base (ftv_ty t))
   | TTuple ts ->
       List.fold_left (fun acc t1 -> ISet.union acc (ftv_ty t1)) ISet.empty ts
   | TActor (_n,ms) ->
@@ -421,7 +485,9 @@ let instantiate (Forall (qs, t)) : ty =
     match ty with
     | TInt | TFloat | TBool | TString | TAny | TUnit -> ty
     | TArray t1 -> TArray (inst t1)
-    | TRecord fs -> TRecord (List.map (fun (l,t1)->(l,inst t1)) fs)
+    | TRecord (fs, tail) ->
+        TRecord (List.map (fun (l,t1)->(l,inst t1)) fs,
+                 Option.map inst tail)
     | TTuple ts -> TTuple (List.map inst ts)
     | TActor (n,ms) -> TActor (n, List.map (fun (m,t1)->(m,inst t1)) ms)
     | TFun (ps,r) -> TFun (List.map inst ps, inst r)

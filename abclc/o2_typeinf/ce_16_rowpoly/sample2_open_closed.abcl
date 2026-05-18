@@ -1,0 +1,15 @@
+// CE-16 V1 / sample 2 — open vs closed records (OCaml).
+//
+// Same method called with two structurally-different records,
+// each having the method's required field plus different extras.
+// The open row variable absorbs the extras independently per call.
+
+class Greeter {
+  method greet(p) -> string { return p.name; }
+  method idof(p)  -> string { return p.id; }
+}
+
+var g = new Greeter();
+print("[ce16/2] open record:");
+print(now g.greet({name: "Alice", id: "u-001", email: "a@b"}));
+print(now g.idof({name: "Bob",  id: "u-002", role: "admin"}));

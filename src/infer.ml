@@ -164,7 +164,10 @@ let rec ty_of_type_expr_with_tbl
   | Ast.TyEArray t -> Types.TArray (go t)
   | Ast.TyETuple ts -> Types.TTuple (List.map go ts)
   | Ast.TyERecord fs ->
-      Types.TRecord (List.map (fun (l, t) -> (l, go t)) fs)
+      (* CE-16: surface-syntax records remain closed (tail=None).
+         A row-variable can only appear via inference (e.g. via a
+         FieldAccess constraint under AIPL_ROWPOLY=1). *)
+      Types.TRecord (List.map (fun (l, t) -> (l, go t)) fs, None)
   | Ast.TyEName n ->
       (match tbl with
        | Some t when is_tvar_name n ->
@@ -421,13 +424,13 @@ let rec infer_expr (env:env) (e:expr) : ty =
       TAny
   | RecordLit fields ->
       let typed = List.map (fun (l, ex) -> (l, infer_expr env ex)) fields in
-      TRecord typed
+      TRecord (typed, None)
   | TupleLit es ->
       TTuple (List.map (infer_expr env) es)
   | FieldAccess (e1, fname) ->
       let t1 = infer_expr env e1 in
       (match repr t1 with
-       | TRecord fs ->
+       | TRecord (fs, _tail) ->
            (match List.assoc_opt fname fs with
             | Some t -> t
             | None ->

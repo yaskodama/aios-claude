@@ -1,0 +1,18 @@
+// CE-16 V1 / sample 3 — nested row variable (record-in-record, OCaml).
+//
+// `city_of` reads only p.addr.city.  Under AIPL_ROWPOLY=1 the
+// receiver's shape is `{addr: {city: string | ρ_addr} | ρ_p}`.
+// The caller's 3-field record (with a 3-field addr) unifies via
+// both row tails simultaneously.
+
+class Geo {
+  method city_of(p) -> string { return p.addr.city; }
+}
+
+var g = new Geo();
+var u = {
+  name: "Alice",
+  addr: { city: "Tokyo", zip: "1000001", country: "JP" },
+  email: "alice@example.com"
+};
+print("[ce16/3] city = " + now g.city_of(u));
