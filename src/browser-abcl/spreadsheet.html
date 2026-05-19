@@ -530,7 +530,8 @@
         const str = (v) => String(v);
         switch (nm) {
           case "SUM":    return vs.reduce((s, v) => s + num(v), 0);
-          case "AVG":    return vs.length ? Math.trunc(vs.reduce((s, v) => s + num(v), 0) / vs.length) : 0;
+          case "AVG":
+          case "AVERAGE": return vs.length ? vs.reduce((s, v) => s + num(v), 0) / vs.length : 0;
           case "MIN":    return vs.length ? Math.min(...vs.map(num)) : 0;
           case "MAX":    return vs.length ? Math.max(...vs.map(num)) : 0;
           case "COUNT":  return vs.filter(v => num(v) !== 0).length;
@@ -549,6 +550,56 @@
           }
           case "FLOOR": return Math.floor(num(vs[0]));
           case "CEIL":  return Math.ceil (num(vs[0]));
+
+          // ── F5 math additions ─────────────────────────────────
+          case "INT":     return Math.trunc(num(vs[0]));
+          case "SQRT":    return Math.sqrt(num(vs[0]));
+          case "SIGN":    { const x = num(vs[0]); return x > 0 ? 1 : x < 0 ? -1 : 0; }
+          case "EXP":     return Math.exp(num(vs[0]));
+          case "LN":      return Math.log(num(vs[0]));
+          case "LOG10":   return Math.log10(num(vs[0]));
+          case "PI":      return Math.PI;
+          case "MEDIAN":  {
+            const sorted = vs.map(num).sort((a, b) => a - b);
+            if (!sorted.length) return 0;
+            const m = Math.floor(sorted.length / 2);
+            return sorted.length & 1 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+          }
+          case "STDEV":   {
+            const ns = vs.map(num);
+            if (ns.length < 2) return 0;
+            const mean = ns.reduce((s, v) => s + v, 0) / ns.length;
+            const sq   = ns.reduce((s, v) => s + (v - mean) * (v - mean), 0);
+            return Math.sqrt(sq / (ns.length - 1));   // sample stdev
+          }
+          case "VAR":     {
+            const ns = vs.map(num);
+            if (ns.length < 2) return 0;
+            const mean = ns.reduce((s, v) => s + v, 0) / ns.length;
+            return ns.reduce((s, v) => s + (v - mean) * (v - mean), 0) / (ns.length - 1);
+          }
+          case "LARGE":   {
+            // LARGE(range, k) — k-th largest (1-based).
+            const ns = vs.slice(0, -1).map(num).sort((a, b) => b - a);
+            const k  = num(vs[vs.length - 1]) || 1;
+            return ns[k - 1] ?? 0;
+          }
+          case "SMALL":   {
+            const ns = vs.slice(0, -1).map(num).sort((a, b) => a - b);
+            const k  = num(vs[vs.length - 1]) || 1;
+            return ns[k - 1] ?? 0;
+          }
+
+          // ── F5 boolean ────────────────────────────────────────
+          case "AND":    return vs.every(v => !!num(v)) ? 1 : 0;
+          case "OR":     return vs.some (v => !!num(v)) ? 1 : 0;
+          case "NOT":    return num(vs[0]) ? 0 : 1;
+
+          // ── F5 conditional aggregates ─────────────────────────
+          // The condition is parsed once into a predicate function.
+          // Accepted forms: literal "5", ">10", "<=5", "<>0", "=foo".
+          // case "COUNTIF" / "SUMIF" / "AVERAGEIF" / "IFERROR"
+          // all live below the date block so they can share matchCond.
 
           // ── F3 text functions ─────────────────────────────────
           case "CONCAT":
@@ -585,10 +636,81 @@
           case "YEAR":  { const d = parseIso(str(vs[0] || "")); return d ? d.getFullYear() : 0; }
           case "MONTH": { const d = parseIso(str(vs[0] || "")); return d ? d.getMonth() + 1 : 0; }
           case "DAY":   { const d = parseIso(str(vs[0] || "")); return d ? d.getDate() : 0; }
+          case "WEEKDAY": {
+            // 1=Sunday..7=Saturday (Sheets default).
+            const d = parseIso(str(vs[0] || ""));
+            return d ? d.getDay() + 1 : 0;
+          }
+
+          // ── F5 conditional aggregates ─────────────────────────
+          case "COUNTIF": {
+            // COUNTIF(range, condition).  vs holds the flattened range
+            // plus the condition as the final scalar.
+            const cond = vs[vs.length - 1];
+            const items = vs.slice(0, -1);
+            const m = matchCondition(cond);
+            return items.filter(m).length;
+          }
+          case "SUMIF": {
+            const cond  = vs[vs.length - 1];
+            const items = vs.slice(0, -1);
+            const m = matchCondition(cond);
+            return items.filter(m).reduce((s, v) => s + num(v), 0);
+          }
+          case "AVERAGEIF": {
+            const cond  = vs[vs.length - 1];
+            const items = vs.slice(0, -1);
+            const m = matchCondition(cond);
+            const ms = items.filter(m).map(num);
+            return ms.length ? ms.reduce((s, v) => s + v, 0) / ms.length : 0;
+          }
+          case "IFERROR": {
+            // IFERROR(expr, fallback) — expr is already evaluated;
+            // we treat NaN, ±Infinity, or empty-string as "error".
+            const v = vs[0];
+            const bad = (typeof v === "number" && !Number.isFinite(v)) ||
+                        v === "" || v === undefined || v === null;
+            return bad ? vs[1] : v;
+          }
         }
         return 0;
       }
       return 0;
+    }
+
+    // Parse a Sheets-style condition into a predicate.  Examples:
+    //   ">10", "<=5", "<>0", "=apple", or just "5" / "apple" for eq.
+    function matchCondition(cond) {
+      const s = String(cond ?? "").trim();
+      const m = s.match(/^(>=|<=|<>|>|<|=)?\s*(.*)$/);
+      const op  = (m && m[1]) || "=";
+      const rhs = (m && m[2]) || "";
+      const rhsNum = Number(rhs);
+      const numeric = !isNaN(rhsNum) && rhs.trim() !== "";
+      return (v) => {
+        if (numeric) {
+          const n = Number(v);
+          if (isNaN(n)) return op === "<>";
+          switch (op) {
+            case "=":  return n === rhsNum;
+            case "<>": return n !== rhsNum;
+            case ">":  return n  >  rhsNum;
+            case "<":  return n  <  rhsNum;
+            case ">=": return n  >= rhsNum;
+            case "<=": return n  <= rhsNum;
+          }
+        }
+        const sv = String(v);
+        switch (op) {
+          case "=":  return sv === rhs;
+          case "<>": return sv !== rhs;
+          case ">":  return sv  >  rhs;
+          case "<":  return sv  <  rhs;
+          case ">=": return sv  >= rhs;
+          case "<=": return sv  <= rhs;
+        }
+        return false;
+      };
     }
 
     // ─── canvas → (row, col) hit test ───────────────────────────
@@ -1086,6 +1208,8 @@
         get cells()  { return interp.runtime.sheetState.cells; },
         get state()  { return interp.runtime.sheetState; },
         cellValues, cellFormulas, cellFormats, cellClocks,
+        // F5 test hook: evaluate a formula string and return the value.
+        evalFormula: (src) => evalAst(parseFormula(src)),
       };
       try {
         const ast = parser.parse(ABCL_SOURCE);
