@@ -1,0 +1,119 @@
+{
+  "name": "AIPL_XinuRazPi_Round1",
+  "task": "AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) で進化させる.Round 0 (= 既存 src/aipl2c.ml --xinu + gen_program_xinu + 3 サンプル + xinu-raz) を base に、(R) regression 修復、(P) パフォーマンス/スケジューラ、(F) AIPL 機能拡張 (Xinu C ランタイム上)、(G) GUI/I/O 拡張、(N) 分散/ネットワーク の 5 軸で進化.全 phase は (1) aipl2c の .abcl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で起動成功 ✅ の 3 段ゲートを通過すること.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "R0_RestoreSampleTyping",
+      "R1_SmokeAutomation",
+      "P1_ActorAsXinuThread",
+      "P2_PriorityClassesAndTimeslice",
+      "P3_LockFreeMailbox",
+      "P4_SchedulingVisualizer",
+      "F1_P3DistCheckpoint",
+      "F2_LWWCellSemantics",
+      "F3_EffectAndTypeParity",
+      "F4_StringsAndArrays",
+      "G1_FramebufferPrimitives",
+      "G2_BitmapFontText",
+      "G3_MouseEventDispatch",
+      "G4_RealPiGPIO",
+      "G5_ImageBitmapLoad",
+      "N1_TCPIPStack",
+      "N2_WSBridgeToBrowser",
+      "N3_MultiPiActorCluster",
+      "N4_mDNSDiscovery",
+      "R_BackwardCompat",
+      "ImplCost"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": []
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}

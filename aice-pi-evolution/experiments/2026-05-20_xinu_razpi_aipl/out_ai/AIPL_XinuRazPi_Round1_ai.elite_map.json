@@ -1,0 +1,57 @@
+{
+  "cells": {
+    "paradigm=BASIC": {
+      "id": "I0001",
+      "genome": {
+        "paradigm": "BASIC",
+        "state_representation": "register_int",
+        "concurrency_model": "structured",
+        "type_safety": "none",
+        "effect_handling": "capability",
+        "ownership_model": "none"
+      },
+      "composite": 0.30200000000000005,
+      "generation": 0
+    },
+    "paradigm=C": {
+      "id": "I0003",
+      "genome": {
+        "paradigm": "C",
+        "state_representation": "register_int",
+        "concurrency_model": "threads_locks",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "rc"
+      },
+      "composite": 0.30800000000000005,
+      "generation": 0
+    },
+    "paradigm=Functional": {
+      "id": "I0006",
+      "genome": {
+        "paradigm": "Functional",
+        "state_representation": "ADT",
+        "concurrency_model": "none",
+        "type_safety": "high",
+        "effect_handling": "monadic",
+        "ownership_model": "rc"
+      },
+      "composite": 0.30000000000000004,
+      "generation": 2
+    },
+    "paradigm=ParallelOOP": {
+      "id": "I0009",
+      "genome": {
+        "paradigm": "ParallelOOP",
+        "state_representation": "symbol_owned",
+        "concurrency_model": "actor_messages",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "rc"
+      },
+      "composite": 0.324,
+      "generation": 5
+    }
+  },
+  "filled": 4
+}
