@@ -1038,6 +1038,100 @@
     // ─── apply_cell_change: the single sheet-mutation entry point.
     // Both the Enter-key commit path and Undo/Redo route through
     // this so history bookkeeping stays consistent.
+    // F13: dependency tracking — per-cell formula → its Ref / Range
+    // dependencies.  Reverse-indexed so we can find all formulas that
+    // need to re-eval when a given cell changes value.
+    const depGraph    = new Map();   // formula cellId → Set<dep cellId>
+    const reverseDeps = new Map();   // value cellId → Set<formula cellId>
+    function collectRefs(ast, out) {
+      if (!ast || typeof ast !== "object") return;
+      if (ast.tag === "Ref") { out.add(ast.id); return; }
+      if (ast.tag === "Range") {
+        const a = idToPair(ast.start_id);
+        const b = idToPair(ast.end_id);
+        if (a.col < 0 || b.col < 0) return;
+        const c0 = Math.min(a.col, b.col), c1 = Math.max(a.col, b.col);
+        const r0 = Math.min(a.row, b.row), r1 = Math.max(a.row, b.row);
+        for (let r = r0; r <= r1; r++)
+          for (let c = c0; c <= c1; c++) out.add(pairToId(c, r));
+        return;
+      }
+      // XRef: skip — cross-sheet auto-update is out of scope for now.
+      if (ast.tag === "XRef") return;
+      if (ast.tag === "Bin")  { collectRefs(ast.lhs, out); collectRefs(ast.rhs, out); return; }
+      if (ast.tag === "Call") { for (const a of (ast.args || [])) collectRefs(a, out); return; }
+    }
+    function clearDepsOf(formulaId) {
+      const prev = depGraph.get(formulaId);
+      if (!prev) return;
+      for (const dep of prev) {
+        const set = reverseDeps.get(dep);
+        if (set) {
+          set.delete(formulaId);
+          if (set.size === 0) reverseDeps.delete(dep);
+        }
+      }
+      depGraph.delete(formulaId);
+    }
+    function recordDepsOf(formulaId, formulaSource) {
+      // Strip leading "=" (EQ form) before parsing.
+      const body = formulaSource && formulaSource.startsWith("=")
+        ? formulaSource.slice(1) : formulaSource;
+      if (!body) return;
+      let ast;
+      try { ast = parseFormula(body); } catch (_) { return; }
+      const deps = new Set();
+      collectRefs(ast, deps);
+      deps.delete(formulaId);                 // self-ref short-circuit
+      depGraph.set(formulaId, deps);
+      for (const dep of deps) {
+        if (!reverseDeps.has(dep)) reverseDeps.set(dep, new Set());
+        reverseDeps.get(dep).add(formulaId);
+      }
+    }
+    // Re-evaluate every formula in `seedIds` (and any cascading dependents).
+    // BFS up to MAX_PASS iterations to bound runaway cycles.
+    let recomputeDepth = 0;
+    function cascadeRecompute(seedIds) {
+      if (recomputeDepth > 0) return;          // re-entrancy guard
+      recomputeDepth++;
+      try {
+        const MAX_PASS = 100;
+        let queue = Array.from(new Set(seedIds));
+        let pass = 0;
+        const visited = new Set();
+        while (queue.length > 0 && pass++ < MAX_PASS) {
+          const next = [];
+          for (const id of queue) {
+            const dependents = reverseDeps.get(id);
+            if (!dependents) continue;
+            for (const fid of dependents) {
+              if (visited.has(fid)) continue;
+              visited.add(fid);
+              const src = cellFormulas.get(fid);
+              if (!src) continue;
+              const body = src.startsWith("=") ? src.slice(1) : src;
+              let v;
+              try { v = evalAst(parseFormula(body)); }
+              catch (_) { continue; }
+              const old = cellValues.get(fid);
+              if (old === v) continue;          // no change → don't cascade further
+              cellValues.set(fid, v);
+              // Repaint just this cell via sheet_cell.
+              const { col, row } = idToPair(fid);
+              const fmt = cellFormats.get(fid) || "general";
+              if (interp && interp.runtime) {
+                interp.runtime._callBuiltin("sheet_cell",
+                  [row, col, formatValue(v, fmt), "Formula"],
+                  { __currentActor: null });
+              }
+              next.push(fid);
+            }
+          }
+          queue = next;
+        }
+      } finally { recomputeDepth--; }
+    }
     function applyCellChange(row, col, val, kind, formula) {
       const id = cellId(row, col);
       // F10: locked cells reject LOCAL edits only — remote writes
@@ -1053,8 +1147,10 @@
                      : (Number(val) === Number(val) && val !== "") ? Number(val)
                                                                    : val;
       cellValues.set(id, stored);
+      // F13: drop any previous dep edges (we'll re-record if it's still a Formula).
+      clearDepsOf(id);
       if (formula === null || formula === undefined) cellFormulas.delete(id);
-      else cellFormulas.set(id, formula);
+      else { cellFormulas.set(id, formula); recordDepsOf(id, formula); }
       // U3: render the formatted string (raw value still in cellValues
       // for downstream formulas).
       const fmt = cellFormats.get(id) || "general";
@@ -1080,6 +1176,8 @@
           macroRec.buffer.push({ row, col, val: stored, kind, formula });
         }
       }
+      // F13: cascade — re-evaluate every formula that depends on this id.
+      cascadeRecompute([id]);
     }
 
     // ─── C3 WebSocket realtime collab ──────────────────────────
@@ -1660,6 +1758,10 @@
         // C7 hooks.
         get peerActivity() { return peerActivity; },
         refreshPresenceBadge,
+        // F13 hooks.
+        get depGraph()    { return depGraph;    },
+        get reverseDeps() { return reverseDeps; },
+        cascadeRecompute,
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.

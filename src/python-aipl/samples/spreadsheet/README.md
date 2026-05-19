@@ -77,6 +77,7 @@
 | F12 | Macros — record/save/play OperationList (D5 round-trip + invalid-op skip) | `src/browser-abcl/spreadsheet.html` macros Map + macroStart/Stop/Save/Play | ✅ 10 assertion |
 | C7  | "Live: N peers" badge + 10-sec TTL pruning (excludes self) | `src/browser-abcl/spreadsheet.html` peerActivity + refreshPresenceBadge | ✅ 5 assertion |
 | Y4  | Heatmap chart kind — 2D tiles, blue→red color ramp on min..max | `src/browser-abcl/spreadsheet.html` renderHeatmapChart | ✅ 4 assertion |
+| F13 | Dependency-tracked auto-recompute (cascade on every cell change) | `src/browser-abcl/spreadsheet.html` depGraph + reverseDeps + cascadeRecompute | ✅ 11 assertion |
 
 ## smoke
 
