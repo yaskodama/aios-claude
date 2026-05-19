@@ -127,16 +127,21 @@
       return id;
     };
 
-    // ─── JS-side formula evaluator (Round 6: + range refs) ──────
-    // Mirrors GSheetsCore12.abcl + GSheetsRanges.abcl from Py-I.
+    // ─── JS-side formula evaluator (Round 6: + range + text/date) ─
+    // Mirrors GSheetsCore12.abcl + GSheetsRanges.abcl from Py-I,
+    // plus a Sheets-like text/date layer not yet ported to Py-I.
     // Supports:
-    //   literals (INT), refs (A1, $A$1)
+    //   literals (INT, STR "..."), refs (A1, $A$1)
     //   range refs (A1:B10, $A$1:$E$5)
     //   arithmetic + - * /
     //   comparison < > <= >= == !=
     //   parens ( )
-    //   12 functions: SUM AVG MIN MAX COUNT COUNTA IF ABS POWER MOD
-    //                 ROUND FLOOR CEIL
+    //   12 numeric functions:  SUM AVG MIN MAX COUNT COUNTA IF
+    //                          ABS POWER MOD ROUND FLOOR CEIL
+    //   9 text functions:      CONCAT CONCATENATE LEN UPPER LOWER
+    //                          TRIM SUBSTITUTE LEFT RIGHT MID
+    //   6 date functions:      TODAY NOW DATE YEAR MONTH DAY
+    //                          (ISO YYYY-MM-DD storage)
     //
     // Range refs are flattened to their cell values inside Call
     // args (SUM(A1:E5) sees 5×5=25 scalars); a bare Range outside
@@ -167,6 +172,25 @@
           // Two-char comparison ops: <=, >=, ==, !=
           T.push({ k: c + "=", v: c + "=" });
           i += 2;
+        } else if (c === "\"") {
+          // F3: quoted string literal "..." with backslash escapes
+          //     (\\, \", \n, \t).  Closing " required; if missing,
+          //     we eat to EOF — the resulting parse error logs in
+          //     the formula bar's catch block.
+          let j = i + 1, buf = "";
+          while (j < n && s[j] !== "\"") {
+            if (s[j] === "\\" && j + 1 < n) {
+              const e = s[j + 1];
+              buf += (e === "n" ? "\n" : e === "t" ? "\t" :
+                      e === "\\" ? "\\" : e === "\"" ? "\"" : e);
+              j += 2;
+            } else {
+              buf += s[j]; j++;
+            }
+          }
+          j++;  // consume closing "
+          T.push({ k: "STR", v: buf });
+          i = j;
         } else {
           T.push({ k: c, v: c }); i++;
         }
@@ -181,6 +205,7 @@
     function parsePrim() {
       const t = peek();
       if (t.k === "INT") { eat(); return { tag: "Lit", val: t.v }; }
+      if (t.k === "STR") { eat(); return { tag: "Str", val: t.v }; }
       if (t.k === "IDENT") {
         eat();
         if (peek().k === "(") {
@@ -268,9 +293,35 @@
       return parseExpr();
     }
 
+    // F3 date helpers — Sheets-style ISO YYYY-MM-DD storage.
+    function todayIso() {
+      const d = new Date();
+      return d.toISOString().slice(0, 10);
+    }
+    function nowIso() {
+      return new Date().toISOString().slice(0, 19).replace("T", " ");
+    }
+    function dateIso(y, m, d) {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${y}-${pad(m)}-${pad(d)}`;
+    }
+    function parseIso(s) {
+      // Accept "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"; return Date or null.
+      if (typeof s !== "string") return null;
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return null;
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
+
     function evalAst(a) {
       if (a.tag === "Lit") return a.val;
-      if (a.tag === "Ref") return cellValues.get(a.id) || 0;
+      if (a.tag === "Str") return a.val;
+      if (a.tag === "Ref") {
+        // For Ref values, preserve string vs number type.  Defaulting
+        // to 0 only when truly missing (not when it's an empty string).
+        const v = cellValues.get(a.id);
+        return v === undefined ? 0 : v;
+      }
       if (a.tag === "Range") {
         // Bare range outside a function call — Sheets shows #ERROR;
         // we degrade gracefully to the first cell.
@@ -308,27 +359,66 @@
           if (arg.tag === "Range") vs.push(...evalRange(arg));
           else                     vs.push(evalAst(arg));
         }
+        // Helpers to coerce a scalar to number / string.
+        const num = (v) => (typeof v === "number") ? v : (Number(v) || 0);
+        const str = (v) => String(v);
         switch (nm) {
-          case "SUM":    return vs.reduce((s, v) => s + v, 0);
-          case "AVG":    return vs.length ? Math.trunc(vs.reduce((s, v) => s + v, 0) / vs.length) : 0;
-          case "MIN":    return vs.length ? Math.min(...vs) : 0;
-          case "MAX":    return vs.length ? Math.max(...vs) : 0;
-          case "COUNT":  return vs.filter(v => v !== 0).length;
+          case "SUM":    return vs.reduce((s, v) => s + num(v), 0);
+          case "AVG":    return vs.length ? Math.trunc(vs.reduce((s, v) => s + num(v), 0) / vs.length) : 0;
+          case "MIN":    return vs.length ? Math.min(...vs.map(num)) : 0;
+          case "MAX":    return vs.length ? Math.max(...vs.map(num)) : 0;
+          case "COUNT":  return vs.filter(v => num(v) !== 0).length;
           case "COUNTA": return vs.length;
-          case "ABS":    return Math.abs(vs[0] || 0);
-          case "POWER":  return Math.pow(vs[0] || 0, vs[1] || 0);
+          case "ABS":    return Math.abs(num(vs[0]));
+          case "POWER":  return Math.pow(num(vs[0]), num(vs[1]));
           case "MOD": {
-            const a0 = vs[0] || 0, b0 = vs[1] || 0;
+            const a0 = num(vs[0]), b0 = num(vs[1]);
             if (b0 === 0) return 0;
             return a0 - Math.trunc(a0 / b0) * b0;
           }
           case "ROUND": {
-            const x = vs[0] || 0, d = vs[1] || 0;
+            const x = num(vs[0]), d = num(vs[1]);
             const m = Math.pow(10, d);
             return Math.round(x * m) / m;
           }
-          case "FLOOR": return Math.floor(vs[0] || 0);
-          case "CEIL":  return Math.ceil (vs[0] || 0);
+          case "FLOOR": return Math.floor(num(vs[0]));
+          case "CEIL":  return Math.ceil (num(vs[0]));
+
+          // ── F3 text functions ─────────────────────────────────
+          case "CONCAT":
+          case "CONCATENATE":
+            return vs.map(str).join("");
+          case "LEN":     return str(vs[0] || "").length;
+          case "UPPER":   return str(vs[0] || "").toUpperCase();
+          case "LOWER":   return str(vs[0] || "").toLowerCase();
+          case "TRIM":    return str(vs[0] || "").trim();
+          case "SUBSTITUTE":
+            // SUBSTITUTE(s, old, new) — replace ALL occurrences.
+            return str(vs[0] || "").split(str(vs[1] || "")).join(str(vs[2] || ""));
+          case "LEFT":  {
+            const s0 = str(vs[0] || ""), n0 = num(vs[1]) || 1;
+            return s0.slice(0, Math.max(0, n0));
+          }
+          case "RIGHT": {
+            const s0 = str(vs[0] || ""), n0 = num(vs[1]) || 1;
+            return n0 <= 0 ? "" : s0.slice(-n0);
+          }
+          case "MID":   {
+            // MID(s, start_1based, length)
+            const s0 = str(vs[0] || ""), p0 = num(vs[1]) || 1, n0 = num(vs[2]) || 0;
+            return s0.slice(p0 - 1, p0 - 1 + n0);
+          }
+
+          // ── F3 date functions ─────────────────────────────────
+          case "TODAY": return todayIso();
+          case "NOW":   return nowIso();
+          case "DATE": {
+            const y = num(vs[0]), m = num(vs[1]), d = num(vs[2]);
+            return dateIso(y, m, d);
+          }
+          case "YEAR":  { const d = parseIso(str(vs[0] || "")); return d ? d.getFullYear() : 0; }
+          case "MONTH": { const d = parseIso(str(vs[0] || "")); return d ? d.getMonth() + 1 : 0; }
+          case "DAY":   { const d = parseIso(str(vs[0] || "")); return d ? d.getDate() : 0; }
         }
         return 0;
       }
@@ -377,7 +467,12 @@
     // this so history bookkeeping stays consistent.
     function applyCellChange(row, col, val, kind, formula) {
       const id = cellId(row, col);
-      cellValues.set(id, Number(val));
+      // F3: preserve string values as-is (CONCAT, TODAY, etc. produce
+      // strings).  Numeric values stay numeric.  Only coerce if val
+      // is already number-shaped to keep the existing fast path.
+      cellValues.set(id, (typeof val === "number") ? val
+                                                   : (Number(val) === Number(val) && val !== "") ? Number(val)
+                                                                                                  : val);
       if (formula === null || formula === undefined) cellFormulas.delete(id);
       else cellFormulas.set(id, formula);
       const runtime = interp && interp.runtime;
@@ -449,10 +544,16 @@
         appendLog("[parse ok]");
         interp.runProgram(ast);
         // After AIPL fills the initial 3x3 sheet, mirror its values
-        // so JS-side formula eval can see them.
+        // so JS-side formula eval can see them.  F3: keep strings
+        // as strings (only coerce to Number if parseable, and treat
+        // empty as 0).
         setTimeout(() => {
           const s = interp.runtime.sheetState;
-          if (s) for (const c of s.cells) cellValues.set(cellId(c.row, c.col), Number(c.val));
+          if (s) for (const c of s.cells) {
+            const n = Number(c.val);
+            cellValues.set(cellId(c.row, c.col),
+              (!Number.isNaN(n) && c.val !== "") ? n : c.val);
+          }
         }, 200);
       } catch (e) {
         running = false;
@@ -519,7 +620,9 @@
           runtime._callBuiltin("sheet_cell",
                                [c.row, c.col, String(c.val), c.kind],
                                { __currentActor: null });
-          cellValues.set(cellId(c.row, c.col), Number(c.val));
+          const n = Number(c.val);
+          cellValues.set(cellId(c.row, c.col),
+            (!Number.isNaN(n) && c.val !== "") ? n : c.val);
         }
         appendLog(`[load] ${id}.json — restored ${j.cells.length} cells`);
         // Load invalidates history (the user's now editing a
@@ -598,7 +701,16 @@
     });
 
     refreshUndoRedoButtons();
-    window.addEventListener("load", runProgram);
+    // The `<script type="module">` has a top-level `await fetch(...)`,
+    // which suspends module execution.  In some browser timing paths
+    // (esp. headless) the `load` event has already fired by the time
+    // we get here, so the listener never triggers and runProgram
+    // never auto-runs.  Guard by checking readyState first.
+    if (document.readyState === "complete") {
+      runProgram();
+    } else {
+      window.addEventListener("load", runProgram);
+    }
   </script>
 </body>
 </html>
