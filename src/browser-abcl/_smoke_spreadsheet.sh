@@ -64,8 +64,8 @@ check_contains() {
 }
 
 echo "[Phase 4] spreadsheet.abcl renders sheetState"
-check_contains "rows"          "rows=3"
-check_contains "cols"          "cols=3"
+check_contains "rows (G4: 10)" "rows=10"
+check_contains "cols (G4: 8)"  "cols=8"
 check_contains "9 cells"       "cells=9"
 check_contains "selection"     "sel_row=2"
 check_contains "selection"     "sel_col=2"

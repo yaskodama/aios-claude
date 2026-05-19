@@ -14,6 +14,9 @@
     #formulaBar { flex: 1; background: #fafafe; color: #222; border: 1px solid #557; padding: 4px 8px; font-family: monospace; font-size: 0.9rem; }
     #formulaBar:focus { outline: 2px solid #5ad; }
     #sheetIdRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #resizeRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #resizeRow input { background: #181828; color: #fff; border: 1px solid #335; padding: 2px 4px; }
+    #gridDims { color: #8aa; font-size: 0.85rem; margin-left: 8px; }
     #sheetIdLabel { color: #aef; font-size: 0.78rem; }
     #sheetId { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 160px; }
     #serverInfo { color: #788; font-size: 0.7rem; margin-left: auto; }
@@ -69,7 +72,7 @@
     <span style="color:#7aa;">selected cell = pale blue</span>
   </div>
 
-  <canvas id="canvas" width="720" height="220"></canvas>
+  <canvas id="canvas" width="720" height="380"></canvas>
 
   <div id="formulaRow">
     <div id="cellLabel">(none)</div>
@@ -81,6 +84,14 @@
     <input id="sheetId" type="text" value="demo">
     <button id="btnLive" title="Toggle WebSocket realtime collab" style="background:#1a3a1a; color:#afe; border-color:#4c6;">⚪ Off</button>
     <span id="serverInfo">server: <span id="serverUrl">http://localhost:8090</span></span>
+  </div>
+
+  <div id="resizeRow">
+    <span id="resizeLabel">grid:</span>
+    rows <input id="resizeRows" type="number" min="3" max="50" value="10" style="width:50px">
+    cols <input id="resizeCols" type="number" min="3" max="15" value="8"  style="width:50px">
+    <button id="btnResize" title="Resize grid (keeps existing in-bounds cells)">📐 Resize</button>
+    <span id="gridDims">current: 10 × 8</span>
   </div>
 
   <div id="formatRow">
@@ -797,6 +808,49 @@
     document.getElementById("sheetId").addEventListener("change", () => {
       // Re-connect with new sheet id if we were connected.
       if (wsConnected) wsConnect();
+    });
+
+    // ─── G4: resize grid (preserves in-bounds cells) ────────────
+    function refreshGridDims() {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      const el = document.getElementById("gridDims");
+      if (s && el) el.textContent = `current: ${s.rows} × ${s.cols}`;
+    }
+    document.getElementById("btnResize").addEventListener("click", () => {
+      const runtime = interp && interp.runtime;
+      if (!runtime || !runtime.sheetState) return;
+      const newRows = Math.max(3, Math.min(50, Number(document.getElementById("resizeRows").value) || 10));
+      const newCols = Math.max(3, Math.min(15, Number(document.getElementById("resizeCols").value) || 8));
+      // Snapshot any cells that still fit in the new bounds.
+      const survivors = runtime.sheetState.cells
+        .filter(c => c.row < newRows && c.col < newCols)
+        .map(c => ({ ...c }));
+      runtime._callBuiltin("sheet_init", [newRows, newCols],
+                           { __currentActor: null });
+      // Cull JS-side maps for cells that fell outside the new bounds.
+      for (const id of [...cellValues.keys()]) {
+        const col = colLetters.indexOf(id[0]);
+        const row = Number(id.slice(1)) - 1;
+        if (row >= newRows || col >= newCols) {
+          cellValues.delete(id); cellFormulas.delete(id);
+          cellFormats.delete(id); cellClocks.delete(id);
+        }
+      }
+      // Re-paint the survivors via the existing sheet_cell primitive.
+      for (const cell of survivors) {
+        runtime._callBuiltin("sheet_cell",
+                             [cell.row, cell.col, cell.val, cell.kind],
+                             { __currentActor: null });
+      }
+      // If the previous anchor fell outside, drop the selection.
+      if (selectedRC &&
+          (selectedRC.row >= newRows || selectedRC.col >= newCols)) {
+        selectedRC = null;
+        cellLabel.textContent = "(none)";
+        formulaBar.value = "";
+      }
+      refreshGridDims();
+      appendLog(`[resize] grid → ${newRows} × ${newCols}  (${survivors.length} cell(s) kept)`);
     });
 
     formulaBar.addEventListener("keydown", e => {

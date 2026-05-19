@@ -69,10 +69,12 @@ class Cell {
   }
 }
 
-// ── Build a 3x3 sheet matching the console samples ────────────
+// ── Build a 10x8 sheet (G4 dynamic-grid default).  The 3x3 corner
+// is still populated to mirror the original sample so smoke tests
+// keep their A1=10 / C3=SUM=1330 invariants.
 var bus  = new Bus();
 var view = new View();
-var _vi  = now view.init(3, 3, bus);
+var _vi  = now view.init(10, 8, bus);
 
 // Row 1: literals + simple sum
 var a1 = new Cell(0, 0, bus); var _a1 = now a1.set_value(10);
@@ -91,4 +93,4 @@ var c3 = new Cell(2, 2, bus); var _c3 = now c3.set_formula("SUM(...)", 1330);
 
 // Highlight C3 (the SUM result) as the focus.
 var _h = now view.highlight(2, 2);
-print("[spreadsheet] 3x3 grid rendered (R3 LayerComposite + IT2 EventBus)");
+print("[spreadsheet] 10x8 grid rendered (R3 LayerComposite + IT2 EventBus)");
