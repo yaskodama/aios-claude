@@ -931,12 +931,25 @@ export class Runtime {
       );
     }
     if (s.sel.row >= 0 && s.sel.col >= 0) {
-      ctx.fillStyle = "#d1e9ff";
-      ctx.fillRect(
-        x0 + (s.sel.col + 1) * cw,
-        y0 + (s.sel.row + 1) * ch,
-        cw, ch
-      );
+      // C6-followup: paint the local selection with the user's own
+      // peer-color (pastel), so the "color-inverted" cell always
+      // tracks the live cursor.  Fall back to the original light
+      // blue if no selColor has been stashed yet.
+      const sx = x0 + (s.sel.col + 1) * cw;
+      const sy = y0 + (s.sel.row + 1) * ch;
+      if (s.selColor) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = s.selColor;
+        ctx.fillRect(sx, sy, cw, ch);
+        ctx.restore();
+        ctx.lineWidth   = 2;
+        ctx.strokeStyle = s.selColor;
+        ctx.strokeRect(sx + 1, sy + 1, cw - 2, ch - 2);
+      } else {
+        ctx.fillStyle = "#d1e9ff";
+        ctx.fillRect(sx, sy, cw, ch);
+      }
     }
 
     // ── Layer 2: grid lines (the "wireframe"). ───────────────

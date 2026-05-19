@@ -986,6 +986,9 @@
                       { __currentActor: null });
     }
     function focusSingleCell(hit, opts) {
+      // C6-followup: stamp the local user's color onto sheetState so
+      // the renderer paints the selection in our identity color.
+      if (typeof applyLocalSelColor === "function") applyLocalSelColor();
       selectedRC = hit;
       const id = cellId(hit.row, hit.col);
       cellLabel.textContent = id;
@@ -1319,6 +1322,15 @@
       return `hsl(${h % 360}, 70%, 70%)`;
     }
     const myCursorColor = colorFromOrigin(clientId);
+
+    // C6-followup: keep the local selection highlight painted in
+    // myCursorColor so the cell the cursor sits on always carries
+    // the user's identity color.  We re-stamp this each time
+    // sheet_init resets sheetState (resize, load, sheet switch).
+    function applyLocalSelColor() {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (s) s.selColor = myCursorColor;
+    }
 
     // ─── C7: Presence indicator ─────────────────────────────────
     // Track recent ws-cursor frames per peer (origin → {row, col,
@@ -1802,6 +1814,18 @@
         if (e.key === "ArrowRight") c = Math.min(s.cols - 1,  c + 1);
         selectedRC = { row: r, col: c };
         cellLabel.textContent = cellId(r, c);
+        // Repaint local selection in the user's identity color.
+        if (typeof applyLocalSelColor === "function") applyLocalSelColor();
+        const viewActor = interp.runtime.actors.get("view");
+        if (viewActor) {
+          const slot = interp.runtime.newReplySlot();
+          interp.runtime.send("view", "highlight", [r, c], false, null, slot);
+        }
+        // Broadcast the new cursor position to ws peers (C6).
+        if (wsConnected && !wsApplyingRemote) {
+          wsSend({ type: "cursor", row: r, col: c,
+                   origin: clientId, color: myCursorColor });
+        }
         paintDragRange(
           Math.min(shiftAnchor.row, r), Math.min(shiftAnchor.col, c),
           Math.max(shiftAnchor.row, r), Math.max(shiftAnchor.col, c));
