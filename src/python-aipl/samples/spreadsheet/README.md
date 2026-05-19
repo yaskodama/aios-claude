@@ -49,6 +49,7 @@
 | G4  | Dynamic grid: default 10×8 + 📐 Resize (preserves cells) | `src/browser-abcl/spreadsheet.abcl` + `spreadsheet.html` | ✅ 7 assertion |
 | U8  | Clipboard: Cmd/Ctrl + C / V / X over range or cell (undo-aware) | `src/browser-abcl/spreadsheet.html` | ✅ 8 assertion |
 | F5  | 20 new functions: AVERAGE/MEDIAN/SQRT/INT/SIGN/EXP/LN/LOG10/PI/STDEV/VAR/LARGE/SMALL/AND/OR/NOT/COUNTIF/SUMIF/AVERAGEIF/IFERROR/WEEKDAY | `src/browser-abcl/spreadsheet.html` evalAst | ✅ 27 assertion |
+| Y2  | Chart kinds: bar (existing) / line / pie via type selector | `src/browser-abcl/spreadsheet.html` renderChart split | ✅ 4 assertion |
 
 ## smoke
 

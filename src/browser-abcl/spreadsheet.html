@@ -111,7 +111,12 @@
     <button id="btnSortAsc"  title="Sort selected range by 1st col ↑">🔽 Sort ↑</button>
     <button id="btnSortDesc" title="Sort selected range by 1st col ↓">🔼 Sort ↓</button>
     <button id="btnFilter"   title="Hide rows where 1st col is empty/zero">🧹 Filter ≠ 0</button>
-    <button id="btnChart"    title="Render horizontal bar chart">📊 Chart</button>
+    <select id="chartType" title="Chart kind">
+      <option value="bar">bar</option>
+      <option value="line">line</option>
+      <option value="pie">pie</option>
+    </select>
+    <button id="btnChart"    title="Render chart of the selected range">📊 Chart</button>
   </div>
 
   <canvas id="chart" width="720" height="180"></canvas>
@@ -1509,13 +1514,12 @@
       appendLog(`[filter] ${rangeStr} kept ${kept.length} / ${r1 - r0 + 1} rows`);
     }
 
-    function renderChart(rangeStr) {
+    // Y2: extract (label, value) pairs once; downstream renderers
+    // (bar / line / pie) only differ in how they paint the canvas.
+    function gatherChartPairs(rangeStr) {
       const rg = parseRangeStr(rangeStr);
-      if (!rg) { appendLog("[chart] invalid range: " + rangeStr); return; }
+      if (!rg) { appendLog("[chart] invalid range: " + rangeStr); return null; }
       const { c0, c1, r0, r1 } = rg;
-      // Read directly from sheetState (always up-to-date) instead of
-      // the cellValues mirror (which may still be empty if the user
-      // clicks chart before the initial-sync setTimeout has fired).
       const sheetCells = (interp && interp.runtime && interp.runtime.sheetState)
                          ? interp.runtime.sheetState.cells : [];
       const lookupCell = (col, row) => {
@@ -1524,8 +1528,6 @@
         const n = Number(c.val);
         return (!Number.isNaN(n) && c.val !== "") ? n : c.val;
       };
-      // Gather (label, value) pairs.  If width ≥ 2, col 0 = labels,
-      // col 1 = values.  Else label = row index, value = col 0.
       const pairs = [];
       for (let r = r0; r <= r1; r++) {
         let label, value;
@@ -1538,38 +1540,156 @@
         }
         pairs.push({ label, value });
       }
-      const chart = document.getElementById("chart");
-      const ctx = chart.getContext("2d");
-      const W = chart.width, H = chart.height;
+      return pairs;
+    }
+    function chartCanvas() {
+      const c = document.getElementById("chart");
+      const ctx = c.getContext("2d");
+      const W = c.width, H = c.height;
       ctx.fillStyle = "#fafafe"; ctx.fillRect(0, 0, W, H);
-      if (pairs.length === 0) {
-        ctx.fillStyle = "#888"; ctx.font = "13px monospace";
-        ctx.fillText("(empty range)", 12, 24);
-        return;
-      }
+      return { c, ctx, W, H };
+    }
+    // Cycle through a small palette for pie slices and line series.
+    const Y2_PALETTE = ["#2255aa", "#22aa55", "#aa3322", "#aa8822",
+                        "#5522aa", "#22aaaa", "#aa22aa", "#888888"];
+
+    function renderBarChart(rangeStr, pairs) {
+      const { ctx, W, H } = chartCanvas();
       const maxV = Math.max(...pairs.map(p => Math.abs(p.value)), 1);
       const labelW = 80, valueW = 60;
       const barAreaW = W - labelW - valueW - 16;
       const rowH = Math.floor((H - 20) / pairs.length);
-      ctx.font = "12px monospace";
-      ctx.textBaseline = "middle";
+      ctx.font = "12px monospace"; ctx.textBaseline = "middle";
       for (let i = 0; i < pairs.length; i++) {
         const y = 10 + i * rowH + rowH / 2;
-        // Label
         ctx.fillStyle = "#222"; ctx.textAlign = "left";
         ctx.fillText(pairs[i].label, 8, y);
-        // Bar
         const bw = Math.max(2, (Math.abs(pairs[i].value) / maxV) * barAreaW);
         ctx.fillStyle = pairs[i].value >= 0 ? "#2255aa" : "#aa3322";
         ctx.fillRect(labelW + 4, y - rowH / 2 + 4, bw, rowH - 8);
-        // Value
         ctx.fillStyle = "#444"; ctx.textAlign = "right";
         ctx.fillText(formatValue(pairs[i].value, "number"), W - 8, y);
       }
-      ctx.fillStyle = "#666"; ctx.textAlign = "left";
-      ctx.font = "10px monospace";
+      ctx.fillStyle = "#666"; ctx.font = "10px monospace"; ctx.textAlign = "left";
       ctx.fillText(`bar chart — range ${rangeStr} — max=${maxV}`, 8, H - 4);
-      appendLog(`[chart] ${rangeStr} — ${pairs.length} bars, max=${maxV}`);
+      appendLog(`[chart] bar ${rangeStr} — ${pairs.length} bars, max=${maxV}`);
+    }
+
+    function renderLineChart(rangeStr, pairs) {
+      const { ctx, W, H } = chartCanvas();
+      const padL = 50, padR = 16, padT = 14, padB = 30;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+      const values = pairs.map(p => p.value);
+      const minV = Math.min(0, ...values);
+      const maxV = Math.max(1, ...values);
+      const range = maxV - minV || 1;
+      // Axes
+      ctx.strokeStyle = "#888"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL,           padT);
+      ctx.lineTo(padL,           padT + plotH);
+      ctx.lineTo(padL + plotW,   padT + plotH);
+      ctx.stroke();
+      // Y ticks (0, mid, max)
+      ctx.font = "10px monospace"; ctx.fillStyle = "#555"; ctx.textAlign = "right";
+      const yOfVal = (v) => padT + plotH - ((v - minV) / range) * plotH;
+      for (const v of [minV, (minV + maxV) / 2, maxV]) {
+        const y = yOfVal(v);
+        ctx.fillText(formatValue(v, "number"), padL - 4, y + 3);
+        ctx.strokeStyle = "#ddd";
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      }
+      // X labels + line + points
+      const stepX = pairs.length > 1 ? plotW / (pairs.length - 1) : 0;
+      const xOfI  = (i) => padL + i * stepX;
+      ctx.strokeStyle = Y2_PALETTE[0]; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < pairs.length; i++) {
+        const x = xOfI(i), y = yOfVal(pairs[i].value);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = Y2_PALETTE[0];
+      for (let i = 0; i < pairs.length; i++) {
+        const x = xOfI(i), y = yOfVal(pairs[i].value);
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      // X labels (skip if too many)
+      ctx.fillStyle = "#444"; ctx.textAlign = "center";
+      const stride = Math.max(1, Math.ceil(pairs.length / 10));
+      for (let i = 0; i < pairs.length; i += stride) {
+        ctx.fillText(String(pairs[i].label), xOfI(i), padT + plotH + 14);
+      }
+      ctx.fillStyle = "#666"; ctx.textAlign = "left";
+      ctx.fillText(`line chart — range ${rangeStr} — min=${minV} max=${maxV}`, 8, H - 4);
+      appendLog(`[chart] line ${rangeStr} — ${pairs.length} points`);
+    }
+
+    function renderPieChart(rangeStr, pairs) {
+      const { ctx, W, H } = chartCanvas();
+      const cx = W * 0.32, cy = H / 2;
+      const radius = Math.min(W * 0.28, H * 0.42);
+      const values = pairs.map(p => Math.abs(p.value));
+      const total  = values.reduce((s, v) => s + v, 0);
+      if (total === 0) {
+        ctx.fillStyle = "#888"; ctx.font = "13px monospace";
+        ctx.fillText("(all-zero range — nothing to plot)", 12, 24);
+        return;
+      }
+      let start = -Math.PI / 2;
+      for (let i = 0; i < pairs.length; i++) {
+        const slice = (values[i] / total) * Math.PI * 2;
+        ctx.fillStyle = Y2_PALETTE[i % Y2_PALETTE.length];
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, start + slice);
+        ctx.closePath();
+        ctx.fill();
+        start += slice;
+      }
+      // Outline.
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+      start = -Math.PI / 2;
+      for (let i = 0; i < pairs.length; i++) {
+        const slice = (values[i] / total) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, start + slice);
+        ctx.closePath();
+        ctx.stroke();
+        start += slice;
+      }
+      // Legend on the right.
+      ctx.font = "12px monospace"; ctx.textBaseline = "middle";
+      const legX = W * 0.62;
+      const lineH = Math.min(20, (H - 20) / pairs.length);
+      for (let i = 0; i < pairs.length; i++) {
+        const y = 12 + i * lineH + lineH / 2;
+        ctx.fillStyle = Y2_PALETTE[i % Y2_PALETTE.length];
+        ctx.fillRect(legX, y - 6, 12, 12);
+        ctx.fillStyle = "#222"; ctx.textAlign = "left";
+        const pct = ((values[i] / total) * 100).toFixed(1);
+        ctx.fillText(`${pairs[i].label}  ${pct}%`, legX + 18, y);
+      }
+      ctx.fillStyle = "#666"; ctx.font = "10px monospace"; ctx.textAlign = "left";
+      ctx.fillText(`pie chart — range ${rangeStr} — total=${total}`, 8, H - 4);
+      appendLog(`[chart] pie ${rangeStr} — ${pairs.length} slices, total=${total}`);
+    }
+
+    function renderChart(rangeStr) {
+      const pairs = gatherChartPairs(rangeStr);
+      if (pairs === null) return;
+      if (pairs.length === 0) {
+        const { ctx } = chartCanvas();
+        ctx.fillStyle = "#888"; ctx.font = "13px monospace";
+        ctx.fillText("(empty range)", 12, 24);
+        return;
+      }
+      const kind = document.getElementById("chartType").value;
+      if      (kind === "line") renderLineChart(rangeStr, pairs);
+      else if (kind === "pie")  renderPieChart (rangeStr, pairs);
+      else                      renderBarChart (rangeStr, pairs);
     }
 
     document.getElementById("btnSortAsc").addEventListener("click", () => {
