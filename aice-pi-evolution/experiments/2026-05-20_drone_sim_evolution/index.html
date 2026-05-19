@@ -186,6 +186,23 @@
       </div>
     </div>
 
+    <!-- B1: fleet sizing — K1 information-collecting UAVs and K2
+         guidance UAVs, applied on Reset. -->
+    <div class="panel">
+      <h2>Fleet <span class="pill" id="fleetPill">K1=1, K2=1</span></h2>
+      <div class="slider-row">
+        <span style="min-width:36px;color:var(--uav1)">UAV1</span>
+        <input type="range" id="fleetK1Slider" min="1" max="5" value="1">
+        <span id="fleetK1Val" style="min-width:24px;text-align:right">1</span>
+      </div>
+      <div class="slider-row">
+        <span style="min-width:36px;color:var(--uav2)">UAV2</span>
+        <input type="range" id="fleetK2Slider" min="1" max="5" value="1">
+        <span id="fleetK2Val" style="min-width:24px;text-align:right">1</span>
+      </div>
+      <button id="btnApplyFleet" style="font-size:10px;padding:3px 8px;margin-top:6px">↻ apply (resets sim)</button>
+    </div>
+
     <!-- B3: SOS frames — a survivor's phone broadcasts on a point and
          propagates a temporary priority boost N hops out (gossip). -->
     <div class="panel">
@@ -523,7 +540,13 @@ class UAV {
     }
   }
 }
+/* B1: scale from 1+1 UAVs to K1 + K2 drones.  `uav1` / `uav2` are
+   kept as aliases for the lead drone of each fleet so existing 3D
+   rendering and HUD code stays unchanged.  fleetK1/fleetK2 are the
+   live counts (sliders default to 1, matching Round 0). */
 let uav1, uav2;
+let uav1Fleet = [], uav2Fleet = [];
+let fleetK1 = 1, fleetK2 = 1;
 
 /* ── core simulation ── */
 let sim = null;
@@ -568,8 +591,13 @@ function resetSim(){
   const sl = document.getElementById('sosLast');  if (sl) sl.textContent = '—';
   pts = {...INITIAL};
   priority = {};
-  uav1 = new UAV('UAV1', getCSS('--uav1'), 'A');
-  uav2 = new UAV('UAV2', getCSS('--uav2'), 'A');
+  uav1Fleet = []; uav2Fleet = [];
+  for (let i = 0; i < fleetK1; i++) uav1Fleet.push(new UAV('UAV1', getCSS('--uav1'), 'A'));
+  for (let i = 0; i < fleetK2; i++) uav2Fleet.push(new UAV('UAV2', getCSS('--uav2'), 'A'));
+  // Tag each member with a 1-based index for log readability + per-UAV trial caps.
+  uav1Fleet.forEach((u,i) => { u.idx = i + 1; u.trials = 0; });
+  uav2Fleet.forEach((u,i) => { u.idx = i + 1; u.trials = 0; });
+  uav1 = uav1Fleet[0]; uav2 = uav2Fleet[0];
   recomputePriorities();
   sim = {
     running:false, t:0, tick:0,
@@ -579,9 +607,11 @@ function resetSim(){
     log:[],
   };
   // UAV1 begins a sweep through all points
-  uav1.setPath(planSweep('A'));
-  // UAV2 idles at A until first task assigned
-  uav2.setPath(['A']);
+  // B1: every UAV1 starts a sweep (they'll diverge naturally as
+  // priorities update during the run).  Every UAV2 idles at A until
+  // it gets its first dispatch.
+  for (const u of uav1Fleet) u.setPath(planSweep('A'));
+  for (const u of uav2Fleet) u.setPath(['A']);
   statsReset();
   // Stats / log lines reflect the active scenario, not the paper default.
   let _tot = 0, _occ = 0;
@@ -835,75 +865,111 @@ function stepSim(dt){
   sim.t += dt; sim.tick++;
   // B3: expire SOS broadcasts that have ridden out their decay window.
   if (sosBoosts.size) decaySOSBoosts();
-  // UAV1 motion + behaviour
-  uav1.step(dt);
-  if (uav1.state==='arrived' || (uav1.targetIdx>=uav1.path.length)){
-    // arrived at sweep end → loop again
-    uav1.setPath(planSweep(uav1.atId));
-    recomputePriorities(); refreshTable();
-    log('U1','sweep cycle restarted, priorities updated','u1');
-  } else if (uav1.state==='atNode' && uav1.targetIdx<uav1.path.length){
-    uav1.targetIdx++;
-  }
-  // when UAV1 reaches a patrol point, recompute priority for that vicinity
-  if (uav1.state==='moving' && uav1._lastNode!==uav1.path[uav1.targetIdx-1]){
-    uav1._lastNode = uav1.path[uav1.targetIdx-1];
-    if (uav1._lastNode && !N(uav1._lastNode).shelter){
-      recomputePriorities(); refreshTable();
-    }
-  }
 
-  // UAV2 logic
-  if (uav2.path.length<=1 || uav2.targetIdx>=uav2.path.length){
-    // idle → dispatch new mission if possible
-    if (uav2.state!=='dispatching'){
-      uav2.state='dispatching';
-      const ok = dispatchUAV2();
-      if(!ok) return;
+  // ── B1: UAV1 fleet motion + sweep recycling ──
+  for (const u of uav1Fleet){
+    u.step(dt);
+    if (u.state === 'arrived' || u.targetIdx >= u.path.length){
+      u.setPath(planSweep(u.atId));
+      recomputePriorities(); refreshTable();
+      log('U1', `UAV1#${u.idx} sweep restarted`, 'u1');
+    } else if (u.state === 'atNode' && u.targetIdx < u.path.length){
+      u.targetIdx++;
     }
-  } else {
-    uav2.step(dt);
-    if (uav2.state==='arrived'){
-      const here = uav2.atId;
-      if (uav2.escortDest===null){
-        // arrived at survivor point
-        const took = pts[here]||0;
-        if (took>0){
-          // Take a portion (simulate 8-trial limit producing ~1-2 left as in Table1)
-          const ratio = 0.92 + Math.random()*0.06;
-          const moved = Math.max(1, Math.floor(took*ratio));
-          uav2.carry = moved;
-          pts[here] = took - moved;
-          recomputePriorities(); refreshTable();
-          log('U2',`picked up ${moved} survivors at P${here} (${pts[here]} remain)`,'u2');
-        }
-        // route to nearest shelter
-        const dest = nearestShelter(here);
-        const {prev} = dijkstra(here);
-        const route = pathTo(prev,dest);
-        uav2.setPath(route);
-        uav2.escortDest = dest;
-      } else {
-        // arrived at shelter
-        sim.rescued += uav2.carry;
-        log('U2',`escorted ${uav2.carry} → 避難所 ${uav2.escortDest}  (total rescued ${sim.rescued})`,'u2');
-        // A3: trial complete — record a stats sample point.
-        stats.lastTrialMs = sim.t - stats.trialStartT;
-        stats.samples.push({
-          trial: sim.attempts,
-          t: sim.t,
-          rescued: sim.rescued,
-          remaining: countRemaining(),
-          uav2Dist: stats.uav2DistAccum,
-        });
-        drawStats();
-        uav2.carry=0; uav2.escortDest=null;
-        uav2.path=[uav2.atId]; uav2.targetIdx=1;
-        uav2.state='atNode';
+    if (u.state === 'moving' && u._lastNode !== u.path[u.targetIdx-1]){
+      u._lastNode = u.path[u.targetIdx-1];
+      if (u._lastNode && !N(u._lastNode).shelter){
+        recomputePriorities(); refreshTable();
       }
     }
   }
+
+  // ── B1: UAV2 fleet — parallel dispatch with shared trial cap ──
+  // First pass: mark targets already claimed by an in-flight UAV2 so
+  // siblings don't dogpile the same survivor point.
+  const claimedTargets = new Set();
+  for (const u of uav2Fleet){
+    if (u.escortDest === null && u.path && u.path.length > 1 &&
+        u.targetIdx < u.path.length){
+      claimedTargets.add(u.path[u.path.length - 1]);
+    }
+  }
+  // Second pass: step each UAV; dispatch idle ones.
+  for (const u of uav2Fleet){
+    if (u.path.length <= 1 || u.targetIdx >= u.path.length){
+      if (sim.attempts >= sim.MAX_ATT) continue;
+      const tgt = pickAvailableHighestPriority(claimedTargets);
+      if (tgt === null) continue;
+      claimedTargets.add(tgt);
+      const {prev} = dijkstra(u.atId);
+      u.setPath(pathTo(prev, tgt));
+      u.escortDest = null; u.carry = 0;
+      sim.attempts++;
+      u.trials = (u.trials||0) + 1;
+      stats.trialStartT = sim.t;
+      log('U2',
+        `TRIAL ${sim.attempts}/${sim.MAX_ATT} (UAV2#${u.idx}) → P${tgt}  ` +
+        `(priority ${priority[tgt].toFixed(2)}, survivors ${pts[tgt]})`, 'u2');
+      continue;
+    }
+    u.step(dt);
+    if (u.state === 'arrived'){
+      const here = u.atId;
+      if (u.escortDest === null){
+        // Pickup
+        const took = pts[here] || 0;
+        if (took > 0){
+          const ratio = 0.92 + Math.random()*0.06;
+          const moved = Math.max(1, Math.floor(took * ratio));
+          u.carry = moved;
+          pts[here] = took - moved;
+          recomputePriorities(); refreshTable();
+          log('U2', `UAV2#${u.idx} picked up ${moved} at P${here} (${pts[here]} remain)`, 'u2');
+        }
+        const dest = nearestShelter(here);
+        const {prev} = dijkstra(here);
+        u.setPath(pathTo(prev, dest));
+        u.escortDest = dest;
+      } else {
+        sim.rescued += u.carry;
+        log('U2',
+          `UAV2#${u.idx} escorted ${u.carry} → 避難所 ${u.escortDest}  ` +
+          `(total rescued ${sim.rescued})`, 'u2');
+        stats.lastTrialMs = sim.t - stats.trialStartT;
+        stats.samples.push({
+          trial:     sim.attempts,
+          t:         sim.t,
+          rescued:   sim.rescued,
+          remaining: countRemaining(),
+          uav2Dist:  stats.uav2DistAccum,
+        });
+        drawStats();
+        u.carry = 0; u.escortDest = null;
+        u.path = [u.atId]; u.targetIdx = 1; u.state = 'atNode';
+      }
+    }
+  }
+  // End-of-simulation guard.
+  if (sim.attempts >= sim.MAX_ATT){
+    const inFlight = uav2Fleet.some(u =>
+      u.path.length > 1 && u.targetIdx < u.path.length);
+    if (!inFlight){
+      sim.running = false;
+      document.getElementById('phase').textContent = 'COMPLETE';
+      log('SYS', 'GUIDANCE LIMIT REACHED — fleet idle, complete.', 'ev');
+    }
+  }
   updateHUD();
+}
+function pickAvailableHighestPriority(claimed){
+  let best = null, bv = -Infinity;
+  for (const n of NODES){
+    if (n.shelter) continue;
+    if ((pts[n.id] || 0) <= 0) continue;
+    if (claimed.has(n.id)) continue;
+    if (priority[n.id] > bv){ bv = priority[n.id]; best = n.id; }
+  }
+  return best;
 }
 
 /* ── rendering ── */
@@ -1050,8 +1116,8 @@ function draw(){
   ctx.clearRect(0,0,W,H);
   // node draw order: shelters under points
   for (const n of NODES) drawNode(n);
-  if (uav1) drawUAV(uav1);
-  if (uav2) drawUAV(uav2);
+  for (const u of uav1Fleet) drawUAV(u);
+  for (const u of uav2Fleet) drawUAV(u);
 }
 
 /* ── A3: stats chart ── */
@@ -1361,6 +1427,26 @@ document.getElementById('btnDisaster').addEventListener('click', triggerDisaster
 document.getElementById('btnRestoreEdges').addEventListener('click', restoreEdges);
 document.getElementById('btnSOS').addEventListener('click', () => triggerSOS());
 document.getElementById('btnSOSClear').addEventListener('click', clearSOS);
+
+/* B1: fleet sliders — applied on btnApplyFleet (full reset). */
+function refreshFleetPill(){
+  document.getElementById('fleetPill').textContent =
+    `K1=${fleetK1}, K2=${fleetK2}`;
+}
+document.getElementById('fleetK1Slider').addEventListener('input', e => {
+  fleetK1 = Math.max(1, Math.min(5, +e.target.value || 1));
+  document.getElementById('fleetK1Val').textContent = String(fleetK1);
+  refreshFleetPill();
+});
+document.getElementById('fleetK2Slider').addEventListener('input', e => {
+  fleetK2 = Math.max(1, Math.min(5, +e.target.value || 1));
+  document.getElementById('fleetK2Val').textContent = String(fleetK2);
+  refreshFleetPill();
+});
+document.getElementById('btnApplyFleet').addEventListener('click', () => {
+  resetSim();
+  log('SYS', `[fleet] applied K1=${fleetK1} K2=${fleetK2}`, 'ev');
+});
 
 /* ─────────────────────────────────────────────────────────────
    3D wireframe view (Three.js) — shares state with 2D simulator
