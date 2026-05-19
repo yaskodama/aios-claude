@@ -1247,6 +1247,9 @@
         get cells()  { return interp.runtime.sheetState.cells; },
         get state()  { return interp.runtime.sheetState; },
         cellValues, cellFormulas, cellFormats, cellClocks,
+        get clientId() { return clientId; },
+        get lamport()  { return lamport;  },
+        lwwWins,
         // F5 test hook: evaluate a formula string and return the value.
         evalFormula: (src) => evalAst(parseFormula(src)),
         // D1 test hooks for CSV round-trip without touching the DOM.
@@ -1401,10 +1404,19 @@
     function currentSheetSnapshot() {
       const s = interp && interp.runtime && interp.runtime.sheetState;
       if (!s) return { rows: 3, cols: 3, cells: [] };
-      return { rows: s.rows, cols: s.cols,
-               cells: s.cells.map(c => ({ row: c.row, col: c.col,
-                                          val: String(c.val),
-                                          kind: c.kind })) };
+      // C5: snapshot LWW state alongside cells so a Load restores
+      // the same (ts, origin) frontier the user is currently at.
+      const clocks = [];
+      for (const [id, c] of cellClocks) {
+        clocks.push({ id, ts: c.ts, origin: c.origin });
+      }
+      return {
+        rows: s.rows, cols: s.cols,
+        cells: s.cells.map(c => ({ row: c.row, col: c.col,
+                                   val: String(c.val), kind: c.kind })),
+        clocks,
+        lamport,
+      };
     }
 
     async function doSave(silent = false) {
@@ -1487,7 +1499,19 @@
           cellValues.set(cellId(c.row, c.col),
             (!Number.isNaN(n) && c.val !== "") ? n : c.val);
         }
-        appendLog(`[load] ${id}.json — restored ${j.cells.length} cells`);
+        // C5: restore LWW state.  Older saves without `clocks` /
+        // `lamport` get fresh defaults — they just won't help
+        // tie-break against concurrent edits made before that save.
+        if (Array.isArray(j.clocks)) {
+          for (const k of j.clocks) {
+            if (k && k.id) cellClocks.set(k.id, { ts: k.ts, origin: k.origin });
+          }
+        }
+        if (typeof j.lamport === "number" && j.lamport > 0) {
+          lamport = j.lamport;
+        }
+        appendLog(`[load] ${id}.json — restored ${j.cells.length} cells, ` +
+                  `${(j.clocks && j.clocks.length) || 0} clock(s), lamport=${lamport}`);
         // Load invalidates history (the user's now editing a
         // freshly-restored sheet, not extending the prior session).
         historyStack = []; redoStack = []; refreshUndoRedoButtons();

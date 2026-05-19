@@ -317,6 +317,10 @@ const server = createServer(async (req, res) => {
             rows: Number(j.rows || 3),
             cols: Number(j.cols || 3),
             cells: Array.isArray(j.cells) ? j.cells : [],
+            // C5: persist per-cell LWW state so reload preserves
+            // convergence after concurrent edits.
+            clocks:  Array.isArray(j.clocks)  ? j.clocks  : [],
+            lamport: Number(j.lamport || 0),
             saved_at: new Date().toISOString(),
           };
           fs.writeFileSync(fp, JSON.stringify(payload, null, 2), "utf8");
