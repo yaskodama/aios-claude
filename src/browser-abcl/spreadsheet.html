@@ -27,6 +27,8 @@
     #rangeRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #findRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #nameRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #macroRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #macroName { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
     #nameInput, #nameTargetIn { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
     #cfRow    { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #noteRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
@@ -111,6 +113,7 @@
     <span id="sheetIdLabel">sheet_id:</span>
     <input id="sheetId" type="text" value="demo">
     <button id="btnLive" title="Toggle WebSocket realtime collab" style="background:#1a3a1a; color:#afe; border-color:#4c6;">⚪ Off</button>
+    <span id="presenceBadge" style="color:#aac; font-size:0.85rem; margin-left:6px;">Live: 0 peers</span>
     <span id="serverInfo">server: <span id="serverUrl">http://localhost:8090</span></span>
   </div>
 
@@ -161,6 +164,18 @@
     <button id="cfClear"  style="background:#222;">clear</button>
   </div>
 
+  <div id="macroRow">
+    <span style="color:#aac; font-size:0.85rem;">macro:</span>
+    <input id="macroName" type="text" placeholder="name" style="width:120px">
+    <button id="btnMacroRec"  title="Start recording every applyCellChange">⏺ rec</button>
+    <button id="btnMacroStop" title="Stop recording">⏹ stop</button>
+    <button id="btnMacroSave" title="Save the recorded buffer under the current name">💾 save</button>
+    <select id="macroList" style="background:#181828; color:#fff; border:1px solid #335;"></select>
+    <button id="btnMacroPlay"  title="Replay the selected macro">▶ play</button>
+    <button id="btnMacroClear" title="Delete the selected macro">🗑</button>
+    <span id="macroStatus" style="color:#8aa; font-size:0.8rem;"></span>
+  </div>
+
   <div id="nameRow">
     <span style="color:#aac; font-size:0.85rem;">name:</span>
     <input id="nameInput"   type="text" placeholder="e.g. tax" style="width:100px">
@@ -191,6 +206,7 @@
       <option value="line">line</option>
       <option value="pie">pie</option>
       <option value="scatter">scatter</option>
+      <option value="heatmap">heatmap</option>
     </select>
     <button id="btnFillDown" title="Fill the range downward with the top row's values">📋 Fill ↓</button>
     <button id="btnFillSeries" title="Arithmetic series: extends row 0 → row 1 delta down the range">🔢 Series</button>
@@ -199,6 +215,12 @@
     <button id="btnDeleteRow" title="Delete the selected row">−R</button>
     <button id="btnInsertCol" title="Insert blank column to the left">⬅+C</button>
     <button id="btnDeleteCol" title="Delete the selected column">−C</button>
+  </div>
+
+  <!-- U14: history panel — opened via the 📜 toolbar button. -->
+  <div id="historyPanel" style="display:none; background:#1a1a2a; border:1px solid #335; padding:8px; margin:6px 0; width:720px; max-height:240px; overflow-y:auto; font-family:monospace; font-size:0.85rem;">
+    <div style="color:#aac; margin-bottom:4px;">History (click row to jump there)</div>
+    <div id="historyList"></div>
   </div>
 
   <canvas id="chart" width="720" height="180"></canvas>
@@ -224,6 +246,7 @@
     <button id="btnRecompute" title="Re-evaluate every Formula cell">🔄 Recompute</button>
     <button id="btnUndo"      title="Undo last commit (DR-11 compensate)">↶ Undo</button>
     <button id="btnRedo"      title="Redo last undo">↷ Redo</button>
+    <button id="btnHistory"   title="Open the undo/redo history panel">📜</button>
     <button id="btnExportCsv"  title="Download the current grid as a CSV file">📤 CSV ↓</button>
     <button id="btnImportCsv"  title="Import a CSV file into the grid starting at A1">📥 CSV ↑</button>
     <button id="btnExportXlsx" title="Download the current grid as an XLSX (Excel) file">📤 XLSX ↓</button>
@@ -1052,6 +1075,10 @@
         wsSend({ type: "cell", row, col, val: stored, kind, formula, fmt,
                  ts: lamport, origin: clientId });
         scheduleAutoSave();
+        // F12: if recording is active, capture this op for later replay.
+        if (typeof macroRec !== "undefined" && macroRec && macroRec.active) {
+          macroRec.buffer.push({ row, col, val: stored, kind, formula });
+        }
       }
     }
 
@@ -1079,6 +1106,42 @@
       return `hsl(${h % 360}, 70%, 70%)`;
     }
     const myCursorColor = colorFromOrigin(clientId);
+
+    // ─── C7: Presence indicator ─────────────────────────────────
+    // Track recent ws-cursor frames per peer (origin → {row, col,
+    // color, at}).  Stale entries (>10 s since last frame) are
+    // pruned by a 1-second tick and the toolbar badge re-renders.
+    const peerActivity = new Map();
+    const PRESENCE_TTL_MS = 10_000;
+    function refreshPresenceBadge() {
+      const el = document.getElementById("presenceBadge");
+      if (!el) return;
+      const now = Date.now();
+      const fresh = [];
+      for (const [origin, info] of peerActivity) {
+        if (now - info.at > PRESENCE_TTL_MS) {
+          peerActivity.delete(origin);
+          // Also wipe the canvas cursor so the stale outline goes away.
+          if (interp && interp.runtime) {
+            interp.runtime._callBuiltin("sheet_peer_cursor",
+              [origin, 0, 0, ""], { __currentActor: null });
+          }
+          continue;
+        }
+        fresh.push({ origin, ...info });
+      }
+      const n = fresh.length;
+      if (n === 0) {
+        el.textContent = "Live: 0 peers";
+        el.title = "";
+        return;
+      }
+      el.textContent = `Live: ${n} peer${n === 1 ? "" : "s"}`;
+      el.title = fresh.map(p =>
+        `${p.origin.slice(0, 8)} @ ${cellId(p.row, p.col)}`
+      ).join("\n");
+    }
+    setInterval(refreshPresenceBadge, 1000);
     function setLiveStatus(text, color) {
       const b = document.getElementById("btnLive");
       b.textContent = text;
@@ -1116,10 +1179,18 @@
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
         // C6: peer cursor — paint a colored outline at their cell.
+        // C7: also record the peer in the presence map so the
+        // "Live: N peers" badge reflects who's currently active.
         if (msg.type === "cursor" && msg.origin && msg.origin !== clientId) {
           interp.runtime._callBuiltin("sheet_peer_cursor",
             [msg.origin, msg.row, msg.col, msg.color || "#aaa"],
             { __currentActor: null });
+          peerActivity.set(msg.origin, {
+            row: msg.row, col: msg.col,
+            color: msg.color || "#aaa",
+            at: Date.now(),
+          });
+          refreshPresenceBadge();
           return;
         }
         // Peer broadcast a whole-snapshot Load — mirror it locally so
@@ -1578,6 +1649,17 @@
         // MS hooks.
         get workbook() { return workbook; },
         addSheet, switchToSheet,
+        // U14 hooks.
+        get historyStack() { return historyStack; },
+        get redoStack()    { return redoStack;    },
+        undoOne, redoOne, undoTo, redoTo,
+        // F12 hooks.
+        get macros() { return macros; },
+        get macroRec() { return macroRec; },
+        macroStart, macroStop, macroSave, macroPlay, macroDelete,
+        // C7 hooks.
+        get peerActivity() { return peerActivity; },
+        refreshPresenceBadge,
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
@@ -2374,14 +2456,11 @@
       }
     }
 
-    document.getElementById("btnUndo").addEventListener("click", () => {
-      if (historyStack.length === 0) { appendLog("[undo] nothing to undo"); return; }
+    function undoOne() {
+      if (historyStack.length === 0) return null;
       const entry = historyStack.pop();
-      // DR-11 "compensate" semantics: restore the pre-image.
       const b = entry.before;
       if (b.val === undefined) {
-        // Cell didn't exist before — best effort: clear by writing 0
-        // (the AIPL Sheet doesn't expose a delete primitive yet).
         applyCellChange(entry.row, entry.col, 0, "Value", null);
         syncBarIfSelected(entry, 0, null);
       } else {
@@ -2391,18 +2470,106 @@
       }
       redoStack.push(entry);
       refreshUndoRedoButtons();
-      appendLog(`[undo] ${entry.id} ← ${b.val === undefined ? "(empty)" : b.val}`);
-    });
-
-    document.getElementById("btnRedo").addEventListener("click", () => {
-      if (redoStack.length === 0) { appendLog("[redo] nothing to redo"); return; }
+      return entry;
+    }
+    function redoOne() {
+      if (redoStack.length === 0) return null;
       const entry = redoStack.pop();
       const a = entry.after;
       applyCellChange(entry.row, entry.col, a.val, a.kind, a.formula);
       syncBarIfSelected(entry, a.val, a.formula);
       historyStack.push(entry);
       refreshUndoRedoButtons();
-      appendLog(`[redo] ${entry.id} → ${a.val}`);
+      return entry;
+    }
+    document.getElementById("btnUndo").addEventListener("click", () => {
+      const e = undoOne();
+      if (!e) { appendLog("[undo] nothing to undo"); return; }
+      appendLog(`[undo] ${e.id} ← ${e.before.val === undefined ? "(empty)" : e.before.val}`);
+      renderHistoryPanel();
+    });
+    document.getElementById("btnRedo").addEventListener("click", () => {
+      const e = redoOne();
+      if (!e) { appendLog("[redo] nothing to redo"); return; }
+      appendLog(`[redo] ${e.id} → ${e.after.val}`);
+      renderHistoryPanel();
+    });
+
+    // ─── U14: history panel + N-step jump ──────────────────────
+    // The popup lists the historyStack (oldest → newest) followed by
+    // the redoStack (newest → oldest, also called "future").  Click
+    // any row to fast-forward / fast-rewind to that point: we just
+    // call undoOne / redoOne repeatedly until the cursor lands.
+    function renderHistoryPanel() {
+      const div = document.getElementById("historyList");
+      if (!div) return;
+      div.innerHTML = "";
+      const rowStyle = "padding:2px 6px; cursor:pointer; border-radius:2px;";
+      // Past (historyStack) — index 0 = oldest, end = newest applied.
+      for (let i = 0; i < historyStack.length; i++) {
+        const e = historyStack[i];
+        const r = document.createElement("div");
+        const av = e.after && e.after.val !== undefined ? e.after.val : "(empty)";
+        r.textContent = `▼ #${i + 1}  ${e.id}: ${e.before.val ?? "—"} → ${av}`;
+        r.style.cssText = rowStyle + "color:#cef;";
+        r.addEventListener("mouseenter", () => { r.style.background = "#2a2a3a"; });
+        r.addEventListener("mouseleave", () => { r.style.background = ""; });
+        r.addEventListener("click", () => undoTo(i));
+        div.appendChild(r);
+      }
+      // Boundary marker — current state.
+      const cur = document.createElement("div");
+      cur.textContent = `▶ — current state — (${historyStack.length} past, ${redoStack.length} ahead) ◀`;
+      cur.style.cssText = "padding:3px 6px; color:#fc6; background:#222232; border-radius:2px; margin:2px 0;";
+      div.appendChild(cur);
+      // Future (redoStack) — top is the NEXT redoable.
+      for (let i = redoStack.length - 1; i >= 0; i--) {
+        const e = redoStack[i];
+        const av = e.after && e.after.val !== undefined ? e.after.val : "(empty)";
+        const r = document.createElement("div");
+        r.textContent = `▲ +${redoStack.length - i}  ${e.id}: → ${av}`;
+        r.style.cssText = rowStyle + "color:#cfc;";
+        r.addEventListener("mouseenter", () => { r.style.background = "#2a2a3a"; });
+        r.addEventListener("mouseleave", () => { r.style.background = ""; });
+        r.addEventListener("click", () => redoTo(redoStack.length - i));
+        div.appendChild(r);
+      }
+    }
+    function undoTo(targetIdx) {
+      // Pop entries until historyStack.length === targetIdx.
+      let n = 0;
+      while (historyStack.length > targetIdx) {
+        if (!undoOne()) break;
+        n++;
+      }
+      appendLog(`[undo×${n}] back to history idx ${targetIdx}`);
+      renderHistoryPanel();
+    }
+    function redoTo(targetCount) {
+      // Apply `targetCount` entries off redoStack.
+      let n = 0;
+      while (n < targetCount && redoStack.length > 0) {
+        if (!redoOne()) break;
+        n++;
+      }
+      appendLog(`[redo×${n}]`);
+      renderHistoryPanel();
+    }
+    document.getElementById("btnHistory").addEventListener("click", () => {
+      const p = document.getElementById("historyPanel");
+      const open = p.style.display === "none";
+      p.style.display = open ? "block" : "none";
+      if (open) renderHistoryPanel();
+    });
+    // Keyboard: Cmd+Shift+Z = undo, Cmd+Y = redo (in addition to U7).
+    document.addEventListener("keydown", e => {
+      if (inEditable()) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault(); document.getElementById("btnUndo").click();
+      } else if (mod && !e.shiftKey && e.key.toLowerCase() === "y") {
+        e.preventDefault(); document.getElementById("btnRedo").click();
+      }
     });
 
     // U3: format-menu change → apply to selected cell + repaint.
@@ -2756,7 +2923,70 @@
       ctx.fillText(`scatter — range ${rangeStr} — ${points.length} pts`, 8, H - 4);
       appendLog(`[chart] scatter ${rangeStr} — ${points.length} points`);
     }
+    // Y4: heatmap — render the range as a 2-D tile grid with a
+    // blue→red color ramp keyed off min..max.  Works directly off
+    // evalRangeGrid (preserves shape), so it bypasses gatherChartPairs.
+    function renderHeatmapChart(rangeStr) {
+      const rg = parseRangeStr(rangeStr);
+      if (!rg) { appendLog("[chart] invalid range: " + rangeStr); return; }
+      const { c0, c1, r0, r1 } = rg;
+      const rows = r1 - r0 + 1, cols = c1 - c0 + 1;
+      // Build a 2D number grid from cellValues (treat missing as 0).
+      const data = [];
+      let minV = Infinity, maxV = -Infinity;
+      for (let r = r0; r <= r1; r++) {
+        const row = [];
+        for (let c = c0; c <= c1; c++) {
+          const v = Number(cellValues.get(pairToId(c, r)) || 0) || 0;
+          row.push(v);
+          if (v < minV) minV = v;
+          if (v > maxV) maxV = v;
+        }
+        data.push(row);
+      }
+      const { ctx, W, H } = chartCanvas();
+      if (minV === Infinity || (minV === 0 && maxV === 0)) {
+        ctx.fillStyle = "#888"; ctx.font = "13px monospace";
+        ctx.fillText("(all-zero range — nothing to plot)", 12, 24);
+        appendLog(`[chart] heatmap ${rangeStr} — all zero`);
+        return;
+      }
+      const padL = 40, padR = 16, padT = 14, padB = 30;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+      const tileW = plotW / cols;
+      const tileH = plotH / rows;
+      const lerpColor = (t) => {
+        // Blue (240°) → red (0°) via HSL; clamp t to [0,1].
+        const tt = Math.max(0, Math.min(1, t));
+        const hue = 240 - 240 * tt;
+        return `hsl(${hue}, 70%, 55%)`;
+      };
+      const range = (maxV - minV) || 1;
+      ctx.font = "11px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const v = data[r][c];
+          const t = (v - minV) / range;
+          ctx.fillStyle = lerpColor(t);
+          ctx.fillRect(padL + c * tileW, padT + r * tileH, tileW, tileH);
+          // Overlay the numeric value (white for dark tiles, black for light).
+          ctx.fillStyle = t > 0.5 ? "#000" : "#fff";
+          ctx.fillText(String(v),
+            padL + c * tileW + tileW / 2,
+            padT + r * tileH + tileH / 2);
+        }
+      }
+      // Border + footer label.
+      ctx.strokeStyle = "#aaa"; ctx.lineWidth = 1;
+      ctx.strokeRect(padL, padT, plotW, plotH);
+      ctx.fillStyle = "#666"; ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText(`heatmap — range ${rangeStr} — min=${minV} max=${maxV}`, 8, H - 4);
+      appendLog(`[chart] heatmap ${rangeStr} — ${rows}×${cols} tiles, min=${minV} max=${maxV}`);
+    }
     function renderChart(rangeStr) {
+      const kind = document.getElementById("chartType").value;
+      if (kind === "heatmap") { renderHeatmapChart(rangeStr); return; }
       const pairs = gatherChartPairs(rangeStr);
       if (pairs === null) return;
       if (pairs.length === 0) {
@@ -2765,7 +2995,6 @@
         ctx.fillText("(empty range)", 12, 24);
         return;
       }
-      const kind = document.getElementById("chartType").value;
       if      (kind === "line")    renderLineChart   (rangeStr, pairs);
       else if (kind === "pie")     renderPieChart    (rangeStr, pairs);
       else if (kind === "scatter") renderScatterChart(rangeStr, pairs);
@@ -3095,6 +3324,90 @@
     document.getElementById("btnNameDefine").addEventListener("click", nameDefine);
     document.getElementById("btnNameGoto"  ).addEventListener("click", nameGoto);
 
+    // ─── F12: macros (record / save / play) ────────────────────
+    // A macro is a list of `{row, col, val, kind, formula}` ops.
+    // While recording is active, every local applyCellChange call
+    // appends to the buffer (via macroHook — wsApplyingRemote frames
+    // are skipped so a peer's edits don't pollute your recording).
+    const macros = new Map();          // name → ops
+    let macroRec = { active: false, buffer: null };
+    function setMacroStatus(text) {
+      const el = document.getElementById("macroStatus");
+      if (el) el.textContent = text;
+    }
+    function refreshMacroList() {
+      const sel = document.getElementById("macroList");
+      if (!sel) return;
+      const wanted = sel.value;
+      sel.innerHTML = "";
+      for (const name of macros.keys()) {
+        const o = document.createElement("option");
+        o.value = name; o.textContent = name;
+        sel.appendChild(o);
+      }
+      if (macros.has(wanted)) sel.value = wanted;
+    }
+    function macroStart() {
+      macroRec = { active: true, buffer: [] };
+      setMacroStatus("⏺ recording…");
+      appendLog("[macro rec] start");
+    }
+    function macroStop() {
+      macroRec.active = false;
+      setMacroStatus(`recorded ${macroRec.buffer ? macroRec.buffer.length : 0} op(s)`);
+      appendLog(`[macro rec] stop — ${macroRec.buffer ? macroRec.buffer.length : 0} op(s)`);
+    }
+    function macroSave() {
+      const name = document.getElementById("macroName").value.trim();
+      if (!name) { appendLog("[macro] empty name"); return; }
+      if (!macroRec.buffer || macroRec.buffer.length === 0) {
+        appendLog("[macro] nothing to save (record first)"); return;
+      }
+      macros.set(name, macroRec.buffer.slice());
+      refreshMacroList();
+      appendLog(`[macro saved] "${name}" — ${macroRec.buffer.length} op(s)`);
+    }
+    function macroPlay(name) {
+      const ops = macros.get(name);
+      if (!ops) { appendLog(`[macro play] no such macro "${name}"`); return 0; }
+      const s = interp.runtime.sheetState;
+      let n = 0, skipped = 0;
+      for (const op of ops) {
+        // Validate bounds — out-of-bounds becomes a soft skip + log.
+        if (!Number.isInteger(op.row) || !Number.isInteger(op.col) ||
+            op.row < 0 || op.row >= s.rows ||
+            op.col < 0 || op.col >= s.cols) {
+          skipped++; continue;
+        }
+        try {
+          applyCellChange(op.row, op.col, op.val, op.kind || "Value", op.formula);
+          n++;
+        } catch (e) {
+          appendLog(`[macro play error] op #${n+skipped}: ${e}`); skipped++;
+        }
+      }
+      appendLog(`[macro play] "${name}" — ${n} applied` +
+                (skipped ? `, ${skipped} skipped (invalid)` : ""));
+      return n;
+    }
+    function macroDelete(name) {
+      if (!macros.has(name)) return;
+      macros.delete(name);
+      refreshMacroList();
+      appendLog(`[macro deleted] "${name}"`);
+    }
+    document.getElementById("btnMacroRec" ).addEventListener("click", macroStart);
+    document.getElementById("btnMacroStop").addEventListener("click", macroStop);
+    document.getElementById("btnMacroSave").addEventListener("click", macroSave);
+    document.getElementById("btnMacroPlay").addEventListener("click", () => {
+      const sel = document.getElementById("macroList").value;
+      if (sel) macroPlay(sel);
+    });
+    document.getElementById("btnMacroClear").addEventListener("click", () => {
+      const sel = document.getElementById("macroList").value;
+      if (sel) macroDelete(sel);
+    });
+
     // ─── D4: Print / Save-as-PDF ───────────────────────────────
     // Defer to the browser's print dialog with a print-only CSS
     // stylesheet (@media print above) that hides everything except
@@ -3131,12 +3444,18 @@
       for (const [name, target] of cellNames) names.push({ name, target });
       const clocks = [];
       for (const [id, c] of cellClocks) clocks.push({ id, ts: c.ts, origin: c.origin });
+      // F12: serialise macro library too.
+      const macroList = [];
+      if (typeof macros !== "undefined") {
+        for (const [name, ops] of macros) macroList.push({ name, ops });
+      }
       return {
         version: 2,
         sheet_id: document.getElementById("sheetId").value.trim() || "demo",
         rows: s.rows, cols: s.cols, cellH: s.cellH || 32,
         cells, formats, bgs, notes, locked, names, clocks,
         lamport,
+        macros: macroList,
         saved_at: new Date().toISOString(),
       };
     }
@@ -3230,6 +3549,14 @@
         if (k && k.id) cellClocks.set(k.id, { ts: k.ts, origin: k.origin });
       }
       if (typeof j.lamport === "number" && j.lamport > 0) lamport = j.lamport;
+      // F12: restore the macro library.
+      if (typeof macros !== "undefined" && Array.isArray(j.macros)) {
+        macros.clear();
+        for (const m of j.macros) {
+          if (m && m.name && Array.isArray(m.ops)) macros.set(m.name, m.ops);
+        }
+        if (typeof refreshMacroList === "function") refreshMacroList();
+      }
       historyStack = []; redoStack = []; refreshUndoRedoButtons();
       return (j.cells || []).length;
     }

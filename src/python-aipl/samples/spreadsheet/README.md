@@ -73,6 +73,10 @@
 | EQ  | `=` prefix required for formulas; source round-trips Save/Load | `src/browser-abcl/spreadsheet.html` formulaBar commit + currentSheetSnapshot + applySheetSnapshot | ✅ 8 assertion |
 | D5  | Full-state JSON workbook export / import (loss-less) | `src/browser-abcl/spreadsheet.html` buildJsonWorkbook / importJsonWorkbook | ✅ 13 assertion |
 | MS  | Multi-sheet workbook (per-sheet state, `Sheet2!A1` xref, bottom tabs) | `src/browser-abcl/spreadsheet.html` workbook + switchToSheet + parsePrim XRef | ✅ 11 assertion |
+| U14 | Undo/Redo panel with N-step jump (Cmd+Shift+Z / Cmd+Y) | `src/browser-abcl/spreadsheet.html` undoTo/redoTo + renderHistoryPanel | ✅ 11 assertion |
+| F12 | Macros — record/save/play OperationList (D5 round-trip + invalid-op skip) | `src/browser-abcl/spreadsheet.html` macros Map + macroStart/Stop/Save/Play | ✅ 10 assertion |
+| C7  | "Live: N peers" badge + 10-sec TTL pruning (excludes self) | `src/browser-abcl/spreadsheet.html` peerActivity + refreshPresenceBadge | ✅ 5 assertion |
+| Y4  | Heatmap chart kind — 2D tiles, blue→red color ramp on min..max | `src/browser-abcl/spreadsheet.html` renderHeatmapChart | ✅ 4 assertion |
 
 ## smoke
 
