@@ -25,6 +25,8 @@
     #formatMenu { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; }
     #formatMenu option { background: #1a1a2a; }
     #rangeRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #findRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #findInput, #replaceInput { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; }
     #rangeLabel { color: #aef; font-size: 0.78rem; }
     #rangeInput { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 140px; }
     #chart { background: #fafafe; border: 1px solid #335; display: block; margin-top: 4px; }
@@ -105,6 +107,16 @@
       <option value="percent">Percent (25%)</option>
       <option value="date">Date (YYYY-MM-DD)</option>
     </select>
+  </div>
+
+  <div id="findRow">
+    <span id="findLabel">find:</span>
+    <input id="findInput" type="text" placeholder="text or number…" style="width:140px">
+    <button id="btnFindNext" title="Jump to next match">⤓ Next</button>
+    <span id="findStatus" style="color:#8aa; font-size:0.85rem;"></span>
+    <input id="replaceInput" type="text" placeholder="replace with…" style="width:140px">
+    <button id="btnReplaceOne" title="Replace the current match and advance">⮌ Replace</button>
+    <button id="btnReplaceAll" title="Replace every match in the grid">⇄ Replace all</button>
   </div>
 
   <div id="rangeRow">
@@ -805,13 +817,16 @@
       rt._callBuiltin("sheet_select_range", [r0, c0, r1, c1],
                       { __currentActor: null });
     }
-    function focusSingleCell(hit) {
+    function focusSingleCell(hit, opts) {
       selectedRC = hit;
       const id = cellId(hit.row, hit.col);
       cellLabel.textContent = id;
       formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
       document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
-      formulaBar.focus();
+      // U10: find/replace navigation keeps focus on findInput so a
+      // burst of Enter presses cycles matches without bouncing into
+      // the formula bar's commit handler.
+      if (!opts || !opts.skipBarFocus) formulaBar.focus();
       const viewActor = interp.runtime.actors.get("view");
       if (viewActor) {
         const slot = interp.runtime.newReplySlot();
@@ -1373,6 +1388,10 @@
         // D2 test hook: build the .xlsx bytes without triggering a
         // download.  Returns a Uint8Array.
         buildXlsx:   () => buildXlsx(),
+        // U10 test hooks for find/replace.
+        get findHits()   { return findHits.slice(); },
+        get findCursor() { return findCursor; },
+        refreshFind, replaceOne, replaceAll, jumpToHit,
       };
       try {
         const ast = parser.parse(ABCL_SOURCE);
@@ -1677,6 +1696,117 @@
       appendLog(`[xlsx-export] ${a.download} — ${bytes.length} bytes`);
     }
     document.getElementById("btnExportXlsx").addEventListener("click", exportXlsx);
+
+    // ─── U10: find / replace ────────────────────────────────────
+    // Find walks the current sheetState.cells and matches by
+    // case-insensitive substring against the displayed value.  Next
+    // cycles through hits.  Replace swaps the matched substring on
+    // the current hit; Replace-all sweeps every hit and routes each
+    // change through applyCellChange so the C3 ws broadcast, undo
+    // stack, and P4 auto-save all kick in unchanged.
+    let findHits   = [];        // [{row, col}, …]
+    let findCursor = -1;        // index into findHits
+    function setFindStatus(text) {
+      const el = document.getElementById("findStatus");
+      if (el) el.textContent = text;
+    }
+    function refreshFind() {
+      const q = document.getElementById("findInput").value;
+      findHits = [];
+      findCursor = -1;
+      if (!q) { setFindStatus(""); paintDragRange(-1,-1,-1,-1); return; }
+      const ql = q.toLowerCase();
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return;
+      for (const c of s.cells) {
+        if (String(c.val).toLowerCase().includes(ql)) {
+          findHits.push({ row: c.row, col: c.col });
+        }
+      }
+      // Sort row-major so Next walks left-to-right, top-to-bottom.
+      findHits.sort((a, b) => (a.row - b.row) || (a.col - b.col));
+      if (findHits.length === 0) {
+        setFindStatus("0 / 0");
+        paintDragRange(-1,-1,-1,-1);
+        return;
+      }
+      jumpToHit(0);
+    }
+    function jumpToHit(i) {
+      if (findHits.length === 0) return;
+      findCursor = ((i % findHits.length) + findHits.length) % findHits.length;
+      const { row, col } = findHits[findCursor];
+      focusSingleCell({ row, col }, { skipBarFocus: true });
+      // Reuse the U5 drag-range overlay as a "find highlight" — a
+      // single-cell range that vanishes when the user types or clicks.
+      paintDragRange(row, col, row, col);
+      setFindStatus(`${findCursor + 1} / ${findHits.length}`);
+    }
+    function replaceOne() {
+      if (findHits.length === 0 || findCursor < 0) return 0;
+      const { row, col } = findHits[findCursor];
+      const q  = document.getElementById("findInput").value;
+      const nv = document.getElementById("replaceInput").value;
+      if (!q) return 0;
+      const id = cellId(row, col);
+      const curr = String(cellValues.get(id) ?? "");
+      const next = curr.split(q).join(nv);            // first arg is plain
+      // Re-coerce: if the new value looks numeric, store as number.
+      const n = Number(next);
+      const stored = (next !== "" && !Number.isNaN(n)) ? n : next;
+      const before = {
+        val:     cellValues.get(id),
+        kind:    cellFormulas.has(id) ? "Formula" : "Value",
+        formula: cellFormulas.get(id) || null,
+      };
+      applyCellChange(row, col, stored, "Value", null);
+      historyStack.push({ row, col, id, before,
+                          after: { val: stored, kind: "Value", formula: null } });
+      redoStack = []; refreshUndoRedoButtons();
+      appendLog(`[replace] ${id} "${curr}" → "${next}"`);
+      // Move cursor; recompute hits since this cell may no longer match.
+      refreshFind();
+      return 1;
+    }
+    function replaceAll() {
+      const q  = document.getElementById("findInput").value;
+      const nv = document.getElementById("replaceInput").value;
+      if (!q) return 0;
+      // Snapshot the hits — refreshFind mutates findHits as we go.
+      const targets = findHits.slice();
+      let n = 0;
+      for (const { row, col } of targets) {
+        const id   = cellId(row, col);
+        const curr = String(cellValues.get(id) ?? "");
+        const next = curr.split(q).join(nv);
+        const num  = Number(next);
+        const stored = (next !== "" && !Number.isNaN(num)) ? num : next;
+        const before = {
+          val:     cellValues.get(id),
+          kind:    cellFormulas.has(id) ? "Formula" : "Value",
+          formula: cellFormulas.get(id) || null,
+        };
+        applyCellChange(row, col, stored, "Value", null);
+        historyStack.push({ row, col, id, before,
+                            after: { val: stored, kind: "Value", formula: null } });
+        n++;
+      }
+      redoStack = []; refreshUndoRedoButtons();
+      refreshFind();
+      appendLog(`[replace-all] ${n} cell(s) "${q}" → "${nv}"`);
+      return n;
+    }
+    document.getElementById("findInput").addEventListener("input", refreshFind);
+    document.getElementById("findInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (findHits.length > 0) jumpToHit(findCursor + 1);
+      }
+    });
+    document.getElementById("btnFindNext").addEventListener("click",
+      () => jumpToHit(findCursor + 1));
+    document.getElementById("btnReplaceOne").addEventListener("click", replaceOne);
+    document.getElementById("btnReplaceAll").addEventListener("click", replaceAll);
 
     // ─── Phase 5.4: Save / Load via JS-N node-aipl-server ──────
     // Server runs at AIPL_NODE_URL (default http://localhost:8090).

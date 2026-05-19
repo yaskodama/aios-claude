@@ -58,6 +58,7 @@
 | F6  | Array-formula SPILL for `Range op scalar` and `scalar op Range` | `src/browser-abcl/spreadsheet.html` maybeSpill | ✅ 9 assertion |
 | D2  | XLSX (Excel) export — minimal store-only ZIP + handwritten XML | `src/browser-abcl/spreadsheet.html` buildXlsx + zipStore | ✅ 14 assertion |
 | F7  | String / mixed-type comparisons + `=` and `<>` operators | `src/browser-abcl/spreadsheet.html` tokenizer + cmp/cmpEq | ✅ 16 assertion |
+| U10 | Find / Replace / Replace-all (substring, Enter cycles hits) | `src/browser-abcl/spreadsheet.html` refreshFind / replaceOne / replaceAll | ✅ 10 assertion |
 
 ## smoke
 
