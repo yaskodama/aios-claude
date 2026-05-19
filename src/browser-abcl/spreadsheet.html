@@ -825,6 +825,90 @@
       redoStack = [];   // new commit invalidates redo branch
       refreshUndoRedoButtons();
       appendLog(`[commit] ${id} = ${val}  (${kind})`);
+      // U7: commit ends edit mode and advances to the cell below.
+      editing = false;
+      moveSelection(1, 0);
+    });
+
+    // ─── U7: keyboard navigation + range-clear ─────────────────
+    // Two modes: SELECTION (arrows move selection) vs EDITING (the
+    // user is actively typing into the formula bar).  Click + arrow
+    // keys without typing stays in SELECTION; the first `input` event
+    // on the formula bar flips to EDITING; commit / Escape /
+    // moveSelection drops back to SELECTION.
+    let editing = false;
+    formulaBar.addEventListener("input", () => { editing = true; });
+    formulaBar.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        // Abandon the in-progress edit, restore the cell's stored val.
+        e.preventDefault();
+        editing = false;
+        if (selectedRC) {
+          const id = cellId(selectedRC.row, selectedRC.col);
+          formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
+        }
+      }
+    });
+    function inEditable() {
+      const a = document.activeElement;
+      if (!a) return false;
+      // Formula bar focused but no in-flight edit → arrows still navigate.
+      if (a === formulaBar && !editing) return false;
+      const t = a.tagName;
+      return t === "INPUT" || t === "TEXTAREA" || t === "SELECT";
+    }
+    function moveSelection(dr, dc) {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return;
+      const base = selectedRC || { row: 0, col: 0 };
+      const row = Math.max(0, Math.min(s.rows - 1, base.row + dr));
+      const col = Math.max(0, Math.min(s.cols - 1, base.col + dc));
+      editing = false;          // moving cells exits edit mode
+      focusSingleCell({ row, col });
+    }
+    function clearSelected() {
+      // Use the current dragRange if set, otherwise just the anchor.
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return;
+      const range = s.selRange;
+      const cells = [];
+      if (range) {
+        for (let r = range.r0; r <= range.r1; r++)
+          for (let c = range.c0; c <= range.c1; c++)
+            cells.push({ row: r, col: c });
+      } else if (selectedRC) {
+        cells.push({ row: selectedRC.row, col: selectedRC.col });
+      } else return;
+      for (const { row, col } of cells) {
+        const id = cellId(row, col);
+        const before = {
+          val:     cellValues.get(id),
+          kind:    cellFormulas.has(id) ? "Formula" : "Value",
+          formula: cellFormulas.get(id) || null,
+        };
+        applyCellChange(row, col, "", "Value", null);
+        historyStack.push({ row, col, id, before,
+                            after: { val: "", kind: "Value", formula: null } });
+      }
+      redoStack = [];
+      refreshUndoRedoButtons();
+      appendLog(`[clear] ${cells.length} cell(s)`);
+    }
+    document.addEventListener("keydown", e => {
+      if (inEditable()) return;            // let inputs handle their own keys
+      switch (e.key) {
+        case "ArrowUp":    e.preventDefault(); moveSelection(-1, 0); break;
+        case "ArrowDown":  e.preventDefault(); moveSelection( 1, 0); break;
+        case "ArrowLeft":  e.preventDefault(); moveSelection( 0,-1); break;
+        case "ArrowRight": e.preventDefault(); moveSelection( 0, 1); break;
+        case "Tab":        e.preventDefault();
+                           moveSelection(0, e.shiftKey ? -1 : 1); break;
+        case "Enter":      e.preventDefault(); formulaBar.focus(); break;
+        case "Delete":
+        case "Backspace":  e.preventDefault(); clearSelected(); break;
+        case "Escape":     e.preventDefault();
+                           paintDragRange(-1, -1, -1, -1); break;
+      }
     });
 
     function appendLog(line) {

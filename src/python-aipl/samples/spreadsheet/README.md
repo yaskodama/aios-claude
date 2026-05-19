@@ -45,6 +45,7 @@
 | C3  | WebSocket realtime collab between browsers | `src/browser-abcl/spreadsheet.html` + `src/node-aipl-server/server.mjs` /ws | ✅ |
 | C4  | DR-10 LWW per cell (Lamport ts + originId tiebreak) | `src/browser-abcl/src/lww.js` + `_smoke_lww.{mjs,sh}` | ✅ 10 assertion |
 | U5  | Mouse-drag range selection + range highlight overlay | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_select_range | ✅ (Puppeteer drag A1→B2 verified) |
+| U7  | Keyboard nav (arrows / Tab / Enter↓ / Delete / Escape) | `src/browser-abcl/spreadsheet.html` selection-vs-editing mode | ✅ 7 assertion |
 
 ## smoke
 
