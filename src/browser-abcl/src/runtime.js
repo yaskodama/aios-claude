@@ -1006,24 +1006,29 @@ export class Runtime {
       ctx.fillStyle = c.kind === "Formula" ? "#2255aa" : "#222";
       ctx.fillText(c.val, px, py);
     }
-    // C6: paint live peer cursors as colored outlines (drawn after
-    // text so they sit on top of cell content but don't obscure it).
+    // C6: paint live peer cursors with a soft tinted fill AND a
+    // solid outline.  The 0.25-alpha fill produces a visible
+    // "color inverted" feel without washing out the cell text; the
+    // outline preserves the peer-color identity.
     if (s.peerCursors && s.peerCursors.size > 0) {
-      ctx.lineWidth = 2;
       for (const [origin, c] of s.peerCursors) {
         if (c.row < 0 || c.row >= s.rows || c.col < 0 || c.col >= s.cols) continue;
+        const x = x0 + (c.col + 1) * cw + 1;
+        const y = y0 + (c.row + 1) * ch + 1;
+        // Soft fill (alpha 0.25) on top of any existing bg / selection.
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = c.color;
+        ctx.fillRect(x, y, cw - 2, ch - 2);
+        ctx.restore();
+        // Solid outline.
+        ctx.lineWidth   = 2;
         ctx.strokeStyle = c.color;
-        ctx.strokeRect(
-          x0 + (c.col + 1) * cw + 1,
-          y0 + (c.row + 1) * ch + 1,
-          cw - 2, ch - 2
-        );
+        ctx.strokeRect(x, y, cw - 2, ch - 2);
         // Origin label above the cell.
         ctx.fillStyle = c.color;
         ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-        ctx.fillText(origin.slice(0, 8),
-                     x0 + (c.col + 1) * cw + 2,
-                     y0 + (c.row + 1) * ch - 1);
+        ctx.fillText(origin.slice(0, 8), x + 1, y - 2);
         ctx.textBaseline = "middle";
         ctx.font = "13px monospace";
       }

@@ -1022,11 +1022,14 @@
     let   lamport  = 0;
     const cellClocks = new Map();    // cellId -> {ts, origin}
     // C6: derive a stable HSL color from clientId so peers get
-    // distinguishable cursor outlines.
+    // distinguishable cursor outlines.  Higher lightness gives a
+    // softer pastel; the runtime then paints a 0.25-alpha fill +
+    // a solid outline so the peer cell visibly "inverts" without
+    // washing out the cell text.
     function colorFromOrigin(origin) {
       let h = 0;
       for (let i = 0; i < origin.length; i++) h = (h * 31 + origin.charCodeAt(i)) >>> 0;
-      return `hsl(${h % 360}, 70%, 55%)`;
+      return `hsl(${h % 360}, 70%, 70%)`;
     }
     const myCursorColor = colorFromOrigin(clientId);
     function setLiveStatus(text, color) {
