@@ -1466,6 +1466,18 @@
           } finally { wsApplyingRemote = false; }
           return;
         }
+        // G4/U9-followup: peer resized the grid.  Apply the same dims
+        // locally so both tabs converge.  applyResize is idempotent on
+        // the survivors → no echo loop.
+        if (msg.type === "resize" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            const kept = applyResize(msg.rows, msg.cols, msg.cellW, msg.rowH);
+            appendLog(`[remote-resize] → ${msg.rows} × ${msg.cols}  ` +
+                      `cellW=${msg.cellW} rowH=${msg.rowH}  (${kept} kept)`);
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
         // F11-followup: peer defined a named-cell alias.
         if (msg.type === "name" && msg.origin && msg.origin !== clientId) {
           wsApplyingRemote = true;
@@ -1562,23 +1574,23 @@
       // U11: keep the sticky header bar in sync with the canvas.
       if (typeof refreshFrozenHeader === "function") refreshFrozenHeader();
     }
-    document.getElementById("btnResize").addEventListener("click", () => {
+    // Apply a resize (rows/cols + cell dims) to the local sheet.
+    // Used both by the local Resize button and by the ws receive
+    // handler so a peer's resize lands identically on every tab.
+    function applyResize(newRows, newCols, cellW, rowH) {
       const runtime = interp && interp.runtime;
-      if (!runtime || !runtime.sheetState) return;
-      const newRows = Math.max(3, Math.min(50, Number(document.getElementById("resizeRows").value) || 10));
-      const newCols = Math.max(3, Math.min(60, Number(document.getElementById("resizeCols").value) || 8));
-      const cellW   = Math.max(30, Math.min(200, Number(document.getElementById("cellW").value) || 40));
-      const rowH    = Math.max(20, Math.min(80,  Number(document.getElementById("rowH" ).value) || 32));
-      // Snapshot any cells that still fit in the new bounds.
+      if (!runtime || !runtime.sheetState) return 0;
+      newRows = Math.max(3, Math.min(50, newRows | 0));
+      newCols = Math.max(3, Math.min(60, newCols | 0));
+      cellW   = Math.max(30, Math.min(200, cellW | 0));
+      rowH    = Math.max(20, Math.min(80,  rowH  | 0));
       const survivors = runtime.sheetState.cells
         .filter(c => c.row < newRows && c.col < newCols)
         .map(c => ({ ...c }));
       reshapeCanvas(newRows, newCols, cellW, rowH);
       runtime._callBuiltin("sheet_init", [newRows, newCols],
                            { __currentActor: null });
-      // sheet_init replaces sheetState, so re-stamp cellH afterward.
       runtime.sheetState.cellH = rowH;
-      // Cull JS-side maps for cells that fell outside the new bounds.
       for (const id of [...cellValues.keys()]) {
         const { col, row } = idToPair(id);
         if (row >= newRows || col >= newCols) {
@@ -1586,22 +1598,39 @@
           cellFormats.delete(id); cellClocks.delete(id);
         }
       }
-      // Re-paint the survivors via the existing sheet_cell primitive.
       for (const cell of survivors) {
         runtime._callBuiltin("sheet_cell",
                              [cell.row, cell.col, cell.val, cell.kind],
                              { __currentActor: null });
       }
-      // If the previous anchor fell outside, drop the selection.
       if (selectedRC &&
           (selectedRC.row >= newRows || selectedRC.col >= newCols)) {
         selectedRC = null;
         cellLabel.textContent = "(none)";
         formulaBar.value = "";
       }
+      // Keep the input fields in sync (helps after a remote-driven resize).
+      document.getElementById("resizeRows").value = newRows;
+      document.getElementById("resizeCols").value = newCols;
+      document.getElementById("cellW"     ).value = cellW;
+      document.getElementById("rowH"      ).value = rowH;
       refreshGridDims();
+      return survivors.length;
+    }
+    document.getElementById("btnResize").addEventListener("click", () => {
+      const newRows = Number(document.getElementById("resizeRows").value) || 10;
+      const newCols = Number(document.getElementById("resizeCols").value) || 8;
+      const cellW   = Number(document.getElementById("cellW").value)      || 40;
+      const rowH    = Number(document.getElementById("rowH" ).value)      || 32;
+      const kept = applyResize(newRows, newCols, cellW, rowH);
       appendLog(`[resize] grid → ${newRows} × ${newCols}  ` +
-                `cellW=${cellW} rowH=${rowH}  (${survivors.length} cell(s) kept)`);
+                `cellW=${cellW} rowH=${rowH}  (${kept} cell(s) kept)`);
+      // C3-followup: propagate the resize to ws peers.
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "resize",
+                 rows: newRows, cols: newCols, cellW, rowH,
+                 origin: clientId });
+      }
     });
 
     // ─── F6: array SPILL for `Range op scalar` and `scalar op Range`.
