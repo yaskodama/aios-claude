@@ -1018,9 +1018,34 @@ void abcl_shutdown(void) {
 
 /* Xinu の queue.h にある enqueue() と名前が衝突するのでリネーム。
    以降 abcl 側のコードでは enqueue マクロで本関数を呼ぶ。 */
+/* R1 smoke markers: print the FIRST send + FIRST recv to the serial
+   console so a -nographic QEMU run can verify the AIPL actor system
+   was reached via grep.  Subsequent sends/recvs are silent to keep
+   the log readable. */
+static volatile int abcl_first_send_logged = 0;
+static volatile int abcl_first_recv_logged = 0;
+extern semaphore print_mu;
+void abcl_log_first_send(int receiver, const char *method) {
+  if (abcl_first_send_logged) return;
+  abcl_first_send_logged = 1;
+  wait(print_mu);
+  kprintf("[aipl] first-send to=%d method=%s\r\n",
+          receiver, method ? method : "?");
+  signal(print_mu);
+}
+void abcl_log_first_recv(int self_id, const char *method) {
+  if (abcl_first_recv_logged) return;
+  abcl_first_recv_logged = 1;
+  wait(print_mu);
+  kprintf("[aipl] first-recv on=%d method=%s\r\n",
+          self_id, method ? method : "?");
+  signal(print_mu);
+}
+
 void abcl_enqueue(int sender, int receiver, const char *method,
                   int n_args, value_t *args) {
   if (receiver < 0 || receiver >= n_objects) return;
+  abcl_log_first_send(receiver, method);
   mailbox_t *mb = &objects[receiver].mbox;
   wait(mb->mu);
   if (mb->tail - mb->head < MAX_MAILBOX) {
@@ -1157,6 +1182,7 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "    m = mb->msgs[mb->head % MAX_MAILBOX];\n";
   emit "    mb->head++;\n";
   emit "    signal(mb->mu);\n";
+  emit "    abcl_log_first_recv(self_id, m.method);\n";
   emit "    wait(counter_mu);\n";
   emit "    idx = ++messages_processed;\n";
   emit "    signal(counter_mu);\n";
@@ -1178,6 +1204,9 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  print_mu   = semcreate(1);\n";
   emit "  objects_mu = semcreate(1);\n";
   emit "  kprintf(\"\\r\\n[abcl] starting...\\r\\n\");\n";
+  (* R1 smoke marker — stable string for `grep aipl-start` in the
+     QEMU -nographic serial log. *)
+  emit "  kprintf(\"[aipl] start\\r\\n\");\n";
   let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
   emit "  /* phase 1: alloc all globals */\n";
   List.iter
