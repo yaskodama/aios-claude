@@ -565,6 +565,25 @@ export class Runtime {
           row: Number(args[0]),
           col: Number(args[1]),
         };
+        this.sheetState.selRange = null;   // U5: clear any range highlight.
+        this._redrawCanvas();
+        break;
+      }
+      // U5: rectangular drag-selection highlight.  Coordinates may
+      // arrive in any order (dragged up-left from down-right); we
+      // normalize before storing.  r1=c1=-1 clears.
+      case "sheet_select_range": {
+        if (!this.sheetState) break;
+        const r0 = Number(args[0]), c0 = Number(args[1]);
+        const r1 = Number(args[2]), c1 = Number(args[3]);
+        if (r1 < 0 || c1 < 0) {
+          this.sheetState.selRange = null;
+        } else {
+          this.sheetState.selRange = {
+            r0: Math.min(r0, r1), c0: Math.min(c0, c1),
+            r1: Math.max(r0, r1), c1: Math.max(c0, c1),
+          };
+        }
         this._redrawCanvas();
         break;
       }
@@ -843,6 +862,19 @@ export class Runtime {
 
     // ── Layer 1: selection highlight (drawn first so it sits under
     //              grid lines and text). ───────────────────────
+    // U5: a drag-range, if present, paints a softer fill across the
+    // whole rectangle; a single-cell sel still gets the brighter
+    // tint on top so the anchor cell stays visually distinct.
+    if (s.selRange) {
+      const r = s.selRange;
+      ctx.fillStyle = "#e8f3ff";
+      ctx.fillRect(
+        x0 + (r.c0 + 1) * cw,
+        y0 + (r.r0 + 1) * ch,
+        (r.c1 - r.c0 + 1) * cw,
+        (r.r1 - r.r0 + 1) * ch,
+      );
+    }
     if (s.sel.row >= 0 && s.sel.col >= 0) {
       ctx.fillStyle = "#d1e9ff";
       ctx.fillRect(

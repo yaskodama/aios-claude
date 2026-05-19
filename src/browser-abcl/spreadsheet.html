@@ -596,30 +596,79 @@
     const colLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const cellId = (row, col) => colLetters[col] + (row + 1);
 
-    canvas.addEventListener("click", e => {
+    // ─── U5: click + drag → range selection.  A non-dragged click
+    // (mousedown and mouseup on the same cell) keeps the existing
+    // single-cell behavior — formula bar, format menu, view.highlight.
+    // A drag fills the range input with `A1:B2` form and paints the
+    // rectangle via sheet_select_range.
+    let dragStart = null;   // {row, col} or null
+    let dragLast  = null;
+    function hitFromEvent(e) {
       const rect = canvas.getBoundingClientRect();
-      const hit = cellAt(e.clientX - rect.left, e.clientY - rect.top);
-      if (!hit) return;
+      return cellAt(e.clientX - rect.left, e.clientY - rect.top);
+    }
+    function paintDragRange(r0, c0, r1, c1) {
+      const rt = interp && interp.runtime;
+      if (!rt) return;
+      rt._callBuiltin("sheet_select_range", [r0, c0, r1, c1],
+                      { __currentActor: null });
+    }
+    function focusSingleCell(hit) {
       selectedRC = hit;
       const id = cellId(hit.row, hit.col);
       cellLabel.textContent = id;
-      // Show the formula source if there is one — that's the value
-      // the user originally entered, not the computed result.
       formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
-      // U3: sync the format menu with this cell's current format.
       document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
       formulaBar.focus();
-      // Tell the AIPL View to repaint the highlight.
-      const top = interp.runtime.globals;
-      const view = top.find && top.find("view");
-      // Simpler: send via existing API by injecting a `now view.highlight(...)`.
-      // The runtime exposes the View actor; we call its method directly:
       const viewActor = interp.runtime.actors.get("view");
       if (viewActor) {
         const slot = interp.runtime.newReplySlot();
         interp.runtime.send("view", "highlight", [hit.row, hit.col],
                             false, null, slot);
       }
+    }
+    canvas.addEventListener("mousedown", e => {
+      const hit = hitFromEvent(e);
+      if (!hit) return;
+      dragStart = hit;
+      dragLast  = hit;
+      // Clear any prior range so a fresh single click feels right.
+      paintDragRange(-1, -1, -1, -1);
+    });
+    canvas.addEventListener("mousemove", e => {
+      if (!dragStart) return;
+      const hit = hitFromEvent(e);
+      if (!hit) return;
+      if (hit.row === dragLast.row && hit.col === dragLast.col) return;
+      dragLast = hit;
+      paintDragRange(dragStart.row, dragStart.col, hit.row, hit.col);
+    });
+    canvas.addEventListener("mouseup", e => {
+      if (!dragStart) return;
+      const hit = hitFromEvent(e) || dragLast;
+      const sameCell = hit.row === dragStart.row && hit.col === dragStart.col;
+      if (sameCell) {
+        // Treat as a single-cell click.
+        paintDragRange(-1, -1, -1, -1);
+        focusSingleCell(hit);
+      } else {
+        // Drag — keep the range painted and write it to the range input.
+        const r0 = Math.min(dragStart.row, hit.row);
+        const c0 = Math.min(dragStart.col, hit.col);
+        const r1 = Math.max(dragStart.row, hit.row);
+        const c1 = Math.max(dragStart.col, hit.col);
+        const rangeStr = `${cellId(r0, c0)}:${cellId(r1, c1)}`;
+        const rangeInput = document.getElementById("rangeInput");
+        if (rangeInput) rangeInput.value = rangeStr;
+        appendLog(`[range] ${rangeStr}`);
+      }
+      dragStart = null;
+      dragLast  = null;
+    });
+    canvas.addEventListener("mouseleave", () => {
+      // Drop a stale drag if the cursor leaves the canvas mid-drag.
+      dragStart = null;
+      dragLast  = null;
     });
 
     // ─── apply_cell_change: the single sheet-mutation entry point.
