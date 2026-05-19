@@ -949,6 +949,16 @@
       ws.onmessage = (ev) => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
+        // Peer broadcast a whole-snapshot Load — mirror it locally so
+        // both tabs converge on the loaded sheet.
+        if (msg.type === "load" && msg.snapshot) {
+          wsApplyingRemote = true;
+          try {
+            const n = applySheetSnapshot(msg.snapshot);
+            appendLog(`[remote-load] applied ${n} cells from peer`);
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
         // Server's welcome frame is `{"kind":"welcome", "sid":…}`,
         // ignore — only react to our own `type:"cell"` shape.
         if (msg.type !== "cell") return;
@@ -1736,6 +1746,41 @@
       autoSaveTimer = setTimeout(() => { autoSaveTimer = null; doSave(true); }, 3000);
     }
 
+    // Applies a save-shaped snapshot to the local view.  Used by both
+    // the Load button (after fetch) and the C3 ws "load" frame so a
+    // remote peer's Load is mirrored without each peer fetching too.
+    function applySheetSnapshot(j) {
+      const runtime = interp && interp.runtime;
+      if (!runtime) return 0;
+      cellValues.clear();
+      cellFormulas.clear();
+      cellFormats.clear();
+      cellClocks.clear();
+      reshapeCanvas(j.rows, j.cols);
+      document.getElementById("resizeRows").value = j.rows;
+      document.getElementById("resizeCols").value = j.cols;
+      runtime._callBuiltin("sheet_init", [j.rows, j.cols],
+                           { __currentActor: null });
+      refreshGridDims();
+      for (const c of (j.cells || [])) {
+        runtime._callBuiltin("sheet_cell",
+                             [c.row, c.col, String(c.val), c.kind],
+                             { __currentActor: null });
+        const n = Number(c.val);
+        cellValues.set(cellId(c.row, c.col),
+          (!Number.isNaN(n) && c.val !== "") ? n : c.val);
+      }
+      if (Array.isArray(j.clocks)) {
+        for (const k of j.clocks) {
+          if (k && k.id) cellClocks.set(k.id, { ts: k.ts, origin: k.origin });
+        }
+      }
+      if (typeof j.lamport === "number" && j.lamport > 0) {
+        lamport = j.lamport;
+      }
+      historyStack = []; redoStack = []; refreshUndoRedoButtons();
+      return (j.cells || []).length;
+    }
     document.getElementById("btnLoad").addEventListener("click", async () => {
       const id = document.getElementById("sheetId").value.trim() || "demo";
       try {
@@ -1746,49 +1791,15 @@
           return;
         }
         const j = await r.json();
-        // Apply each cell via the existing sheet_cell primitive +
-        // mirror into cellValues.
-        const runtime = interp && interp.runtime;
-        if (!runtime) { appendLog("[load error] no interpreter"); return; }
-        cellValues.clear();
-        cellFormulas.clear();
-        cellFormats.clear();
-        cellClocks.clear();
-        // G5: reshape the canvas to match the loaded grid dims so a
-        // resize-then-load round-trip leaves no stale paint area.
-        reshapeCanvas(j.rows, j.cols);
-        // Sync the rows/cols inputs and the dims pill.
-        document.getElementById("resizeRows").value = j.rows;
-        document.getElementById("resizeCols").value = j.cols;
-        // Re-init the canvas so stale cells from the current view
-        // get wiped before we replay.
-        runtime._callBuiltin("sheet_init", [j.rows, j.cols],
-                             { __currentActor: null });
-        refreshGridDims();
-        for (const c of (j.cells || [])) {
-          runtime._callBuiltin("sheet_cell",
-                               [c.row, c.col, String(c.val), c.kind],
-                               { __currentActor: null });
-          const n = Number(c.val);
-          cellValues.set(cellId(c.row, c.col),
-            (!Number.isNaN(n) && c.val !== "") ? n : c.val);
-        }
-        // C5: restore LWW state.  Older saves without `clocks` /
-        // `lamport` get fresh defaults — they just won't help
-        // tie-break against concurrent edits made before that save.
-        if (Array.isArray(j.clocks)) {
-          for (const k of j.clocks) {
-            if (k && k.id) cellClocks.set(k.id, { ts: k.ts, origin: k.origin });
-          }
-        }
-        if (typeof j.lamport === "number" && j.lamport > 0) {
-          lamport = j.lamport;
-        }
-        appendLog(`[load] ${id}.json — restored ${j.cells.length} cells, ` +
+        const n = applySheetSnapshot(j);
+        appendLog(`[load] ${id}.json — restored ${n} cells, ` +
                   `${(j.clocks && j.clocks.length) || 0} clock(s), lamport=${lamport}`);
-        // Load invalidates history (the user's now editing a
-        // freshly-restored sheet, not extending the prior session).
-        historyStack = []; redoStack = []; refreshUndoRedoButtons();
+        // Push the snapshot to ws peers so they see the same cells
+        // without each peer needing to click Load themselves.
+        if (wsConnected) {
+          wsSend({ type: "load", snapshot: j });
+          appendLog(`[load broadcast] propagated to ws peers (sheet:${id})`);
+        }
       } catch (e) { appendLog(`[load error] ${e}`); }
     });
 
