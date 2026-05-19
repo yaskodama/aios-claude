@@ -81,6 +81,7 @@
 | U15 | Shift + arrow extends selection from anchor | `src/browser-abcl/spreadsheet.html` shiftAnchor + Shift-arrow branch | ✅ 3 assertion |
 | F14 | Cross-sheet ranges in function calls (`SUM(Sheet2!A1:A3)`) | `src/browser-abcl/spreadsheet.html` Call-args XRef flattening | ✅ 3 assertion |
 | D6  | Markdown table export (GitHub-flavored) | `src/browser-abcl/spreadsheet.html` buildMarkdown / btnExportMd | ✅ 5 assertion |
+| U16 | In-cell editor overlay (dblclick / F2 / first typed char) | `src/browser-abcl/spreadsheet.html` startInCellEdit / finishInCellEdit | ✅ 8 assertion |
 
 ## smoke
 

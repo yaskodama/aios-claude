@@ -103,6 +103,9 @@
     <input id="freezeCb" type="checkbox"> freeze first row
   </label>
   <canvas id="canvas" width="720" height="380"></canvas>
+  <!-- U16: floating in-cell editor — absolutely positioned over the
+       canvas while the user edits.  Hidden until startInCellEdit fires. -->
+  <input id="inCellEditor" type="text" style="display:none; position:absolute; background:#fff; color:#222; border:2px solid #2255aa; padding:2px 4px; font-family:monospace; font-size:13px; outline:none; box-sizing:border-box; z-index:99;">
 
   <div id="formulaRow">
     <div id="cellLabel">(none)</div>
@@ -1007,6 +1010,102 @@
                             false, null, slot);
       }
     }
+    // ─── U16: in-cell editing overlay ──────────────────────────
+    // A single floating <input id="inCellEditor"> is positioned over
+    // the clicked cell.  Triggers: double-click on canvas, F2, or
+    // typing a printable key while a cell is selected.  Enter commits
+    // via the same path as the formula bar (EQ "=" prefix detection);
+    // Escape cancels.
+    let inCellEdit = null;     // { row, col, prev }
+    function startInCellEdit(row, col, initialText) {
+      const ed = document.getElementById("inCellEditor");
+      const canvasEl = document.getElementById("canvas");
+      const rect = canvasEl.getBoundingClientRect();
+      const s = interp.runtime.sheetState;
+      const cw = Math.floor((canvasEl.width - 60) / (s.cols + 1));
+      const ch = s.cellH || 32;
+      const sx = rect.width  / canvasEl.width;
+      const sy = rect.height / canvasEl.height;
+      // Position relative to the page (window.scroll{X,Y} for scrolled pages).
+      const x = rect.left + window.scrollX + (30 + (col + 1) * cw) * sx;
+      const y = rect.top  + window.scrollY + (30 + (row + 1) * ch) * sy;
+      ed.style.left   = `${x}px`;
+      ed.style.top    = `${y}px`;
+      ed.style.width  = `${cw * sx - 2}px`;
+      ed.style.height = `${ch * sy - 2}px`;
+      ed.style.display = "block";
+      const id = cellId(row, col);
+      const prev = cellFormulas.get(id) || cellValues.get(id);
+      ed.value = initialText !== undefined ? initialText
+              : (prev === undefined ? "" : String(prev));
+      ed.focus();
+      // Place cursor at end of value.
+      ed.setSelectionRange(ed.value.length, ed.value.length);
+      inCellEdit = { row, col, prev };
+    }
+    function finishInCellEdit(commit, advance) {
+      const ed = document.getElementById("inCellEditor");
+      if (!inCellEdit) { ed.style.display = "none"; return; }
+      const { row, col } = inCellEdit;
+      if (commit) {
+        const src = ed.value.trim();
+        let val, kind, formula, ast;
+        if (src.startsWith("=")) {
+          try {
+            ast = parseFormula(src.slice(1));
+            val = evalAst(ast);
+            kind = "Formula"; formula = src;
+          } catch (err) { appendLog("[parse-error] " + err); ed.style.display = "none"; inCellEdit = null; return; }
+        } else {
+          const n = Number(src);
+          val = (src !== "" && !Number.isNaN(n)) ? n : src;
+          kind = "Value"; formula = null;
+        }
+        const id = cellId(row, col);
+        const before = {
+          val:     cellValues.get(id),
+          kind:    cellFormulas.has(id) ? "Formula" : "Value",
+          formula: cellFormulas.get(id) || null,
+        };
+        applyCellChange(row, col, val, kind, formula);
+        historyStack.push({ row, col, id, before, after: { val, kind, formula } });
+        redoStack = []; refreshUndoRedoButtons();
+        appendLog(`[in-cell] ${id} = ${val}  (${kind})`);
+      }
+      ed.style.display = "none";
+      inCellEdit = null;
+      if (commit && advance) moveSelection(1, 0);
+      else if (selectedRC) focusSingleCell(selectedRC, { skipBarFocus: true });
+    }
+    document.getElementById("inCellEditor").addEventListener("keydown", e => {
+      if (e.key === "Enter")  { e.preventDefault(); finishInCellEdit(true,  true);  return; }
+      if (e.key === "Tab")    { e.preventDefault(); finishInCellEdit(true,  false);
+                                moveSelection(0, e.shiftKey ? -1 : 1); return; }
+      if (e.key === "Escape") { e.preventDefault(); finishInCellEdit(false, false); return; }
+    });
+    document.getElementById("inCellEditor").addEventListener("blur",
+      () => finishInCellEdit(true, false));
+    canvas.addEventListener("dblclick", e => {
+      const hit = hitFromEvent(e);
+      if (hit) startInCellEdit(hit.row, hit.col);
+    });
+    // F2 to start an in-cell edit on the currently selected cell.
+    document.addEventListener("keydown", e => {
+      if (inEditable()) return;
+      if (e.key === "F2" && selectedRC) {
+        e.preventDefault();
+        startInCellEdit(selectedRC.row, selectedRC.col);
+        return;
+      }
+      // Typing a printable key while a cell is selected + nothing else
+      // focused → open the in-cell editor pre-filled with that char.
+      if (selectedRC && !e.metaKey && !e.ctrlKey && !e.altKey &&
+          e.key.length === 1 && /[\w=+\-.,]/.test(e.key)) {
+        e.preventDefault();
+        startInCellEdit(selectedRC.row, selectedRC.col, e.key);
+      }
+    });
+
     canvas.addEventListener("mousedown", e => {
       const hit = hitFromEvent(e);
       if (!hit) return;
@@ -1807,6 +1906,9 @@
         cascadeRecompute,
         // D6 hook.
         buildMarkdown: () => buildMarkdown(),
+        // U16 hooks.
+        startInCellEdit, finishInCellEdit,
+        get inCellEdit() { return inCellEdit; },
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
