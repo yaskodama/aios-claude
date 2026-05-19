@@ -129,6 +129,9 @@
     <button id="btnRecompute" title="Re-evaluate every Formula cell">🔄 Recompute</button>
     <button id="btnUndo"      title="Undo last commit (DR-11 compensate)">↶ Undo</button>
     <button id="btnRedo"      title="Redo last undo">↷ Redo</button>
+    <button id="btnExportCsv" title="Download the current grid as a CSV file">📤 CSV ↓</button>
+    <button id="btnImportCsv" title="Import a CSV file into the grid starting at A1">📥 CSV ↑</button>
+    <input  id="csvFile" type="file" accept=".csv,text/csv" style="display:none">
     <button id="btnShowSrc">Show ABCL source</button>
   </div>
   <div id="log"></div>
@@ -1215,6 +1218,10 @@
         cellValues, cellFormulas, cellFormats, cellClocks,
         // F5 test hook: evaluate a formula string and return the value.
         evalFormula: (src) => evalAst(parseFormula(src)),
+        // D1 test hooks for CSV round-trip without touching the DOM.
+        buildCsv:    () => buildCsv(),
+        parseCsv:    (s) => parseCsv(s),
+        importCsv:   (s, anchor) => importCsv(s, anchor),
       };
       try {
         const ast = parser.parse(ABCL_SOURCE);
@@ -1241,6 +1248,117 @@
     document.getElementById("btnRun").addEventListener("click", runProgram);
     document.getElementById("btnStop").addEventListener("click", () => { stopAll(); appendLog("[stopped]"); });
     document.getElementById("btnShowSrc").addEventListener("click", () => { logDiv.textContent = ABCL_SOURCE; });
+
+    // ─── D1: CSV export / import ────────────────────────────────
+    // RFC-4180-ish: fields containing , " or newline get wrapped in
+    // double quotes, and embedded " is doubled.  Empty rows are kept
+    // up to the last non-empty cell to avoid emitting a tail of
+    // blank lines.  Values are exported as their displayed form so
+    // a round-trip matches what the user sees.
+    function csvEscape(v) {
+      const s = String(v ?? "");
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    function buildCsv() {
+      const s = interp.runtime.sheetState;
+      const grid = Array.from({ length: s.rows }, () => Array(s.cols).fill(""));
+      for (const c of s.cells) grid[c.row][c.col] = c.val;
+      // Trim trailing all-empty rows.
+      let last = grid.length - 1;
+      while (last >= 0 && grid[last].every(v => v === "")) last--;
+      const lines = [];
+      for (let r = 0; r <= last; r++) lines.push(grid[r].map(csvEscape).join(","));
+      return lines.join("\n") + (lines.length ? "\n" : "");
+    }
+    function exportCsv() {
+      const text = buildCsv();
+      const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const sid  = document.getElementById("sheetId").value.trim() || "sheet";
+      a.href = url;
+      a.download = `${sid}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const lineCount = text.replace(/\n$/, "").split("\n").length;
+      appendLog(`[csv-export] ${a.download} — ${lineCount} row(s)`);
+    }
+    // CSV parser — handles quoted fields, embedded commas and
+    // newlines, and "" escapes.  Returns rows as string[][].
+    function parseCsv(text) {
+      const rows = [];
+      let row = [], field = "", i = 0, q = false;
+      while (i < text.length) {
+        const ch = text[i];
+        if (q) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+            q = false; i++; continue;
+          }
+          field += ch; i++; continue;
+        }
+        if (ch === '"') { q = true; i++; continue; }
+        if (ch === ',') { row.push(field); field = ""; i++; continue; }
+        if (ch === '\r') { i++; continue; }     // CRLF support
+        if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+        field += ch; i++;
+      }
+      // Flush a partial trailing row (no final newline).
+      if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+      return rows;
+    }
+    function importCsv(text, anchor) {
+      const rows = parseCsv(text);
+      const s = interp.runtime.sheetState;
+      // Anchor: explicit arg wins, then current selection, then A1.
+      const r0 = anchor ? anchor.row :
+                 selectedRC ? selectedRC.row : 0;
+      const c0 = anchor ? anchor.col :
+                 selectedRC ? selectedRC.col : 0;
+      let n = 0, skipped = 0;
+      for (let dr = 0; dr < rows.length; dr++) {
+        for (let dc = 0; dc < rows[dr].length; dc++) {
+          const row = r0 + dr, col = c0 + dc;
+          if (row >= s.rows || col >= s.cols) { skipped++; continue; }
+          const raw = rows[dr][dc];
+          // Cells that look like numbers become numeric; everything
+          // else stays as a string Value.  Formulas are not re-parsed
+          // (CSV doesn't carry the formula source).
+          const num = Number(raw);
+          const val = (raw !== "" && !Number.isNaN(num)) ? num : raw;
+          const id  = cellId(row, col);
+          const before = {
+            val:     cellValues.get(id),
+            kind:    cellFormulas.has(id) ? "Formula" : "Value",
+            formula: cellFormulas.get(id) || null,
+          };
+          applyCellChange(row, col, val, "Value", null);
+          historyStack.push({ row, col, id, before,
+                              after: { val, kind: "Value", formula: null } });
+          n++;
+        }
+      }
+      redoStack = [];
+      refreshUndoRedoButtons();
+      appendLog(`[csv-import] ${n} cell(s) loaded` +
+                (skipped ? `, ${skipped} skipped (out of bounds — try 📐 Resize)` : ""));
+    }
+    document.getElementById("btnExportCsv").addEventListener("click", exportCsv);
+    document.getElementById("btnImportCsv").addEventListener("click", () => {
+      document.getElementById("csvFile").click();
+    });
+    document.getElementById("csvFile").addEventListener("change", e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const fr = new FileReader();
+      fr.onload = () => importCsv(String(fr.result || ""));
+      fr.readAsText(file);
+      // Reset so picking the same file twice still fires "change".
+      e.target.value = "";
+    });
 
     // ─── Phase 5.4: Save / Load via JS-N node-aipl-server ──────
     // Server runs at AIPL_NODE_URL (default http://localhost:8090).
