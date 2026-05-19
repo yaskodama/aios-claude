@@ -70,6 +70,7 @@
 | F11 | Named cells (single-cell aliases for formula refs) | `src/browser-abcl/spreadsheet.html` cellNames + evalAst Ref fallback | ✅ 2 assertion |
 | Y3  | Scatter chart kind (x/y pairs, both-axes ticks) | `src/browser-abcl/spreadsheet.html` renderScatterChart | ✅ 1 assertion |
 | C6  | Live peer cursor sync (color-coded outline + origin label) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_peer_cursor | ✅ 4 assertion |
+| EQ  | `=` prefix required for formulas; source round-trips Save/Load | `src/browser-abcl/spreadsheet.html` formulaBar commit + currentSheetSnapshot + applySheetSnapshot | ✅ 8 assertion |
 
 ## smoke
 

@@ -1223,19 +1223,27 @@
       if (e.key !== "Enter" || !selectedRC) return;
       e.preventDefault();
       const src = formulaBar.value.trim();
+      // EQ: an "=" prefix is now required to mark the input as a
+      // formula.  Plain text / numbers are stored as Value verbatim.
       let val, kind, formula, ast;
-      try {
-        ast = parseFormula(src);
-        val = evalAst(ast);
-        // "Value" only if the entire input was a plain int literal;
-        // anything else (refs, ops, function calls) is a Formula.
-        kind = (ast.tag === "Lit" && String(ast.val) === src) ? "Value" : "Formula";
-        formula = (kind === "Formula") ? src : null;
-      } catch (err) { appendLog("[parse-error] " + err); return; }
+      if (src.startsWith("=")) {
+        try {
+          ast = parseFormula(src.slice(1));
+          val = evalAst(ast);
+          kind = "Formula";
+          formula = src;                  // store the FULL source incl. leading "="
+        } catch (err) { appendLog("[parse-error] " + err); return; }
+      } else {
+        // Coerce numerics, otherwise keep as string.
+        const n = Number(src);
+        val     = (src !== "" && !Number.isNaN(n)) ? n : src;
+        kind    = "Value";
+        formula = null;
+        ast     = null;
+      }
 
-      // F6: try array SPILL first.  On a match, write each cell
-      // (anchor keeps the formula source; the rest are spilled Values).
-      const arr = maybeSpill(ast);
+      // F6: try array SPILL first — but only inside an "=" formula.
+      const arr = ast ? maybeSpill(ast) : null;
       if (arr) {
         const s = interp.runtime.sheetState;
         let n = 0;
@@ -2139,8 +2147,16 @@
       }
       return {
         rows: s.rows, cols: s.cols,
-        cells: s.cells.map(c => ({ row: c.row, col: c.col,
-                                   val: String(c.val), kind: c.kind })),
+        // EQ: include each Formula cell's source ("=A1+B1") so Save→
+        // Load round-trips the formula text, not just the computed val.
+        cells: s.cells.map(c => {
+          const id = cellId(c.row, c.col);
+          return {
+            row: c.row, col: c.col,
+            val: String(c.val), kind: c.kind,
+            formula: cellFormulas.get(id) || null,
+          };
+        }),
         clocks,
         lamport,
       };
@@ -2206,12 +2222,20 @@
                            { __currentActor: null });
       refreshGridDims();
       for (const c of (j.cells || [])) {
+        const cid = cellId(c.row, c.col);
         runtime._callBuiltin("sheet_cell",
                              [c.row, c.col, String(c.val), c.kind],
                              { __currentActor: null });
         const n = Number(c.val);
-        cellValues.set(cellId(c.row, c.col),
+        cellValues.set(cid,
           (!Number.isNaN(n) && c.val !== "") ? n : c.val);
+        // EQ: restore the formula source if the save carries it.
+        // Older saves stored the body without a leading "=" — normalize
+        // so cellFormulas always holds the EQ-prefixed form.
+        if (c.formula) {
+          const src = c.formula.startsWith("=") ? c.formula : "=" + c.formula;
+          cellFormulas.set(cid, src);
+        }
       }
       if (Array.isArray(j.clocks)) {
         for (const k of j.clocks) {
@@ -2255,8 +2279,11 @@
       let n = 0;
       for (const [id, src] of cellFormulas.entries()) {
         if (!src) continue;
+        // EQ: parse only the body after the leading "=".  Older save
+        // files may store the body without the "=", so fall through.
+        const body = src.startsWith("=") ? src.slice(1) : src;
         let val;
-        try { val = evalAst(parseFormula(src)); }
+        try { val = evalAst(parseFormula(body)); }
         catch (err) { appendLog(`[recompute error @ ${id}] ${err}`); continue; }
         // Find the (row, col) for the id by reverse-lookup in sheetState.
         const s = interp && interp.runtime && interp.runtime.sheetState;
