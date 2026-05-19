@@ -1006,12 +1006,12 @@
       // burst of Enter presses cycles matches without bouncing into
       // the formula bar's commit handler.
       if (!opts || !opts.skipBarFocus) formulaBar.focus();
-      const viewActor = interp.runtime.actors.get("view");
-      if (viewActor) {
-        const slot = interp.runtime.newReplySlot();
-        interp.runtime.send("view", "highlight", [hit.row, hit.col],
-                            false, null, slot);
-      }
+      // C6-followup: paint the highlight synchronously by calling the
+      // builtin directly.  The actor-message round-trip (`send view
+      // highlight`) was racing fast clicks / arrow-key bursts so the
+      // colored cell sometimes lagged the actual selection.
+      interp.runtime._callBuiltin("sheet_select", [hit.row, hit.col],
+                                   { __currentActor: null });
     }
     // ─── U16: in-cell editing overlay ──────────────────────────
     // A single floating <input id="inCellEditor"> is positioned over
@@ -1021,6 +1021,11 @@
     // Escape cancels.
     let inCellEdit = null;     // { row, col, prev }
     function startInCellEdit(row, col, initialText) {
+      // U16-followup: move the local selection to the cell we're
+      // about to edit so the colored highlight and the editor overlay
+      // share the same target.  skipBarFocus → we'll focus the
+      // in-cell editor right after, not the top formula bar.
+      focusSingleCell({ row, col }, { skipBarFocus: true });
       const ed = document.getElementById("inCellEditor");
       const canvasEl = document.getElementById("canvas");
       const rect = canvasEl.getBoundingClientRect();
@@ -1814,13 +1819,11 @@
         if (e.key === "ArrowRight") c = Math.min(s.cols - 1,  c + 1);
         selectedRC = { row: r, col: c };
         cellLabel.textContent = cellId(r, c);
-        // Repaint local selection in the user's identity color.
+        // Repaint local selection in the user's identity color —
+        // synchronously, so the colored cell never lags the cursor.
         if (typeof applyLocalSelColor === "function") applyLocalSelColor();
-        const viewActor = interp.runtime.actors.get("view");
-        if (viewActor) {
-          const slot = interp.runtime.newReplySlot();
-          interp.runtime.send("view", "highlight", [r, c], false, null, slot);
-        }
+        interp.runtime._callBuiltin("sheet_select", [r, c],
+                                     { __currentActor: null });
         // Broadcast the new cursor position to ws peers (C6).
         if (wsConnected && !wsApplyingRemote) {
           wsSend({ type: "cursor", row: r, col: c,
