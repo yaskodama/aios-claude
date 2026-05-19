@@ -1433,6 +1433,49 @@
           } finally { wsApplyingRemote = false; }
           return;
         }
+        // F9-followup: peer set / cleared a comment.
+        if (msg.type === "note" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            const id = cellId(msg.row, msg.col);
+            if (msg.text) {
+              cellNotes.set(id, msg.text);
+              interp.runtime._callBuiltin("sheet_cell_note",
+                [msg.row, msg.col, 1], { __currentActor: null });
+            } else {
+              cellNotes.delete(id);
+              interp.runtime._callBuiltin("sheet_cell_note",
+                [msg.row, msg.col, 0], { __currentActor: null });
+            }
+            appendLog(`[remote-note] ${id} ← ${msg.text ? `"${msg.text.slice(0,30)}…"` : "(cleared)"}`);
+            // If the user is currently looking at this cell, refresh.
+            if (selectedRC && selectedRC.row === msg.row && selectedRC.col === msg.col) {
+              const noteEl = document.getElementById("noteInput");
+              if (noteEl) noteEl.value = msg.text || "";
+            }
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
+        // F10-followup: peer toggled a cell's write-lock.
+        if (msg.type === "lock" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            if (msg.locked) cellLocked.add(msg.id);
+            else            cellLocked.delete(msg.id);
+            appendLog(`[remote-${msg.locked ? "lock" : "unlock"}] ${msg.id}`);
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
+        // F11-followup: peer defined a named-cell alias.
+        if (msg.type === "name" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            cellNames.set(msg.name, msg.target);
+            if (typeof refreshNameList === "function") refreshNameList();
+            appendLog(`[remote-name] ${msg.name} → ${msg.target}`);
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
         // Peer broadcast a whole-snapshot Load — mirror it locally so
         // both tabs converge on the loaded sheet.
         if (msg.type === "load" && msg.snapshot) {
@@ -3585,6 +3628,11 @@
           [selectedRC.row, selectedRC.col, 0], { __currentActor: null });
         appendLog(`[note cleared] ${id}`);
       }
+      // C3-followup: sync note over ws.
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "note", row: selectedRC.row, col: selectedRC.col,
+                 text: txt || "", origin: clientId });
+      }
     }
     function clearNote() {
       if (!selectedRC) return;
@@ -3594,6 +3642,10 @@
       interp.runtime._callBuiltin("sheet_cell_note",
         [selectedRC.row, selectedRC.col, 0], { __currentActor: null });
       appendLog(`[note cleared] ${id}`);
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "note", row: selectedRC.row, col: selectedRC.col,
+                 text: "", origin: clientId });
+      }
     }
     document.getElementById("btnSaveNote" ).addEventListener("click", saveNote);
     document.getElementById("btnClearNote").addEventListener("click", clearNote);
@@ -3606,12 +3658,16 @@
     function toggleLock() {
       if (!selectedRC) return;
       const id = cellId(selectedRC.row, selectedRC.col);
-      if (cellLocked.has(id)) {
+      const locked = cellLocked.has(id);
+      if (locked) {
         cellLocked.delete(id);
         appendLog(`[unlock] ${id}`);
       } else {
         cellLocked.add(id);
         appendLog(`[lock] ${id}`);
+      }
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "lock", id, locked: !locked, origin: clientId });
       }
     }
     document.getElementById("btnLock").addEventListener("click", toggleLock);
@@ -3647,6 +3703,9 @@
       cellNames.set(n, target);
       refreshNameList();
       appendLog(`[name] ${n} → ${target}`);
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "name", name: n, target, origin: clientId });
+      }
     }
     function nameGoto() {
       const n = document.getElementById("nameInput").value.trim();
