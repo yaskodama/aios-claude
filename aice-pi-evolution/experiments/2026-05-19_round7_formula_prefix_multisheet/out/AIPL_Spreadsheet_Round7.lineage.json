@@ -1,0 +1,1250 @@
+[
+  {
+    "id": "I0001",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "register_int",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0002",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "symbol_owned",
+      "concurrency_model": "csp_channels",
+      "type_safety": "low",
+      "effect_handling": "capability",
+      "ownership_model": "linear"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6799999999999999,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.611,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0003",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "rc"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0004",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "global_num",
+      "concurrency_model": "actor_messages",
+      "type_safety": "none",
+      "effect_handling": "implicit",
+      "ownership_model": "borrow_check"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.72,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.619,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0005",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0006",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "global_num",
+      "concurrency_model": "actor_messages",
+      "type_safety": "none",
+      "effect_handling": "monadic",
+      "ownership_model": "linear"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6699999999999999,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.609,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0007",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "symbol_owned",
+      "concurrency_model": "threads_locks",
+      "type_safety": "medium",
+      "effect_handling": "implicit",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.74,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.623,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0008",
+    "genome": {
+      "paradigm": "ParallelOOP",
+      "state_representation": "register_int",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=ParallelOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0009",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "borrow_check"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 1,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0010",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "linear"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.74,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.623,
+    "generation": 2,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0011",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 3,
+    "parents": [
+      "I0003",
+      "I0001"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0012",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "monadic",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 4,
+    "parents": [
+      "I0005"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0013",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 5,
+    "parents": [
+      "I0005",
+      "I0001"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0014",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "dependent",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "rc"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.7400000000000001,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.623,
+    "generation": 6,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0015",
+    "genome": {
+      "paradigm": "assembler",
+      "state_representation": "register_int",
+      "concurrency_model": "none",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=assembler",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.595,
+    "generation": 7,
+    "parents": [
+      "I0005"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0016",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "none",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.595,
+    "generation": 8,
+    "parents": [
+      "I0005",
+      "I0015"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0017",
+    "genome": {
+      "paradigm": "assembler",
+      "state_representation": "register_int",
+      "concurrency_model": "none",
+      "type_safety": "none",
+      "effect_handling": "implicit",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=assembler",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.595,
+    "generation": 9,
+    "parents": [
+      "I0015"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0018",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "global_num",
+      "concurrency_model": "threads_locks",
+      "type_safety": "low",
+      "effect_handling": "implicit",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6900000000000001,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.613,
+    "generation": 10,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0019",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "borrow_check"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 11,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0020",
+    "genome": {
+      "paradigm": "ParallelOOP",
+      "state_representation": "enum_state",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=ParallelOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 12,
+    "parents": [
+      "I0008"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0021",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "enum_state",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 13,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0022",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "structured",
+      "type_safety": "none",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.76,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.627,
+    "generation": 14,
+    "parents": [
+      "I0001",
+      "I0003"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0023",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "monadic",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 15,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0024",
+    "genome": {
+      "paradigm": "ParallelOOP",
+      "state_representation": "register_int",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=ParallelOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 16,
+    "parents": [
+      "I0008"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0025",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "register_int",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 17,
+    "parents": [
+      "I0001",
+      "I0008"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0026",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "none",
+      "type_safety": "high",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.75,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.625,
+    "generation": 18,
+    "parents": [
+      "I0003",
+      "I0015"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0027",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "rc"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 19,
+    "parents": [
+      "I0025",
+      "I0003"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0028",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "none",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "rc"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.64,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.603,
+    "generation": 20,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0029",
+    "genome": {
+      "paradigm": "Java_OOP",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=Java_OOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 21,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0030",
+    "genome": {
+      "paradigm": "assembler",
+      "state_representation": "ADT",
+      "concurrency_model": "none",
+      "type_safety": "none",
+      "effect_handling": "capability",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=assembler",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.595,
+    "generation": 22,
+    "parents": [
+      "I0015"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0031",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "implicit",
+      "ownership_model": "rc"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 23,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0032",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "register_int",
+      "concurrency_model": "threads_locks",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.79,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.633,
+    "generation": 24,
+    "parents": [
+      "I0029"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0033",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "enum_state",
+      "concurrency_model": "actor_messages",
+      "type_safety": "medium",
+      "effect_handling": "implicit",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.82,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.639,
+    "generation": 25,
+    "parents": [
+      "I0025"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0034",
+    "genome": {
+      "paradigm": "BASIC",
+      "state_representation": "register_int",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "monadic",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=BASIC",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 26,
+    "parents": [
+      "I0025"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0035",
+    "genome": {
+      "paradigm": "ParallelOOP",
+      "state_representation": "register_int",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "monadic",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=ParallelOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 27,
+    "parents": [
+      "I0023",
+      "I0008"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0036",
+    "genome": {
+      "paradigm": "ParallelOOP",
+      "state_representation": "symbol_owned",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "gc"
+    },
+    "cell": "paradigm=ParallelOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 28,
+    "parents": [
+      "I0029"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0037",
+    "genome": {
+      "paradigm": "C",
+      "state_representation": "enum_state",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=C",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 29,
+    "parents": [
+      "I0033",
+      "I0025"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0038",
+    "genome": {
+      "paradigm": "FunctionalOOP",
+      "state_representation": "ADT",
+      "concurrency_model": "actor_messages",
+      "type_safety": "high",
+      "effect_handling": "algebraic_effects",
+      "ownership_model": "none"
+    },
+    "cell": "paradigm=FunctionalOOP",
+    "fitness_components": {
+      "task::EQ_FormulaPrefix": 0.5,
+      "task::MS_MultipleSheets": 0.5,
+      "task::U14_UndoRedoPanel": 0.5,
+      "task::F12_MacroNamedOperations": 0.5,
+      "task::D5_JSONFullExport": 0.5,
+      "task::C7_PresenceIndicator": 0.5,
+      "task::Y4_HeatmapChart": 0.5,
+      "task::BackwardCompat": 0.5,
+      "task::ImplCost": 0.5,
+      "implementability": 0.87,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5,
+      "paradigm_match": 0.5
+    },
+    "composite": 0.649,
+    "generation": 30,
+    "parents": [
+      "I0023",
+      "I0037"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  }
+]
