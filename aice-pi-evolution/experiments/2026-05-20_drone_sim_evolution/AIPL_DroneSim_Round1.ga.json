@@ -1,0 +1,113 @@
+{
+  "name": "AIPL_DroneSim_Round1",
+  "task": "Round 0 の M-006 再現シミュレータ (drone_sim_v0.html) を seed に、Direction A (論文課題の解消) + Direction B (機能拡張) + Direction C (AIPL/abclc 統合) + Direction D (現実モデル) の 4 軸で進化させる. 既存挙動 (UAV1 巡回 + UAV2 誘導 + 8 試行制限 + 表 1 初期値) は absolute compat floor、新機能は全て opt-in (toggle/別ボタン/別パネル). 各 phase は HTML 1 ファイル + Puppeteer smoke のセットで commit.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "A1_AlphaBetaGammaSlider",
+      "A2_UAV1SweepOptimization",
+      "A3_StatisticsPanel",
+      "A4_ScenarioSelector",
+      "B1_NDrones",
+      "B2_SecondaryDisaster",
+      "B3_SOSBroadcast",
+      "B4_BatteryWind",
+      "C1_UAVAsAIPLActor",
+      "C2_MultiCommanderWS",
+      "D1_RealTerrainTile",
+      "D2_LearnedRouting",
+      "D3_SurvivorMobility",
+      "R0_BackwardCompat",
+      "ImplCost"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": []
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}

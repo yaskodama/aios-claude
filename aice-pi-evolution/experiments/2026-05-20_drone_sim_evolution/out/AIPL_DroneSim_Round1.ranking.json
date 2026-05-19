@@ -1,0 +1,209 @@
+{
+  "trend": {
+    "deltas": {
+      "type_safety": 0.75,
+      "concurrency_model": -0.25,
+      "ownership_model": 0.0
+    },
+    "normalized": {
+      "type_safety": 0.75,
+      "concurrency_model": -0.25,
+      "ownership_model": 0.0
+    },
+    "new_axis_values": [
+      [
+        "concurrency_model",
+        "actor_messages"
+      ],
+      [
+        "type_safety",
+        "high"
+      ],
+      [
+        "effect_handling",
+        "algebraic_effects"
+      ],
+      [
+        "paradigm",
+        "C"
+      ],
+      [
+        "state_representation",
+        "enum_state"
+      ],
+      [
+        "type_safety",
+        "medium"
+      ],
+      [
+        "effect_handling",
+        "implicit"
+      ]
+    ],
+    "path": [
+      "I0001",
+      "I0025",
+      "I0033",
+      "I0037"
+    ]
+  },
+  "gaps": [
+    {
+      "descriptor": {
+        "paradigm": "Functional"
+      },
+      "near_score": 0.649,
+      "distance_to_filled": 1,
+      "coherent": false
+    }
+  ],
+  "meta_fitness": {
+    "I0025": {
+      "trend_alignment": 0.8125,
+      "frontier_coverage": 0.5,
+      "novelty": 0.4,
+      "evolvability": 0.29411764705882354,
+      "cross_task_generality": 0.5,
+      "implementability": 0.87
+    },
+    "I0037": {
+      "trend_alignment": 0.8125,
+      "frontier_coverage": 0.5,
+      "novelty": 0.4,
+      "evolvability": 0.058823529411764705,
+      "cross_task_generality": 0.5,
+      "implementability": 0.87
+    },
+    "I0038": {
+      "trend_alignment": 0.8125,
+      "frontier_coverage": 0.5,
+      "novelty": 0.4,
+      "evolvability": 0.0,
+      "cross_task_generality": 0.5,
+      "implementability": 0.87
+    },
+    "I0008": {
+      "trend_alignment": 0.8125,
+      "frontier_coverage": 0.5,
+      "novelty": 0.4,
+      "evolvability": 0.5294117647058824,
+      "cross_task_generality": 0.5,
+      "implementability": 0.87
+    },
+    "I0015": {
+      "trend_alignment": 0.625,
+      "frontier_coverage": 0.0,
+      "novelty": 0.19999999999999996,
+      "evolvability": 0.23529411764705882,
+      "cross_task_generality": 0.5,
+      "implementability": 0.6
+    },
+    "I0029": {
+      "trend_alignment": 0.7142857142857143,
+      "frontier_coverage": 0.4166666666666667,
+      "novelty": 0.4,
+      "evolvability": 0.11764705882352941,
+      "cross_task_generality": 0.5,
+      "implementability": 0.79
+    }
+  },
+  "rankings": [
+    {
+      "scenario": "conservative",
+      "weights": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0008",
+          "composite": 0.6940661764705883,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        },
+        {
+          "individual_id": "I0025",
+          "composite": 0.6705367647058824,
+          "pareto_rank": 2,
+          "pairwise_win_rate": 0.8
+        },
+        {
+          "individual_id": "I0037",
+          "composite": 0.6470073529411765,
+          "pareto_rank": 3,
+          "pairwise_win_rate": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "innovative",
+      "weights": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0008",
+          "composite": 0.5035367647058824,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        },
+        {
+          "individual_id": "I0025",
+          "composite": 0.4682426470588235,
+          "pareto_rank": 2,
+          "pairwise_win_rate": 0.8
+        },
+        {
+          "individual_id": "I0037",
+          "composite": 0.4329485294117647,
+          "pareto_rank": 3,
+          "pairwise_win_rate": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "general_purpose",
+      "weights": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0008",
+          "composite": 0.6188161764705883,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        },
+        {
+          "individual_id": "I0025",
+          "composite": 0.5952867647058824,
+          "pareto_rank": 2,
+          "pairwise_win_rate": 0.8
+        },
+        {
+          "individual_id": "I0037",
+          "composite": 0.5717573529411765,
+          "pareto_rank": 3,
+          "pairwise_win_rate": 0.6
+        }
+      ]
+    }
+  ],
+  "discoveries": {
+    "axes": [],
+    "values": {}
+  }
+}

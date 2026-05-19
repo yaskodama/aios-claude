@@ -204,10 +204,10 @@ aice AIPL_DroneSim_Round1 {
   // ─── 検証 (期待 assertion 合計) ──────────────────────────────
   verification {
     round0_baseline      = "1 assertion (rescued ≥ 280 / 349 after 8 trials)";
-    A1+A3+A4+A2          = "17 assertion";
-    B2+B3+B1+B4          = "13 assertion";
-    C2+C1                = "8 assertion";
-    D1+D3+D2             = "11 assertion";
+    direction_A_total    = "17 assertion (A1 + A3 + A4 + A2)";
+    direction_B_total    = "13 assertion (B2 + B3 + B1 + B4)";
+    direction_C_total    = "8 assertion (C2 + C1)";
+    direction_D_total    = "11 assertion (D1 + D3 + D2)";
     grand_total          = "50 assertion for Round 1";
     regression_floor     = "round0_baseline must stay green at every phase";
   }

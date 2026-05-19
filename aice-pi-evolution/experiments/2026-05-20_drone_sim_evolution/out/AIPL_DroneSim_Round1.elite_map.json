@@ -1,0 +1,83 @@
+{
+  "cells": {
+    "paradigm=BASIC": {
+      "id": "I0025",
+      "genome": {
+        "paradigm": "BASIC",
+        "state_representation": "register_int",
+        "concurrency_model": "actor_messages",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "none"
+      },
+      "composite": 0.649,
+      "generation": 17
+    },
+    "paradigm=C": {
+      "id": "I0037",
+      "genome": {
+        "paradigm": "C",
+        "state_representation": "enum_state",
+        "concurrency_model": "actor_messages",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "none"
+      },
+      "composite": 0.649,
+      "generation": 29
+    },
+    "paradigm=FunctionalOOP": {
+      "id": "I0038",
+      "genome": {
+        "paradigm": "FunctionalOOP",
+        "state_representation": "ADT",
+        "concurrency_model": "actor_messages",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "none"
+      },
+      "composite": 0.649,
+      "generation": 30
+    },
+    "paradigm=ParallelOOP": {
+      "id": "I0008",
+      "genome": {
+        "paradigm": "ParallelOOP",
+        "state_representation": "register_int",
+        "concurrency_model": "actor_messages",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "none"
+      },
+      "composite": 0.649,
+      "generation": 0
+    },
+    "paradigm=assembler": {
+      "id": "I0015",
+      "genome": {
+        "paradigm": "assembler",
+        "state_representation": "register_int",
+        "concurrency_model": "none",
+        "type_safety": "none",
+        "effect_handling": "capability",
+        "ownership_model": "none"
+      },
+      "composite": 0.595,
+      "generation": 7
+    },
+    "paradigm=Java_OOP": {
+      "id": "I0029",
+      "genome": {
+        "paradigm": "Java_OOP",
+        "state_representation": "register_int",
+        "concurrency_model": "threads_locks",
+        "type_safety": "high",
+        "effect_handling": "algebraic_effects",
+        "ownership_model": "gc"
+      },
+      "composite": 0.633,
+      "generation": 21
+    }
+  },
+  "filled": 6
+}
