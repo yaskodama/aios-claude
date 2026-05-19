@@ -1467,10 +1467,18 @@
         cellValues.clear();
         cellFormulas.clear();
         cellFormats.clear();
+        cellClocks.clear();
+        // G5: reshape the canvas to match the loaded grid dims so a
+        // resize-then-load round-trip leaves no stale paint area.
+        reshapeCanvas(j.rows, j.cols);
+        // Sync the rows/cols inputs and the dims pill.
+        document.getElementById("resizeRows").value = j.rows;
+        document.getElementById("resizeCols").value = j.cols;
         // Re-init the canvas so stale cells from the current view
         // get wiped before we replay.
         runtime._callBuiltin("sheet_init", [j.rows, j.cols],
                              { __currentActor: null });
+        refreshGridDims();
         for (const c of (j.cells || [])) {
           runtime._callBuiltin("sheet_cell",
                                [c.row, c.col, String(c.val), c.kind],
