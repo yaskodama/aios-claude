@@ -17,7 +17,7 @@ laid out in [`AIPL_DroneSim_Round1.aice`](./AIPL_DroneSim_Round1.aice).
 | **A4** | **Scenario selector — Table 1 / All Empty / Random (seeded) / Custom JSON** | **18/18** |
 | **A2** | **UAV1 sweep: TSP + 2-opt + priority-bias + transit dedup** | **5/5** |
 | **B2** | **Secondary-disaster events — cut 3 random edges + visual X marks + isolation warning** | **11/11** |
-| B3 | … | — |
+| **B3** | **SOS broadcasts — N-hop gossip + decaying priority bonus + golden halo** | **13/13** |
 | B1 | … | — |
 | B4 | … | — |
 | C2 | … | — |

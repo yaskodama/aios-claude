@@ -186,6 +186,20 @@
       </div>
     </div>
 
+    <!-- B3: SOS frames — a survivor's phone broadcasts on a point and
+         propagates a temporary priority boost N hops out (gossip). -->
+    <div class="panel">
+      <h2>SOS Broadcasts <span class="pill" id="sosPill">0 active</span></h2>
+      <div class="controls">
+        <button id="btnSOS" class="primary" style="font-size:11px">📡 Send SOS</button>
+        <button id="btnSOSClear" style="font-size:10px">↺ clear</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="k">Last SOS</span>
+        <span class="v" id="sosLast">—</span>
+      </div>
+    </div>
+
     <!-- B2: secondary-disaster events — sever edges mid-run. -->
     <div class="panel">
       <h2>Disaster Events <span class="pill" id="disasterPill">0 edges cut</span></h2>
@@ -548,6 +562,10 @@ function resetSim(){
   if (dp) dp.textContent = '0 edges cut';
   const dl = document.getElementById('disasterLast');
   if (dl) dl.textContent = '—';
+  // B3: clear any active SOS broadcasts on reset.
+  sosBoosts.clear();
+  const sp = document.getElementById('sosPill');  if (sp) sp.textContent = '0 active';
+  const sl = document.getElementById('sosLast');  if (sl) sl.textContent = '—';
   pts = {...INITIAL};
   priority = {};
   uav1 = new UAV('UAV1', getCSS('--uav1'), 'A');
@@ -585,6 +603,29 @@ function travelTimeFromUAV2(id){
   const {dist} = dijkstra(uav2.atId);
   return dist.get(id) || 0;
 }
+/* B3: SOS broadcasts — a survivor on a point sends an emergency
+   frame.  The frame propagates N hops out over the road network
+   (gossip-style) and contributes a time-decaying bonus to that
+   neighbourhood's priority. */
+const sosBoosts        = new Map();    // cellId → {strength, firedAt, hop}
+const SOS_DURATION_MS  = 10_000;       // 10 sim-seconds of decay
+const SOS_PROP_HOPS    = 2;
+const SOS_BASE_BONUS   = 5;            // bonus added to base priority at origin
+function sosRemainingBoost(id){
+  const info = sosBoosts.get(id);
+  if (!info) return 0;
+  const elapsed = (sim ? sim.t : 0) - info.firedAt;
+  if (elapsed >= SOS_DURATION_MS) return 0;
+  return info.strength * (1 - elapsed / SOS_DURATION_MS);
+}
+function decaySOSBoosts(){
+  for (const [id, info] of sosBoosts){
+    const elapsed = (sim ? sim.t : 0) - info.firedAt;
+    if (elapsed >= SOS_DURATION_MS) sosBoosts.delete(id);
+  }
+  const p = document.getElementById('sosPill');
+  if (p) p.textContent = `${sosBoosts.size} active`;
+}
 function recomputePriorities(){
   for (const n of NODES){
     if (n.shelter){ priority[n.id]=0; continue; }
@@ -593,8 +634,60 @@ function recomputePriorities(){
     const dd  = elevationProxy(n.id);          // distance from secondary disaster (proxy)
     const t   = travelTimeFromUAV2(n.id)*0.01; // travel time
     const dhc = elevationProxy(n.id)*coastDistance(n.id);
-    priority[n.id] = (ALPHA*dd + BETA*t + GAMMA*dhc) * Math.log(1+survivors);
+    let pri = (ALPHA*dd + BETA*t + GAMMA*dhc) * Math.log(1+survivors);
+    // B3: layer the decaying SOS bonus on top of the paper's formula.
+    pri += sosRemainingBoost(n.id);
+    priority[n.id] = pri;
   }
+}
+function triggerSOS(opts){
+  // BFS up to SOS_PROP_HOPS hops over current adj from a random
+  // occupied point (the survivor's phone fires the frame).
+  const candidates = [];
+  for (let i = 1; i <= 20; i++) if ((pts[i] || 0) > 0) candidates.push(i);
+  if (candidates.length === 0){
+    log('SYS','[sos] no occupied points to fire from','ev'); return null;
+  }
+  const src = (opts && opts.src != null)
+    ? opts.src
+    : candidates[Math.floor(Math.random() * candidates.length)];
+  const t = sim ? sim.t : 0;
+  // Walk hops out, halving the strength each hop.
+  const visited = new Set();
+  let layer = [src];
+  for (let hop = 0; hop <= SOS_PROP_HOPS; hop++){
+    const next = [];
+    const strength = SOS_BASE_BONUS * Math.pow(0.5, hop);
+    for (const id of layer){
+      if (N(id).shelter) continue;
+      if (!visited.has(id)){
+        visited.add(id);
+        sosBoosts.set(id, { strength, firedAt: t, hop });
+      }
+      for (const nb of (adj.get(id) || [])){
+        if (visited.has(nb)) continue;
+        next.push(nb);
+      }
+    }
+    layer = next;
+    if (!layer.length) break;
+  }
+  recomputePriorities();
+  refreshTable();
+  document.getElementById('sosLast').textContent =
+    `P${src} → ${visited.size} pts (hop ≤ ${SOS_PROP_HOPS})`;
+  document.getElementById('sosPill').textContent = `${sosBoosts.size} active`;
+  log('SYS', `[sos] FROM P${src}  →  ${visited.size} points boosted`, 'ev');
+  return src;
+}
+function clearSOS(){
+  const n = sosBoosts.size;
+  sosBoosts.clear();
+  document.getElementById('sosPill').textContent = '0 active';
+  document.getElementById('sosLast').textContent = '—';
+  recomputePriorities();
+  refreshTable();
+  if (n) log('SYS', `[sos] cleared ${n} active broadcasts`, 'ev');
 }
 
 // UAV1 sweep — visit every patrol point in a heuristic order from start node.
@@ -740,6 +833,8 @@ function frame(now){
 }
 function stepSim(dt){
   sim.t += dt; sim.tick++;
+  // B3: expire SOS broadcasts that have ridden out their decay window.
+  if (sosBoosts.size) decaySOSBoosts();
   // UAV1 motion + behaviour
   uav1.step(dt);
   if (uav1.state==='arrived' || (uav1.targetIdx>=uav1.path.length)){
@@ -883,6 +978,15 @@ function drawNode(n){
       const a = Math.min(0.5, pri*0.25+0.08);
       ctx.fillStyle=`rgba(255,107,138,${a})`;
       ctx.beginPath(); ctx.arc(x,y, sz+8, 0, Math.PI*2); ctx.fill();
+    }
+    // B3: SOS halo (golden pulse on top of the priority halo).
+    const sos = sosRemainingBoost(n.id);
+    if (sos > 0){
+      const rad = sz + 14 + (Math.sin(Date.now()*0.005) + 1) * 3;
+      ctx.strokeStyle = `rgba(255,214,107,${0.35 + sos*0.06})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI*2); ctx.stroke();
+      ctx.lineWidth = 1;
     }
     ctx.strokeStyle=getCSS('--ink');
     ctx.fillStyle='rgba(11,16,32,0.85)';
@@ -1255,6 +1359,8 @@ function restoreEdges(){
 }
 document.getElementById('btnDisaster').addEventListener('click', triggerDisaster);
 document.getElementById('btnRestoreEdges').addEventListener('click', restoreEdges);
+document.getElementById('btnSOS').addEventListener('click', () => triggerSOS());
+document.getElementById('btnSOSClear').addEventListener('click', clearSOS);
 
 /* ─────────────────────────────────────────────────────────────
    3D wireframe view (Three.js) — shares state with 2D simulator
