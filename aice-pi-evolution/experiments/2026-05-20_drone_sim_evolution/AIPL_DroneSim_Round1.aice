@@ -1,0 +1,234 @@
+// AIPL_DroneSim_Round1.aice  (2026-05-20)
+//
+// 種: M-006 (FIT2023 関口/加藤/神林) で提案された
+//   「移動エージェントを搭載した UAV による山間部災害避難支援
+//    システム」のシミュレータを HTML/JS+Three.js で実装した
+//   Round 0 版 (drone_sim_v0.html, 41 KB, 1134 行).
+//
+//   Round 0 で実装済み:
+//     - 2D Canvas + 3D Three.js のデュアルビュー
+//     - 山間部地形 + 道路グラフ (避難所 A/B + 巡回点 20)
+//     - Dijkstra 最短経路
+//     - 優先度式 priority = α·dd + β·t + γ·dhc
+//     - UAV1 巡回探索 + UAV2 高優先度ポイント誘導 (8 試行制限)
+//     - 表 1 (誘導前 349 人) の初期値完全再現
+//     - HUD/ログ/テーブル/Speed スライダー
+//
+//   Round 0 で残った論文の課題 (M-006 §5「まとめ」):
+//     1. 経路計画アルゴリズムの効率 = 遠回り・反復訪問あり
+//     2. UAV が何をしているかの随時可視化が弱い
+//     3. 実機実装を見据えた現実モデルが必要
+//
+// Round 1 はユーザ指定の 4 方向 (A/B/C/D) で進化を進める.
+
+aice AIPL_DroneSim_Round1 {
+  dialect = "aice_evolution_v2";
+
+  task = "Round 0 の M-006 再現シミュレータ (drone_sim_v0.html) を seed に、Direction A (論文課題の解消) + Direction B (機能拡張) + Direction C (AIPL/abclc 統合) + Direction D (現実モデル) の 4 軸で進化させる. 既存挙動 (UAV1 巡回 + UAV2 誘導 + 8 試行制限 + 表 1 初期値) は absolute compat floor、新機能は全て opt-in (toggle/別ボタン/別パネル). 各 phase は HTML 1 ファイル + Puppeteer smoke のセットで commit.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  seed_from {
+    base       = "drone_sim_v0.html";
+    paper      = "/Users/kodamay/Dropbox/アプリ/site44/lecture.site44.com/drone/M-006.pdf";
+    references = ["[1] Katayama 2019 (Multi-UAV evacuation)",
+                  "[2] Taga 2017 (Multi-agent ANET)",
+                  "[3][4][5] Tago/Kambayashi 2020-2021 (mountainous redundancy)"];
+    constants  = "α=1.2, β=0.05, γ=0.7  (Round 0 hard-coded)";
+    initial    = "Table 1 誘導前 = {P1:15, P2:30, P5:25, P6:30, P8:10, P9:25, P10:5, P11:40, P12:35, P16:12, P17:20, P18:25, P19:32, P20:45} 合計 349 人";
+  }
+
+  // ─── 評価タスク (= Round 1 で実装する候補 phase) ────────────────
+  evaluation_tasks {
+
+    // ═════════════════════════════════════════════════════════════
+    //  Direction A — 論文課題の直接攻略
+    // ═════════════════════════════════════════════════════════════
+
+    task A1_AlphaBetaGammaSlider {
+      spec = "右パネルに α/β/γ を実時間で動かせるスライダーを追加.値変更で recomputePriorities() を即時呼んで Point State テーブル + ポイント halo を再描画.既存定数 ALPHA/BETA/GAMMA を let 化、スライダー初期値 = Round 0 のハードコード値 (1.2 / 0.05 / 0.7).";
+      weight = 0.10;
+      acceptance = "5 assertion: (1) 3 つの slider input が見える, (2) α=0 にすると elevation 寄与が消える, (3) γ=0 だと海岸寄与が消える, (4) スライダー変更で table の Pri. 列が更新, (5) 既存 Start/Pause/Reset は影響なし.";
+    }
+
+    task A2_UAV1SweepOptimization {
+      spec = "現状の planSweep は最近傍貪欲.A2 では (a) priority 予測値で重み付けした TSP-lite (2-opt 改良), (b) 既訪問ポイントの再訪問を抑制する pheromone-decay, の 2 改善を入れる.UAV1 が遠回りせず + 同ポイントの反復が消える.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) 1 sweep 内で同 P を 2 度訪問しない, (2) sweep 全長が貪欲版より短い, (3) priority の高い P が早く確定する, (4) 既存 8 trial の最終 rescued 数が ≥ Round 0.";
+    }
+
+    task A3_StatisticsPanel {
+      spec = "下部 / 別タブに累積救助人数 + 各 trial の所要時間 + UAV2 走行距離 + 残存被災者の時系列折れ線を出す.Canvas での簡易グラフ (spreadsheet Y2/Y3 と同じ要領、外部 lib 不要).Reset でクリア.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) trial 1 完了で点が 1 個増える, (2) Reset で点が消える, (3) 残存被災者は単調減少, (4) 累積救助は単調増加.";
+    }
+
+    task A4_ScenarioSelector {
+      spec = "シナリオドロップダウン: { Table1, AllEmpty, Random(seed), Custom(編集可能) }.選んだ瞬間に pts (= INITIAL) を差し替え + Reset 同等.Custom は P1..P20 を JSON で貼り付け or per-cell スピンエディタ.";
+      weight = 0.10;
+      acceptance = "4 assertion: Table1 / AllEmpty / Random で初期人数が変わり、Custom で手入力が反映される、Reset 動作と互換.";
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    //  Direction B — 機能拡張
+    // ═════════════════════════════════════════════════════════════
+
+    task B1_NDrones {
+      spec = "UAV を 2 機固定から N 機に.UAV1×K1 (情報収集) + UAV2×K2 (誘導) を別パネルで増減.役割は同じだが並列に dispatch (互いに干渉しない). pickHighestPriorityPoint は次の利用可能ドローンへ割り当てる.最大 8 試行は workbook-level の合算で保つか、ドローンごとに 8 にするかは toggle.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) UAV1 を 3 機にすると sweep が分割される, (2) UAV2 を 2 機にすると並行救助が走る, (3) trial 上限が合算/per モードで切替, (4) 既存 (2,2) 設定では Round 0 と同じ結果.";
+    }
+
+    task B2_SecondaryDisaster {
+      spec = "時刻 T で土砂崩れ・橋落ち等の event を発生させ、特定 edge を一時的に遮断.dijkstra が動的に更新、UAV2 が代替経路を取る.event タイムライン UI で発生時刻・場所を編集.";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) event 発火後、対象 edge が描画から消える + adj から除外, (2) UAV2 が代替経路を取る, (3) 全 edge が切られた孤立ポイントは log で警告.";
+    }
+
+    task B3_SOSBroadcast {
+      spec = "ランダムな点が「SOS フレーム」を発生 → 優先度が一時的にブースト.被災者スマホ→アドホック網→UAV1 で受信、というモデルの抽象化.最大伝搬距離は edge 跨ぎ N 段まで (gossip).";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) SOS 発火点の priority が即時 +bonus, (2) 隣接 N 段ポイントにも propagation, (3) timeout で priority が減衰.";
+    }
+
+    task B4_BatteryWind {
+      spec = "各 UAV にバッテリ残量 (0..100%) を持たせる.移動 km あたり消費、避難所近傍で +charge.風ベクトルがマップに常時表示、UAV の実効速度に乗る.バッテリ 0 で landing animation + log.";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) battery 表示が UAV ラベル下に出る, (2) battery 0 で UAV が停止, (3) 風が逆風方向の UAV を遅らせる.";
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    //  Direction C — AIPL / abclc 統合
+    // ═════════════════════════════════════════════════════════════
+
+    task C1_UAVAsAIPLActor {
+      spec = "UAV を AIPL Cell actor (browser-abcl ランタイム) としてモデル化.shooter / scout という class を AIPL 側で定義し、メッセージで step / dispatch / report を渡す.JS 側 simulator はメッセージ I/O だけ.IT2 EventBus を topic として再利用 (uav.*).";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) ページに AIPL Interpreter が初期化される, (2) UAV1/UAV2 が actor として登録, (3) 1 step で actor メッセージが少なくとも 1 件流れる, (4) 既存 2D/3D 描画は不変.";
+    }
+
+    task C2_MultiCommanderWS {
+      spec = "spreadsheet C3/C4/C5 と同じ WebSocket + LWW 同期インフラを再利用し、複数の指揮官が同じシミュレーションを同期して見られる.dispatch / event / battery 変更を peer に配信、各種 Live: N peers バッジ.別ホスト (例: 2 タブ) で同じ状態を共有.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) 🟢 Live トグル, (2) tab A で Start → tab B も Start, (3) event 発火が peer に届く, (4) LWW で同時 dispatch が一方に収束.";
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    //  Direction D — 現実モデル強化
+    // ═════════════════════════════════════════════════════════════
+
+    task D1_RealTerrainTile {
+      spec = "背景を国土地理院標準地図タイルに差し替え.群馬県安中市山間部 (z14, 約 36.32N 138.88E) を初期化、ポイント・避難所はタイル上の (lon,lat) で固定.3D mode は標高 DEM (国土地理院 GSI elevation tile) で MeshBasicMaterial 山を生成.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) 2D 背景にタイル画像が現れる, (2) ポイント座標が地理院座標系で計算, (3) 3D の terrainHeight が DEM から取得, (4) オフライン時は Round 0 の合成地形に fallback.";
+    }
+
+    task D2_LearnedRouting {
+      spec = "UAV2 経路選択を強化学習 (Q-learning) または GA で訓練.状態 = (uav 位置, 残被災者ベクトル), 行動 = (次に向かう point), 報酬 = (救助 - 距離 - 時間).学習中の Q-table または population は LocalStorage に保存、Resume 可.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) 学習開始トグル, (2) 100 epoch 後の rescued ≥ Round 0 baseline, (3) Q-table を JSON 出力, (4) Replay でデモ実行.";
+    }
+
+    task D3_SurvivorMobility {
+      spec = "被災者は静止ではなく、各 tick で隣接ポイントへ確率的に移動.恐慌モデル (近隣に二次災害があると低標高方向へ移動 / herd モデル (UAV1 を視認すると静止).";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) Step 後 P 間で人数が再分布, (2) 二次災害ありの方向に明確な偏り, (3) UAV1 観測下では移動が遅い.";
+    }
+
+    // ═════════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═════════════════════════════════════════════════════════════
+
+    task R0_BackwardCompat {
+      spec = "Round 0 の drone_sim_v0.html の挙動 (UAV1 sweep + UAV2 8 試行 + Table 1 初期値) を 1 phase も壊さない.既存 Start/Pause/Reset/Step + Speed + 2D/3D toggle + zoom + Telemetry log のすべてが新 phase でも動く.";
+      weight = 0.10;
+      acceptance = "Round 0 と同じ初期化で動かして trial 8 完了時の rescued 数が Round 0 の中央値 ±10% に収まる.";
+    }
+
+    task ImplCost {
+      spec = "Round 1 全 phase 合計で +1500..+2500 LOC 以内.各 phase 100-300 LOC を目安、最大は C1 (~400) と D1 (~350).";
+      weight = 0.05;
+    }
+  }
+
+  // ─── 実装順序 (依存関係) ─────────────────────────────────────
+  implementation_order {
+    // 小さく見えやすい phase から
+    step A1_AlphaBetaGammaSlider     { dep = "round 0 base"; }
+    step A3_StatisticsPanel          { dep = "A1 (sliders で recompute が走る)"; }
+    step A4_ScenarioSelector         { dep = "A3 (グラフを scenario 切替でクリアできる)"; }
+    step A2_UAV1SweepOptimization    { dep = "A4 (シナリオ別に効果比較できる)"; }
+    step B2_SecondaryDisaster        { dep = "A4"; }
+    step B3_SOSBroadcast             { dep = "A1 (priority bonus に乗る)"; }
+    step B1_NDrones                  { dep = "B2 + B3"; }
+    step B4_BatteryWind              { dep = "B1"; }
+    step C2_MultiCommanderWS         { dep = "B1 (drones も同期する)"; }
+    step C1_UAVAsAIPLActor           { dep = "C2 (actor が WS 配信主体)"; }
+    step D1_RealTerrainTile          { dep = "round 0 base"; }
+    step D3_SurvivorMobility         { dep = "B2 (二次災害との連動)"; }
+    step D2_LearnedRouting           { dep = "A2 + A3 + D3 (報酬関数 + 統計 + 動的環境)"; }
+  }
+
+  // ─── アーキテクチャ決定 ──────────────────────────────────────
+  decisions {
+
+    decision file_layout {
+      // 各 phase で 1 つの HTML ファイルを残しつつ、進化に従って
+      // 大きくなるなら module split を許す.
+      single_file = true;            // index.html 1 ファイル維持を優先
+      tolerated_size = "≤ 200 KB / ≤ 5000 行";
+      split_after    = "> 200 KB → src/ サブディレクトリへ分割";
+    }
+
+    decision dependencies {
+      cdn_three   = "OK (Round 0 で既に使用)";
+      cdn_other   = "禁止 — D2 の RL/GA も自前実装";
+      offline     = "Round 0 base は CDN 切でも 2D は動くこと";
+    }
+
+    decision testing {
+      smoke   = "各 phase に Puppeteer smoke を 1 セット (5+ assertion)";
+      runner  = "/tmp/_ppt から node-side で実行";
+      regression = "Round 0 baseline test を毎 phase 後に実行";
+    }
+
+    decision evolution_search {
+      // .aice → .ga.json の MAP-Elites は実装決定よりも
+      // 「軸の優先度を再確認する topology check」として使う.
+      // 各 Round 開始時に 1 回まわす程度.
+      use_for = "design 検証 (mock_v1 evaluator).";
+      not_for = "実装の取捨選択 (= implementation_order に従う).";
+    }
+  }
+
+  // ─── 検証 (期待 assertion 合計) ──────────────────────────────
+  verification {
+    round0_baseline      = "1 assertion (rescued ≥ 280 / 349 after 8 trials)";
+    A1+A3+A4+A2          = "17 assertion";
+    B2+B3+B1+B4          = "13 assertion";
+    C2+C1                = "8 assertion";
+    D1+D3+D2             = "11 assertion";
+    grand_total          = "50 assertion for Round 1";
+    regression_floor     = "round0_baseline must stay green at every phase";
+  }
+
+  // ─── ファイル更新範囲 ─────────────────────────────────────────
+  file_impact {
+    primary = [
+      "aice-pi-evolution/experiments/2026-05-20_drone_sim_evolution/index.html  (= drone_sim_v0.html を seed として進化, ~1100 → ~3500 行)",
+      "aice-pi-evolution/experiments/2026-05-20_drone_sim_evolution/README.md   (進捗 phase 表)"
+    ];
+    new_files = [
+      "aice-pi-evolution/experiments/2026-05-20_drone_sim_evolution/_smoke_*.{mjs,sh}   (phase 単位)",
+      "aice-pi-evolution/experiments/2026-05-20_drone_sim_evolution/scenarios/*.json    (A4 用)",
+      "aice-pi-evolution/experiments/2026-05-20_drone_sim_evolution/AIPL_DroneSim_Round1.ga.json (.aice の lowering)"
+    ];
+    untouched = [
+      "/Users/kodamay/Dropbox/.../drone/index.html   (live URL は当面そのまま)",
+      "src/browser-abcl/spreadsheet.html             (別プロジェクト)"
+    ];
+  }
+
+  // ─── 最終目標 ─────────────────────────────────────────────────
+  goal = "Round 1 全 13 phase を着地後、ユーザは (a) α/β/γ をリアルタイムで動かして優先度の感度を学べる、(b) UAV1 巡回が遠回りしなくなる、(c) 累積救助カーブを見ながらアルゴリズムを比較できる、(d) シナリオを切り替えて 8 試行の限界を実感できる、(e) 二次災害イベントで経路再計画を観察できる、(f) SOS フレーム伝搬を可視化、(g) UAV を N 機に増やして並列救助、(h) バッテリ + 風で現実制約を体感、(i) 2 ブラウザタブで同じシミュレーションを peer 同期、(j) UAV を AIPL Cell actor として観察、(k) 国土地理院タイルの本物の地形上で群馬県安中市山間部を再現、(l) 被災者の自発的移動でより現実的な避難動態、(m) 強化学習で UAV2 経路を改善 — の 13 軸の進化を獲得する.";
+}
