@@ -925,9 +925,18 @@ export class Runtime {
     ctx.textBaseline = "middle";
     ctx.fillStyle    = "#444";
     ctx.font         = "bold 13px monospace";
-    const colLabels  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    // G5: base-26 letter labels (A..Z, AA..AZ, BA..) for wide grids.
+    const colLabel = (col) => {
+      let s = "", n = col + 1;
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        s = String.fromCharCode(65 + rem) + s;
+        n = Math.floor((n - 1) / 26);
+      }
+      return s || "A";
+    };
     for (let c = 0; c < s.cols; c++) {
-      ctx.fillText(colLabels[c] || "?",
+      ctx.fillText(colLabel(c),
         x0 + (c + 1) * cw + cw / 2, y0 + ch / 2);
     }
     for (let r = 0; r < s.rows; r++) {
