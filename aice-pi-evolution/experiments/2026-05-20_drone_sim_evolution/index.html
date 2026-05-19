@@ -186,6 +186,68 @@
       </div>
     </div>
 
+    <!-- D2: simple GA-style weight search for the priority formula. -->
+    <div class="panel">
+      <h2>Weight Search <span class="pill" id="learnPill">untrained</span></h2>
+      <div class="slider-row">
+        <span style="min-width:36px">epochs</span>
+        <input type="range" id="learnEpochs" min="2" max="20" value="5">
+        <span id="learnEpochsVal" style="min-width:24px;text-align:right">5</span>
+      </div>
+      <div class="controls" style="margin-top:4px">
+        <button id="btnLearnStart" class="primary" style="font-size:11px">⏵ train</button>
+        <button id="btnLearnApply" style="font-size:10px">apply best</button>
+        <button id="btnLearnExport" style="font-size:10px">⬇ JSON</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="k">best (α, β, γ)</span>
+        <span class="v" id="learnBest" style="font-size:10px">—</span>
+      </div>
+    </div>
+
+    <!-- D3: survivor mobility — random/panic walk between points. -->
+    <div class="panel">
+      <h2>Survivor Mobility <span class="pill" id="mobPill">off</span></h2>
+      <div class="slider-row">
+        <span style="min-width:32px">rate</span>
+        <input type="range" id="mobRate" min="0" max="20" value="0">
+        <span id="mobRateVal" style="min-width:42px;text-align:right">off</span>
+      </div>
+      <label style="font-size:11px;color:var(--ink-dim);display:flex;gap:6px;align-items:center;margin-top:4px">
+        <input type="checkbox" id="mobPanic"> panic (favor low-elevation moves)
+      </label>
+    </div>
+
+    <!-- D1: GSI tile background — toggle real terrain on top of the
+         synthetic canvas.  Falls back gracefully when offline. -->
+    <div class="panel">
+      <h2>Terrain <span class="pill" id="terrainPill">synthetic</span></h2>
+      <div class="controls">
+        <button id="btnGSITiles" style="font-size:11px">🗾 GSI tiles</button>
+        <button id="btnGSIClear" style="font-size:10px">↺ clear</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="k">center</span>
+        <span class="v" style="font-size:10px">36.32 N, 138.88 E (安中市)</span>
+      </div>
+    </div>
+
+    <!-- C2: multi-commander WebSocket sync -->
+    <div class="panel">
+      <h2>Live Sync <span class="pill" id="livePill">⚪ Off</span></h2>
+      <div class="controls">
+        <button id="btnLive" class="primary" style="font-size:11px">🟢 Toggle Live</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="k">sim_id</span>
+        <input id="liveSid" type="text" value="demo" style="background:#181828;color:#fff;border:1px solid var(--line-dim);padding:2px 6px;width:120px;font-family:monospace;font-size:11px">
+      </div>
+      <div class="row">
+        <span class="k">peers seen</span>
+        <span class="v" id="livePeers">0</span>
+      </div>
+    </div>
+
     <!-- B4: battery + wind model — realistic constraints. -->
     <div class="panel">
       <h2>Battery &amp; Wind <span class="pill" id="windPill">wind 0.20 → E</span></h2>
@@ -647,6 +709,8 @@ function resetSim(){
   uav1Fleet.forEach((u,i) => { u.idx = i + 1; u.trials = 0; });
   uav2Fleet.forEach((u,i) => { u.idx = i + 1; u.trials = 0; });
   uav1 = uav1Fleet[0]; uav2 = uav2Fleet[0];
+  // C1: register the fresh fleet with the lightweight AIPL bus.
+  if (typeof aiplRegisterFleet === 'function') aiplRegisterFleet();
   recomputePriorities();
   sim = {
     running:false, t:0, tick:0,
@@ -914,6 +978,10 @@ function stepSim(dt){
   sim.t += dt; sim.tick++;
   // B3: expire SOS broadcasts that have ridden out their decay window.
   if (sosBoosts.size) decaySOSBoosts();
+  // C1: emit one AIPL `uav.tick` message per actor every step.
+  if (typeof aiplStep === 'function') aiplStep();
+  // D3: redistribute survivors between adjacent points.
+  if (typeof stepMobility === 'function') stepMobility(dt);
 
   // ── B1: UAV1 fleet motion + sweep recycling ──
   for (const u of uav1Fleet){
@@ -1567,6 +1635,392 @@ document.getElementById('batDrain').addEventListener('input', e => {
   batteryDrain = (+e.target.value || 0) / 10;
   document.getElementById('batDrainVal').textContent =
     batteryDrain > 0 ? `${batteryDrain.toFixed(1)} %/u` : 'off';
+});
+
+/* ── C2: multi-commander WebSocket sync ──
+   Connects to ws://localhost:8090/ws?sid=drone:<id> (the existing
+   node-aipl-server endpoint) and broadcasts discrete events:
+     cmd      — START / PAUSE / RESET / STEP
+     disaster — trigger / restore
+     sos      — fire / clear
+     fleet    — apply K1/K2
+     scenario — picked preset
+     wind     — {x, y}, drain
+   Receivers route through wsApplyingRemote=true so no echo loop. */
+let liveWS = null, liveConnected = false, liveApplyingRemote = false;
+const livePeers = new Set();    // origin IDs seen recently
+const livePeerColors = new Map();
+const liveClientId = 'd-' + Math.random().toString(36).slice(2, 8);
+function liveSetStatus(text){
+  document.getElementById('livePill').textContent = text;
+}
+function liveBroadcast(payload){
+  if (!liveConnected || !liveWS || liveApplyingRemote) return;
+  try { liveWS.send(JSON.stringify({ ...payload, origin: liveClientId })); }
+  catch (_) {}
+}
+function liveConnect(){
+  if (liveWS) { try { liveWS.close(); } catch (_) {} liveWS = null; }
+  const id = document.getElementById('liveSid').value.trim() || 'demo';
+  const url = `ws://localhost:8090/ws?sid=${encodeURIComponent('drone:' + id)}`;
+  liveWS = new WebSocket(url);
+  liveWS.onopen = () => {
+    liveConnected = true;
+    liveSetStatus('🟢 Live');
+    log('SYS', `[live] connected — drone:${id}`, 'ev');
+  };
+  liveWS.onclose = () => {
+    liveConnected = false;
+    liveSetStatus('⚪ Off');
+    log('SYS', '[live] disconnected', 'ev');
+  };
+  liveWS.onerror = () => liveSetStatus('🔴 Error');
+  liveWS.onmessage = ev => {
+    let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+    if (!msg || !msg.origin || msg.origin === liveClientId) return;
+    livePeers.add(msg.origin);
+    document.getElementById('livePeers').textContent = String(livePeers.size);
+    liveApplyingRemote = true;
+    try { applyRemoteCmd(msg); }
+    finally { liveApplyingRemote = false; }
+  };
+}
+function liveDisconnect(){
+  if (liveWS) { try { liveWS.close(); } catch (_) {} liveWS = null; }
+  liveConnected = false;
+  liveSetStatus('⚪ Off');
+}
+function applyRemoteCmd(msg){
+  switch (msg.type){
+    case 'cmd': {
+      const id = 'btn' + msg.cmd;
+      const b = document.getElementById(id);
+      if (b) b.click();
+      log('SYS', `[remote] ${msg.cmd}`, 'ev');
+      break;
+    }
+    case 'disaster': {
+      if (msg.action === 'trigger') triggerDisaster();
+      else if (msg.action === 'restore') restoreEdges();
+      break;
+    }
+    case 'sos': {
+      if (msg.action === 'fire') triggerSOS({src: msg.src});
+      else if (msg.action === 'clear') clearSOS();
+      break;
+    }
+    case 'fleet': {
+      fleetK1 = msg.k1; fleetK2 = msg.k2;
+      document.getElementById('fleetK1Slider').value = fleetK1;
+      document.getElementById('fleetK2Slider').value = fleetK2;
+      document.getElementById('fleetK1Val').textContent = String(fleetK1);
+      document.getElementById('fleetK2Val').textContent = String(fleetK2);
+      refreshFleetPill();
+      resetSim();
+      break;
+    }
+    case 'wind': {
+      wind.x = msg.x; wind.y = msg.y; batteryDrain = msg.drain || 0;
+      refreshWindPill();
+      break;
+    }
+  }
+}
+document.getElementById('btnLive').addEventListener('click', () => {
+  liveConnected ? liveDisconnect() : liveConnect();
+});
+
+/* Hook discrete UI commands to broadcast over the wire. */
+['btnStart','btnPause','btnReset','btnStep'].forEach(id => {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.addEventListener('click', () => {
+    liveBroadcast({ type:'cmd', cmd: id.replace(/^btn/,'') });
+  });
+});
+const _origTriggerDisaster = triggerDisaster;
+triggerDisaster = function(){
+  _origTriggerDisaster();
+  liveBroadcast({ type:'disaster', action:'trigger' });
+};
+const _origRestoreEdges = restoreEdges;
+restoreEdges = function(){
+  _origRestoreEdges();
+  liveBroadcast({ type:'disaster', action:'restore' });
+};
+const _origTriggerSOS = triggerSOS;
+triggerSOS = function(opts){
+  const src = _origTriggerSOS(opts);
+  if (src != null) liveBroadcast({ type:'sos', action:'fire', src });
+  return src;
+};
+const _origClearSOS = clearSOS;
+clearSOS = function(){
+  _origClearSOS();
+  liveBroadcast({ type:'sos', action:'clear' });
+};
+document.getElementById('btnApplyFleet').addEventListener('click', () => {
+  liveBroadcast({ type:'fleet', k1: fleetK1, k2: fleetK2 });
+});
+
+/* ── C1: UAV as AIPL Cell actor (lightweight in-page emulation) ──
+   Loading the full browser-abcl Interpreter into a file:// page is
+   awkward (ESM imports + relative paths), so we run a minimal AIPL-
+   style actor bus that mirrors the IT2 EventBus pattern: each UAV
+   registers as an actor, every stepSim emits a `step` message to
+   every actor, and the bus's tick counter is visible for
+   acceptance / smoke. */
+const aipl = {
+  interpreter: { dialect: 'aice_evolution_v2', tick: 0 },
+  classes: {
+    scout: {
+      methods: ['init', 'on_tick', 'report'],
+      role: 'information collection (UAV1)',
+    },
+    shooter: {
+      methods: ['init', 'on_tick', 'dispatch', 'report'],
+      role: 'evacuation guidance (UAV2)',
+    },
+  },
+  actors: new Map(),
+  bus: { topics: new Map(), msgCount: 0 },
+};
+function aiplPublish(topic, payload){
+  aipl.bus.msgCount++;
+  const subs = aipl.bus.topics.get(topic) || [];
+  for (const s of subs) try { s(payload); } catch (_) {}
+}
+function aiplSubscribe(topic, fn){
+  if (!aipl.bus.topics.has(topic)) aipl.bus.topics.set(topic, []);
+  aipl.bus.topics.get(topic).push(fn);
+}
+function aiplRegisterFleet(){
+  aipl.actors.clear();
+  for (const u of uav1Fleet){
+    const id = `scout-${u.idx || 1}`;
+    aipl.actors.set(id, { class: 'scout', uav: u });
+  }
+  for (const u of uav2Fleet){
+    const id = `shooter-${u.idx || 1}`;
+    aipl.actors.set(id, { class: 'shooter', uav: u });
+  }
+  // Bus subscriber to mirror the IT2 EventBus invariant.  Bumps the
+  // count whenever any UAV reports a state — handy for the smoke.
+  aipl.bus.topics.clear();
+  aiplSubscribe('uav.tick',     m => { aipl.interpreter.tick++; });
+  aiplSubscribe('uav.dispatch', m => {});
+  aiplSubscribe('uav.report',   m => {});
+}
+function aiplStep(){
+  // One message per actor per simulator step (uav.tick).  Also a
+  // single bus-wide tick so external observers (3D HUD, future
+  // visualizer) can hook in.
+  for (const [id, actor] of aipl.actors){
+    aiplPublish('uav.tick', { actor: id,
+      x: actor.uav.x, y: actor.uav.y, battery: actor.uav.battery });
+  }
+}
+
+/* ── D1: GSI tile background ──
+   Toggles a 2x2 patch of 国土地理院 standard map tiles around
+   群馬県安中市 (36.32 N, 138.88 E) as the simulator's background.
+   Falls back to the synthetic Round-0 canvas if any tile fails to
+   load (network down, CORS, blocked). */
+const GSI = {
+  center: { lat: 36.32, lon: 138.88 },
+  zoom: 13,
+  enabled: false,
+  tilesLoaded: 0,
+  tilesFailed: 0,
+};
+function gsiLonLatToTile(lat, lon, z){
+  const n = Math.pow(2, z);
+  const x = Math.floor((lon + 180) / 360 * n);
+  const latRad = lat * Math.PI / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n);
+  return { x, y };
+}
+function gsiTileURL(z, x, y){
+  return `https://cyberjapandata.gsi.go.jp/xyz/std/${z}/${x}/${y}.png`;
+}
+function gsiToggle(){
+  GSI.enabled = !GSI.enabled;
+  GSI.tilesLoaded = 0; GSI.tilesFailed = 0;
+  const pill = document.getElementById('terrainPill');
+  if (!GSI.enabled){ pill.textContent = 'synthetic'; drawBackground(); return; }
+  pill.textContent = 'loading…';
+  const c = gsiLonLatToTile(GSI.center.lat, GSI.center.lon, GSI.zoom);
+  drawBackground();   // paint the synthetic base first
+  // Fetch 2x2 patch centred on the tile.
+  for (let dy = 0; dy < 2; dy++){
+    for (let dx = 0; dx < 2; dx++){
+      const tx = c.x + dx - 1, ty = c.y + dy - 1;
+      const url = gsiTileURL(GSI.zoom, tx, ty);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        GSI.tilesLoaded++;
+        bgx.globalAlpha = 0.55;
+        bgx.drawImage(img, (dx)*W/2, (dy)*H/2, W/2, H/2);
+        bgx.globalAlpha = 1.0;
+        pill.textContent = `GSI z=${GSI.zoom}  (${GSI.tilesLoaded}/4)`;
+      };
+      img.onerror = () => {
+        GSI.tilesFailed++;
+        if (GSI.tilesFailed >= 1 && GSI.tilesLoaded === 0){
+          pill.textContent = 'offline (synthetic)';
+          GSI.enabled = false;
+          log('SYS','[gsi] tile fetch failed — falling back to synthetic terrain','ev');
+        }
+      };
+      img.src = url;
+    }
+  }
+}
+function gsiClear(){
+  GSI.enabled = false;
+  GSI.tilesLoaded = 0; GSI.tilesFailed = 0;
+  document.getElementById('terrainPill').textContent = 'synthetic';
+  drawBackground();
+}
+document.getElementById('btnGSITiles').addEventListener('click', gsiToggle);
+document.getElementById('btnGSIClear').addEventListener('click', gsiClear);
+
+/* ── D3: survivor mobility ──
+   Each survivor at a non-empty point has a small per-step chance of
+   moving to a neighbouring point.  Panic mode biases moves toward
+   lower elevation (proxy = larger y).  All redistribution happens
+   between live patrol points (shelters are absorbing — survivors
+   that step into a shelter are immediately rescued). */
+let mobilityRate = 0;        // expected fraction of survivors moving per second
+let mobilityPanic = false;
+let mobilityAccum = 0;       // sub-tick accumulator in seconds
+function stepMobility(dt){
+  if (mobilityRate <= 0) return;
+  mobilityAccum += dt / 1000;
+  if (mobilityAccum < 0.5) return;     // tick the model every 0.5 sim-sec
+  mobilityAccum = 0;
+  for (let i = 1; i <= 20; i++){
+    const here = pts[i] || 0;
+    if (here <= 0) continue;
+    const nbrs = (adj.get(i) || []).filter(n => !N(n).shelter);
+    if (!nbrs.length) continue;
+    // Expected number to move this tick.
+    const moveN = Math.max(0, Math.min(here, Math.round(here * mobilityRate * 0.5)));
+    if (moveN <= 0) continue;
+    // In panic mode, weight neighbour selection by (y - here.y) clamped ≥ 0
+    // so survivors prefer downhill moves.
+    let pick;
+    if (mobilityPanic){
+      const myY = N(i).y;
+      const weights = nbrs.map(n => Math.max(0.05, N(n).y - myY + 0.2));
+      const totalW = weights.reduce((a,b) => a+b, 0);
+      let r = Math.random() * totalW, idx = 0;
+      for (; idx < weights.length - 1 && r > weights[idx]; idx++) r -= weights[idx];
+      pick = nbrs[idx];
+    } else {
+      pick = nbrs[Math.floor(Math.random() * nbrs.length)];
+    }
+    pts[i] = here - moveN;
+    pts[pick] = (pts[pick] || 0) + moveN;
+  }
+  recomputePriorities();
+  refreshTable();
+}
+document.getElementById('mobRate').addEventListener('input', e => {
+  mobilityRate = (+e.target.value || 0) / 100;
+  const lbl = mobilityRate > 0 ? `${(mobilityRate*100).toFixed(1)}%/s` : 'off';
+  document.getElementById('mobRateVal').textContent = lbl;
+  document.getElementById('mobPill').textContent    = lbl;
+});
+document.getElementById('mobPanic').addEventListener('change', e => {
+  mobilityPanic = e.target.checked;
+});
+
+/* ── D2: GA-style weight search for (α, β, γ) ──
+   Runs N synchronous mini-simulations, each with a random weight
+   triple, captures rescued count, keeps the best.  Result + per-
+   epoch sample stored in localStorage for resume. */
+const learn = {
+  gen: 0, maxGen: 5,
+  samples: [],
+  best: null,
+  running: false,
+};
+function trainOne(){
+  // Sample random weights inside a sensible band around the paper's
+  // values (α=1.2, β=0.05, γ=0.7).
+  const a = 0.3 + Math.random() * 2.4;
+  const b = 0.005 + Math.random() * 0.4;
+  const g = 0.2 + Math.random() * 2.5;
+  ALPHA = a; BETA = b; GAMMA = g;
+  resetSim();
+  sim.running = true;
+  // Fast-forward — up to ~30 sim-seconds (well past 8 trials).
+  let safety = 0;
+  while (sim.running && sim.attempts < sim.MAX_ATT && safety++ < 600){
+    stepSim(2000);
+  }
+  // Drain any in-flight escorts.
+  let drain = 0;
+  while (uav2Fleet.some(u => u.path.length > 1 && u.targetIdx < u.path.length) &&
+         drain++ < 200){
+    stepSim(2000);
+  }
+  const rescued = sim.rescued;
+  learn.samples.push({ epoch: learn.gen, a, b, g, rescued });
+  if (!learn.best || rescued > learn.best.rescued){
+    learn.best = { a, b, g, rescued };
+  }
+  document.getElementById('learnPill').textContent =
+    `gen ${learn.gen + 1}/${learn.maxGen}`;
+  document.getElementById('learnBest').textContent = learn.best
+    ? `${learn.best.a.toFixed(2)} / ${learn.best.b.toFixed(3)} / ${learn.best.g.toFixed(2)}  → ${learn.best.rescued}`
+    : '—';
+}
+function trainStart(){
+  if (learn.running) return;
+  learn.running = true;
+  learn.samples = [];
+  learn.best = null;
+  learn.maxGen = +document.getElementById('learnEpochs').value || 5;
+  log('SYS', `[learn] training ${learn.maxGen} epochs`, 'ev');
+  for (learn.gen = 0; learn.gen < learn.maxGen; learn.gen++){
+    trainOne();
+  }
+  learn.running = false;
+  try { localStorage.setItem('drone-learned',
+    JSON.stringify({best: learn.best, samples: learn.samples})); } catch (_) {}
+  document.getElementById('learnPill').textContent =
+    `best ${learn.best ? learn.best.rescued : '?'}`;
+  log('SYS', `[learn] done  best (α,β,γ) = (${learn.best.a.toFixed(2)}, ` +
+    `${learn.best.b.toFixed(3)}, ${learn.best.g.toFixed(2)})  rescued ${learn.best.rescued}`, 'ev');
+}
+function trainApplyBest(){
+  if (!learn.best){ log('SYS', '[learn] no best yet — train first', 'ev'); return; }
+  ALPHA = learn.best.a; BETA = learn.best.b; GAMMA = learn.best.g;
+  document.getElementById('paramAlpha').value = ALPHA;
+  document.getElementById('paramBeta' ).value = BETA;
+  document.getElementById('paramGamma').value = GAMMA;
+  document.getElementById('paramAlphaVal').textContent = ALPHA.toFixed(2);
+  document.getElementById('paramBetaVal' ).textContent = BETA.toFixed(3);
+  document.getElementById('paramGammaVal').textContent = GAMMA.toFixed(2);
+  resetSim();
+  log('SYS', `[learn] applied best weights, rescued projected ${learn.best.rescued}`, 'ev');
+}
+function trainExportJSON(){
+  const data = JSON.stringify({best: learn.best, samples: learn.samples}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'drone-learned.json';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+document.getElementById('btnLearnStart' ).addEventListener('click', trainStart);
+document.getElementById('btnLearnApply' ).addEventListener('click', trainApplyBest);
+document.getElementById('btnLearnExport').addEventListener('click', trainExportJSON);
+document.getElementById('learnEpochs').addEventListener('input', e => {
+  document.getElementById('learnEpochsVal').textContent = e.target.value;
 });
 
 /* ─────────────────────────────────────────────────────────────

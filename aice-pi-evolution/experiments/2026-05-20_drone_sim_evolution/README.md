@@ -20,7 +20,11 @@ laid out in [`AIPL_DroneSim_Round1.aice`](./AIPL_DroneSim_Round1.aice).
 | **B3** | **SOS broadcasts — N-hop gossip + decaying priority bonus + golden halo** | **13/13** |
 | **B1** | **N drones — UAV1×K1 + UAV2×K2 (sliders, parallel dispatch, shared trial cap)** | **9/9** |
 | **B4** | **Battery + wind — drain sliders, headwind/tailwind speed mod, landed state, charge at shelters** | **8/8** |
-| C2 | … | — |
+| **C2** | **Multi-commander WS sync — Live toggle + cmd/disaster/sos/fleet broadcast (reuses 8090 ws)** | **10/10** |
+| **C1** | **UAV as AIPL Cell actor — lightweight in-page emulator + IT2 bus** | **4/4** |
+| **D1** | **国土地理院 tile background — toggle + offline fallback** | **5/5** |
+| **D3** | **Survivor mobility — random + panic walk, conservation invariant** | **3/3** |
+| **D2** | **GA-style weight search — 2..20 epochs, JSON export, localStorage resume** | **7/7** |
 | C1 | … | — |
 | D1 | … | — |
 | D3 | … | — |
