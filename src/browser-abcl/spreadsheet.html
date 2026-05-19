@@ -1466,6 +1466,44 @@
           } finally { wsApplyingRemote = false; }
           return;
         }
+        // MS-followup: peer added / renamed / deleted a sheet tab.
+        if (msg.type === "sheet_add" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            if (!workbook.sheets.some(s => s.name === msg.name)) {
+              addSheet(msg.name, { remote: true });
+              appendLog(`[remote-sheet_add] "${msg.name}"`);
+            }
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
+        if (msg.type === "sheet_rename" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            const tgt = workbook.sheets.find(s => s.name === msg.oldName);
+            if (tgt) {
+              tgt.name = msg.newName;
+              refreshSheetTabs();
+              appendLog(`[remote-sheet_rename] "${msg.oldName}" → "${msg.newName}"`);
+            }
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
+        if (msg.type === "sheet_delete" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            const idx = workbook.sheets.findIndex(s => s.name === msg.name);
+            if (idx >= 0 && workbook.sheets.length > 1) {
+              workbook.sheets.splice(idx, 1);
+              if (workbook.activeIdx >= workbook.sheets.length) {
+                workbook.activeIdx = workbook.sheets.length - 1;
+              }
+              switchToSheet(workbook.activeIdx);
+              appendLog(`[remote-sheet_delete] "${msg.name}"`);
+            }
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
         // G4/U9-followup: peer resized the grid.  Apply the same dims
         // locally so both tabs converge.  applyResize is idempotent on
         // the survivors → no echo loop.
@@ -4070,7 +4108,16 @@
         b.addEventListener("dblclick", e => {
           e.preventDefault();
           const next = prompt("Rename sheet:", s.name);
-          if (next && next !== s.name) { s.name = next; refreshSheetTabs(); }
+          if (next && next !== s.name) {
+            const oldName = s.name;
+            s.name = next;
+            refreshSheetTabs();
+            // C3-followup: propagate rename to ws peers.
+            if (wsConnected && !wsApplyingRemote) {
+              wsSend({ type: "sheet_rename", oldName, newName: next,
+                       origin: clientId });
+            }
+          }
         });
         b.addEventListener("contextmenu", e => {
           e.preventDefault();
@@ -4078,11 +4125,15 @@
             alert("Cannot delete the last sheet"); return;
           }
           if (confirm(`Delete "${s.name}"?`)) {
+            const dropped = s.name;
             workbook.sheets.splice(i, 1);
             if (workbook.activeIdx >= workbook.sheets.length) {
               workbook.activeIdx = workbook.sheets.length - 1;
             }
             switchToSheet(workbook.activeIdx);
+            if (wsConnected && !wsApplyingRemote) {
+              wsSend({ type: "sheet_delete", name: dropped, origin: clientId });
+            }
           }
         });
         inner.appendChild(b);
@@ -4132,11 +4183,15 @@
       refreshSheetTabs();
       appendLog(`[sheet] switched to "${next.name}"`);
     }
-    function addSheet(name) {
+    function addSheet(name, opts) {
       name = name || `Sheet${workbook.sheets.length + 1}`;
       const fresh = newSheetState(name);
       workbook.sheets.push(fresh);
       switchToSheet(workbook.sheets.length - 1);
+      // Broadcast unless this addSheet was triggered by a remote frame.
+      if ((!opts || !opts.remote) && wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "sheet_add", name, origin: clientId });
+      }
     }
     document.getElementById("btnAddSheet").addEventListener("click",
       () => addSheet());
