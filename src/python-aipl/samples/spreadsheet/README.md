@@ -47,6 +47,7 @@
 | U5  | Mouse-drag range selection + range highlight overlay | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_select_range | ✅ (Puppeteer drag A1→B2 verified) |
 | U7  | Keyboard nav (arrows / Tab / Enter↓ / Delete / Escape) | `src/browser-abcl/spreadsheet.html` selection-vs-editing mode | ✅ 7 assertion |
 | G4  | Dynamic grid: default 10×8 + 📐 Resize (preserves cells) | `src/browser-abcl/spreadsheet.abcl` + `spreadsheet.html` | ✅ 7 assertion |
+| U8  | Clipboard: Cmd/Ctrl + C / V / X over range or cell (undo-aware) | `src/browser-abcl/spreadsheet.html` | ✅ 8 assertion |
 
 ## smoke
 

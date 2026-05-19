@@ -948,8 +948,94 @@
       refreshUndoRedoButtons();
       appendLog(`[clear] ${cells.length} cell(s)`);
     }
+    // ─── U8: clipboard — copy / cut / paste of a single cell or
+    // the current drag range.  Lives entirely in JS memory; we
+    // intentionally do NOT touch navigator.clipboard so that real
+    // OS copy/paste keeps working inside the formula bar.
+    let pasteBuf = null;        // { rows: [[{val,kind,formula,fmt}, …], …] }
+    function selectedRect() {
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return null;
+      if (s.selRange) return { ...s.selRange };
+      if (selectedRC) return {
+        r0: selectedRC.row, c0: selectedRC.col,
+        r1: selectedRC.row, c1: selectedRC.col,
+      };
+      return null;
+    }
+    function copySelection() {
+      const r = selectedRect();
+      if (!r) return 0;
+      const rows = [];
+      for (let row = r.r0; row <= r.r1; row++) {
+        const line = [];
+        for (let col = r.c0; col <= r.c1; col++) {
+          const id = cellId(row, col);
+          line.push({
+            val:     cellValues.get(id) ?? "",
+            kind:    cellFormulas.has(id) ? "Formula" : "Value",
+            formula: cellFormulas.get(id) || null,
+            fmt:     cellFormats.get(id) || "general",
+          });
+        }
+        rows.push(line);
+      }
+      pasteBuf = { rows };
+      const n = (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1);
+      appendLog(`[copy] ${n} cell(s) from ${cellId(r.r0, r.c0)}:${cellId(r.r1, r.c1)}`);
+      return n;
+    }
+    function pasteFromBuf() {
+      if (!pasteBuf || !selectedRC) return 0;
+      const s = interp.runtime.sheetState;
+      const baseRow = selectedRC.row, baseCol = selectedRC.col;
+      const h = pasteBuf.rows.length;
+      const w = pasteBuf.rows[0] ? pasteBuf.rows[0].length : 0;
+      let n = 0;
+      for (let dr = 0; dr < h; dr++) {
+        for (let dc = 0; dc < w; dc++) {
+          const row = baseRow + dr, col = baseCol + dc;
+          if (row >= s.rows || col >= s.cols) continue;
+          const cell = pasteBuf.rows[dr][dc];
+          const id   = cellId(row, col);
+          const before = {
+            val:     cellValues.get(id),
+            kind:    cellFormulas.has(id) ? "Formula" : "Value",
+            formula: cellFormulas.get(id) || null,
+          };
+          if (cell.fmt && cell.fmt !== "general") cellFormats.set(id, cell.fmt);
+          else cellFormats.delete(id);
+          applyCellChange(row, col, cell.val, cell.kind, cell.formula);
+          historyStack.push({ row, col, id, before,
+                              after: { val: cell.val, kind: cell.kind, formula: cell.formula } });
+          n += 1;
+        }
+      }
+      redoStack = [];
+      refreshUndoRedoButtons();
+      // Re-paint a range overlay covering the pasted rect.
+      const r0 = baseRow, c0 = baseCol;
+      const r1 = Math.min(s.rows - 1, baseRow + h - 1);
+      const c1 = Math.min(s.cols - 1, baseCol + w - 1);
+      paintDragRange(r0, c0, r1, c1);
+      appendLog(`[paste] ${n} cell(s) → ${cellId(r0, c0)}:${cellId(r1, c1)}`);
+      return n;
+    }
+    function cutSelection() {
+      const n = copySelection();
+      if (n > 0) clearSelected();
+      return n;
+    }
     document.addEventListener("keydown", e => {
       if (inEditable()) return;            // let inputs handle their own keys
+      const mod = e.metaKey || e.ctrlKey;   // Cmd on mac, Ctrl elsewhere
+      if (mod && !e.shiftKey && !e.altKey) {
+        switch (e.key.toLowerCase()) {
+          case "c": e.preventDefault(); copySelection(); return;
+          case "v": e.preventDefault(); pasteFromBuf();  return;
+          case "x": e.preventDefault(); cutSelection();  return;
+        }
+      }
       switch (e.key) {
         case "ArrowUp":    e.preventDefault(); moveSelection(-1, 0); break;
         case "ArrowDown":  e.preventDefault(); moveSelection( 1, 0); break;
@@ -995,6 +1081,12 @@
       running = true;
       interp = new Interpreter(appendLog);
       interp.setCanvas(canvas);
+      // Expose for browser DevTools and Puppeteer-driven smoke tests.
+      window._sheet = {
+        get cells()  { return interp.runtime.sheetState.cells; },
+        get state()  { return interp.runtime.sheetState; },
+        cellValues, cellFormulas, cellFormats, cellClocks,
+      };
       try {
         const ast = parser.parse(ABCL_SOURCE);
         appendLog("[parse ok]");
