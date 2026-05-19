@@ -1,0 +1,190 @@
+// AIPL_Spreadsheet_Round7.aice  (2026-05-19)
+//
+// Round 6 で 28 phase / 235 assertion を積み上げ、Google Sheets parity の
+// 主要機能 (realtime collab + LWW persist + multi-letter cols + 50+ 関数 +
+// CSV/XLSX I/O + 4 chart kinds + find/replace + cell lock/notes + named
+// cells + peer cursor + PDF print) が揃った.
+//
+// Round 7 はその上に、**ユーザ指定の 2 軸 + 候補 5 phase** を載せて
+// 「数式 vs 値」の意味的分離と「複数シート」を導入する.
+//
+//   ユーザ指定 (priority A):
+//     EQ: 数式入力に `=` プレフィックスを必須化、保存時に formula 文字列を
+//         そのまま round-trip (現状は computed value のみ保存).
+//     MS: 複数シート (tab UI) — 各シートが独立 cells / cellFormulas /
+//         cellFormats / cellClocks / cellBgs / cellNotes / cellLocked /
+//         cellNames、cross-sheet ref `Sheet2!A1` をサポート.
+//
+//   候補 (priority B):
+//     U14: 多重 Undo / Redo パネル — 履歴を可視化 + 任意の点へジャンプ.
+//     F12: マクロ / マルチセル数式登録 — 名前付きで複数セルの操作を 1 操作に.
+//     D5:  JSON エクスポート — sheet 全状態 (cells + clocks + notes + locks
+//          + names + formats + bgs + comments) をワンファイルで.
+//     C7:  Presence — オンラインピア数 + 名前を toolbar に表示.
+//     Y4:  ヒートマップ chart — 範囲を 2D グリッドとして色強度で可視化.
+//
+// Round 6 までで確定した 12 ground axes は維持:
+//   T4 ActorPerCell + C1 ClientFull + S? (今は C3..C6 で server-relayed
+//   + LWW persisted) + U2 Canvas_2D + CA4 HybridSpawn + FE4 ActorEval +
+//   P3 DistCheckpoint + R3 LayerComposite + PA4 LevelCPort + IT2 EventBus +
+//   F* JS-side evaluator + D* CSV/XLSX I/O.
+
+aice AIPL_Spreadsheet_Round7 {
+  dialect = "aice_evolution_v2";
+
+  task = "Round 6 完了状態 (browser-abcl spreadsheet + node-aipl-server /ws + LWW persist + 50+ functions + CSV/XLSX round-trip + multi-letter cols + peer cursors) を base に、(EQ) 数式プレフィックス `=` 必須化と保存時の formula 文字列 round-trip、(MS) 複数シート + cross-sheet refs、加えて (U14 Undo パネル / F12 マクロ / D5 JSON 全状態 export / C7 Presence / Y4 heatmap) の 7 phase を積み増す.既存 235 assertion + Phase 4 smoke 8/8 は absolute compat floor、新機能は全て opt-in (新 UI 要素・新 endpoint・新メッセージ type).";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  seed_from {
+    phase            = "AIPL_GoogleSheetsClone";
+    inherit_axes     = ["T4", "C1", "U2", "CA4", "FE4", "P3", "R3", "PA4", "IT2"];
+    inherit_state    = "Round 6 完了時 (commit 3571f20)";
+    promote_features = [
+      "C3_WebSocketRealtime", "C4_LWWPerCell", "C5_PersistClocks",
+      "G4_Dynamic10x8", "G5_MultiLetterCols",
+      "U5_DragRange", "U7_KeyboardNav", "U8_Clipboard", "U9_CellSize",
+      "U10_FindReplace", "U11_FreezeHeader", "U12_FillSeries", "U13_InsertDelete",
+      "F5_20Functions", "F6_ArraySpill", "F7_StringCompare",
+      "F8_CondFormat", "F9_CellNotes", "F10_CellLock", "F11_NamedCells",
+      "Y2_LinePieCharts", "Y3_ScatterChart",
+      "D1_CSV", "D2_XLSXExport", "D3_XLSXImport", "D4_PrintPDF",
+      "P4_AutoSave", "C6_PeerCursorSync"
+    ];
+  }
+
+  // ─── 評価タスク: 7 phase の機能仕様 ─────────────────────────────
+  evaluation_tasks {
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Priority A (ユーザ指定)
+    // ═══════════════════════════════════════════════════════════════
+
+    task EQ_FormulaPrefix {
+      spec = "セル入力が `=` で始まるなら formula、それ以外は plain value として保存.commit 時に parseFormula を `=` 後ろの部分にだけ適用、source 全体 (`=SUM(A1:A3)`) を cellFormulas Map に保存.D2 XLSX export と D5 JSON export は値ではなく formula 文字列を出力 (再評価可能).D3 XLSX import / D1 CSV import 時に `=` 始まりは Formula 種別で取り込む.既存の自動 string-→-Formula 判定 (ast.tag ≠ Lit) は廃止し、明示プレフィックス必須に統一する.";
+      weight = 0.20;
+      acceptance = "5 + assertion: (1) plain '42' → Value, (2) '=42' → Formula, (3) '=A1+B1' commit → cellFormulas.get('C1') === '=A1+B1' (source 含む), (4) Save → Load round-trip で formula 文字列が復元, (5) Recompute は cellFormulas の `=` 以降のみ parse & eval.";
+    }
+
+    task MS_MultipleSheets {
+      spec = "ページ上部または下部に sheet タブ (Sheet1, Sheet2, ...).各シートは独立した cells / cellValues / cellFormulas / cellFormats / cellClocks / cellBgs / cellNotes / cellLocked / cellNames を持つ.cross-sheet ref `Sheet2!A1` を parser + evalAst Ref 解決でサポート (現 IDENT トークナイザに `!` を追加).Save 時は { sheets: [{name, rows, cols, cells, ...}, ...] } 形式に拡張、Load も対応.WebSocket frame (cell / cursor / load) に sheet 名フィールドを追加し、対象シートが異なるなら別状態に書き分け.UI: +Add sheet ボタン / シート名変更 (double click) / 削除確認ダイアログ.";
+      weight = 0.20;
+      acceptance = "6 + assertion: (1) 起動時 Sheet1 が active, (2) +Add で Sheet2 が出現 → アクティブ切替で別 cell データ, (3) Sheet1!A1 ref が Sheet2 から評価可能, (4) Save → Load で 2 シート構造を round-trip, (5) C3 ws cell frame に sheet 名が乗って同シートにのみ反映, (6) 既存 1-sheet save (Round 6 形式) も後方互換で Load 可能.";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Priority B (候補 5 phase)
+    // ═══════════════════════════════════════════════════════════════
+
+    task U14_UndoRedoPanel {
+      spec = "現状の historyStack / redoStack を popup パネルで可視化.各エントリを `{時刻, セル, before → after}` 形式で並べ、クリックでその点までまとめて undo/redo (saga 風に N 段戻し).パネル開閉ボタン (toolbar 末尾) + Cmd+Shift+Z で前へ / Cmd+Y で次へのキーバインドも追加.";
+      weight = 0.10;
+      acceptance = "3 assertion: パネル開閉、N 段戻し、再 redo 後の整合.";
+    }
+
+    task F12_MacroNamedOperations {
+      spec = "現状の名前付きセル (F11) を拡張し、複数セル操作を 1 操作名で登録できる.例: 'monthly_recalc' という macro 名で '範囲 B1:B12 を SUM' + 'C1:C12 を AVERAGE' をまとめ、ボタンクリックで再実行.macros: Map<name, OperationList>.macro 行 UI で record/play/save.";
+      weight = 0.10;
+      acceptance = "3 assertion: record + play、保存後 reload で復元、無効 op 検出 → ログ出力.";
+    }
+
+    task D5_JSONFullExport {
+      spec = "現 Save (server) と並列に、ブラウザに完全 JSON ファイルとして download.cells / formulas (=prefix 保持) / formats / bgs / notes / locks / names / clocks / lamport / sheets (MS 後) をすべて含む人間可読 JSON.import 用ボタンも対.D1 CSV / D2 XLSX より低粒度な loss-less エクスポートとして.";
+      weight = 0.10;
+      acceptance = "4 assertion: 全フィールド埋まる、import 後すべて restore、未知フィールドは無視、ファイル形式バージョン.";
+    }
+
+    task C7_PresenceIndicator {
+      spec = "C6 の peer cursor 情報を集約し、'Live: N peers' バッジを toolbar に表示.各ピアの clientId プレフィックス (例 `c-x4f2a1 (緑)`) を一覧、ホバーで現在の位置 (cell ref) も出す.前回 cursor frame からの timeout (10 sec) で消える.";
+      weight = 0.05;
+      acceptance = "3 assertion: 0 → 1 → 2 peer 変化、timeout 後の自動除去、自分自身は含まない.";
+    }
+
+    task Y4_HeatmapChart {
+      spec = "chart 種別に 'heatmap' を追加.範囲を 2D グリッドとして描画、各セル値を min..max 線形補間で色濃淡 (blue→red) にマッピング.セル数値 + 色強度の両方をオーバーレイ.bar/line/pie/scatter と同じ gatherChartPairs パスではなく evalRangeGrid を直接使う.";
+      weight = 0.05;
+      acceptance = "3 assertion: 範囲 3x3 で 9 セル描画、最小値が青、最大値が赤、全 0 範囲は警告メッセージ.";
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═══════════════════════════════════════════════════════════════
+
+    task BackwardCompat {
+      spec = "Round 6 までで通っている 235 assertion + Phase 4 smoke 8/8 が無修正で動作.特に: (a) `=` プレフィックス導入で既存サンプル A1=10 のような plain value は Value のまま、(b) 旧 save JSON (sheets 配列なし) は単一シート扱いで Load 可能、(c) 既存 cellFormulas が computed value だけだった場合のフォールバック.";
+      weight = 0.10;
+      acceptance = "Phase 4 smoke 8/8、Round 6 smoke 全 22 個 (C3-C6, U5-U13, G4-G5, F5-F11, Y2-Y3, D1-D4, P4) 無修正で 235 PASS.";
+    }
+
+    task ImplCost {
+      spec = "Round 6 の base から 7 phase 合算で 800-1500 LOC 増分以内.各 phase 100-300 LOC を目安、最大は MS (~400 LOC).";
+      weight = 0.10;
+    }
+  }
+
+  // ─── 実装順序 (進化探索ではなく決定論) ────────────────────────
+  implementation_order {
+    step  EQ_FormulaPrefix     { dep = "round 6 base"; }
+    step  D5_JSONFullExport    { dep = "EQ (formula 文字列保存に依存)"; }
+    step  MS_MultipleSheets    { dep = "EQ + D5 (シート単位 JSON が安定してから)"; }
+    step  U14_UndoRedoPanel    { dep = "MS (per-sheet history)"; }
+    step  F12_MacroNamedOperations { dep = "U14 (history 視点を流用)"; }
+    step  C7_PresenceIndicator { dep = "round 6 C6 base"; }
+    step  Y4_HeatmapChart      { dep = "round 6 Y3 base"; }
+  }
+
+  // ─── アーキテクチャ決定 (priority A の詳細) ───────────────────
+  decisions {
+
+    decision EQ_storage {
+      // Round 6 では cellFormulas.set(id, "SUM(A1:A3)") のように prefix 抜きで保存
+      // していたが、Round 7 では `=` 込みで保存し source として再評価可能に.
+      cellFormulas_format = "leading '=' を含む source 文字列";
+      kind_detection      = "trim().startsWith('=') ? Formula : Value";
+      eval_path           = "Formula なら src.slice(1) を parseFormula → evalAst";
+      auto_promote        = false;   // ast.tag による自動 Formula 化を廃止
+    }
+
+    decision MS_storage {
+      js_state            = "全 Map / Set を sheetIndex で keyed: Map<sheetIndex, perSheetState>";
+      save_format = "{ version: 2, sheets: [{name, rows, cols, cells, clocks, ...}, ...] }";
+      load_compat         = "version 不在 / sheets 配列なし → 旧 format として sheet[0] に押し込む";
+      ws_frame            = "type:'cell', sheet:'Sheet2', ...  / type:'cursor', sheet:'Sheet1', ...";
+      parser              = "IDENT トークナイザに '!' を追加して 'Sheet2!A1' を 1 Ref ノードへ";
+      eval_xref           = "evalAst Ref が sheet プレフィックスを解いて other sheet の cellValues を lookup";
+    }
+
+    decision tab_ui {
+      placement = "page bottom — Excel/Sheets 流の bottom tab bar";
+      buttons   = "+Add / rename (double click) / delete (with confirm) / active highlight";
+      keyboard  = "Cmd+Shift+] = next sheet, Cmd+Shift+[ = prev sheet";
+    }
+  }
+
+  // ─── 検証 (期待 assertion 合計) ────────────────────────────────
+  verification {
+    smoke_phase4  = "8/8 (unchanged)";
+    smoke_round6  = "235 assertion (all green)";
+    smoke_round7  = "EQ:5 + MS:6 + U14:3 + F12:3 + D5:4 + C7:3 + Y4:3 = 27";
+    grand_total   = "262 assertion across 17 puppeteer/integration scripts";
+  }
+
+  // ─── ファイル更新範囲の見積もり ────────────────────────────────
+  file_impact {
+    primary = [
+      "src/browser-abcl/spreadsheet.html        (~1200 LOC additions)",
+      "src/browser-abcl/spreadsheet.abcl        (~10 LOC — initial sheet[0] only)",
+      "src/browser-abcl/src/runtime.js          (~80 LOC — multi-sheet swap-in)",
+      "src/node-aipl-server/server.mjs          (~30 LOC — v2 save schema accept)",
+      "src/python-aipl/samples/spreadsheet/README.md   (~14 row table additions)"
+    ];
+    new_files = [
+      "src/browser-abcl/_smoke_eq_prefix.{mjs,sh}",
+      "src/browser-abcl/_smoke_multisheet.{mjs,sh}",
+      "src/browser-abcl/_smoke_round7_misc.{mjs,sh}"
+    ];
+  }
+
+  // ─── 最終目標 ──────────────────────────────────────────────────
+  goal = "Round 7 commit がマージされた後、ユーザは (a) `=` をつけて formula を明示的に書ける、(b) Sheet2 タブを増やして同一 workbook 内で別グリッドを編集できる、(c) Sheet1!A1 で sheet 跨ぎ参照、(d) 完全 JSON で workbook を 1 ファイルにダンプ/復元、(e) Undo パネルで N 段戻し、(f) マクロで複数操作を 1 ボタンに、(g) Live 表示で他ピア数を確認、(h) heatmap で 2D データを濃淡表示 — の 8 つの新しい操作を獲得する.";
+}
