@@ -126,6 +126,10 @@
     <button id="btnStop">■ Stop</button>
     <button id="btnSave" title="POST /api/sheet/&lt;id&gt;/save">💾 Save</button>
     <button id="btnLoad" title="GET /api/sheet/&lt;id&gt;/load">📂 Load</button>
+    <label style="color:#aac; font-size:0.85rem; margin-left:4px;">
+      <input id="autoSaveCb" type="checkbox" checked> auto-save
+    </label>
+    <span id="autoSaveStatus" style="color:#8aa; font-size:0.8rem;"></span>
     <button id="btnRecompute" title="Re-evaluate every Formula cell">🔄 Recompute</button>
     <button id="btnUndo"      title="Undo last commit (DR-11 compensate)">↶ Undo</button>
     <button id="btnRedo"      title="Redo last undo">↷ Redo</button>
@@ -863,6 +867,7 @@
         cellClocks.set(id, { ts: lamport, origin: clientId });
         wsSend({ type: "cell", row, col, val: stored, kind, formula, fmt,
                  ts: lamport, origin: clientId });
+        scheduleAutoSave();
       }
     }
 
@@ -1402,7 +1407,7 @@
                                           kind: c.kind })) };
     }
 
-    document.getElementById("btnSave").addEventListener("click", async () => {
+    async function doSave(silent = false) {
       const id = document.getElementById("sheetId").value.trim() || "demo";
       const snap = currentSheetSnapshot();
       try {
@@ -1412,10 +1417,38 @@
           body: JSON.stringify(snap),
         });
         const j = await r.json();
-        if (j.ok) appendLog(`[save] ${id}.json (${j.cells} cells) → ${j.path}`);
-        else     appendLog(`[save error] ${j.error || JSON.stringify(j)}`);
-      } catch (e) { appendLog(`[save error] ${e}`); }
-    });
+        if (j.ok) {
+          if (!silent) appendLog(`[save] ${id}.json (${j.cells} cells) → ${j.path}`);
+          setAutoSaveStatus(`saved ${new Date().toLocaleTimeString()}`);
+        } else {
+          appendLog(`[save error] ${j.error || JSON.stringify(j)}`);
+          setAutoSaveStatus("save failed");
+        }
+      } catch (e) {
+        appendLog(`[save error] ${e}`);
+        setAutoSaveStatus("save error");
+      }
+    }
+    document.getElementById("btnSave").addEventListener("click", () => doSave(false));
+
+    // ─── P4: debounced auto-save ────────────────────────────────
+    // Every local edit schedules a save 3 s after the LAST edit, so
+    // a burst of typing only triggers one network call.  Remote
+    // changes (wsApplyingRemote) don't reschedule — the originator
+    // already owns the save for that batch.
+    let autoSaveTimer = null;
+    function setAutoSaveStatus(text) {
+      const el = document.getElementById("autoSaveStatus");
+      if (el) el.textContent = text;
+    }
+    function scheduleAutoSave() {
+      const cb = document.getElementById("autoSaveCb");
+      if (!cb || !cb.checked) return;
+      if (wsApplyingRemote)   return;
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      setAutoSaveStatus("…");
+      autoSaveTimer = setTimeout(() => { autoSaveTimer = null; doSave(true); }, 3000);
+    }
 
     document.getElementById("btnLoad").addEventListener("click", async () => {
       const id = document.getElementById("sheetId").value.trim() || "demo";

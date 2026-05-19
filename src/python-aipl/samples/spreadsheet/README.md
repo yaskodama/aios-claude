@@ -52,6 +52,7 @@
 | Y2  | Chart kinds: bar (existing) / line / pie via type selector | `src/browser-abcl/spreadsheet.html` renderChart split | ✅ 4 assertion |
 | D1  | CSV import / export (RFC-4180-ish escapes, anchor at selection) | `src/browser-abcl/spreadsheet.html` buildCsv / parseCsv / importCsv | ✅ 15 assertion |
 | G5  | Multi-letter columns AA..BH (max 60) + auto-grow canvas | `src/browser-abcl/spreadsheet.html` + `runtime.js` colLabel | ✅ 9 assertion |
+| P4  | Debounced auto-save (3-sec idle) + toggle + status pill | `src/browser-abcl/spreadsheet.html` scheduleAutoSave | ✅ 6 assertion |
 
 ## smoke
 
