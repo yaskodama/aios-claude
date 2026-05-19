@@ -4,9 +4,9 @@
 // Start / Stop ボタンで一斉に動かす/止める。
 
 class Fork {
-  var idx    = 0;
-  var held   = 0;
-  var holder = 0;
+  var idx: int    = 0;
+  var held: int   = 0;
+  var holder: int = 0;
 
   method init(i: int) {
     idx  = i;
@@ -34,14 +34,14 @@ class Fork {
 }
 
 class Philosopher {
-  var idx       = 0;
-  var state     = 0;
-  var counter   = 0;
-  var left_idx  = 0;
-  var right_idx = 0;
-  var left_fork  = 0;
-  var right_fork = 0;
-  var running   = 0;
+  var idx: int       = 0;
+  var state: int     = 0;
+  var counter: int   = 0;
+  var left_idx: int  = 0;
+  var right_idx: int = 0;
+  var left_fork: any  = 0;
+  var right_fork: any = 0;
+  var running: int   = 0;
 
   method init(i: int, li: int, ri: int, lf, rf) {
     idx       = i;
@@ -116,8 +116,8 @@ class Philosopher {
 }
 
 class Controller {
-  var p0 = ""; var p1 = ""; var p2 = ""; var p3 = ""; var p4 = "";
-  var f0 = 0; var f1 = 0; var f2 = 0; var f3 = 0; var f4 = 0;
+  var p0: any = 0; var p1: any = 0; var p2: any = 0; var p3: any = 0; var p4: any = 0;
+  var f0: any = 0; var f1: any = 0; var f2: any = 0; var f3: any = 0; var f4: any = 0;
 
   method init() {
     f0 = new Fork(0);

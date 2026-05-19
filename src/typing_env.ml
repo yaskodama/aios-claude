@@ -76,6 +76,11 @@ let prelude () : env =
   List.iter add_f5 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
   let add_f6 f = add_mono e f (TFun ([TString; TString], TBool)) in
   List.iter add_f6 [ "=="; "!=" ];
+  (* 2.5.3) 二項関係: int と float の混在 — 算術と同じく許容 *)
+  let add_mxr1 f = add_mono e f (TFun ([TInt; TFloat], TBool)) in
+  List.iter add_mxr1 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
+  let add_mxr2 f = add_mono e f (TFun ([TFloat; TInt], TBool)) in
+  List.iter add_mxr2 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
 
   (* reply : 'a -> unit  （まずは多相でもOK。型が厳しいなら int/float/string の overload に） *)
   let a = fresh_tvar () in
@@ -162,6 +167,28 @@ let prelude () : env =
   add_mono e "sdl_mouse_x"    (TFun ([], TInt));
   add_mono e "sdl_mouse_y"    (TFun ([], TInt));
   add_mono e "sdl_mouse_down" (TFun ([], TInt));
+
+  (* ---- Xinu GUI surface (PL110 LCD + PL050 mouse, kernel-side stubs).
+     Without these typed declarations the typechecker would treat each
+     call as gradual (any -> any), and any expression that mixed a
+     gradual result with concrete arithmetic (e.g.
+     `counter = 110 - xinu_gui_slider_value(0) * 10;`) would fail
+     overload resolution.  Argument widths match the prototypes in
+     /Users/kodamay/projects/xinu-raz/xinu/apps/abcl_xinu_gui.c. ---- *)
+  add_mono e "xinu_gui_set_line"        (TFun ([TAny;TAny;TAny;TAny;TAny;TAny;TAny;TAny], TUnit));
+  add_mono e "xinu_gui_register_ticker" (TFun ([TAny], TUnit));
+  add_mono e "xinu_gui_add_button"      (TFun ([TString;TInt;TInt;TInt;TInt;TAny;TString], TUnit));
+  add_mono e "xinu_gui_add_slider"      (TFun ([TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TString], TUnit));
+  add_mono e "xinu_gui_slider_value"    (TFun ([TInt], TInt));
+  (* Philosophers5 fork / phil state visualisers *)
+  add_mono e "xinu_gui_set_fork_free"   (TFun ([TInt], TUnit));
+  add_mono e "xinu_gui_set_fork_held"   (TFun ([TInt; TInt], TUnit));
+  add_mono e "xinu_gui_set_phil"        (TFun ([TInt; TInt], TUnit));
+  (* BoundedBuffer producer / consumer visualisers *)
+  add_mono e "xinu_gui_set_actor"       (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "xinu_gui_buf_setup"       (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "xinu_gui_buf_put"         (TFun ([TInt], TUnit));
+  add_mono e "xinu_gui_buf_take"        (TFun ([TInt], TUnit));
 
   (* 3) typeof : 各型 or 多相。ここでは各型を列挙 *)
   add_mono e "typeof" (TFun ([TInt],    TString));

@@ -683,6 +683,20 @@ let check_decl (env:env) = function
             let t   = infer_expr env_cls init in
             let sch = Types.generalize (ftv_env env_cls) t in
             set env_cls name sch
+        | TypedVarDecl (name, te, init) ->
+            (* var name: T = init;  inside a class body.  Use the
+               declared type T for the field's scheme so methods that
+               reference the field see the annotated type.  Still
+               unify against the initializer so a mismatch at the
+               field declaration site surfaces immediately. *)
+            let declared = ty_of_type_expr te in
+            let t_init   = infer_expr env_cls init in
+            if not (unify_at st.sloc declared t_init) then
+              Types.type_error ~loc:st.sloc
+                (Printf.sprintf "field %s: declared type does not match initializer"
+                   name);
+            let sch = Types.generalize (ftv_env env_cls) declared in
+            set env_cls name sch
         | _ -> ()
       ) c.fields;
 

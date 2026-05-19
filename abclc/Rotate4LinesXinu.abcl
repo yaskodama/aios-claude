@@ -4,16 +4,18 @@
 // Controller はボタン押下を受けて全 spinner に start/stop を broadcast。
 
 class Spinner {
-  var idx     = 0;
-  var angle   = 0.;
-  var speed   = 5;
-  var cx      = 0;
-  var cy      = 0;
-  var radius  = 60;
-  var running = 1;
-  var rr = 200; var gg = 220; var bb = 255;
+  var idx: int = 0;
+  var angle: float = 0.;
+  var speed: int = 5;
+  var cx: int = 0;
+  var cy: int = 0;
+  var radius: int = 60;
+  var running: int = 1;
+  var rr: int = 200;
+  var gg: int = 220;
+  var bb: int = 255;
 
-  method init(i: int, sp: float, mx: float, my: float, r: int, g: int, b: int) {
+  method init(i: int, sp: int, mx: int, my: int, r: int, g: int, b: int) {
     idx = i;
     speed = sp;
     cx = mx;
@@ -46,7 +48,7 @@ class Spinner {
 }
 
 class Controller {
-  var s1 = ""; var s2 = ""; var s3 = ""; var s4 = "";
+  var s1: any = 0; var s2: any = 0; var s3: any = 0; var s4: any = 0;
 
   method init() {
     // 正方形の 4 角

@@ -100,6 +100,11 @@ let () =
     Printf.printf "[aipl2c] --check: no C generated (type-check + dump only)\n";
     exit 0
   end;
+  (* Strip `var name: T = e;` field/local annotations down to plain
+     `VarDecl (name, e)` so every codegen backend sees the simpler form.
+     The annotation side table is no longer consulted at codegen — only
+     the type checker (which has already run) needed it. *)
+  let prog = Ast.normalize_program prog in
   let c_code =
     if !pony      then C_translator.gen_program_pony                       prog
     else if !erl  then C_translator.gen_program_erlang                     prog
