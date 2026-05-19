@@ -17,6 +17,10 @@
     #sheetIdLabel { color: #aef; font-size: 0.78rem; }
     #sheetId { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 160px; }
     #serverInfo { color: #788; font-size: 0.7rem; margin-left: auto; }
+    #formatRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #formatLabel { color: #aef; font-size: 0.78rem; }
+    #formatMenu { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; }
+    #formatMenu option { background: #1a1a2a; }
     #controls { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
     button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446; cursor: pointer; font-family: monospace; }
     button:hover { background: #334; }
@@ -74,6 +78,17 @@
     <span id="serverInfo">server: <span id="serverUrl">http://localhost:8090</span></span>
   </div>
 
+  <div id="formatRow">
+    <span id="formatLabel">format (selected cell):</span>
+    <select id="formatMenu">
+      <option value="general">General</option>
+      <option value="number">Number (1,234)</option>
+      <option value="currency">Currency ($1,234.56)</option>
+      <option value="percent">Percent (25%)</option>
+      <option value="date">Date (YYYY-MM-DD)</option>
+    </select>
+  </div>
+
   <div id="controls">
     <button id="btnRun">▶ Run</button>
     <button id="btnStop">■ Stop</button>
@@ -108,6 +123,44 @@
     let selectedRC    = null;                       // {row, col} of clicked cell
     let cellValues    = new Map();                  // id → numeric value (mirror)
     let cellFormulas  = new Map();                  // id → formula source string (null = literal)
+    let cellFormats   = new Map();                  // id → "general"|"number"|"currency"|"percent"|"date"
+
+    // U3 format menu — produces the display string from a raw value
+    // + a format tag.  cellValues keeps the raw number so SUM etc.
+    // still works numerically; only the on-screen string changes.
+    function formatValue(val, fmt) {
+      if (fmt === undefined || fmt === null || fmt === "general") return String(val);
+      const n = (typeof val === "number") ? val : Number(val);
+      // Strings + non-numeric → fall back to General.
+      if (!Number.isFinite(n) && fmt !== "date") return String(val);
+      switch (fmt) {
+        case "number":
+          // 1,234 (no decimals when integer, else up to 2)
+          return Number.isInteger(n)
+            ? n.toLocaleString("en-US")
+            : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+        case "currency":
+          return n.toLocaleString("en-US", {
+            style: "currency", currency: "USD",
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+          });
+        case "percent":
+          // Sheets convention: 0.25 → "25%".  We treat the raw value
+          // as a fraction-of-100 multiplier.
+          return (n * 100).toLocaleString("en-US",
+            { maximumFractionDigits: 2 }) + "%";
+        case "date":
+          // If the value is already an ISO-shaped string, keep it.
+          // Otherwise, treat the number as a UNIX-epoch day count or
+          // an integer like 20260519 — degrade to raw String() if we
+          // can't interpret.
+          if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+            return val.slice(0, 10);
+          }
+          return String(val);
+      }
+      return String(val);
+    }
 
     // Phase 5.5: history stack ── each entry mirrors a DR-11 saga
     // step: {id, before:{val,kind,formula}, after:{val,kind,formula}}.
@@ -531,8 +584,13 @@
       const hit = cellAt(e.clientX - rect.left, e.clientY - rect.top);
       if (!hit) return;
       selectedRC = hit;
-      cellLabel.textContent = cellId(hit.row, hit.col);
-      formulaBar.value = cellValues.get(cellId(hit.row, hit.col)) ?? "";
+      const id = cellId(hit.row, hit.col);
+      cellLabel.textContent = id;
+      // Show the formula source if there is one — that's the value
+      // the user originally entered, not the computed result.
+      formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
+      // U3: sync the format menu with this cell's current format.
+      document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
       formulaBar.focus();
       // Tell the AIPL View to repaint the highlight.
       const top = interp.runtime.globals;
@@ -555,15 +613,20 @@
       // F3: preserve string values as-is (CONCAT, TODAY, etc. produce
       // strings).  Numeric values stay numeric.  Only coerce if val
       // is already number-shaped to keep the existing fast path.
-      cellValues.set(id, (typeof val === "number") ? val
-                                                   : (Number(val) === Number(val) && val !== "") ? Number(val)
-                                                                                                  : val);
+      const stored = (typeof val === "number") ? val
+                     : (Number(val) === Number(val) && val !== "") ? Number(val)
+                                                                   : val;
+      cellValues.set(id, stored);
       if (formula === null || formula === undefined) cellFormulas.delete(id);
       else cellFormulas.set(id, formula);
+      // U3: render the formatted string (raw value still in cellValues
+      // for downstream formulas).
+      const fmt = cellFormats.get(id) || "general";
+      const display = formatValue(stored, fmt);
       const runtime = interp && interp.runtime;
       if (runtime) {
         runtime._callBuiltin("sheet_cell",
-                             [row, col, String(val), kind],
+                             [row, col, display, kind],
                              { __currentActor: null });
       }
     }
@@ -613,11 +676,13 @@
       logDiv.textContent = "";
       cellValues.clear();
       cellFormulas.clear();
+      cellFormats.clear();
       historyStack = [];
       redoStack = [];
       selectedRC = null;
       cellLabel.textContent = "(none)";
       formulaBar.value = "";
+      document.getElementById("formatMenu").value = "general";
       const parser = window.parser;
       if (!parser) { appendLog("[ERROR] parser not loaded"); return; }
       parser.yy = AST;
@@ -697,6 +762,7 @@
         if (!runtime) { appendLog("[load error] no interpreter"); return; }
         cellValues.clear();
         cellFormulas.clear();
+        cellFormats.clear();
         // Re-init the canvas so stale cells from the current view
         // get wiped before we replay.
         runtime._callBuiltin("sheet_init", [j.rows, j.cols],
@@ -783,6 +849,30 @@
       historyStack.push(entry);
       refreshUndoRedoButtons();
       appendLog(`[redo] ${entry.id} → ${a.val}`);
+    });
+
+    // U3: format-menu change → apply to selected cell + repaint.
+    document.getElementById("formatMenu").addEventListener("change", e => {
+      if (!selectedRC) {
+        appendLog("[format] no cell selected — click one first");
+        e.target.value = "general";
+        return;
+      }
+      const id  = cellId(selectedRC.row, selectedRC.col);
+      const fmt = e.target.value;
+      if (fmt === "general") cellFormats.delete(id);
+      else cellFormats.set(id, fmt);
+      // Re-render this one cell using the new format.
+      const raw  = cellValues.get(id);
+      const kind = cellFormulas.has(id) ? "Formula" : "Value";
+      const display = formatValue(raw, fmt);
+      const runtime = interp && interp.runtime;
+      if (runtime) {
+        runtime._callBuiltin("sheet_cell",
+                             [selectedRC.row, selectedRC.col, display, kind],
+                             { __currentActor: null });
+      }
+      appendLog(`[format] ${id} → ${fmt}   (${display})`);
     });
 
     refreshUndoRedoButtons();
