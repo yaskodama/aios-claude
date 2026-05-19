@@ -1423,6 +1423,16 @@
           refreshPresenceBadge();
           return;
         }
+        // F8-followup: peer painted (or cleared) a cell's background.
+        if (msg.type === "bg" && msg.origin && msg.origin !== clientId) {
+          wsApplyingRemote = true;
+          try {
+            interp.runtime._callBuiltin("sheet_cell_bg",
+              [msg.row, msg.col, msg.color || ""], { __currentActor: null });
+            appendLog(`[remote-bg] ${cellId(msg.row, msg.col)} ← ${msg.color || "(cleared)"}`);
+          } finally { wsApplyingRemote = false; }
+          return;
+        }
         // Peer broadcast a whole-snapshot Load — mirror it locally so
         // both tabs converge on the loaded sheet.
         if (msg.type === "load" && msg.snapshot) {
@@ -3514,6 +3524,10 @@
           if (hit) {
             runtime._callBuiltin("sheet_cell_bg", [r, c, color],
                                  { __currentActor: null });
+            // C3-followup: broadcast bg over ws so peers see the paint.
+            if (wsConnected && !wsApplyingRemote) {
+              wsSend({ type: "bg", row: r, col: c, color, origin: clientId });
+            }
             painted++;
           } else if (conditional) {
             // Conditional + no-match → clear any prior bg on this cell.
@@ -3521,6 +3535,9 @@
             if (had) {
               runtime._callBuiltin("sheet_cell_bg", [r, c, ""],
                                    { __currentActor: null });
+              if (wsConnected && !wsApplyingRemote) {
+                wsSend({ type: "bg", row: r, col: c, color: "", origin: clientId });
+              }
               cleared++;
             }
           }
@@ -3533,9 +3550,17 @@
     function cfClearAll() {
       const runtime = interp && interp.runtime;
       if (!runtime || !runtime.sheetState || !runtime.sheetState.cellBgs) return;
-      const n = runtime.sheetState.cellBgs.size;
+      // Snapshot the painted cells first so we can also broadcast.
+      const keys = Array.from(runtime.sheetState.cellBgs.keys());
+      const n = keys.length;
       runtime.sheetState.cellBgs.clear();
       runtime._redrawCanvas();
+      if (wsConnected && !wsApplyingRemote) {
+        for (const k of keys) {
+          const [r, c] = k.split(",").map(Number);
+          wsSend({ type: "bg", row: r, col: c, color: "", origin: clientId });
+        }
+      }
       appendLog(`[cf clear] cleared ${n} cell(s)`);
     }
     document.getElementById("cfRed"   ).addEventListener("click", () => cfApply("#7a1818"));
