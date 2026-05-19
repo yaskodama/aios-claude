@@ -13,7 +13,7 @@ laid out in [`AIPL_DroneSim_Round1.aice`](./AIPL_DroneSim_Round1.aice).
 |---|---|---|
 | R0   | Round 0 base copy from the live URL | (baseline) |
 | **A1** | **α/β/γ real-time sliders + reset button** | **10/10** |
-| A3 | … (planned) | — |
+| **A3** | **Statistics panel — cumulative rescued / remaining / per-trial time / UAV2 distance line chart** | **10/10** |
 | A4 | … | — |
 | A2 | … | — |
 | B2 | … | — |

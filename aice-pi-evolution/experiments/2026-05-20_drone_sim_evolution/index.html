@@ -239,6 +239,30 @@
       </div>
     </div>
 
+    <!-- A3: statistics panel — cumulative rescued / remaining
+         survivors / per-trial duration / UAV2 cumulative distance. -->
+    <div class="panel">
+      <h2>Statistics <span class="pill" id="statsPill">0 trials · 0 m</span></h2>
+      <canvas id="statsChart" width="280" height="120"
+              style="position:relative;inset:auto;width:100%;height:120px;display:block;background:rgba(11,16,32,.4);border:1px solid var(--line-dim);"></canvas>
+      <div class="row" style="margin-top:4px">
+        <span class="k" style="color:var(--accent)">■ Cumulative rescued</span>
+        <span class="v" id="statRescued">0</span>
+      </div>
+      <div class="row">
+        <span class="k" style="color:var(--danger)">■ Survivors remaining</span>
+        <span class="v" id="statRemaining">0</span>
+      </div>
+      <div class="row">
+        <span class="k" style="color:var(--warn)">▲ Last trial time</span>
+        <span class="v" id="statLastTime">—</span>
+      </div>
+      <div class="row">
+        <span class="k">UAV2 total distance</span>
+        <span class="v" id="statDist">0</span>
+      </div>
+    </div>
+
     <div class="panel">
       <h2>Telemetry Log</h2>
       <div class="log" id="log"></div>
@@ -413,6 +437,11 @@ class UAV {
     const dx=tgt.x-this.x, dy=tgt.y-this.y;
     const dist=Math.hypot(dx,dy);
     const step=this.speed*dt;
+    // A3: track UAV2 cumulative travel distance for the stats panel.
+    const moved = Math.min(step, dist);
+    if (this.label === 'UAV2' && typeof stats !== 'undefined') {
+      stats.uav2DistAccum += moved;
+    }
     if (step>=dist){
       this.x=tgt.x; this.y=tgt.y;
       this.atId=tgt.id;
@@ -430,6 +459,33 @@ let uav1, uav2;
 
 /* ── core simulation ── */
 let sim = null;
+/* A3: stats panel — accumulates samples on every trial completion
+   (UAV2 arriving back at a shelter) so the line chart can render
+   cumulative rescued / remaining survivors over the 8-trial run. */
+const stats = {
+  samples: [],          // [{trial, t, rescued, remaining, uav2Dist}]
+  uav2DistAccum: 0,     // total UAV2 travel distance (normalised units)
+  trialStartT: 0,       // sim.t when current trial dispatched
+  lastTrialMs: 0,       // duration of the most recent completed trial
+};
+function statsReset(){
+  stats.samples.length = 0;
+  stats.uav2DistAccum  = 0;
+  stats.trialStartT    = 0;
+  stats.lastTrialMs    = 0;
+  // Seed sample 0 — initial state before any trial.
+  stats.samples.push({
+    trial: 0, t: 0,
+    rescued: 0, remaining: countRemaining(),
+    uav2Dist: 0,
+  });
+  drawStats();
+}
+function countRemaining(){
+  let r = 0;
+  for (let i = 1; i <= 20; i++) r += pts[i] || 0;
+  return r;
+}
 function resetSim(){
   pts = {...INITIAL};
   priority = {};
@@ -447,6 +503,7 @@ function resetSim(){
   uav1.setPath(planSweep('A'));
   // UAV2 idles at A until first task assigned
   uav2.setPath(['A']);
+  statsReset();
   log('SYS','SIMULATION INITIALISED · 349 survivors across 14 occupied points');
   refreshTable();
   updateHUD();
@@ -522,6 +579,8 @@ function dispatchUAV2(){
   uav2.setPath(route);
   uav2.escortDest=null; uav2.carry=0;
   sim.attempts++;
+  // A3: record trial start time so we can derive duration on completion.
+  stats.trialStartT = sim.t;
   log('U2',`TRIAL ${sim.attempts}/8 → P${tgt}  (priority ${priority[tgt].toFixed(2)}, survivors ${pts[tgt]})`,'u2');
   return true;
 }
@@ -594,6 +653,16 @@ function stepSim(dt){
         // arrived at shelter
         sim.rescued += uav2.carry;
         log('U2',`escorted ${uav2.carry} → 避難所 ${uav2.escortDest}  (total rescued ${sim.rescued})`,'u2');
+        // A3: trial complete — record a stats sample point.
+        stats.lastTrialMs = sim.t - stats.trialStartT;
+        stats.samples.push({
+          trial: sim.attempts,
+          t: sim.t,
+          rescued: sim.rescued,
+          remaining: countRemaining(),
+          uav2Dist: stats.uav2DistAccum,
+        });
+        drawStats();
         uav2.carry=0; uav2.escortDest=null;
         uav2.path=[uav2.atId]; uav2.targetIdx=1;
         uav2.state='atNode';
@@ -726,6 +795,79 @@ function draw(){
   for (const n of NODES) drawNode(n);
   if (uav1) drawUAV(uav1);
   if (uav2) drawUAV(uav2);
+}
+
+/* ── A3: stats chart ── */
+function drawStats(){
+  const c = document.getElementById('statsChart');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  // Match the backing-store to css size for crisp rendering.
+  const cssW = c.clientWidth || 280, cssH = c.clientHeight || 120;
+  if (c.width !== cssW || c.height !== cssH) { c.width = cssW; c.height = cssH; }
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+
+  // axes
+  const padL = 28, padR = 6, padT = 6, padB = 14;
+  const pw = W - padL - padR, ph = H - padT - padB;
+  ctx.strokeStyle = 'rgba(159,179,255,.25)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(padL, padT, pw, ph);
+
+  const s = stats.samples;
+  const maxTrial = Math.max(1, ...s.map(p=>p.trial), 8);
+  const yMax = Math.max(1, ...s.map(p=>Math.max(p.rescued, p.remaining)), 349);
+  const xAt = i => padL + (s.length<=1 ? 0 : (i/(s.length-1))*pw);
+  const yAt = v => padT + ph - (v/yMax)*ph;
+
+  // y-axis ticks: 0 / ½ / max
+  ctx.fillStyle = 'rgba(159,179,255,.55)';
+  ctx.font = '9px ui-monospace,monospace';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of [0, Math.round(yMax/2), yMax]){
+    const y = yAt(v);
+    ctx.fillText(String(v), padL-3, y);
+    ctx.strokeStyle = 'rgba(159,179,255,.08)';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+  }
+  // x labels: 0..maxTrial
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let i=0;i<s.length;i++){
+    ctx.fillText(String(s[i].trial), xAt(i), H-padB+2);
+  }
+
+  if (s.length < 2){ return; }
+
+  function plot(series, colour){
+    ctx.strokeStyle = colour;
+    ctx.fillStyle   = colour;
+    ctx.lineWidth   = 1.6;
+    ctx.beginPath();
+    for (let i=0;i<s.length;i++){
+      const x = xAt(i), y = yAt(series(s[i]));
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    for (let i=0;i<s.length;i++){
+      ctx.beginPath();
+      ctx.arc(xAt(i), yAt(series(s[i])), 2.4, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  plot(p=>p.rescued,   getCSS('--accent'));
+  plot(p=>p.remaining, getCSS('--danger'));
+
+  // sidebar numbers
+  const last = s[s.length-1];
+  document.getElementById('statRescued'  ).textContent = last.rescued;
+  document.getElementById('statRemaining').textContent = last.remaining;
+  document.getElementById('statLastTime' ).textContent =
+    stats.lastTrialMs > 0 ? `${(stats.lastTrialMs/1000).toFixed(1)} s sim-time` : '—';
+  document.getElementById('statDist'     ).textContent = stats.uav2DistAccum.toFixed(2);
+  document.getElementById('statsPill'    ).textContent =
+    `${sim ? sim.attempts : 0} trials · ${stats.uav2DistAccum.toFixed(2)} u`;
 }
 
 /* ── HUD/log ── */
