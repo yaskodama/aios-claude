@@ -569,6 +569,20 @@ export class Runtime {
         this._redrawCanvas();
         break;
       }
+      // C6: live peer cursors — origin → {row, col, color}.  Cleared
+      // by passing color = "" (peer disconnected from this view).
+      case "sheet_peer_cursor": {
+        if (!this.sheetState) break;
+        const origin = String(args[0] || "");
+        const row    = Number(args[1]);
+        const col    = Number(args[2]);
+        const color  = args[3] == null ? "" : String(args[3]);
+        if (!this.sheetState.peerCursors) this.sheetState.peerCursors = new Map();
+        if (!color) this.sheetState.peerCursors.delete(origin);
+        else        this.sheetState.peerCursors.set(origin, { row, col, color });
+        this._redrawCanvas();
+        break;
+      }
       // F9: corner indicator for cells carrying a comment.  hasNote
       // is 1/true to set, 0/false (or empty) to clear.
       case "sheet_cell_note": {
@@ -991,6 +1005,28 @@ export class Runtime {
       const py = y0 + (c.row + 1) * ch + ch / 2;
       ctx.fillStyle = c.kind === "Formula" ? "#2255aa" : "#222";
       ctx.fillText(c.val, px, py);
+    }
+    // C6: paint live peer cursors as colored outlines (drawn after
+    // text so they sit on top of cell content but don't obscure it).
+    if (s.peerCursors && s.peerCursors.size > 0) {
+      ctx.lineWidth = 2;
+      for (const [origin, c] of s.peerCursors) {
+        if (c.row < 0 || c.row >= s.rows || c.col < 0 || c.col >= s.cols) continue;
+        ctx.strokeStyle = c.color;
+        ctx.strokeRect(
+          x0 + (c.col + 1) * cw + 1,
+          y0 + (c.row + 1) * ch + 1,
+          cw - 2, ch - 2
+        );
+        // Origin label above the cell.
+        ctx.fillStyle = c.color;
+        ctx.font = "10px monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+        ctx.fillText(origin.slice(0, 8),
+                     x0 + (c.col + 1) * cw + 2,
+                     y0 + (c.row + 1) * ch - 1);
+        ctx.textBaseline = "middle";
+        ctx.font = "13px monospace";
+      }
     }
     // F9: paint a tiny red corner triangle on cells with comments.
     if (s.cellNotes && s.cellNotes.size > 0) {

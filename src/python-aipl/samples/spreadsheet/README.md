@@ -65,6 +65,11 @@
 | F8  | Conditional formatting (>, ≥, <, ≤, =, contains → 3 colors) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_cell_bg | ✅ 4 assertion |
 | F9  | Per-cell comments + red corner indicator | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_cell_note | ✅ 2 assertion |
 | D4  | Print / Save-as-PDF via @media print stylesheet | `src/browser-abcl/spreadsheet.html` btnPrint + @media | ✅ 2 assertion |
+| U13 | Insert / delete row / column (shift + re-apply) | `src/browser-abcl/spreadsheet.html` insertRow/Col + deleteRow/Col | ✅ 8 assertion |
+| F10 | Per-cell write lock (rejects local edits, ws bypass) | `src/browser-abcl/spreadsheet.html` cellLocked + applyCellChange gate | ✅ 4 assertion |
+| F11 | Named cells (single-cell aliases for formula refs) | `src/browser-abcl/spreadsheet.html` cellNames + evalAst Ref fallback | ✅ 2 assertion |
+| Y3  | Scatter chart kind (x/y pairs, both-axes ticks) | `src/browser-abcl/spreadsheet.html` renderScatterChart | ✅ 1 assertion |
+| C6  | Live peer cursor sync (color-coded outline + origin label) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_peer_cursor | ✅ 4 assertion |
 
 ## smoke
 

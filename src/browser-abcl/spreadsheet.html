@@ -26,6 +26,8 @@
     #formatMenu option { background: #1a1a2a; }
     #rangeRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #findRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #nameRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #nameInput, #nameTargetIn { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
     #cfRow    { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #noteRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #noteInput { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
@@ -138,6 +140,7 @@
     <input id="noteInput" type="text" placeholder="(comment for selected cell)" style="width:400px;">
     <button id="btnSaveNote" title="Save / replace the comment on the selected cell">📝 save</button>
     <button id="btnClearNote" title="Remove the comment from the selected cell">🗑 clear</button>
+    <button id="btnLock"      title="Toggle write-lock on the selected cell">🔒 lock</button>
   </div>
 
   <div id="cfRow">
@@ -156,6 +159,15 @@
     <button id="cfYellow" style="background:#5a5018; color:#ffc;">yellow</button>
     <button id="cfGreen"  style="background:#185a30; color:#cfc;">green</button>
     <button id="cfClear"  style="background:#222;">clear</button>
+  </div>
+
+  <div id="nameRow">
+    <span style="color:#aac; font-size:0.85rem;">name:</span>
+    <input id="nameInput"   type="text" placeholder="e.g. tax" style="width:100px">
+    <input id="nameTargetIn" type="text" placeholder="e.g. A1"  style="width:80px">
+    <button id="btnNameDefine" title="Bind the name to that cell ref">📌 define</button>
+    <button id="btnNameGoto"   title="Jump to the cell the name points to">↗ goto</button>
+    <span id="nameList" style="color:#8aa; font-size:0.8rem; margin-left:8px;"></span>
   </div>
 
   <div id="findRow">
@@ -178,10 +190,15 @@
       <option value="bar">bar</option>
       <option value="line">line</option>
       <option value="pie">pie</option>
+      <option value="scatter">scatter</option>
     </select>
     <button id="btnFillDown" title="Fill the range downward with the top row's values">📋 Fill ↓</button>
     <button id="btnFillSeries" title="Arithmetic series: extends row 0 → row 1 delta down the range">🔢 Series</button>
     <button id="btnChart"    title="Render chart of the selected range">📊 Chart</button>
+    <button id="btnInsertRow" title="Insert blank row above the selected cell">⬆+R</button>
+    <button id="btnDeleteRow" title="Delete the selected row">−R</button>
+    <button id="btnInsertCol" title="Insert blank column to the left">⬅+C</button>
+    <button id="btnDeleteCol" title="Delete the selected column">−C</button>
   </div>
 
   <canvas id="chart" width="720" height="180"></canvas>
@@ -526,9 +543,17 @@
       if (a.tag === "Lit") return a.val;
       if (a.tag === "Str") return a.val;
       if (a.tag === "Ref") {
+        // F11: named cells — if the id isn't a direct cell ref but a
+        // defined alias, hop to the target.  Only resolves single-cell
+        // names; multi-cell ranges would need parser-level integration.
+        let id = a.id;
+        if (typeof cellNames !== "undefined" && cellNames.has(id) &&
+            !cellValues.has(id)) {
+          id = cellNames.get(id);
+        }
         // For Ref values, preserve string vs number type.  Defaulting
         // to 0 only when truly missing (not when it's an empty string).
-        const v = cellValues.get(a.id);
+        const v = cellValues.get(id);
         return v === undefined ? 0 : v;
       }
       if (a.tag === "Range") {
@@ -875,6 +900,11 @@
       selectedRC = hit;
       const id = cellId(hit.row, hit.col);
       cellLabel.textContent = id;
+      // C6: broadcast our new cursor position to ws peers.
+      if (wsConnected && !wsApplyingRemote) {
+        wsSend({ type: "cursor", row: hit.row, col: hit.col,
+                 origin: clientId, color: myCursorColor });
+      }
       formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
       document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
       // F9: surface this cell's comment (if any) in the note input.
@@ -940,6 +970,12 @@
     // this so history bookkeeping stays consistent.
     function applyCellChange(row, col, val, kind, formula) {
       const id = cellId(row, col);
+      // F10: locked cells reject LOCAL edits only — remote writes
+      // (wsApplyingRemote) keep flowing through so a peer can override.
+      if (cellLocked && cellLocked.has(id) && !wsApplyingRemote) {
+        appendLog(`[locked] ${id} — edit rejected (🔒)`);
+        return;
+      }
       // F3: preserve string values as-is (CONCAT, TODAY, etc. produce
       // strings).  Numeric values stay numeric.  Only coerce if val
       // is already number-shaped to keep the existing fast path.
@@ -985,6 +1021,14 @@
     const clientId = newClientId();
     let   lamport  = 0;
     const cellClocks = new Map();    // cellId -> {ts, origin}
+    // C6: derive a stable HSL color from clientId so peers get
+    // distinguishable cursor outlines.
+    function colorFromOrigin(origin) {
+      let h = 0;
+      for (let i = 0; i < origin.length; i++) h = (h * 31 + origin.charCodeAt(i)) >>> 0;
+      return `hsl(${h % 360}, 70%, 55%)`;
+    }
+    const myCursorColor = colorFromOrigin(clientId);
     function setLiveStatus(text, color) {
       const b = document.getElementById("btnLive");
       b.textContent = text;
@@ -1021,6 +1065,13 @@
       ws.onmessage = (ev) => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
+        // C6: peer cursor — paint a colored outline at their cell.
+        if (msg.type === "cursor" && msg.origin && msg.origin !== clientId) {
+          interp.runtime._callBuiltin("sheet_peer_cursor",
+            [msg.origin, msg.row, msg.col, msg.color || "#aaa"],
+            { __currentActor: null });
+          return;
+        }
         // Peer broadcast a whole-snapshot Load — mirror it locally so
         // both tabs converge on the loaded sheet.
         if (msg.type === "load" && msg.snapshot) {
@@ -2561,6 +2612,57 @@
       appendLog(`[chart] pie ${rangeStr} — ${pairs.length} slices, total=${total}`);
     }
 
+    function renderScatterChart(rangeStr, pairs) {
+      // Y3: (x, y) pairs — x = label coerced to number, y = value.
+      // If the labels aren't numeric (e.g. strings), fall back to
+      // the row index for x.
+      const { ctx, W, H } = chartCanvas();
+      const padL = 50, padR = 16, padT = 14, padB = 30;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+      const points = pairs.map((p, i) => {
+        const x = Number(p.label);
+        return { x: Number.isNaN(x) ? i : x, y: Number(p.value) || 0 };
+      });
+      const xs = points.map(p => p.x);
+      const ys = points.map(p => p.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(0, ...ys), maxY = Math.max(1, ...ys);
+      const rangeX = (maxX - minX) || 1;
+      const rangeY = (maxY - minY) || 1;
+      // Axes.
+      ctx.strokeStyle = "#888"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL,         padT);
+      ctx.lineTo(padL,         padT + plotH);
+      ctx.lineTo(padL + plotW, padT + plotH);
+      ctx.stroke();
+      // Light gridlines + Y ticks.
+      ctx.font = "10px monospace"; ctx.fillStyle = "#555"; ctx.textAlign = "right";
+      const yOf = (v) => padT + plotH - ((v - minY) / rangeY) * plotH;
+      const xOf = (v) => padL + ((v - minX) / rangeX) * plotW;
+      for (const v of [minY, (minY + maxY) / 2, maxY]) {
+        const y = yOf(v);
+        ctx.fillText(formatValue(v, "number"), padL - 4, y + 3);
+        ctx.strokeStyle = "#ddd";
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+      }
+      // X axis labels (min, mid, max)
+      ctx.textAlign = "center"; ctx.fillStyle = "#555";
+      for (const v of [minX, (minX + maxX) / 2, maxX]) {
+        ctx.fillText(formatValue(v, "number"), xOf(v), padT + plotH + 14);
+      }
+      // Points.
+      ctx.fillStyle = Y2_PALETTE[0];
+      for (const p of points) {
+        ctx.beginPath();
+        ctx.arc(xOf(p.x), yOf(p.y), 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#666"; ctx.font = "10px monospace"; ctx.textAlign = "left";
+      ctx.fillText(`scatter — range ${rangeStr} — ${points.length} pts`, 8, H - 4);
+      appendLog(`[chart] scatter ${rangeStr} — ${points.length} points`);
+    }
     function renderChart(rangeStr) {
       const pairs = gatherChartPairs(rangeStr);
       if (pairs === null) return;
@@ -2571,9 +2673,10 @@
         return;
       }
       const kind = document.getElementById("chartType").value;
-      if      (kind === "line") renderLineChart(rangeStr, pairs);
-      else if (kind === "pie")  renderPieChart (rangeStr, pairs);
-      else                      renderBarChart (rangeStr, pairs);
+      if      (kind === "line")    renderLineChart   (rangeStr, pairs);
+      else if (kind === "pie")     renderPieChart    (rangeStr, pairs);
+      else if (kind === "scatter") renderScatterChart(rangeStr, pairs);
+      else                         renderBarChart    (rangeStr, pairs);
     }
 
     document.getElementById("btnSortAsc").addEventListener("click", () => {
@@ -2637,6 +2740,109 @@
       () => fillRange("down"));
     document.getElementById("btnFillSeries").addEventListener("click",
       () => fillRange("series"));
+
+    // ─── U13: insert / delete row / column ─────────────────────
+    // Snapshot every cell, shift indices, replay through
+    // applyCellChange so undo, ws broadcast, and auto-save all run.
+    function insertRow(rowIdx) {
+      const s = interp.runtime.sheetState;
+      if (!s || rowIdx < 0 || rowIdx >= s.rows) return;
+      // Read every (row,col) pair from cellValues/cellFormulas, then
+      // re-write under the new layout.
+      const snap = [];
+      for (const [id, v] of cellValues) {
+        const { row, col } = idToPair(id);
+        const fm = cellFormulas.get(id) || null;
+        const ft = cellFormats.get(id)  || null;
+        snap.push({ row, col, val: v, formula: fm, fmt: ft });
+      }
+      // Clear everything via sheet_init refresh.
+      interp.runtime._callBuiltin("sheet_init", [s.rows, s.cols],
+                                   { __currentActor: null });
+      cellValues.clear(); cellFormulas.clear(); cellFormats.clear();
+      for (const c of snap) {
+        const r = c.row >= rowIdx ? c.row + 1 : c.row;
+        if (r >= s.rows) continue;            // pushed off the bottom
+        if (c.fmt) cellFormats.set(cellId(r, c.col), c.fmt);
+        applyCellChange(r, c.col, c.val,
+                        c.formula ? "Formula" : "Value", c.formula);
+      }
+      appendLog(`[insert-row] above ${rowIdx + 1}`);
+    }
+    function deleteRow(rowIdx) {
+      const s = interp.runtime.sheetState;
+      if (!s || rowIdx < 0 || rowIdx >= s.rows) return;
+      const snap = [];
+      for (const [id, v] of cellValues) {
+        const { row, col } = idToPair(id);
+        if (row === rowIdx) continue;          // drop this row
+        const fm = cellFormulas.get(id) || null;
+        const ft = cellFormats.get(id)  || null;
+        snap.push({ row, col, val: v, formula: fm, fmt: ft });
+      }
+      interp.runtime._callBuiltin("sheet_init", [s.rows, s.cols],
+                                   { __currentActor: null });
+      cellValues.clear(); cellFormulas.clear(); cellFormats.clear();
+      for (const c of snap) {
+        const r = c.row > rowIdx ? c.row - 1 : c.row;
+        if (c.fmt) cellFormats.set(cellId(r, c.col), c.fmt);
+        applyCellChange(r, c.col, c.val,
+                        c.formula ? "Formula" : "Value", c.formula);
+      }
+      appendLog(`[delete-row] row ${rowIdx + 1}`);
+    }
+    function insertCol(colIdx) {
+      const s = interp.runtime.sheetState;
+      if (!s || colIdx < 0 || colIdx >= s.cols) return;
+      const snap = [];
+      for (const [id, v] of cellValues) {
+        const { row, col } = idToPair(id);
+        const fm = cellFormulas.get(id) || null;
+        const ft = cellFormats.get(id)  || null;
+        snap.push({ row, col, val: v, formula: fm, fmt: ft });
+      }
+      interp.runtime._callBuiltin("sheet_init", [s.rows, s.cols],
+                                   { __currentActor: null });
+      cellValues.clear(); cellFormulas.clear(); cellFormats.clear();
+      for (const c of snap) {
+        const cc = c.col >= colIdx ? c.col + 1 : c.col;
+        if (cc >= s.cols) continue;
+        if (c.fmt) cellFormats.set(cellId(c.row, cc), c.fmt);
+        applyCellChange(c.row, cc, c.val,
+                        c.formula ? "Formula" : "Value", c.formula);
+      }
+      appendLog(`[insert-col] before ${colToLetters(colIdx)}`);
+    }
+    function deleteCol(colIdx) {
+      const s = interp.runtime.sheetState;
+      if (!s || colIdx < 0 || colIdx >= s.cols) return;
+      const snap = [];
+      for (const [id, v] of cellValues) {
+        const { row, col } = idToPair(id);
+        if (col === colIdx) continue;
+        const fm = cellFormulas.get(id) || null;
+        const ft = cellFormats.get(id)  || null;
+        snap.push({ row, col, val: v, formula: fm, fmt: ft });
+      }
+      interp.runtime._callBuiltin("sheet_init", [s.rows, s.cols],
+                                   { __currentActor: null });
+      cellValues.clear(); cellFormulas.clear(); cellFormats.clear();
+      for (const c of snap) {
+        const cc = c.col > colIdx ? c.col - 1 : c.col;
+        if (c.fmt) cellFormats.set(cellId(c.row, cc), c.fmt);
+        applyCellChange(c.row, cc, c.val,
+                        c.formula ? "Formula" : "Value", c.formula);
+      }
+      appendLog(`[delete-col] ${colToLetters(colIdx)}`);
+    }
+    document.getElementById("btnInsertRow").addEventListener("click",
+      () => { if (selectedRC) insertRow(selectedRC.row); });
+    document.getElementById("btnDeleteRow").addEventListener("click",
+      () => { if (selectedRC) deleteRow(selectedRC.row); });
+    document.getElementById("btnInsertCol").addEventListener("click",
+      () => { if (selectedRC) insertCol(selectedRC.col); });
+    document.getElementById("btnDeleteCol").addEventListener("click",
+      () => { if (selectedRC) deleteCol(selectedRC.col); });
 
     // ─── F8: conditional formatting ────────────────────────────
     // For every cell in the cf range that satisfies (cell op value),
@@ -2735,6 +2941,66 @@
     }
     document.getElementById("btnSaveNote" ).addEventListener("click", saveNote);
     document.getElementById("btnClearNote").addEventListener("click", clearNote);
+
+    // ─── F10: per-cell write lock ──────────────────────────────
+    // Locked cells reject local edits (applyCellChange path).
+    // Remote ws updates bypass the lock so a peer can still push
+    // an authoritative value through.
+    const cellLocked = new Set();   // ids
+    function toggleLock() {
+      if (!selectedRC) return;
+      const id = cellId(selectedRC.row, selectedRC.col);
+      if (cellLocked.has(id)) {
+        cellLocked.delete(id);
+        appendLog(`[unlock] ${id}`);
+      } else {
+        cellLocked.add(id);
+        appendLog(`[lock] ${id}`);
+      }
+    }
+    document.getElementById("btnLock").addEventListener("click", toggleLock);
+
+    // ─── F11: named cells (single-cell aliases) ────────────────
+    // `name → "A1"` lookup; resolved on every Ref eval so formulas
+    // like `=tax * 100` work the same as `=A1 * 100`.
+    const cellNames = new Map();   // name → cellId string
+    function refreshNameList() {
+      const text = Array.from(cellNames.entries())
+        .map(([n, t]) => `${n}→${t}`).join(", ");
+      const el = document.getElementById("nameList");
+      if (el) el.textContent = text ? `[${text}]` : "";
+    }
+    function nameDefine() {
+      const n = document.getElementById("nameInput"   ).value.trim();
+      const t = document.getElementById("nameTargetIn").value.trim().toUpperCase();
+      if (!n) { appendLog("[name] empty name"); return; }
+      if (!/^[A-Z][A-Z0-9_]*$/i.test(n)) {
+        appendLog("[name] must start with a letter (got " + n + ")");
+        return;
+      }
+      // Allow either a single-cell target (e.g. "A1") or "selected" / "" → current sel.
+      let target = t;
+      if (!target) {
+        if (!selectedRC) { appendLog("[name] no target — type a ref or click a cell first"); return; }
+        target = cellId(selectedRC.row, selectedRC.col);
+      }
+      if (!/^[A-Z]+\d+$/.test(target)) {
+        appendLog(`[name] target "${target}" doesn't look like a cell ref`);
+        return;
+      }
+      cellNames.set(n, target);
+      refreshNameList();
+      appendLog(`[name] ${n} → ${target}`);
+    }
+    function nameGoto() {
+      const n = document.getElementById("nameInput").value.trim();
+      const target = cellNames.get(n);
+      if (!target) { appendLog(`[name] no such name "${n}"`); return; }
+      const { col, row } = idToPair(target);
+      focusSingleCell({ row, col });
+    }
+    document.getElementById("btnNameDefine").addEventListener("click", nameDefine);
+    document.getElementById("btnNameGoto"  ).addEventListener("click", nameGoto);
 
     // ─── D4: Print / Save-as-PDF ───────────────────────────────
     // Defer to the browser's print dialog with a print-only CSS
