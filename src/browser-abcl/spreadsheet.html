@@ -79,6 +79,7 @@
   <div id="sheetIdRow">
     <span id="sheetIdLabel">sheet_id:</span>
     <input id="sheetId" type="text" value="demo">
+    <button id="btnLive" title="Toggle WebSocket realtime collab" style="background:#1a3a1a; color:#afe; border-color:#4c6;">⚪ Off</button>
     <span id="serverInfo">server: <span id="serverUrl">http://localhost:8090</span></span>
   </div>
 
@@ -644,7 +645,83 @@
                              [row, col, display, kind],
                              { __currentActor: null });
       }
+      // C3: broadcast cell update over WebSocket (unless we're
+      // currently applying a remote change — avoid the echo loop).
+      if (!wsApplyingRemote) {
+        wsSend({ type: "cell", row, col, val: stored, kind, formula, fmt });
+      }
     }
+
+    // ─── C3 WebSocket realtime collab ──────────────────────────
+    // Connection per-sheet_id.  Toggle button in the sheet_id row
+    // opens/closes the socket; sheet_id input change re-connects.
+    let ws = null;
+    let wsConnected     = false;
+    let wsApplyingRemote = false;    // re-entrancy flag to skip echo
+    function setLiveStatus(text, color) {
+      const b = document.getElementById("btnLive");
+      b.textContent = text;
+      b.style.background = color === "on"   ? "#1a3a1a"
+                          : color === "err"  ? "#3a1a1a"
+                          : "#1a1a1a";
+      b.style.color      = color === "on"   ? "#afe"
+                          : color === "err"  ? "#fcc"
+                          : "#aaa";
+    }
+    function wsSend(msg) {
+      if (!wsConnected || !ws) return;
+      try { ws.send(JSON.stringify(msg)); } catch (_) {}
+    }
+    function wsConnect() {
+      if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+      const id = document.getElementById("sheetId").value.trim() || "demo";
+      const wsUrl = `ws://${new URL(NODE_URL).host}/ws?sid=${encodeURIComponent("sheet:" + id)}`;
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        wsConnected = true;
+        setLiveStatus("🟢 Live", "on");
+        appendLog(`[ws] connected — sheet:${id}`);
+      };
+      ws.onclose = () => {
+        wsConnected = false;
+        setLiveStatus("⚪ Off", "off");
+        appendLog("[ws] disconnected");
+      };
+      ws.onerror = () => {
+        setLiveStatus("🔴 Error", "err");
+        appendLog("[ws] error");
+      };
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        // Server's welcome frame is `{"kind":"welcome", "sid":…}`,
+        // ignore — only react to our own `type:"cell"` shape.
+        if (msg.type !== "cell") return;
+        // Apply without re-broadcasting (wsApplyingRemote guards it).
+        wsApplyingRemote = true;
+        try {
+          const id = cellId(msg.row, msg.col);
+          if (msg.fmt && msg.fmt !== "general") cellFormats.set(id, msg.fmt);
+          else cellFormats.delete(id);
+          applyCellChange(msg.row, msg.col, msg.val, msg.kind, msg.formula);
+          appendLog(`[remote] ${id} = ${msg.val}  (${msg.kind})`);
+        } finally {
+          wsApplyingRemote = false;
+        }
+      };
+    }
+    function wsDisconnect() {
+      if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+      wsConnected = false;
+      setLiveStatus("⚪ Off", "off");
+    }
+    document.getElementById("btnLive").addEventListener("click", () => {
+      wsConnected ? wsDisconnect() : wsConnect();
+    });
+    document.getElementById("sheetId").addEventListener("change", () => {
+      // Re-connect with new sheet id if we were connected.
+      if (wsConnected) wsConnect();
+    });
 
     formulaBar.addEventListener("keydown", e => {
       if (e.key !== "Enter" || !selectedRC) return;
@@ -886,6 +963,12 @@
         runtime._callBuiltin("sheet_cell",
                              [selectedRC.row, selectedRC.col, display, kind],
                              { __currentActor: null });
+      }
+      // C3: broadcast format change so peer browsers re-render this
+      // cell with the same format.
+      if (!wsApplyingRemote) {
+        wsSend({ type: "cell", row: selectedRC.row, col: selectedRC.col,
+                 val: raw, kind, formula: cellFormulas.get(id) || null, fmt });
       }
       appendLog(`[format] ${id} → ${fmt}   (${display})`);
     });
