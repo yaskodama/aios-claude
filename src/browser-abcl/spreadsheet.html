@@ -1441,6 +1441,17 @@
           applyCellChange(msg.row, msg.col, msg.val, msg.kind, msg.formula);
           appendLog(`[remote] ${id} = ${msg.val}  (${msg.kind})  ` +
                     `ts=${incoming.ts}/${incoming.origin}`);
+          // If the remote update lands on the cell the user currently
+          // has selected, refresh the formula bar / format menu / note
+          // input so the formula source / format / comment that just
+          // arrived is visible without clicking the cell again.
+          if (selectedRC &&
+              selectedRC.row === msg.row && selectedRC.col === msg.col) {
+            formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
+            document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
+            const noteEl = document.getElementById("noteInput");
+            if (noteEl) noteEl.value = cellNotes.get(id) || "";
+          }
         } finally {
           wsApplyingRemote = false;
         }
