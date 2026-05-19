@@ -78,6 +78,9 @@
 | C7  | "Live: N peers" badge + 10-sec TTL pruning (excludes self) | `src/browser-abcl/spreadsheet.html` peerActivity + refreshPresenceBadge | ✅ 5 assertion |
 | Y4  | Heatmap chart kind — 2D tiles, blue→red color ramp on min..max | `src/browser-abcl/spreadsheet.html` renderHeatmapChart | ✅ 4 assertion |
 | F13 | Dependency-tracked auto-recompute (cascade on every cell change) | `src/browser-abcl/spreadsheet.html` depGraph + reverseDeps + cascadeRecompute | ✅ 11 assertion |
+| U15 | Shift + arrow extends selection from anchor | `src/browser-abcl/spreadsheet.html` shiftAnchor + Shift-arrow branch | ✅ 3 assertion |
+| F14 | Cross-sheet ranges in function calls (`SUM(Sheet2!A1:A3)`) | `src/browser-abcl/spreadsheet.html` Call-args XRef flattening | ✅ 3 assertion |
+| D6  | Markdown table export (GitHub-flavored) | `src/browser-abcl/spreadsheet.html` buildMarkdown / btnExportMd | ✅ 5 assertion |
 
 ## smoke
 

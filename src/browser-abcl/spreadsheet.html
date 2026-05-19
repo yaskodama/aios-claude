@@ -252,6 +252,7 @@
     <button id="btnExportXlsx" title="Download the current grid as an XLSX (Excel) file">📤 XLSX ↓</button>
     <button id="btnImportXlsx" title="Import an XLSX file into the grid starting at A1">📥 XLSX ↑</button>
     <button id="btnPrint"      title="Open the browser print dialog (Save as PDF)">📄 PDF</button>
+    <button id="btnExportMd"   title="Download the grid as a GitHub-flavored Markdown table">📤 MD ↓</button>
     <button id="btnExportJson" title="Download the FULL workbook state (formulas, notes, locks, …) as JSON">📤 JSON ↓</button>
     <button id="btnImportJson" title="Import a full-state JSON workbook">📥 JSON ↑</button>
     <input  id="jsonFile" type="file" accept=".json,application/json" style="display:none">
@@ -740,9 +741,24 @@
         }
         // R3: flatten Range nodes into their cell-value lists so
         // SUM(A1:E5) sees 25 scalars, not 1 Range AST.
+        // F14: also flatten XRef-with-end_id (`Sheet2!A1:B3`) — look
+        // the target sheet up in the workbook and pull cellValues.
         const vs = [];
         for (const arg of a.args) {
           if (arg.tag === "Range") vs.push(...evalRange(arg));
+          else if (arg.tag === "XRef" && arg.end_id &&
+                   typeof workbook !== "undefined") {
+            const tgt = workbook.sheets.find(s => s.name === arg.sheet);
+            if (!tgt) continue;
+            const a0 = idToPair(arg.id);
+            const b0 = idToPair(arg.end_id);
+            const c0 = Math.min(a0.col, b0.col), c1 = Math.max(a0.col, b0.col);
+            const r0 = Math.min(a0.row, b0.row), r1 = Math.max(a0.row, b0.row);
+            for (let r = r0; r <= r1; r++)
+              for (let c = c0; c <= c1; c++) {
+                vs.push(tgt.cellValues.get(pairToId(c, r)) || 0);
+              }
+          }
           else                     vs.push(evalAst(arg));
         }
         // Helpers to coerce a scalar to number / string.
@@ -1663,6 +1679,31 @@
           case "x": e.preventDefault(); cutSelection();  return;
         }
       }
+      // U15: Shift + arrow extends the active range from the anchor.
+      if (e.shiftKey && /^Arrow/.test(e.key) && selectedRC) {
+        e.preventDefault();
+        if (!shiftAnchor) shiftAnchor = { row: selectedRC.row, col: selectedRC.col };
+        const s = interp && interp.runtime && interp.runtime.sheetState;
+        if (!s) return;
+        let r = selectedRC.row, c = selectedRC.col;
+        if (e.key === "ArrowUp")    r = Math.max(0,           r - 1);
+        if (e.key === "ArrowDown")  r = Math.min(s.rows - 1,  r + 1);
+        if (e.key === "ArrowLeft")  c = Math.max(0,           c - 1);
+        if (e.key === "ArrowRight") c = Math.min(s.cols - 1,  c + 1);
+        selectedRC = { row: r, col: c };
+        cellLabel.textContent = cellId(r, c);
+        paintDragRange(
+          Math.min(shiftAnchor.row, r), Math.min(shiftAnchor.col, c),
+          Math.max(shiftAnchor.row, r), Math.max(shiftAnchor.col, c));
+        const rng = `${cellId(Math.min(shiftAnchor.row, r), Math.min(shiftAnchor.col, c))}` +
+                    `:${cellId(Math.max(shiftAnchor.row, r), Math.max(shiftAnchor.col, c))}`;
+        document.getElementById("rangeInput").value = rng;
+        return;
+      }
+      // A non-shift arrow / movement key resets the anchor.
+      if (/^Arrow/.test(e.key) || e.key === "Tab" || e.key === "Enter") {
+        shiftAnchor = null;
+      }
       switch (e.key) {
         case "ArrowUp":    e.preventDefault(); moveSelection(-1, 0); break;
         case "ArrowDown":  e.preventDefault(); moveSelection( 1, 0); break;
@@ -1674,9 +1715,11 @@
         case "Delete":
         case "Backspace":  e.preventDefault(); clearSelected(); break;
         case "Escape":     e.preventDefault();
-                           paintDragRange(-1, -1, -1, -1); break;
+                           paintDragRange(-1, -1, -1, -1);
+                           shiftAnchor = null; break;
       }
     });
+    let shiftAnchor = null;   // U15: persists across consecutive Shift+arrow presses
 
     function appendLog(line) {
       if (line === undefined || line === null) return;
@@ -1762,6 +1805,8 @@
         get depGraph()    { return depGraph;    },
         get reverseDeps() { return reverseDeps; },
         cascadeRecompute,
+        // D6 hook.
+        buildMarkdown: () => buildMarkdown(),
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
@@ -3663,6 +3708,50 @@
       return (j.cells || []).length;
     }
     document.getElementById("btnExportJson").addEventListener("click", exportJson);
+
+    // ─── D6: Markdown table export ─────────────────────────────
+    // GitHub-flavored table: header = column letters, body = cell
+    // values.  | and \n inside a cell are escaped (| → \|, \n → <br>).
+    function buildMarkdown() {
+      const s = interp.runtime.sheetState;
+      // Trim trailing empty columns / rows so the table doesn't get
+      // padded with dozens of blanks past the data.
+      const grid = Array.from({ length: s.rows }, () => Array(s.cols).fill(""));
+      for (const c of s.cells) grid[c.row][c.col] = String(c.val);
+      let lastRow = grid.length - 1;
+      while (lastRow >= 0 && grid[lastRow].every(v => v === "")) lastRow--;
+      let lastCol = -1;
+      for (let r = 0; r <= lastRow; r++)
+        for (let c = 0; c < s.cols; c++)
+          if (grid[r][c] !== "" && c > lastCol) lastCol = c;
+      if (lastRow < 0 || lastCol < 0) return "(empty sheet)\n";
+      const esc = v => String(v).replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+      const lines = [];
+      // Header row — column letters.
+      const headers = [];
+      for (let c = 0; c <= lastCol; c++) headers.push(colToLetters(c));
+      lines.push("| " + headers.join(" | ") + " |");
+      lines.push("|" + headers.map(() => "---").join("|") + "|");
+      for (let r = 0; r <= lastRow; r++) {
+        const cells = [];
+        for (let c = 0; c <= lastCol; c++) cells.push(esc(grid[r][c]));
+        lines.push("| " + cells.join(" | ") + " |");
+      }
+      return lines.join("\n") + "\n";
+    }
+    function exportMarkdown() {
+      const text = buildMarkdown();
+      const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const sid  = document.getElementById("sheetId").value.trim() || "sheet";
+      a.href = url; a.download = `${sid}.md`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const lineCount = text.split("\n").filter(Boolean).length;
+      appendLog(`[md-export] ${a.download} — ${lineCount} line(s)`);
+    }
+    document.getElementById("btnExportMd").addEventListener("click", exportMarkdown);
 
     // ─── MS: multi-sheet workbook ──────────────────────────────
     // Each sheet keeps its own per-cell Maps + a snapshot of the
