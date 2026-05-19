@@ -71,6 +71,7 @@
 | Y3  | Scatter chart kind (x/y pairs, both-axes ticks) | `src/browser-abcl/spreadsheet.html` renderScatterChart | ✅ 1 assertion |
 | C6  | Live peer cursor sync (color-coded outline + origin label) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_peer_cursor | ✅ 4 assertion |
 | EQ  | `=` prefix required for formulas; source round-trips Save/Load | `src/browser-abcl/spreadsheet.html` formulaBar commit + currentSheetSnapshot + applySheetSnapshot | ✅ 8 assertion |
+| D5  | Full-state JSON workbook export / import (loss-less) | `src/browser-abcl/spreadsheet.html` buildJsonWorkbook / importJsonWorkbook | ✅ 13 assertion |
 
 ## smoke
 

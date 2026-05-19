@@ -220,6 +220,9 @@
     <button id="btnExportXlsx" title="Download the current grid as an XLSX (Excel) file">📤 XLSX ↓</button>
     <button id="btnImportXlsx" title="Import an XLSX file into the grid starting at A1">📥 XLSX ↑</button>
     <button id="btnPrint"      title="Open the browser print dialog (Save as PDF)">📄 PDF</button>
+    <button id="btnExportJson" title="Download the FULL workbook state (formulas, notes, locks, …) as JSON">📤 JSON ↓</button>
+    <button id="btnImportJson" title="Import a full-state JSON workbook">📥 JSON ↑</button>
+    <input  id="jsonFile" type="file" accept=".json,application/json" style="display:none">
     <input  id="xlsxFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
     <input  id="csvFile" type="file" accept=".csv,text/csv" style="display:none">
     <button id="btnShowSrc">Show ABCL source</button>
@@ -1516,9 +1519,12 @@
         get cellBgs() {
           return interp.runtime.sheetState.cellBgs || new Map();
         },
-        get cellNotes() {
-          return interp.runtime.sheetState.cellNotes || new Set();
-        },
+        get cellNotes()  { return cellNotes;  },
+        get cellLocked() { return cellLocked; },
+        get cellNames()  { return cellNames;  },
+        // D5 hooks.
+        buildJsonWorkbook: () => buildJsonWorkbook(),
+        importJsonWorkbook: (j) => importJsonWorkbook(j),
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
@@ -3039,6 +3045,158 @@
     document.getElementById("btnPrint").addEventListener("click", () => {
       appendLog(`[pdf] opened print dialog (use "Save as PDF")`);
       window.print();
+    });
+
+    // ─── D5: full-state JSON workbook export / import ──────────
+    // Loss-less snapshot of every JS-side Map / Set used by the UI:
+    // formulas (with leading "="), formats, bgs, notes, locked,
+    // names, clocks, lamport, plus the runtime sheetState bounds
+    // and cellH.  version=2 lets future loaders detect & migrate.
+    function buildJsonWorkbook() {
+      const s = interp.runtime.sheetState;
+      const cells = s.cells.map(c => ({
+        row: c.row, col: c.col,
+        val: String(c.val), kind: c.kind,
+        formula: cellFormulas.get(cellId(c.row, c.col)) || null,
+      }));
+      const formats = [];
+      for (const [id, f] of cellFormats) formats.push({ id, format: f });
+      const bgs = [];
+      if (s.cellBgs) for (const [key, color] of s.cellBgs) {
+        const [r, c] = key.split(",").map(Number);
+        bgs.push({ row: r, col: c, color });
+      }
+      const notes = [];
+      for (const [id, text] of cellNotes) notes.push({ id, text });
+      const locked = [];
+      for (const id of cellLocked) locked.push(id);
+      const names = [];
+      for (const [name, target] of cellNames) names.push({ name, target });
+      const clocks = [];
+      for (const [id, c] of cellClocks) clocks.push({ id, ts: c.ts, origin: c.origin });
+      return {
+        version: 2,
+        sheet_id: document.getElementById("sheetId").value.trim() || "demo",
+        rows: s.rows, cols: s.cols, cellH: s.cellH || 32,
+        cells, formats, bgs, notes, locked, names, clocks,
+        lamport,
+        saved_at: new Date().toISOString(),
+      };
+    }
+    function exportJson() {
+      const obj = buildJsonWorkbook();
+      const text = JSON.stringify(obj, null, 2);
+      const blob = new Blob([text], { type: "application/json" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = `${obj.sheet_id}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const stats =
+        `${obj.cells.length} cells, ${obj.formats.length} formats, ` +
+        `${obj.bgs.length} bgs, ${obj.notes.length} notes, ` +
+        `${obj.locked.length} locked, ${obj.names.length} names`;
+      appendLog(`[json-export] ${a.download} — ${stats}`);
+    }
+    function importJsonWorkbook(j) {
+      if (!j || typeof j !== "object") {
+        appendLog("[json-import error] not an object"); return 0;
+      }
+      // Unknown / future fields are ignored — only the known schema below
+      // is restored.  version=2 is the current shape; absent → legacy.
+      const runtime = interp && interp.runtime;
+      if (!runtime) return 0;
+      // Reset every JS-side Map / Set.
+      cellValues.clear();
+      cellFormulas.clear();
+      cellFormats.clear();
+      cellClocks.clear();
+      cellNotes.clear();
+      cellLocked.clear();
+      cellNames.clear();
+      // Bounds + canvas.
+      const rows = Number(j.rows || 10);
+      const cols = Number(j.cols || 8);
+      const cellH = Number(j.cellH || 32);
+      reshapeCanvas(rows, cols, undefined, cellH);
+      runtime._callBuiltin("sheet_init", [rows, cols], { __currentActor: null });
+      runtime.sheetState.cellH = cellH;
+      document.getElementById("resizeRows").value = rows;
+      document.getElementById("resizeCols").value = cols;
+      refreshGridDims();
+      // Cells + formulas.
+      for (const c of (j.cells || [])) {
+        const id = cellId(c.row, c.col);
+        runtime._callBuiltin("sheet_cell",
+                             [c.row, c.col, String(c.val), c.kind || "Value"],
+                             { __currentActor: null });
+        const n = Number(c.val);
+        cellValues.set(id, (!Number.isNaN(n) && c.val !== "") ? n : c.val);
+        if (c.formula) {
+          const src = c.formula.startsWith("=") ? c.formula : "=" + c.formula;
+          cellFormulas.set(id, src);
+        }
+      }
+      // Formats.
+      for (const f of (j.formats || [])) {
+        if (f && f.id && f.format) cellFormats.set(f.id, f.format);
+      }
+      // Backgrounds (F8).
+      for (const b of (j.bgs || [])) {
+        if (b && Number.isInteger(b.row) && Number.isInteger(b.col) && b.color) {
+          runtime._callBuiltin("sheet_cell_bg",
+            [b.row, b.col, b.color], { __currentActor: null });
+        }
+      }
+      // Notes (F9).
+      for (const n of (j.notes || [])) {
+        if (n && n.id && n.text != null) {
+          cellNotes.set(n.id, n.text);
+          const { row, col } = idToPair(n.id);
+          if (row >= 0 && col >= 0) {
+            runtime._callBuiltin("sheet_cell_note",
+              [row, col, 1], { __currentActor: null });
+          }
+        }
+      }
+      // Locked (F10).
+      for (const id of (j.locked || [])) {
+        if (typeof id === "string") cellLocked.add(id);
+      }
+      // Named cells (F11).
+      for (const n of (j.names || [])) {
+        if (n && n.name && n.target) cellNames.set(n.name, n.target);
+      }
+      if (typeof refreshNameList === "function") refreshNameList();
+      // LWW (C5).
+      for (const k of (j.clocks || [])) {
+        if (k && k.id) cellClocks.set(k.id, { ts: k.ts, origin: k.origin });
+      }
+      if (typeof j.lamport === "number" && j.lamport > 0) lamport = j.lamport;
+      historyStack = []; redoStack = []; refreshUndoRedoButtons();
+      return (j.cells || []).length;
+    }
+    document.getElementById("btnExportJson").addEventListener("click", exportJson);
+    document.getElementById("btnImportJson").addEventListener("click", () => {
+      document.getElementById("jsonFile").click();
+    });
+    document.getElementById("jsonFile").addEventListener("change", e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        let j;
+        try { j = JSON.parse(String(fr.result || "")); }
+        catch (err) { appendLog(`[json-import parse error] ${err}`); return; }
+        const n = importJsonWorkbook(j);
+        appendLog(`[json-import] ${file.name} → ${n} cells, ` +
+                  `v=${j.version || "legacy"}, ` +
+                  `${(j.formats || []).length}/${(j.bgs || []).length}/` +
+                  `${(j.notes || []).length}/${(j.locked || []).length}/` +
+                  `${(j.names || []).length} (formats/bgs/notes/locks/names)`);
+      };
+      fr.readAsText(file);
+      e.target.value = "";
     });
 
     refreshUndoRedoButtons();
