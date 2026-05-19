@@ -850,7 +850,7 @@ export class Runtime {
   _drawSheetState(ctx, W, H) {
     const s    = this.sheetState;
     const cw   = Math.floor((W - 60) / (s.cols + 1));   // +1 for row-header column
-    const ch   = 32;
+    const ch   = s.cellH || 32;     // U9: row height from sheetState
     const x0   = 30;
     const y0   = 30;
     const totW = cw * (s.cols + 1);

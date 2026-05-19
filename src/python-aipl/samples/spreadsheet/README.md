@@ -54,6 +54,10 @@
 | G5  | Multi-letter columns AA..BH (max 60) + auto-grow canvas | `src/browser-abcl/spreadsheet.html` + `runtime.js` colLabel | ✅ 9 assertion |
 | P4  | Debounced auto-save (3-sec idle) + toggle + status pill | `src/browser-abcl/spreadsheet.html` scheduleAutoSave | ✅ 6 assertion |
 | C5  | Persist LWW clocks (ts, origin, lamport) across save/load | `src/node-aipl-server/server.mjs` + `spreadsheet.html` | ✅ 11 assertion |
+| U9  | Configurable cellWidth / rowHeight via the Resize panel | `src/browser-abcl/spreadsheet.html` + `runtime.js` cellH | ✅ 5 assertion |
+| F6  | Array-formula SPILL for `Range op scalar` and `scalar op Range` | `src/browser-abcl/spreadsheet.html` maybeSpill | ✅ 9 assertion |
+| D2  | XLSX (Excel) export — minimal store-only ZIP + handwritten XML | `src/browser-abcl/spreadsheet.html` buildXlsx + zipStore | ✅ 14 assertion |
+| F7  | String / mixed-type comparisons + `=` and `<>` operators | `src/browser-abcl/spreadsheet.html` tokenizer + cmp/cmpEq | ✅ 16 assertion |
 
 ## smoke
 
