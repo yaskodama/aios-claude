@@ -1067,6 +1067,24 @@ void abcl_enqueue(int sender, int receiver, const char *method,
 
 /* 以降の生成コードでは abcl_enqueue を enqueue として書く */
 #define enqueue abcl_enqueue
+
+/* P1 heartbeat thread: sleep + print, sleep + print, ...  Six ticks
+   over ~6 sec.  Always lands as long as Xinu's scheduler keeps
+   running — i.e. as long as the actor pool isn't busy-looping.
+   Each tick also reports the live actor count, which grows past the
+   global-declaration count as constructors spawn nested actors. */
+thread abcl_heartbeat(void) {
+  int i;
+  for (i = 0; i < 6; i++) {
+    sleep(1000);
+    if (global_shutdown) break;
+    wait(print_mu);
+    kprintf("[aipl] heartbeat tick=%d actors=%d msgs=%d\r\n",
+            i, n_objects, messages_processed);
+    signal(print_mu);
+  }
+  return OK;
+}
 |}
 
 (* ---------- Xinu 用プログラム生成 ---------- *)
@@ -1186,6 +1204,12 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "    wait(counter_mu);\n";
   emit "    idx = ++messages_processed;\n";
   emit "    signal(counter_mu);\n";
+  emit "    /* P1: every 25 dispatches print one liveness marker. */\n";
+  emit "    if (idx % 25 == 0) {\n";
+  emit "      wait(print_mu);\n";
+  emit "      kprintf(\"[aipl] alive msg=%d\\r\\n\", idx);\n";
+  emit "      signal(print_mu);\n";
+  emit "    }\n";
   emit "    if (_abcl_cap > 0 && idx > _abcl_cap) {\n";
   emit "      wait(print_mu);\n";
   emit "      kprintf(\"[abcl] message cap reached (%d)\\r\\n\", _abcl_cap);\n";
@@ -1229,6 +1253,17 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "    int i, total;\n";
   emit "    wait(objects_mu); total = n_objects; signal(objects_mu);\n";
   emit "    for (i = 0; i < total; i++) spawn_actor(i);\n";
+  emit "    /* P1: stable thread-count marker. */\n";
+  emit "    kprintf(\"[aipl] spawned=%d\\r\\n\", total);\n";
+  emit "  }\n";
+  emit "  /* P1: heartbeat thread — proves the Xinu scheduler isn't\n";
+  emit "     starved by busy-looping actors.  Five ticks over ~5 sec\n";
+  emit "     should always land if mailboxes use blocking semaphores. */\n";
+  emit "  {\n";
+  emit "    extern thread abcl_heartbeat(void);\n";
+  emit "    tid_typ htid = create((void*)abcl_heartbeat, 4096, INITPRIO,\n";
+  emit "                          \"aipl-hb\", 0);\n";
+  emit "    if (htid != SYSERR) ready(htid, RESCHED_NO);\n";
   emit "  }\n";
   emit "  /* phase 3: any non-VarDecl top-level */\n";
   List.iter
