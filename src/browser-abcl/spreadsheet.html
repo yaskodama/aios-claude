@@ -126,6 +126,7 @@
   <script type="module">
     import * as AST from "/src/ast.js";
     import { Interpreter } from "/src/interpreter.js";
+    import { lwwWins, newClientId } from "/src/lww.js";
 
     const ABCL_SOURCE = await (await fetch("/spreadsheet.abcl")).text();
 
@@ -647,8 +648,13 @@
       }
       // C3: broadcast cell update over WebSocket (unless we're
       // currently applying a remote change — avoid the echo loop).
+      // C4: stamp a fresh Lamport timestamp; remember it for LWW so a
+      // racing remote update with a lower (ts, origin) gets dropped.
       if (!wsApplyingRemote) {
-        wsSend({ type: "cell", row, col, val: stored, kind, formula, fmt });
+        lamport += 1;
+        cellClocks.set(id, { ts: lamport, origin: clientId });
+        wsSend({ type: "cell", row, col, val: stored, kind, formula, fmt,
+                 ts: lamport, origin: clientId });
       }
     }
 
@@ -658,6 +664,13 @@
     let ws = null;
     let wsConnected     = false;
     let wsApplyingRemote = false;    // re-entrancy flag to skip echo
+    // C4: per-cell LWW state.  Each tab has a stable origin id and a
+    // Lamport clock; cellClocks records the winning (ts, origin) for
+    // every cell we've ever seen so concurrent edits resolve the same
+    // way on every peer.
+    const clientId = newClientId();
+    let   lamport  = 0;
+    const cellClocks = new Map();    // cellId -> {ts, origin}
     function setLiveStatus(text, color) {
       const b = document.getElementById("btnLive");
       b.textContent = text;
@@ -697,14 +710,28 @@
         // Server's welcome frame is `{"kind":"welcome", "sid":…}`,
         // ignore — only react to our own `type:"cell"` shape.
         if (msg.type !== "cell") return;
+        // C4: advance Lamport on every receive so future local writes
+        // are globally newer than anything we've seen.
+        if (typeof msg.ts === "number") {
+          lamport = Math.max(lamport, msg.ts) + 1;
+        }
+        const id = cellId(msg.row, msg.col);
+        const incoming = { ts: msg.ts ?? 0, origin: msg.origin ?? "" };
+        const current  = cellClocks.get(id);
+        if (!lwwWins(incoming, current)) {
+          appendLog(`[remote-stale] ${id}  (ts=${incoming.ts}/${incoming.origin}` +
+                    ` ≤ local ${current.ts}/${current.origin})`);
+          return;
+        }
+        cellClocks.set(id, incoming);
         // Apply without re-broadcasting (wsApplyingRemote guards it).
         wsApplyingRemote = true;
         try {
-          const id = cellId(msg.row, msg.col);
           if (msg.fmt && msg.fmt !== "general") cellFormats.set(id, msg.fmt);
           else cellFormats.delete(id);
           applyCellChange(msg.row, msg.col, msg.val, msg.kind, msg.formula);
-          appendLog(`[remote] ${id} = ${msg.val}  (${msg.kind})`);
+          appendLog(`[remote] ${id} = ${msg.val}  (${msg.kind})  ` +
+                    `ts=${incoming.ts}/${incoming.origin}`);
         } finally {
           wsApplyingRemote = false;
         }
@@ -966,9 +993,14 @@
       }
       // C3: broadcast format change so peer browsers re-render this
       // cell with the same format.
+      // C4: also LWW-stamp this update — a format flip is still an
+      // edit, so it has to race against value edits cleanly.
       if (!wsApplyingRemote) {
+        lamport += 1;
+        cellClocks.set(id, { ts: lamport, origin: clientId });
         wsSend({ type: "cell", row: selectedRC.row, col: selectedRC.col,
-                 val: raw, kind, formula: cellFormulas.get(id) || null, fmt });
+                 val: raw, kind, formula: cellFormulas.get(id) || null, fmt,
+                 ts: lamport, origin: clientId });
       }
       appendLog(`[format] ${id} → ${fmt}   (${display})`);
     });

@@ -42,6 +42,8 @@
 | 5.3 | E1 FormulaBar (DOM input) | `src/browser-abcl/spreadsheet.html` | ✅ (browser-only, smoke unchanged) |
 | 5.4 | C2 ServerFile (JS-N /api/sheet/...) | `src/node-aipl-server/server.mjs` + `spreadsheet.html` | ✅ 4 server smoke |
 | 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | `src/browser-abcl/spreadsheet.html` + `runtime.js` cell-replace fix | ✅ |
+| C3  | WebSocket realtime collab between browsers | `src/browser-abcl/spreadsheet.html` + `src/node-aipl-server/server.mjs` /ws | ✅ |
+| C4  | DR-10 LWW per cell (Lamport ts + originId tiebreak) | `src/browser-abcl/src/lww.js` + `_smoke_lww.{mjs,sh}` | ✅ 10 assertion |
 
 ## smoke
 
