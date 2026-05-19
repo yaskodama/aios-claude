@@ -16,7 +16,7 @@ laid out in [`AIPL_DroneSim_Round1.aice`](./AIPL_DroneSim_Round1.aice).
 | **A3** | **Statistics panel — cumulative rescued / remaining / per-trial time / UAV2 distance line chart** | **10/10** |
 | **A4** | **Scenario selector — Table 1 / All Empty / Random (seeded) / Custom JSON** | **18/18** |
 | **A2** | **UAV1 sweep: TSP + 2-opt + priority-bias + transit dedup** | **5/5** |
-| B2 | … | — |
+| **B2** | **Secondary-disaster events — cut 3 random edges + visual X marks + isolation warning** | **11/11** |
 | B3 | … | — |
 | B1 | … | — |
 | B4 | … | — |

@@ -186,6 +186,19 @@
       </div>
     </div>
 
+    <!-- B2: secondary-disaster events — sever edges mid-run. -->
+    <div class="panel">
+      <h2>Disaster Events <span class="pill" id="disasterPill">0 edges cut</span></h2>
+      <div class="controls">
+        <button id="btnDisaster" class="warn" style="font-size:11px">⚠ Quake (cut 3 edges)</button>
+        <button id="btnRestoreEdges" style="font-size:10px">↺ restore all</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="k">Last event</span>
+        <span class="v" id="disasterLast">—</span>
+      </div>
+    </div>
+
     <!-- A4: scenario selector — swap the initial survivor distribution -->
     <div class="panel">
       <h2>Scenario <span class="pill" id="scenarioPill">Table 1 · 349 survivors</span></h2>
@@ -395,10 +408,20 @@ const EDGES = [
 // build adjacency + edge length cache
 const adj = new Map();
 function eucl(a,b){ const dx=(a.x-b.x)*W, dy=(a.y-b.y)*H; return Math.hypot(dx,dy); }
-for (const n of NODES) adj.set(n.id, []);
-for (const [a,b] of EDGES){
-  adj.get(a).push(b); adj.get(b).push(a);
+// B2: cutEdges tracks edges severed by disaster events.  rebuildAdj
+// regenerates the adjacency list from EDGES \ cutEdges so dijkstra
+// automatically respects the current topology.
+const cutEdges = new Set();   // edgeKey strings
+function edgeKey(a, b){ return String(a) < String(b) ? `${a}-${b}` : `${b}-${a}`; }
+function rebuildAdj(){
+  adj.clear();
+  for (const n of NODES) adj.set(n.id, []);
+  for (const [a,b] of EDGES){
+    if (cutEdges.has(edgeKey(a,b))) continue;
+    adj.get(a).push(b); adj.get(b).push(a);
+  }
 }
+rebuildAdj();
 
 /* ── initial survivor counts (Table 1, "誘導前") ── */
 /* A4: INITIAL is now a swappable preset.  SCENARIO_TABLE1 keeps
@@ -518,6 +541,13 @@ function countRemaining(){
   return r;
 }
 function resetSim(){
+  // B2: restore the full graph on every reset so a new run starts
+  // with the seed topology.
+  if (cutEdges.size){ cutEdges.clear(); rebuildAdj(); }
+  const dp = document.getElementById('disasterPill');
+  if (dp) dp.textContent = '0 edges cut';
+  const dl = document.getElementById('disasterLast');
+  if (dl) dl.textContent = '—';
   pts = {...INITIAL};
   priority = {};
   uav1 = new UAV('UAV1', getCSS('--uav1'), 'A');
@@ -797,17 +827,31 @@ function drawBackground(){
     }
     bgx.stroke();
   }
-  // edges
-  bgx.strokeStyle='rgba(159,179,255,0.30)';
-  bgx.setLineDash([4,4]);
+  // edges — live ones dashed blue, B2-cut ones marked red (different dash)
   for (const [a,b] of EDGES){
     const A=N(a), B=N(b);
+    const isCut = cutEdges.has(edgeKey(a,b));
+    bgx.strokeStyle = isCut ? 'rgba(255,107,138,0.55)' : 'rgba(159,179,255,0.30)';
+    bgx.setLineDash(isCut ? [2,5] : [4,4]);
+    bgx.lineWidth   = isCut ? 1.4 : 1;
     bgx.beginPath();
     bgx.moveTo(A.x*W,A.y*H);
     bgx.lineTo(B.x*W,B.y*H);
     bgx.stroke();
+    // Tiny red X mark midpoint to make the severed edge unmistakable.
+    if (isCut){
+      const mx = (A.x+B.x)*W/2, my = (A.y+B.y)*H/2;
+      bgx.strokeStyle = 'rgba(255,107,138,0.9)';
+      bgx.setLineDash([]);
+      bgx.lineWidth = 1.6;
+      bgx.beginPath();
+      bgx.moveTo(mx-4, my-4); bgx.lineTo(mx+4, my+4);
+      bgx.moveTo(mx+4, my-4); bgx.lineTo(mx-4, my+4);
+      bgx.stroke();
+    }
   }
   bgx.setLineDash([]);
+  bgx.lineWidth = 1;
   // crosshair tick frame
   bgx.strokeStyle='rgba(159,179,255,0.25)';
   bgx.strokeRect(8,8,W-16,H-16);
@@ -1148,6 +1192,69 @@ document.getElementById('btnRandomApply').addEventListener('click', () => {
 document.getElementById('btnCustomApply').addEventListener('click', () => {
   applyScenario('custom', { raw: document.getElementById('scenarioCustom').value });
 });
+
+/* ── B2: secondary-disaster events ──
+   Trigger now: pick 3 random non-cut edges, remove them from the
+   adjacency graph (dijkstra automatically respects the new topology),
+   redraw the background, and force UAV2 to re-dispatch with the
+   updated routing.  Detect points that are no longer reachable from
+   any shelter and warn the operator. */
+function checkIsolation(){
+  const ra = dijkstra('A').dist;
+  const rb = dijkstra('B').dist;
+  const isolated = [];
+  for (const n of NODES){
+    if (n.shelter) continue;
+    const dA = ra.get(n.id), dB = rb.get(n.id);
+    if (!isFinite(dA) && !isFinite(dB)) isolated.push(n.id);
+  }
+  if (isolated.length){
+    log('SYS', `[disaster] WARN: ${isolated.length} point(s) isolated from all shelters → P${isolated.join(', P')}`, 'ev');
+  }
+  return isolated;
+}
+function triggerDisaster(){
+  const candidates = EDGES.filter(([a,b]) => !cutEdges.has(edgeKey(a,b)));
+  if (candidates.length === 0){ log('SYS','[disaster] no edges left to cut','ev'); return; }
+  // Fisher-Yates partial shuffle for 3 picks.
+  const N_CUT = Math.min(3, candidates.length);
+  for (let i = candidates.length - 1; i > candidates.length - 1 - N_CUT; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const picked = candidates.slice(-N_CUT);
+  for (const [a,b] of picked){
+    cutEdges.add(edgeKey(a,b));
+    log('SYS', `[disaster] EDGE CUT  ${a} ↔ ${b}`, 'ev');
+  }
+  rebuildAdj();
+  recomputePriorities();
+  refreshTable();
+  drawBackground();
+  // Force UAV2 to re-dispatch so it picks up the new topology.
+  if (uav2 && uav2.state !== 'dispatching'){
+    uav2.path = [uav2.atId]; uav2.targetIdx = 1; uav2.state = 'idle';
+  }
+  document.getElementById('disasterPill').textContent = `${cutEdges.size} edges cut`;
+  document.getElementById('disasterLast').textContent =
+    picked.map(([a,b]) => `${a}↔${b}`).join(', ') +
+    `  @ tick ${sim ? sim.tick : 0}`;
+  checkIsolation();
+}
+function restoreEdges(){
+  if (cutEdges.size === 0){ log('SYS','[disaster] no edges to restore','ev'); return; }
+  const n = cutEdges.size;
+  cutEdges.clear();
+  rebuildAdj();
+  drawBackground();
+  document.getElementById('disasterPill').textContent = '0 edges cut';
+  document.getElementById('disasterLast').textContent = '—';
+  log('SYS', `[disaster] restored ${n} edges`, 'ev');
+  recomputePriorities();
+  refreshTable();
+}
+document.getElementById('btnDisaster').addEventListener('click', triggerDisaster);
+document.getElementById('btnRestoreEdges').addEventListener('click', restoreEdges);
 
 /* ─────────────────────────────────────────────────────────────
    3D wireframe view (Three.js) — shares state with 2D simulator
