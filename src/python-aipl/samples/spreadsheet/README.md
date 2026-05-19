@@ -59,6 +59,7 @@
 | D2  | XLSX (Excel) export — minimal store-only ZIP + handwritten XML | `src/browser-abcl/spreadsheet.html` buildXlsx + zipStore | ✅ 14 assertion |
 | F7  | String / mixed-type comparisons + `=` and `<>` operators | `src/browser-abcl/spreadsheet.html` tokenizer + cmp/cmpEq | ✅ 16 assertion |
 | U10 | Find / Replace / Replace-all (substring, Enter cycles hits) | `src/browser-abcl/spreadsheet.html` refreshFind / replaceOne / replaceAll | ✅ 10 assertion |
+| D3  | XLSX import — store + DEFLATE, sharedStrings, inlineStr | `src/browser-abcl/spreadsheet.html` unzip / parseXlsx / importXlsx | ✅ 15 assertion |
 
 ## smoke
 

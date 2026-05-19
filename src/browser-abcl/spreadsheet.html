@@ -150,6 +150,8 @@
     <button id="btnExportCsv"  title="Download the current grid as a CSV file">📤 CSV ↓</button>
     <button id="btnImportCsv"  title="Import a CSV file into the grid starting at A1">📥 CSV ↑</button>
     <button id="btnExportXlsx" title="Download the current grid as an XLSX (Excel) file">📤 XLSX ↓</button>
+    <button id="btnImportXlsx" title="Import an XLSX file into the grid starting at A1">📥 XLSX ↑</button>
+    <input  id="xlsxFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
     <input  id="csvFile" type="file" accept=".csv,text/csv" style="display:none">
     <button id="btnShowSrc">Show ABCL source</button>
   </div>
@@ -1388,6 +1390,9 @@
         // D2 test hook: build the .xlsx bytes without triggering a
         // download.  Returns a Uint8Array.
         buildXlsx:   () => buildXlsx(),
+        // D3 test hooks for XLSX parsing/import.
+        parseXlsx:   (bytes) => parseXlsx(bytes),
+        importXlsx:  (bytes, anchor) => importXlsx(bytes, anchor),
         // U10 test hooks for find/replace.
         get findHits()   { return findHits.slice(); },
         get findCursor() { return findCursor; },
@@ -1696,6 +1701,162 @@
       appendLog(`[xlsx-export] ${a.download} — ${bytes.length} bytes`);
     }
     document.getElementById("btnExportXlsx").addEventListener("click", exportXlsx);
+
+    // ─── D3: XLSX import ───────────────────────────────────────
+    // Parse the ZIP structure ourselves (no JSZip dep): walk the
+    // central directory, slice each entry, run DEFLATE entries
+    // through the browser's DecompressionStream("deflate-raw").
+    async function unzip(bytes) {
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      // EOCD search — scan back up to 64 KB for the signature.
+      let eocd = -1;
+      for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+        if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+      }
+      if (eocd < 0) throw new Error("not a ZIP (no EOCD)");
+      const cdStart = dv.getUint32(eocd + 16, true);
+      const cdSize  = dv.getUint32(eocd + 12, true);
+      const dec = new TextDecoder();
+      const files = {};
+      let p = cdStart;
+      while (p < cdStart + cdSize) {
+        if (dv.getUint32(p, true) !== 0x02014b50) break;
+        const method = dv.getUint16(p + 10, true);
+        const csize  = dv.getUint32(p + 20, true);
+        const nlen   = dv.getUint16(p + 28, true);
+        const elen   = dv.getUint16(p + 30, true);
+        const clen   = dv.getUint16(p + 32, true);
+        const lhOff  = dv.getUint32(p + 42, true);
+        const name   = dec.decode(bytes.subarray(p + 46, p + 46 + nlen));
+        // Local header — find data start.
+        const lhNlen = dv.getUint16(lhOff + 26, true);
+        const lhElen = dv.getUint16(lhOff + 28, true);
+        const dataStart = lhOff + 30 + lhNlen + lhElen;
+        const raw = bytes.subarray(dataStart, dataStart + csize);
+        let data;
+        if (method === 0) {
+          data = raw;
+        } else if (method === 8) {
+          // DEFLATE — supported by modern browsers.
+          const ds = new DecompressionStream("deflate-raw");
+          const stream = new Blob([raw]).stream().pipeThrough(ds);
+          data = new Uint8Array(await new Response(stream).arrayBuffer());
+        } else {
+          throw new Error(`unsupported zip method ${method} for ${name}`);
+        }
+        files[name] = data;
+        p += 46 + nlen + elen + clen;
+      }
+      return files;
+    }
+    // Decode a {row, col, val, kind} list from an XLSX byte buffer.
+    async function parseXlsx(bytes) {
+      const files = await unzip(bytes);
+      const dec = new TextDecoder();
+      // Resolve sharedStrings (Excel/Sheets put most strings here).
+      const sstBytes = files["xl/sharedStrings.xml"];
+      const shared = [];
+      if (sstBytes) {
+        const sstXml = dec.decode(sstBytes);
+        // Each <si> can be <si><t>…</t></si> or rich-text form.
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(sstXml, "application/xml");
+        for (const si of doc.getElementsByTagName("si")) {
+          // Concatenate every <t> text node inside (handles rich text).
+          let s = "";
+          for (const t of si.getElementsByTagName("t")) s += t.textContent || "";
+          shared.push(s);
+        }
+      }
+      // Locate the first worksheet — workbook.xml.rels points to it,
+      // but the convention is xl/worksheets/sheet1.xml.
+      let sheetName = null;
+      for (const k of Object.keys(files)) {
+        if (k.match(/^xl\/worksheets\/sheet1?\.xml$/)) { sheetName = k; break; }
+      }
+      if (!sheetName) {
+        for (const k of Object.keys(files)) {
+          if (k.startsWith("xl/worksheets/") && k.endsWith(".xml")) { sheetName = k; break; }
+        }
+      }
+      if (!sheetName) throw new Error("no worksheet found in XLSX");
+      const sheetXml = dec.decode(files[sheetName]);
+      const doc = new DOMParser().parseFromString(sheetXml, "application/xml");
+      const cells = [];
+      for (const c of doc.getElementsByTagName("c")) {
+        const ref = c.getAttribute("r") || "";
+        const m   = ref.match(/^([A-Z]+)(\d+)$/);
+        if (!m) continue;
+        const col = lettersToCol(m[1]);
+        const row = Number(m[2]) - 1;
+        const t   = c.getAttribute("t") || "n";
+        let val   = "";
+        if (t === "inlineStr") {
+          // <is><t>…</t></is>
+          const is = c.getElementsByTagName("is")[0];
+          if (is) for (const tt of is.getElementsByTagName("t")) val += tt.textContent || "";
+        } else if (t === "s") {
+          // Shared-string index in <v>.
+          const v = c.getElementsByTagName("v")[0];
+          const idx = v ? Number(v.textContent) : -1;
+          if (idx >= 0 && idx < shared.length) val = shared[idx];
+        } else if (t === "str") {
+          // Formula result as string — pick up <v>.
+          const v = c.getElementsByTagName("v")[0];
+          val = v ? (v.textContent || "") : "";
+        } else if (t === "b") {
+          // Boolean — 0/1 maps to FALSE/TRUE textually.
+          const v = c.getElementsByTagName("v")[0];
+          val = (v && v.textContent === "1") ? "TRUE" : "FALSE";
+        } else {
+          // Numeric default — <v>.
+          const v = c.getElementsByTagName("v")[0];
+          val = v ? (v.textContent || "") : "";
+        }
+        cells.push({ row, col, val });
+      }
+      return cells;
+    }
+    async function importXlsx(bytes, anchor) {
+      let cells;
+      try { cells = await parseXlsx(bytes); }
+      catch (e) { appendLog(`[xlsx-import error] ${e.message || e}`); return 0; }
+      const s = interp.runtime.sheetState;
+      const r0 = anchor ? anchor.row : selectedRC ? selectedRC.row : 0;
+      const c0 = anchor ? anchor.col : selectedRC ? selectedRC.col : 0;
+      let n = 0, skipped = 0;
+      for (const c of cells) {
+        const row = r0 + c.row, col = c0 + c.col;
+        if (row >= s.rows || col >= s.cols) { skipped++; continue; }
+        const id  = cellId(row, col);
+        const raw = c.val;
+        const num = Number(raw);
+        const stored = (raw !== "" && !Number.isNaN(num)) ? num : raw;
+        const before = {
+          val:     cellValues.get(id),
+          kind:    cellFormulas.has(id) ? "Formula" : "Value",
+          formula: cellFormulas.get(id) || null,
+        };
+        applyCellChange(row, col, stored, "Value", null);
+        historyStack.push({ row, col, id, before,
+                            after: { val: stored, kind: "Value", formula: null } });
+        n++;
+      }
+      redoStack = []; refreshUndoRedoButtons();
+      appendLog(`[xlsx-import] ${n} cell(s) loaded` +
+                (skipped ? `, ${skipped} skipped (out of bounds — try 📐 Resize)` : ""));
+      return n;
+    }
+    document.getElementById("btnImportXlsx").addEventListener("click", () => {
+      document.getElementById("xlsxFile").click();
+    });
+    document.getElementById("xlsxFile").addEventListener("change", async e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const buf = new Uint8Array(await file.arrayBuffer());
+      await importXlsx(buf);
+      e.target.value = "";
+    });
 
     // ─── U10: find / replace ────────────────────────────────────
     // Find walks the current sheetState.cells and matches by
