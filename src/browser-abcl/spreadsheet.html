@@ -3457,46 +3457,66 @@
     // For every cell in the cf range that satisfies (cell op value),
     // paint that cell's background.  Cleared with the "clear" button.
     function cfApply(color) {
-      const rg = parseRangeStr(document.getElementById("cfRange").value);
-      if (!rg) { appendLog("[cf] invalid range"); return; }
-      const op  = document.getElementById("cfOp"   ).value;
-      const raw = document.getElementById("cfValue").value;
-      const num = Number(raw);
-      const numeric = raw !== "" && !Number.isNaN(num);
+      // F8-followup: prefer the LIVE selection over the cf range input.
+      // 1) If the user has a drag-range overlay, use that.
+      // 2) Else if a single cell is selected, paint just that cell.
+      // 3) Else fall back to the cfRange textbox (legacy behaviour).
       const runtime = interp && interp.runtime;
       if (!runtime) return;
+      const s = runtime.sheetState;
+      let rg = null;
+      if (s && s.selRange) {
+        rg = { r0: s.selRange.r0, c0: s.selRange.c0,
+               r1: s.selRange.r1, c1: s.selRange.c1 };
+      } else if (selectedRC) {
+        rg = { r0: selectedRC.row, c0: selectedRC.col,
+               r1: selectedRC.row, c1: selectedRC.col };
+      } else {
+        rg = parseRangeStr(document.getElementById("cfRange").value);
+        if (!rg) { appendLog("[cf] no selection and no valid range"); return; }
+      }
+      const op  = document.getElementById("cfOp"   ).value;
+      const raw = document.getElementById("cfValue").value;
+      const conditional = raw !== "";       // empty value → paint unconditionally
+      const num = Number(raw);
+      const numeric = conditional && !Number.isNaN(num);
       let painted = 0, cleared = 0;
       for (let r = rg.r0; r <= rg.r1; r++) {
         for (let c = rg.c0; c <= rg.c1; c++) {
-          const v = cellValues.get(pairToId(c, r));
-          let hit = false;
-          if (op === "contains") {
-            hit = String(v ?? "").toLowerCase().includes(raw.toLowerCase());
-          } else if (numeric && typeof v === "number") {
-            switch (op) {
-              case ">":  hit = v >  num; break;
-              case ">=": hit = v >= num; break;
-              case "<":  hit = v <  num; break;
-              case "<=": hit = v <= num; break;
-              case "=":  hit = v === num; break;
-            }
+          let hit;
+          if (!conditional) {
+            // No condition → unconditionally paint every cell in the range.
+            hit = true;
           } else {
-            // Non-numeric comparison — string-lex.
-            const sv = String(v ?? "");
-            switch (op) {
-              case ">":  hit = sv >  raw; break;
-              case ">=": hit = sv >= raw; break;
-              case "<":  hit = sv <  raw; break;
-              case "<=": hit = sv <= raw; break;
-              case "=":  hit = sv === raw; break;
+            const v = cellValues.get(pairToId(c, r));
+            hit = false;
+            if (op === "contains") {
+              hit = String(v ?? "").toLowerCase().includes(raw.toLowerCase());
+            } else if (numeric && typeof v === "number") {
+              switch (op) {
+                case ">":  hit = v >  num; break;
+                case ">=": hit = v >= num; break;
+                case "<":  hit = v <  num; break;
+                case "<=": hit = v <= num; break;
+                case "=":  hit = v === num; break;
+              }
+            } else {
+              const sv = String(v ?? "");
+              switch (op) {
+                case ">":  hit = sv >  raw; break;
+                case ">=": hit = sv >= raw; break;
+                case "<":  hit = sv <  raw; break;
+                case "<=": hit = sv <= raw; break;
+                case "=":  hit = sv === raw; break;
+              }
             }
           }
           if (hit) {
             runtime._callBuiltin("sheet_cell_bg", [r, c, color],
                                  { __currentActor: null });
             painted++;
-          } else {
-            // If the rule clears this cell's bg only if it was prev set.
+          } else if (conditional) {
+            // Conditional + no-match → clear any prior bg on this cell.
             const had = runtime.sheetState.cellBgs && runtime.sheetState.cellBgs.has(r + "," + c);
             if (had) {
               runtime._callBuiltin("sheet_cell_bg", [r, c, ""],
@@ -3506,7 +3526,9 @@
           }
         }
       }
-      appendLog(`[cf ${color}] ${op} ${raw}  →  painted=${painted} cleared=${cleared}`);
+      const tgt = `${cellId(rg.r0, rg.c0)}:${cellId(rg.r1, rg.c1)}`;
+      appendLog(`[cf ${color}] ${tgt} ${conditional ? `${op} ${raw} ` : ""}` +
+                `→ painted=${painted}` + (cleared ? ` cleared=${cleared}` : ""));
     }
     function cfClearAll() {
       const runtime = interp && interp.runtime;
