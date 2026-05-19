@@ -186,6 +186,31 @@
       </div>
     </div>
 
+    <!-- A4: scenario selector — swap the initial survivor distribution -->
+    <div class="panel">
+      <h2>Scenario <span class="pill" id="scenarioPill">Table 1 · 349 survivors</span></h2>
+      <select id="scenarioSel"
+              style="width:100%;background:#181828;color:#fff;border:1px solid var(--line-dim);
+                     padding:4px;font:inherit;font-size:12px;border-radius:2px;">
+        <option value="table1">Table 1 (paper, 349 survivors)</option>
+        <option value="empty">All empty (0 survivors)</option>
+        <option value="random">Random (seeded)</option>
+        <option value="custom">Custom (JSON)</option>
+      </select>
+      <div id="scenarioRandomRow" class="slider-row" style="display:none;margin-top:6px">
+        <span style="min-width:28px">seed</span>
+        <input type="number" id="scenarioSeed" value="42"
+               style="width:70px;background:#181828;color:#fff;border:1px solid var(--line-dim);padding:2px 4px;font-family:monospace">
+        <button id="btnRandomApply" style="font-size:10px;padding:3px 8px">apply</button>
+      </div>
+      <div id="scenarioCustomRow" style="display:none;margin-top:6px">
+        <textarea id="scenarioCustom" rows="3"
+                  placeholder='{"1":10,"2":20,"5":15,...}'
+                  style="width:100%;box-sizing:border-box;background:#181828;color:var(--ink);border:1px solid var(--line-dim);font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:4px;resize:vertical"></textarea>
+        <button id="btnCustomApply" style="font-size:10px;padding:3px 8px;margin-top:4px">apply</button>
+      </div>
+    </div>
+
     <div class="panel">
       <h2>Mission Status</h2>
       <div class="row"><span class="k">Phase</span><span class="v" id="phase">IDLE</span></div>
@@ -376,8 +401,14 @@ for (const [a,b] of EDGES){
 }
 
 /* ── initial survivor counts (Table 1, "誘導前") ── */
-const INITIAL = {1:15,2:30,3:0,4:0,5:25,6:30,7:0,8:10,9:25,10:5,
-                 11:40,12:35,13:0,14:0,15:0,16:12,17:20,18:25,19:32,20:45};
+/* A4: INITIAL is now a swappable preset.  SCENARIO_TABLE1 keeps
+   the paper's Table-1 values pristine; INITIAL points at whichever
+   preset the Scenario dropdown currently selects. */
+const SCENARIO_TABLE1 = Object.freeze({
+  1:15,2:30,3:0,4:0,5:25,6:30,7:0,8:10,9:25,10:5,
+  11:40,12:35,13:0,14:0,15:0,16:12,17:20,18:25,19:32,20:45
+});
+let INITIAL = {...SCENARIO_TABLE1};
 let pts = {};               // current survivors at each point
 let priority = {};          // current priority value
 /* A1: priority-weight coefficients are now adjustable at runtime
@@ -504,7 +535,12 @@ function resetSim(){
   // UAV2 idles at A until first task assigned
   uav2.setPath(['A']);
   statsReset();
-  log('SYS','SIMULATION INITIALISED · 349 survivors across 14 occupied points');
+  // Stats / log lines reflect the active scenario, not the paper default.
+  let _tot = 0, _occ = 0;
+  for (let i = 1; i <= 20; i++) { const v = INITIAL[i] || 0; _tot += v; if (v > 0) _occ++; }
+  log('SYS', `SIMULATION INITIALISED · ${_tot} survivors across ${_occ} occupied points`);
+  const tb = document.querySelector('#ptable tbody');
+  if (tb) tb._built = false;   // force rebuild so "Before" column matches new INITIAL
   refreshTable();
   updateHUD();
 }
@@ -969,6 +1005,76 @@ document.getElementById('btnParamReset').addEventListener('click', () => {
 setInterval(()=>{
   document.getElementById('clock').textContent = new Date().toTimeString().slice(0,8);
 },1000);
+
+/* ── A4: scenario selector ──
+   The dropdown swaps INITIAL between four presets:
+     table1  — paper's Table 1 (349 survivors)
+     empty   — every point 0 survivors
+     random  — seeded LCG, 0..49 per point
+     custom  — user-pasted JSON {"1":15,"2":30,...}
+   On every preset apply, resetSim() runs so the chart, table,
+   AIPL canvas and HUD all reflect the new starting distribution. */
+function scenarioEmpty(){
+  const o = {}; for (let i = 1; i <= 20; i++) o[i] = 0; return o;
+}
+function scenarioRandom(seed){
+  // LCG (Numerical Recipes constants) so the run is reproducible.
+  let s = (seed >>> 0) || 1;
+  const r = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x1_0000_0000; };
+  const o = {};
+  for (let i = 1; i <= 20; i++) {
+    // 65% chance of a non-empty point; counts skew small (0..49).
+    o[i] = r() < 0.65 ? Math.floor(r() * 50) : 0;
+  }
+  return o;
+}
+function scenarioCustom(raw){
+  let parsed; try { parsed = JSON.parse(raw); }
+  catch (e) { log('SYS', '[scenario] invalid JSON: ' + e.message, 'ev'); return null; }
+  if (!parsed || typeof parsed !== 'object') {
+    log('SYS', '[scenario] expected JSON object', 'ev'); return null;
+  }
+  const o = {};
+  for (let i = 1; i <= 20; i++) {
+    const v = parsed[i] ?? parsed[String(i)];
+    o[i] = Number.isFinite(+v) ? Math.max(0, Math.floor(+v)) : 0;
+  }
+  return o;
+}
+function applyScenario(kind, opts){
+  let next = null, label = '';
+  if (kind === 'table1') { next = {...SCENARIO_TABLE1}; label = 'Table 1'; }
+  else if (kind === 'empty')  { next = scenarioEmpty();         label = 'All empty'; }
+  else if (kind === 'random') {
+    next = scenarioRandom(opts.seed); label = `Random seed=${opts.seed}`;
+  }
+  else if (kind === 'custom') { next = scenarioCustom(opts.raw); label = 'Custom'; }
+  if (!next) return false;
+  INITIAL = next;
+  let tot = 0, occ = 0;
+  for (let i = 1; i <= 20; i++) { const v = next[i] || 0; tot += v; if (v > 0) occ++; }
+  document.getElementById('scenarioPill').textContent = `${label} · ${tot} survivors`;
+  // Wipe the chart + log before re-init so the panels mirror the new run.
+  document.getElementById('log').innerHTML = '';
+  resetSim();
+  log('SYS', `[scenario] → ${label}  (${tot} survivors / ${occ} occupied)`, 'ev');
+  return true;
+}
+document.getElementById('scenarioSel').addEventListener('change', e => {
+  const v = e.target.value;
+  document.getElementById('scenarioRandomRow').style.display = v === 'random' ? 'flex' : 'none';
+  document.getElementById('scenarioCustomRow').style.display = v === 'custom' ? 'block' : 'none';
+  if (v === 'table1' || v === 'empty') applyScenario(v);
+  else if (v === 'random') applyScenario('random', {
+    seed: +document.getElementById('scenarioSeed').value || 42
+  });
+});
+document.getElementById('btnRandomApply').addEventListener('click', () => {
+  applyScenario('random', { seed: +document.getElementById('scenarioSeed').value || 42 });
+});
+document.getElementById('btnCustomApply').addEventListener('click', () => {
+  applyScenario('custom', { raw: document.getElementById('scenarioCustom').value });
+});
 
 /* ─────────────────────────────────────────────────────────────
    3D wireframe view (Three.js) — shares state with 2D simulator
