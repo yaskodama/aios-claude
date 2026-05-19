@@ -567,24 +567,97 @@ function recomputePriorities(){
   }
 }
 
-// UAV1 sweep — visit every patrol point in a heuristic order from start node
-function planSweep(start){
-  const remaining = new Set(NODES.filter(n=>!n.shelter).map(n=>n.id));
+// UAV1 sweep — visit every patrol point in a heuristic order from start node.
+// A2: TSP-lite (nearest-neighbor seed + 2-opt) with optional priority bias
+//     so high-priority points migrate toward the front of the route, and
+//     the expanded path is de-duplicated so no patrol point is visited
+//     twice within one sweep.
+//
+//   options.greedy = true : keep the original nearest-neighbor algorithm
+//                            (kept for the A2 smoke's length comparison).
+function planSweep(start, options){
+  const greedy = !!(options && options.greedy);
+  const targets = NODES.filter(n => !n.shelter).map(n => n.id);
+
+  // Pre-cache dijkstra distances from every target + start (small graph, OK).
+  const distCache = new Map();
+  const distFrom = id => {
+    if (!distCache.has(id)) distCache.set(id, dijkstra(id).dist);
+    return distCache.get(id);
+  };
+
+  // ── Step 1: nearest-neighbor seed (optionally priority-biased).
+  const hasPri = !greedy && targets.some(id => (priority[id] || 0) > 0);
+  const visited = new Set();
+  const seq = [start];
   let cur = start;
-  const order=[start];
-  while(remaining.size){
-    const {dist,prev} = dijkstra(cur);
-    let best=null,bd=Infinity;
-    for (const id of remaining){ if(dist.get(id)<bd){bd=dist.get(id);best=id;} }
-    const seg = pathTo(prev,best); seg.shift();
-    order.push(...seg);
-    cur=best;
-    remaining.delete(best);
+  while (visited.size < targets.length){
+    const d = distFrom(cur);
+    let best = null, bestKey = Infinity;
+    for (const id of targets){
+      if (visited.has(id)) continue;
+      const dist = d.get(id);
+      // High-priority targets feel "closer" by ~500 px per priority unit
+      // (typical edge length is ~150-300 px; natural priorities are 1-3
+      // so the bias is comparable to a one-hop discount, while large
+      // explicit boosts dominate.)
+      const key = hasPri ? dist - (priority[id] || 0) * 500 : dist;
+      if (key < bestKey){ bestKey = key; best = id; }
+    }
+    visited.add(best);
+    cur = best;
+    seq.push(best);
   }
-  // return home to A so cycle can repeat
-  const {prev} = dijkstra(cur);
-  const back = pathTo(prev,'A'); back.shift();
-  order.push(...back);
+
+  // ── Step 2: 2-opt improvement on the target order (skipped in greedy
+  // mode AND when priority is biasing the NN — 2-opt minimises pure
+  // distance and would otherwise undo the priority-first ordering).
+  if (!greedy && !hasPri){
+    const tourLen = s => {
+      let L = 0;
+      for (let i = 0; i + 1 < s.length; i++) L += distFrom(s[i]).get(s[i+1]);
+      return L;
+    };
+    let bestLen = tourLen(seq);
+    let improved = true, iters = 0;
+    while (improved && iters++ < 20){
+      improved = false;
+      for (let i = 1; i < seq.length - 2; i++){
+        for (let j = i + 1; j < seq.length - 1; j++){
+          const cand = seq.slice(0, i)
+            .concat(seq.slice(i, j + 1).reverse())
+            .concat(seq.slice(j + 1));
+          const L = tourLen(cand);
+          if (L < bestLen - 1e-9){
+            seq.splice(0, seq.length, ...cand);
+            bestLen = L; improved = true;
+          }
+        }
+      }
+    }
+  }
+
+  // ── Step 3: expand the target order into a graph-following waypoint list,
+  // de-duplicating any non-shelter ID so each point is visited at most once.
+  const order = [seq[0]];
+  const seen = new Set([seq[0]]);
+  for (let i = 0; i + 1 < seq.length; i++){
+    const {prev} = dijkstra(seq[i]);
+    const segPath = pathTo(prev, seq[i + 1]);
+    segPath.shift();
+    for (const id of segPath){
+      if (!N(id).shelter && seen.has(id)) continue;
+      order.push(id);
+      seen.add(id);
+    }
+  }
+  // Return home to A (allowed even if A already appears at order[0]).
+  const {prev: backPrev} = dijkstra(seq[seq.length - 1]);
+  const back = pathTo(backPrev, 'A'); back.shift();
+  for (const id of back){
+    if (!N(id).shelter && seen.has(id)) continue;
+    order.push(id); seen.add(id);
+  }
   return order;
 }
 
