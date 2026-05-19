@@ -569,6 +569,32 @@ export class Runtime {
         this._redrawCanvas();
         break;
       }
+      // F9: corner indicator for cells carrying a comment.  hasNote
+      // is 1/true to set, 0/false (or empty) to clear.
+      case "sheet_cell_note": {
+        if (!this.sheetState) break;
+        const row = Number(args[0]), col = Number(args[1]);
+        const has = !!args[2];
+        if (!this.sheetState.cellNotes) this.sheetState.cellNotes = new Set();
+        const key = row + "," + col;
+        if (has) this.sheetState.cellNotes.add(key);
+        else     this.sheetState.cellNotes.delete(key);
+        this._redrawCanvas();
+        break;
+      }
+      // F8: per-cell background fill for conditional formatting.
+      // color = "" or null clears.
+      case "sheet_cell_bg": {
+        if (!this.sheetState) break;
+        const row = Number(args[0]), col = Number(args[1]);
+        const color = (args[2] == null || args[2] === "") ? null : String(args[2]);
+        if (!this.sheetState.cellBgs) this.sheetState.cellBgs = new Map();
+        const key = row + "," + col;
+        if (color) this.sheetState.cellBgs.set(key, color);
+        else       this.sheetState.cellBgs.delete(key);
+        this._redrawCanvas();
+        break;
+      }
       // U5: rectangular drag-selection highlight.  Coordinates may
       // arrive in any order (dragged up-left from down-right); we
       // normalize before storing.  r1=c1=-1 clears.
@@ -860,6 +886,21 @@ export class Runtime {
     ctx.fillStyle = "#fdfdfd";
     ctx.fillRect(x0 - 6, y0 - 6, totW + 12, totH + 12);
 
+    // F8: conditional-format backgrounds — drawn FIRST so the
+    // selection tints can sit on top of them.
+    if (s.cellBgs) {
+      for (const [key, color] of s.cellBgs) {
+        const [r, c] = key.split(",").map(Number);
+        if (r >= 0 && r < s.rows && c >= 0 && c < s.cols) {
+          ctx.fillStyle = color;
+          ctx.fillRect(
+            x0 + (c + 1) * cw,
+            y0 + (r + 1) * ch,
+            cw, ch
+          );
+        }
+      }
+    }
     // ── Layer 1: selection highlight (drawn first so it sits under
     //              grid lines and text). ───────────────────────
     // U5: a drag-range, if present, paints a softer fill across the
@@ -950,6 +991,22 @@ export class Runtime {
       const py = y0 + (c.row + 1) * ch + ch / 2;
       ctx.fillStyle = c.kind === "Formula" ? "#2255aa" : "#222";
       ctx.fillText(c.val, px, py);
+    }
+    // F9: paint a tiny red corner triangle on cells with comments.
+    if (s.cellNotes && s.cellNotes.size > 0) {
+      ctx.fillStyle = "#c33";
+      for (const key of s.cellNotes) {
+        const [r, col] = key.split(",").map(Number);
+        if (r < 0 || r >= s.rows || col < 0 || col >= s.cols) continue;
+        const x = x0 + (col + 2) * cw - 8;
+        const y = y0 + (r   + 1) * ch + 1;
+        ctx.beginPath();
+        ctx.moveTo(x,     y);
+        ctx.lineTo(x + 8, y);
+        ctx.lineTo(x + 8, y + 8);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     // Footer caption

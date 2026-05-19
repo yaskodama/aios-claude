@@ -26,6 +26,24 @@
     #formatMenu option { background: #1a1a2a; }
     #rangeRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
     #findRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #cfRow    { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #noteRow  { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #noteInput { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
+    /* D4: print stylesheet — render just the canvas grid on the page. */
+    @media print {
+      body { background: white !important; color: black !important; }
+      h1, p, nav, #controls, #log, #chart, #findRow, #cfRow, #noteRow,
+      #sheetIdRow, #formatRow, #rangeRow, #resizeRow, #cellLabel + input,
+      #cellLabel, #formulaBar, #frozenHeader {
+        display: none !important;
+      }
+      #canvas {
+        background: white !important;
+        border: 1px solid #000;
+        max-width: 100% !important;
+      }
+    }
+    #cfRange, #cfValue { background:#181828; color:#fff; border:1px solid #335; padding:3px 6px; font-family:monospace; }
     #findInput, #replaceInput { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; }
     #rangeLabel { color: #aef; font-size: 0.78rem; }
     #rangeInput { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 140px; }
@@ -74,6 +92,12 @@
     <span style="color:#7aa;">selected cell = pale blue</span>
   </div>
 
+  <div id="frozenHeader" style="display:none; position:sticky; top:0; z-index:50; background:#0a0a1a; padding:4px 0; border-bottom:1px solid #335; overflow:hidden;">
+    <div id="frozenHeaderInner" style="display:flex; height:24px; align-items:center;"></div>
+  </div>
+  <label style="color:#aac; font-size:0.85rem;">
+    <input id="freezeCb" type="checkbox"> freeze first row
+  </label>
   <canvas id="canvas" width="720" height="380"></canvas>
 
   <div id="formulaRow">
@@ -109,6 +133,31 @@
     </select>
   </div>
 
+  <div id="noteRow">
+    <span style="color:#aac; font-size:0.85rem;">note:</span>
+    <input id="noteInput" type="text" placeholder="(comment for selected cell)" style="width:400px;">
+    <button id="btnSaveNote" title="Save / replace the comment on the selected cell">📝 save</button>
+    <button id="btnClearNote" title="Remove the comment from the selected cell">🗑 clear</button>
+  </div>
+
+  <div id="cfRow">
+    <span style="color:#aac; font-size:0.85rem;">cf:</span>
+    <input id="cfRange" type="text" value="A1:C3" style="width:80px" placeholder="range">
+    <select id="cfOp">
+      <option value=">">&gt;</option>
+      <option value=">=">&gt;=</option>
+      <option value="<">&lt;</option>
+      <option value="<=">&lt;=</option>
+      <option value="=">=</option>
+      <option value="contains">contains</option>
+    </select>
+    <input id="cfValue" type="text" value="100" style="width:80px" placeholder="value">
+    <button id="cfRed"    style="background:#5a1818; color:#fcc;">red</button>
+    <button id="cfYellow" style="background:#5a5018; color:#ffc;">yellow</button>
+    <button id="cfGreen"  style="background:#185a30; color:#cfc;">green</button>
+    <button id="cfClear"  style="background:#222;">clear</button>
+  </div>
+
   <div id="findRow">
     <span id="findLabel">find:</span>
     <input id="findInput" type="text" placeholder="text or number…" style="width:140px">
@@ -130,6 +179,8 @@
       <option value="line">line</option>
       <option value="pie">pie</option>
     </select>
+    <button id="btnFillDown" title="Fill the range downward with the top row's values">📋 Fill ↓</button>
+    <button id="btnFillSeries" title="Arithmetic series: extends row 0 → row 1 delta down the range">🔢 Series</button>
     <button id="btnChart"    title="Render chart of the selected range">📊 Chart</button>
   </div>
 
@@ -151,6 +202,7 @@
     <button id="btnImportCsv"  title="Import a CSV file into the grid starting at A1">📥 CSV ↑</button>
     <button id="btnExportXlsx" title="Download the current grid as an XLSX (Excel) file">📤 XLSX ↓</button>
     <button id="btnImportXlsx" title="Import an XLSX file into the grid starting at A1">📥 XLSX ↑</button>
+    <button id="btnPrint"      title="Open the browser print dialog (Save as PDF)">📄 PDF</button>
     <input  id="xlsxFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
     <input  id="csvFile" type="file" accept=".csv,text/csv" style="display:none">
     <button id="btnShowSrc">Show ABCL source</button>
@@ -825,6 +877,9 @@
       cellLabel.textContent = id;
       formulaBar.value = cellFormulas.get(id) ?? (cellValues.get(id) ?? "");
       document.getElementById("formatMenu").value = cellFormats.get(id) || "general";
+      // F9: surface this cell's comment (if any) in the note input.
+      const noteEl = document.getElementById("noteInput");
+      if (noteEl) noteEl.value = cellNotes.get(id) || "";
       // U10: find/replace navigation keeps focus on findInput so a
       // burst of Enter presses cycles matches without bouncing into
       // the formula bar's commit handler.
@@ -1038,6 +1093,8 @@
       // picks it up.  (cellW falls out of canvas-width / (cols+1).)
       const s = interp && interp.runtime && interp.runtime.sheetState;
       if (s) s.cellH = rowH;
+      // U11: keep the sticky header bar in sync with the canvas.
+      if (typeof refreshFrozenHeader === "function") refreshFrozenHeader();
     }
     document.getElementById("btnResize").addEventListener("click", () => {
       const runtime = interp && interp.runtime;
@@ -1393,6 +1450,15 @@
         // D3 test hooks for XLSX parsing/import.
         parseXlsx:   (bytes) => parseXlsx(bytes),
         importXlsx:  (bytes, anchor) => importXlsx(bytes, anchor),
+        // F8/F9 test hooks for the canvas-side state.
+        get cellBgs() {
+          return interp.runtime.sheetState.cellBgs || new Map();
+        },
+        get cellNotes() {
+          return interp.runtime.sheetState.cellNotes || new Set();
+        },
+        // Test hook to drive the module-scoped selectedRC from page.evaluate.
+        setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
         get findHits()   { return findHits.slice(); },
         get findCursor() { return findCursor; },
@@ -1847,6 +1913,38 @@
                 (skipped ? `, ${skipped} skipped (out of bounds — try 📐 Resize)` : ""));
       return n;
     }
+    // ─── U11: sticky frozen header ─────────────────────────────
+    // A small HTML strip ABOVE the canvas mirrors the column letters
+    // and stays visible while the page scrolls vertically.  Width
+    // matches the current canvas so horizontal scroll lines up.
+    function refreshFrozenHeader() {
+      const cb = document.getElementById("freezeCb");
+      const wrap = document.getElementById("frozenHeader");
+      if (!cb || !wrap) return;
+      if (!cb.checked) { wrap.style.display = "none"; return; }
+      wrap.style.display = "";
+      const s = interp && interp.runtime && interp.runtime.sheetState;
+      if (!s) return;
+      const W  = document.getElementById("canvas").width;
+      const cw = Math.floor((W - 60) / (s.cols + 1));
+      const inner = document.getElementById("frozenHeaderInner");
+      inner.innerHTML = "";
+      inner.style.width = W + "px";
+      // Row-header placeholder (lines up with the left column).
+      const rh = document.createElement("div");
+      rh.style.cssText = `width:${cw + 30}px; flex-shrink:0;`;
+      inner.appendChild(rh);
+      for (let c = 0; c < s.cols; c++) {
+        const d = document.createElement("div");
+        d.textContent = colToLetters(c);
+        d.style.cssText = `width:${cw}px; flex-shrink:0; text-align:center; ` +
+                          `color:#aac; font-family:monospace; font-size:13px; ` +
+                          `border-right:1px solid #233;`;
+        inner.appendChild(d);
+      }
+    }
+    document.getElementById("freezeCb").addEventListener("change", refreshFrozenHeader);
+
     document.getElementById("btnImportXlsx").addEventListener("click", () => {
       document.getElementById("xlsxFile").click();
     });
@@ -2489,6 +2587,162 @@
     });
     document.getElementById("btnChart").addEventListener("click", () => {
       renderChart(document.getElementById("rangeInput").value);
+    });
+
+    // ─── U12: drag-fill — copy row 0 down (Fill ↓) or extend the
+    // row 0 → row 1 delta as an arithmetic series (Series).
+    function fillRange(mode) {
+      const rg = parseRangeStr(document.getElementById("rangeInput").value);
+      if (!rg) { appendLog("[fill] invalid range"); return; }
+      const { r0, r1, c0, c1 } = rg;
+      if (r1 === r0) { appendLog("[fill] range needs >1 row"); return; }
+      // Take row r0 as the template for every column.
+      const seed   = [];   // first-row values per column (numeric where possible)
+      const delta  = [];   // per-column arithmetic delta (mode === "series")
+      for (let c = c0; c <= c1; c++) {
+        const sv = cellValues.get(pairToId(c, r0));
+        const nv = Number(sv);
+        seed.push((sv !== "" && !Number.isNaN(nv)) ? nv : sv);
+        if (mode === "series" && r1 > r0 + 1) {
+          const s2 = cellValues.get(pairToId(c, r0 + 1));
+          const n2 = Number(s2);
+          if (!Number.isNaN(nv) && !Number.isNaN(n2)) delta.push(n2 - nv);
+          else delta.push(null);    // non-numeric column → copy-fill
+        } else delta.push(null);
+      }
+      const startDr = (mode === "series" && r1 > r0 + 1) ? 2 : 1;
+      let n = 0;
+      for (let dr = startDr; dr <= r1 - r0; dr++) {
+        for (let dc = 0; dc <= c1 - c0; dc++) {
+          const row = r0 + dr, col = c0 + dc;
+          const sd = seed[dc];
+          const dl = delta[dc];
+          const val = (mode === "series" && dl !== null) ? (Number(sd) + dr * dl) : sd;
+          const id  = cellId(row, col);
+          const before = {
+            val:     cellValues.get(id),
+            kind:    cellFormulas.has(id) ? "Formula" : "Value",
+            formula: cellFormulas.get(id) || null,
+          };
+          applyCellChange(row, col, val, "Value", null);
+          historyStack.push({ row, col, id, before,
+                              after: { val, kind: "Value", formula: null } });
+          n++;
+        }
+      }
+      redoStack = []; refreshUndoRedoButtons();
+      appendLog(`[fill ${mode}] ${n} cell(s) in range ${cellId(r0,c0)}:${cellId(r1,c1)}`);
+    }
+    document.getElementById("btnFillDown").addEventListener("click",
+      () => fillRange("down"));
+    document.getElementById("btnFillSeries").addEventListener("click",
+      () => fillRange("series"));
+
+    // ─── F8: conditional formatting ────────────────────────────
+    // For every cell in the cf range that satisfies (cell op value),
+    // paint that cell's background.  Cleared with the "clear" button.
+    function cfApply(color) {
+      const rg = parseRangeStr(document.getElementById("cfRange").value);
+      if (!rg) { appendLog("[cf] invalid range"); return; }
+      const op  = document.getElementById("cfOp"   ).value;
+      const raw = document.getElementById("cfValue").value;
+      const num = Number(raw);
+      const numeric = raw !== "" && !Number.isNaN(num);
+      const runtime = interp && interp.runtime;
+      if (!runtime) return;
+      let painted = 0, cleared = 0;
+      for (let r = rg.r0; r <= rg.r1; r++) {
+        for (let c = rg.c0; c <= rg.c1; c++) {
+          const v = cellValues.get(pairToId(c, r));
+          let hit = false;
+          if (op === "contains") {
+            hit = String(v ?? "").toLowerCase().includes(raw.toLowerCase());
+          } else if (numeric && typeof v === "number") {
+            switch (op) {
+              case ">":  hit = v >  num; break;
+              case ">=": hit = v >= num; break;
+              case "<":  hit = v <  num; break;
+              case "<=": hit = v <= num; break;
+              case "=":  hit = v === num; break;
+            }
+          } else {
+            // Non-numeric comparison — string-lex.
+            const sv = String(v ?? "");
+            switch (op) {
+              case ">":  hit = sv >  raw; break;
+              case ">=": hit = sv >= raw; break;
+              case "<":  hit = sv <  raw; break;
+              case "<=": hit = sv <= raw; break;
+              case "=":  hit = sv === raw; break;
+            }
+          }
+          if (hit) {
+            runtime._callBuiltin("sheet_cell_bg", [r, c, color],
+                                 { __currentActor: null });
+            painted++;
+          } else {
+            // If the rule clears this cell's bg only if it was prev set.
+            const had = runtime.sheetState.cellBgs && runtime.sheetState.cellBgs.has(r + "," + c);
+            if (had) {
+              runtime._callBuiltin("sheet_cell_bg", [r, c, ""],
+                                   { __currentActor: null });
+              cleared++;
+            }
+          }
+        }
+      }
+      appendLog(`[cf ${color}] ${op} ${raw}  →  painted=${painted} cleared=${cleared}`);
+    }
+    function cfClearAll() {
+      const runtime = interp && interp.runtime;
+      if (!runtime || !runtime.sheetState || !runtime.sheetState.cellBgs) return;
+      const n = runtime.sheetState.cellBgs.size;
+      runtime.sheetState.cellBgs.clear();
+      runtime._redrawCanvas();
+      appendLog(`[cf clear] cleared ${n} cell(s)`);
+    }
+    document.getElementById("cfRed"   ).addEventListener("click", () => cfApply("#7a1818"));
+    document.getElementById("cfYellow").addEventListener("click", () => cfApply("#7a6e1a"));
+    document.getElementById("cfGreen" ).addEventListener("click", () => cfApply("#186a32"));
+    document.getElementById("cfClear" ).addEventListener("click", cfClearAll);
+
+    // ─── F9: per-cell comments ─────────────────────────────────
+    const cellNotes = new Map();   // cellId → text
+    function saveNote() {
+      if (!selectedRC) { appendLog("[note] no cell selected"); return; }
+      const txt = document.getElementById("noteInput").value;
+      const id  = cellId(selectedRC.row, selectedRC.col);
+      if (txt) {
+        cellNotes.set(id, txt);
+        interp.runtime._callBuiltin("sheet_cell_note",
+          [selectedRC.row, selectedRC.col, 1], { __currentActor: null });
+        appendLog(`[note set] ${id} — "${txt.slice(0, 50)}${txt.length > 50 ? "…" : ""}"`);
+      } else {
+        cellNotes.delete(id);
+        interp.runtime._callBuiltin("sheet_cell_note",
+          [selectedRC.row, selectedRC.col, 0], { __currentActor: null });
+        appendLog(`[note cleared] ${id}`);
+      }
+    }
+    function clearNote() {
+      if (!selectedRC) return;
+      const id = cellId(selectedRC.row, selectedRC.col);
+      cellNotes.delete(id);
+      document.getElementById("noteInput").value = "";
+      interp.runtime._callBuiltin("sheet_cell_note",
+        [selectedRC.row, selectedRC.col, 0], { __currentActor: null });
+      appendLog(`[note cleared] ${id}`);
+    }
+    document.getElementById("btnSaveNote" ).addEventListener("click", saveNote);
+    document.getElementById("btnClearNote").addEventListener("click", clearNote);
+
+    // ─── D4: Print / Save-as-PDF ───────────────────────────────
+    // Defer to the browser's print dialog with a print-only CSS
+    // stylesheet (@media print above) that hides everything except
+    // the canvas grid.  Users can then "Save as PDF" from the dialog.
+    document.getElementById("btnPrint").addEventListener("click", () => {
+      appendLog(`[pdf] opened print dialog (use "Save as PDF")`);
+      window.print();
     });
 
     refreshUndoRedoButtons();

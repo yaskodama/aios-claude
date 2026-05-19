@@ -60,6 +60,11 @@
 | F7  | String / mixed-type comparisons + `=` and `<>` operators | `src/browser-abcl/spreadsheet.html` tokenizer + cmp/cmpEq | ✅ 16 assertion |
 | U10 | Find / Replace / Replace-all (substring, Enter cycles hits) | `src/browser-abcl/spreadsheet.html` refreshFind / replaceOne / replaceAll | ✅ 10 assertion |
 | D3  | XLSX import — store + DEFLATE, sharedStrings, inlineStr | `src/browser-abcl/spreadsheet.html` unzip / parseXlsx / importXlsx | ✅ 15 assertion |
+| U11 | Sticky column-header bar above the canvas (toggle) | `src/browser-abcl/spreadsheet.html` refreshFrozenHeader | ✅ 3 assertion |
+| U12 | Fill-down + arithmetic-series fill across a range | `src/browser-abcl/spreadsheet.html` fillRange | ✅ 5 assertion |
+| F8  | Conditional formatting (>, ≥, <, ≤, =, contains → 3 colors) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_cell_bg | ✅ 4 assertion |
+| F9  | Per-cell comments + red corner indicator | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_cell_note | ✅ 2 assertion |
+| D4  | Print / Save-as-PDF via @media print stylesheet | `src/browser-abcl/spreadsheet.html` btnPrint + @media | ✅ 2 assertion |
 
 ## smoke
 
