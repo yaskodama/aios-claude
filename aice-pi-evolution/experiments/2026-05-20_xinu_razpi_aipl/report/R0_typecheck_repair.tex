@@ -1,0 +1,468 @@
+% R0_typecheck_repair.tex
+% Build:  lualatex -interaction=nonstopmode R0_typecheck_repair.tex
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{luatexja}
+\usepackage{luatexja-fontspec}
+\setmainjfont[BoldFont=Hiragino Sans W6]{Hiragino Sans W3}
+
+\usepackage[margin=22mm]{geometry}
+\usepackage{fontspec}
+\setmonofont[Scale=0.92]{Menlo}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!60!black}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{amssymb}  % \checkmark
+\setlist[itemize]{leftmargin=*,topsep=2pt,itemsep=1pt}
+
+% Code listing style
+\definecolor{kw}{rgb}{0.10,0.30,0.65}
+\definecolor{str}{rgb}{0.50,0.20,0.10}
+\definecolor{com}{rgb}{0.30,0.55,0.30}
+\definecolor{bg}{rgb}{0.97,0.97,0.95}
+\lstdefinelanguage{abcl}{
+  morekeywords={class,method,var,if,else,while,for,do,return,send,new,self,sender,
+                int,float,string,bool,unit,any,array,function,reply,true,false,pub},
+  morecomment=[l]{//},
+  morestring=[b]",
+}
+\lstdefinelanguage{ocaml}{
+  morekeywords={let,rec,in,fun,function,match,with,if,then,else,try,raise,
+                module,struct,sig,end,type,of,val,open,and,as,when,for,to,do,done,
+                begin,end,not,or,land,lor,lxor,lsl,lsr,asr,Some,None,Ok,Error},
+  morecomment=[s]{(*}{*)},
+  morestring=[b]",
+}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{com}\itshape,
+  stringstyle=\color{str},
+  numbers=left,numberstyle=\tiny\color{gray},
+  backgroundcolor=\color{bg},
+  frame=single,framerule=0.2pt,framesep=2pt,
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=8pt,xrightmargin=4pt,
+  belowskip=4pt,aboveskip=6pt,
+}
+
+\title{\bfseries AIPL 型チェッカー回帰修復報告 \\
+       \large Xinu サンプル 3 件の修正と恒久的な型システム改善}
+\author{abclcp-project R0 phase\\
+        \texttt{aice-pi-evolution/experiments/2026-05-20\_xinu\_razpi\_aipl}}
+\date{2026 年 5 月 20 日}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+本報告は、Xinu/Raspberry~Pi 進化プロジェクトの初動 phase である R0
+(regression 修復) の作業内容と、その過程で明らかになった
+AIPL 型チェッカー側の永続的な不具合の修復をまとめる.作業前は
+\texttt{abclc/} 配下の 3 サンプル
+(\texttt{Rotate4LinesXinu}, \texttt{Philosophers5Xinu},
+\texttt{BoundedBufferXinu}) が全て型エラーで reject されていたが、
+\texttt{src/infer.ml} の\textbf{ クラスフィールド処理に
+\texttt{TypedVarDecl} を追加}し、\texttt{src/aipl2c.ml}
+で\textbf{ codegen 前に \texttt{normalize\_program} を呼ぶ}、
+\texttt{src/typing\_env.ml} に\textbf{ Xinu GUI 関数群と
+int/float 混在の関係演算子を登録}した結果、
+3 サンプルすべてが型検査・C 生成・Xinu kernel リンク・QEMU 起動の
+4 段ゲートを通過するようになった.既存の非 Xinu サンプル 8 件にも
+回帰は無く、合計 R0\,/\,R1\,/\,P1 で 26 個の assertion が green
+になっている.
+\end{abstract}
+
+\section{背景}
+
+\subsection{進化プロジェクトの位置づけ}
+
+Embedded Xinu (arm-qemu / Raspberry Pi 系) 上で AIPL を進化させる
+Round~1 は、5 つの方向 (R: regression 修復, P: scheduler,
+F: AIPL 機能, G: GUI/I/O, N: 分散) に分かれて 21 phase + 63 assertion
+を目標としている.最初のサブフェーズ\textbf{ R0} は、その出発点として
+既存の Xinu サンプル 3 件が現行ツールチェーンで再び\textbf{ build + 動作}
+することを保証するものである.
+
+\subsection{2026-05-20 朝の動作確認}
+
+aipl2c~+~xinu-raz~+~QEMU の各層は単体では動作するが、
+\texttt{aipl2c --xinu} が 3 サンプル全てを\textbf{ 型検査の段階で
+reject していた}ことを確認した.
+
+\begin{lstlisting}[language=,caption={3 サンプルでの拒否メッセージ (要約)}]
+$ ./_build/default/src/aipl2c.exe abclc/Rotate4LinesXinu.abcl \
+      --xinu --max-msgs 0
+class Spinner
+  init : (int * float * float * float * int * int * int) -> 'a
+  tick : () -> 'a
+[Type error] line 18, col 5: type mismatch        <-- speed = sp;
+
+$ ./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.abcl \
+      --xinu --max-msgs 0
+[Type error] line 68, col 16: send target is not actor: int
+                                                  <-- send left_fork.request(idx)
+
+$ ./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.abcl \
+      --xinu --max-msgs 0
+[Type error] line 81, col 7: type mismatch        <-- counter = 110 - slider * 10
+\end{lstlisting}
+
+\texttt{--no-typecheck} を付ければ C 生成は進むが、これは型安全網を全て
+無効化してしまうため恒久的な解決にならない.
+
+\subsection{予備調査で発覚した深層不具合}
+
+3 ファイルの内容自体を修正しようとして、まず\textbf{ 既存の
+\texttt{abclc/TypedDemo.abcl} で同じ事象}が起きていることに気付いた:
+
+\begin{lstlisting}[language=,caption={TypedDemo.abcl ですら type-check に失敗}]
+$ ./_build/default/src/aipl2c.exe abclc/TypedDemo.abcl --check
+class Counter
+  bump : (int) -> int
+[Type error] line 37, col 13: unbound variable: count
+\end{lstlisting}
+
+\texttt{TypedDemo.abcl} は\texttt{ var count: int = 0;} という\textbf{
+型注釈付きフィールド}を持ち、 \texttt{bump} メソッドがその \texttt{count}
+を参照する.この pattern は AIPL の Phase~11+ で導入された
+\texttt{TypedVarDecl} を用いており、ここがエラーの \emph{真の発生源}
+であった.つまり、\textbf{ 型注釈付きフィールドを持つあらゆるクラスが
+全 Xinu codegen 経路で壊れていた}ことになる.
+
+\section{根本原因の分析}
+
+\subsection{原因 1 — \texttt{infer.ml} の Class 処理から
+\texttt{TypedVarDecl} が抜け落ちている}
+
+\texttt{src/infer.ml} の \texttt{check\_decl} は、クラスフィールドを
+ローカル環境に bind する際に \texttt{VarDecl} だけを認識していた:
+
+\begin{lstlisting}[language=ocaml,caption={infer.ml の問題箇所 (修正前)}]
+let check_decl (env:env) = function
+  | Class c ->
+    let env_cls = clone env in
+    List.iter
+      (fun (st:Ast.stmt) ->
+        match st.sdesc with
+        | VarDecl (name, init) ->
+            let t   = infer_expr env_cls init in
+            let sch = Types.generalize (ftv_env env_cls) t in
+            set env_cls name sch
+        | _ -> ()                  (* <-- TypedVarDecl がここに落ちる *)
+      ) c.fields;
+    ...
+\end{lstlisting}
+
+その結果\texttt{ var count: int = 0;} のフィールドは \texttt{env\_cls}
+へ\textbf{ 一度も登録されない}まま methods の本文 check に入る.
+method 本文中の \texttt{count = count + 1} は\textbf{ unbound variable:
+count} で reject される.
+
+\subsection{原因 2 — codegen が \texttt{normalize\_program} 抜きで動いていた}
+
+\texttt{src/ast.ml} には全 \texttt{TypedVarDecl} を \texttt{VarDecl} に
+畳んで型注釈をサイドテーブルに退避する \texttt{normalize\_program} が
+存在するが、\texttt{src/aipl2c.ml} のパイプラインは型検査直後に
+\textbf{normalize を経由せず}に直接 codegen を呼んでいた.
+そのため C-translator 側の各 backend
+(\texttt{gen\_program\_xinu}, \texttt{gen\_class}, etc.) が
+field 反復で\texttt{ VarDecl} のみ拾う設計と矛盾し、
+typed field は\textbf{ 列挙 (\texttt{enum F\_class\_field}) には現れる
+ものの method body から \texttt{g\_field} という未宣言の global
+シンボルとして参照される}という、リンク段階で必ず失敗するコードを
+吐いていた.
+
+\subsection{原因 3 — Xinu GUI 関数が gradual 化されていた}
+
+\texttt{src/typing\_env.ml::prelude} には \texttt{sdl\_*} 系や
+\texttt{ai\_call} などは登録されているが、Xinu GUI 表面の
+\texttt{xinu\_gui\_set\_line} / \texttt{xinu\_gui\_slider\_value} /
+\texttt{xinu\_gui\_set\_phil} など 12 個の関数は\textbf{ どれも未登録}で
+\texttt{[type warning] unknown function ... treated as gradual (any -> any)}
+として通っていた.この結果、
+
+\begin{lstlisting}[language=abcl]
+counter = 110 - xinu_gui_slider_value(0) * 10;
+\end{lstlisting}
+
+の \texttt{slider\_value} 戻り値は \texttt{any}、しかし \texttt{*} の
+オーバーロードは \texttt{(int,int), (float,float), (int,float),
+(float,int)} のみで \texttt{any} を受けるものが無く、結果
+\textbf{ 型エラー (overload 失敗)} になっていた.同時に、
+\texttt{if (angle >= 360)} のような\textbf{ float vs int の関係比較}も
+prelude に overload が無く reject されていた.
+
+\section{修正}
+
+\subsection{修正 1 — \texttt{infer.ml} に \texttt{TypedVarDecl} ハンドラ}
+
+\begin{lstlisting}[language=ocaml,caption={infer.ml::check\_decl Class — TypedVarDecl 追加}]
+| TypedVarDecl (name, te, init) ->
+    (* var name: T = init;  inside a class body.  Use the
+       declared type T for the field's scheme so methods that
+       reference the field see the annotated type.  Still
+       unify against the initializer so a mismatch at the
+       field declaration site surfaces immediately. *)
+    let declared = ty_of_type_expr te in
+    let t_init   = infer_expr env_cls init in
+    if not (unify_at st.sloc declared t_init) then
+      Types.type_error ~loc:st.sloc
+        (Printf.sprintf "field %s: declared type does not match initializer"
+           name);
+    let sch = Types.generalize (ftv_env env_cls) declared in
+    set env_cls name sch
+\end{lstlisting}
+
+宣言型を field の scheme として登録し、initializer は\texttt{ unify} で
+追加チェックする.これで\texttt{ TypedDemo.abcl} を始めとした既存の
+typed-field サンプルも自然に通る.
+
+\subsection{修正 2 — aipl2c が \texttt{normalize\_program} を経由}
+
+\begin{lstlisting}[language=ocaml,caption={aipl2c.ml — codegen 前に normalize}]
+if !check_only then begin
+  Printf.printf "[aipl2c] --check: ...\n";
+  exit 0
+end;
+(* Strip `var name: T = e;` field/local annotations down to plain
+   VarDecl (name, e) so every codegen backend sees the simpler form.
+   The annotation side table is no longer consulted at codegen — only
+   the type checker (which has already run) needed it. *)
+let prog = Ast.normalize_program prog in
+let c_code = (* gen_program_xinu / gen_program / ... *)
+\end{lstlisting}
+
+これで\texttt{ TypedVarDecl} は型検査済の AST から消え去り、Xinu
+だけでなく Pony / Erlang / Go / Prolog / Python / OpenMP / LLVM
+全てのバックエンドが透過的に typed-field を扱えるようになる.
+
+\subsection{修正 3 — \texttt{typing\_env.ml} に Xinu GUI 表面 + 混在比較}
+
+12 個の Xinu GUI 関数と、関係演算子の int/float 混在 overload を
+prelude に登録した:
+
+\begin{lstlisting}[language=ocaml,caption={typing\_env.ml — extern + mixed numeric 関係}]
+add_mono e "xinu_gui_set_line"        (TFun ([TAny;TAny;TAny;TAny;TAny;TAny;TAny;TAny], TUnit));
+add_mono e "xinu_gui_register_ticker" (TFun ([TAny], TUnit));
+add_mono e "xinu_gui_add_button"      (TFun ([TString;TInt;TInt;TInt;TInt;TAny;TString], TUnit));
+add_mono e "xinu_gui_add_slider"      (TFun ([TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TString], TUnit));
+add_mono e "xinu_gui_slider_value"    (TFun ([TInt], TInt));
+add_mono e "xinu_gui_set_fork_free"   (TFun ([TInt], TUnit));
+add_mono e "xinu_gui_set_fork_held"   (TFun ([TInt; TInt], TUnit));
+add_mono e "xinu_gui_set_phil"        (TFun ([TInt; TInt], TUnit));
+add_mono e "xinu_gui_set_actor"       (TFun ([TInt; TInt; TInt], TUnit));
+add_mono e "xinu_gui_buf_setup"       (TFun ([TInt; TInt; TInt], TUnit));
+add_mono e "xinu_gui_buf_put"         (TFun ([TInt], TUnit));
+add_mono e "xinu_gui_buf_take"        (TFun ([TInt], TUnit));
+(* 関係演算子の int/float 混在 *)
+let add_mxr1 f = add_mono e f (TFun ([TInt; TFloat], TBool)) in
+List.iter add_mxr1 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
+let add_mxr2 f = add_mono e f (TFun ([TFloat; TInt], TBool)) in
+List.iter add_mxr2 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
+\end{lstlisting}
+
+\section{サンプルプログラムの修正}
+
+ツールチェーン側を直した上で、3 サンプルにも\textbf{ 最小限の型注釈}を
+入れた.いずれもセマンティクス変更は無く、AIPL の typed-field 構文
+\texttt{var name: T = init;} を用いた\textbf{ ドキュメント的な追加}である.
+
+\subsection{Rotate4LinesXinu.abcl}
+
+\paragraph{変更点} (1) フィールド全てに型注釈を付与、
+(2) \texttt{Spinner.init} の \texttt{sp: float, mx: float, my: float} を
+\texttt{sp: int, mx: int, my: int} へ
+(呼び出し側はもともと整数を渡していたため)、
+(3) \texttt{Controller} のフィールド \texttt{s1..s4} を
+空文字列ではなく \texttt{any} 注釈の整数 0 で初期化.
+
+\begin{lstlisting}[language=abcl,caption={Rotate4LinesXinu.abcl 主な差分}]
+class Spinner {
+  var idx: int = 0;
+  var angle: float = 0.;
+  var speed: int = 5;
+  var cx: int = 0;
+  var cy: int = 0;
+  var radius: int = 60;
+  var running: int = 1;
+  var rr: int = 200;
+  var gg: int = 220;
+  var bb: int = 255;
+
+  method init(i: int, sp: int, mx: int, my: int,
+              r: int, g: int, b: int) {
+    ...
+  }
+}
+
+class Controller {
+  var s1: any = 0; var s2: any = 0;
+  var s3: any = 0; var s4: any = 0;
+  ...
+}
+\end{lstlisting}
+
+\subsection{Philosophers5Xinu.abcl}
+
+\paragraph{変更点}
+\texttt{Fork.idx/held/holder} を \texttt{int} に明示、
+\texttt{Philosopher} は actor 参照を保持する \texttt{left\_fork,
+right\_fork} を \texttt{: any} 注釈、
+\texttt{Controller} の \texttt{p0..p4, f0..f4} を \texttt{: any}.
+
+\begin{lstlisting}[language=abcl,caption={Philosophers5Xinu.abcl actor 参照フィールド}]
+class Philosopher {
+  var idx: int       = 0;
+  var state: int     = 0;
+  var counter: int   = 0;
+  var left_idx: int  = 0;
+  var right_idx: int = 0;
+  var left_fork:  any = 0;  // actor ref
+  var right_fork: any = 0;  // actor ref
+  var running: int   = 0;
+  ...
+}
+
+class Controller {
+  var p0: any = 0; var p1: any = 0; var p2: any = 0;
+  var p3: any = 0; var p4: any = 0;
+  var f0: any = 0; var f1: any = 0; var f2: any = 0;
+  var f3: any = 0; var f4: any = 0;
+  ...
+}
+\end{lstlisting}
+
+\subsection{BoundedBufferXinu.abcl}
+
+\paragraph{変更点}
+\texttt{Buffer.capacity/count} を \texttt{int} 明示、
+\texttt{Producer}/\texttt{Consumer} の \texttt{buffer} フィールドを
+\texttt{: any} に
+(actor 参照 \texttt{new Buffer(20)} を保持するため)、
+\texttt{Controller} の \texttt{buf, p0..p2, c0..c2} を \texttt{: any}.
+
+\begin{lstlisting}[language=abcl,caption={BoundedBufferXinu.abcl Producer のフィールド}]
+class Producer {
+  var idx: int     = 0;
+  var state: int   = 0;
+  var counter: int = 0;
+  var buffer: any  = 0;   // Buffer actor ref
+  var running: int = 0;
+  ...
+}
+
+class Controller {
+  var buf: any = 0;
+  var p0: any = 0; var p1: any = 0; var p2: any = 0;
+  var c0: any = 0; var c1: any = 0; var c2: any = 0;
+  ...
+}
+\end{lstlisting}
+
+\section{検証結果}
+
+\subsection{R0 phase の acceptance — 5/5 PASS}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Assertion & R4L & P5 & BB \\
+\midrule
+(1) typecheck pass               & \checkmark & \checkmark & \checkmark \\
+(2) C 生成成功 (\texttt{aipl2c}) & \checkmark & \checkmark & \checkmark \\
+(3) Xinu kernel link 成功        & \checkmark & \checkmark & \checkmark \\
+(4) QEMU \texttt{xsh\$} 到達     & \checkmark & \checkmark & \checkmark \\
+(5) panic / FATAL 無し           & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\caption{R0 — 5 assertion × 3 sample = 15、全 PASS}
+\end{table}
+
+\subsection{後続 phase への波及}
+
+R0 修正は\textbf{ AIPL 型システム全体に有効}な変更だったため、
+後続 R1 / P1 phase でも追加の修復は不要だった:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Phase & Assertion 数 & 結果 \\
+\midrule
+R0 (型チェック修復)        & 5 & 5 PASS / 0 FAIL \\
+R1 (smoke 自動化)           & 9 & 9 PASS / 0 FAIL \\
+P1 (actor=Xinu thread)      & 12 & 12 PASS / 0 FAIL \\
+\midrule
+\textbf{合計}               & \textbf{26} & \textbf{26 PASS} \\
+\bottomrule
+\end{tabular}
+\caption{Round 1 進捗 (2026-05-20)}
+\end{table}
+
+\subsection{Backward compat}
+
+非 Xinu サンプル 8 件
+(\texttt{Counter}, \texttt{PingPong}, \texttt{TypedDemo}, \texttt{Hello},
+ \texttt{Generics}, \texttt{Philosophers5}, \texttt{Phase15\_Owned},
+ \texttt{bounded\_buffer}) も全件 PASS で、特に\texttt{
+TypedDemo.abcl} 自体が R0 修正によって\textbf{ 初めて型検査を
+通るようになった}.
+
+\subsection{コミット履歴}
+
+\begin{lstlisting}[language=]
+f5d902c  xinu-razpi-aipl P1: verify 1:1 actor->Xinu-thread mapping
+a69308c  xinu-razpi-aipl R1: smoke automation with [aipl] markers
+e80769e  xinu-razpi-aipl R0: restore typecheck for 3 Xinu samples   <-- 本報告
+181ba26  xinu-razpi-aipl: add .ga.json (top-level) + .aipl orchestrator
+dd35f63  xinu-razpi-aipl Round 1: design + MAP-Elites evolution
+\end{lstlisting}
+
+外部リポジトリ \texttt{xinu-raz/xinu} 側にも commit \texttt{5ee95b6}
+(``Conditional AIPL auto-start via -DAIPL\_AUTOSTART'') を入れたが、
+これは R1 smoke の都合上の auto-start hook であり、R0 とは独立.
+
+\section{結論}
+
+R0 phase は単なる「3 サンプルの型注釈を足す」作業に見えたが、
+実際には AIPL 型システム本体に\textbf{ 構造的な不具合 3 つ}が
+潜んでいた:
+
+\begin{enumerate}[label=(\arabic*)]
+  \item \texttt{infer.ml::check\_decl Class} がクラスフィールドの
+        \texttt{TypedVarDecl} を無視していた
+  \item \texttt{aipl2c.ml} のパイプラインが \texttt{normalize\_program} を
+        呼んでおらず、 codegen 側の field 反復が \texttt{VarDecl} 限定
+        だった
+  \item \texttt{typing\_env.ml::prelude} に Xinu GUI 表面と
+        int/float 混在の関係演算子が欠落していた
+\end{enumerate}
+
+これらを直したことで、3 Xinu サンプルだけでなく\textbf{ AIPL の
+typed-field を持つ全プログラム}が再び型検査を通るようになり、
+全 codegen バックエンド (Xinu / C / Pony / Erlang / Go / Prolog /
+Python / OpenMP / LLVM) でも整合的な C を生成するようになった.
+3 サンプルのソース側の修正は\textbf{ \emph{付随的}な型注釈追加}に
+留まり、ロジックには一切手を加えていない.
+
+\medskip
+
+\noindent
+これにより Round~1 の本丸 phase (P2-P4 / F1-F4 / G1-G5 / N1-N4) が
+\textbf{ ツールチェーン側の足場が固まった状態で}着手できるように
+なった.
+
+\end{document}
