@@ -203,6 +203,15 @@
 
   <canvas id="chart" width="720" height="180"></canvas>
 
+  <!-- MS: multi-sheet tab bar (bottom of the workbook).  Excel/Sheets
+       style: one button per sheet + a "+" add button.  Renaming is
+       triggered by double-click; deletion uses a confirm. -->
+  <div id="sheetTabs" style="display:flex; align-items:center; gap:4px; margin:6px 0; width:720px; flex-wrap:wrap;">
+    <span style="color:#aac; font-size:0.85rem; margin-right:6px;">sheets:</span>
+    <div id="sheetTabsInner" style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;"></div>
+    <button id="btnAddSheet" title="Add a new sheet">+</button>
+  </div>
+
   <div id="controls">
     <button id="btnRun">▶ Run</button>
     <button id="btnStop">■ Stop</button>
@@ -406,6 +415,26 @@
           eat(); // )
           return { tag: "Call", name: t.v, args };
         }
+        // MS: detect `IDENT ! IDENT` as a cross-sheet reference.
+        // Sheet2!A1 → { tag: "XRef", sheet: "Sheet2", id: "A1" }.
+        // Sheet2!A1:B3 → { tag: "XRef", sheet, id, end_id }.
+        if (peek().k === "!") {
+          const nxt = __toks[__pos + 1];
+          if (nxt && nxt.k === "IDENT") {
+            eat(); // "!"
+            eat(); // end IDENT
+            // Optional ":NEXT_IDENT" for a cross-sheet range.
+            if (peek().k === ":") {
+              const r2 = __toks[__pos + 1];
+              if (r2 && r2.k === "IDENT") {
+                eat(); // ":"
+                eat(); // end IDENT
+                return { tag: "XRef", sheet: t.v, id: nxt.v, end_id: r2.v };
+              }
+            }
+            return { tag: "XRef", sheet: t.v, id: nxt.v };
+          }
+        }
         // R3: detect `IDENT : IDENT` as a Range node.
         if (peek().k === ":") {
           const sep = __toks[__pos];      // ":"
@@ -557,6 +586,21 @@
         // For Ref values, preserve string vs number type.  Defaulting
         // to 0 only when truly missing (not when it's an empty string).
         const v = cellValues.get(id);
+        return v === undefined ? 0 : v;
+      }
+      // MS: cross-sheet ref `Sheet2!A1` (single cell) or `Sheet2!A1:B3`
+      // (range).  Look the sheet up by name and read from its
+      // cellValues directly.  Missing sheet / cell → 0.
+      if (a.tag === "XRef") {
+        if (typeof workbook === "undefined" || !workbook.sheets) return 0;
+        const tgt = workbook.sheets.find(s => s.name === a.sheet);
+        if (!tgt) return 0;
+        if (a.end_id) {
+          // Range — return first cell (mimics bare Range tag behaviour).
+          const first = tgt.cellValues.get(a.id);
+          return first === undefined ? 0 : first;
+        }
+        const v = tgt.cellValues.get(a.id);
         return v === undefined ? 0 : v;
       }
       if (a.tag === "Range") {
@@ -1023,7 +1067,7 @@
     // way on every peer.
     const clientId = newClientId();
     let   lamport  = 0;
-    const cellClocks = new Map();    // cellId -> {ts, origin}
+    let   cellClocks = new Map();    // cellId -> {ts, origin} — MS: rebound per sheet
     // C6: derive a stable HSL color from clientId so peers get
     // distinguishable cursor outlines.  Higher lightness gives a
     // softer pastel; the runtime then paints a 0.25-alpha fill +
@@ -1499,7 +1543,13 @@
       window._sheet = {
         get cells()  { return interp.runtime.sheetState.cells; },
         get state()  { return interp.runtime.sheetState; },
-        cellValues, cellFormulas, cellFormats, cellClocks,
+        // MS: dynamic getters — the module-scope `let` bindings get
+        // rebound on every sheet switch, so capturing the value here
+        // would freeze pre-MS Sheet1 references forever.
+        get cellValues()   { return cellValues;   },
+        get cellFormulas() { return cellFormulas; },
+        get cellFormats()  { return cellFormats;  },
+        get cellClocks()   { return cellClocks;   },
         get clientId() { return clientId; },
         get lamport()  { return lamport;  },
         lwwWins,
@@ -1525,6 +1575,9 @@
         // D5 hooks.
         buildJsonWorkbook: () => buildJsonWorkbook(),
         importJsonWorkbook: (j) => importJsonWorkbook(j),
+        // MS hooks.
+        get workbook() { return workbook; },
+        addSheet, switchToSheet,
         // Test hook to drive the module-scoped selectedRC from page.evaluate.
         setSelected(row, col) { focusSingleCell({ row, col }, { skipBarFocus: true }); },
         // U10 test hooks for find/replace.
@@ -1546,6 +1599,10 @@
             const n = Number(c.val);
             cellValues.set(cellId(c.row, c.col),
               (!Number.isNaN(n) && c.val !== "") ? n : c.val);
+          }
+          // MS: register the populated state as Sheet1 in the workbook.
+          if (typeof initWorkbookFromCurrentState === "function") {
+            initWorkbookFromCurrentState();
           }
         }, 200);
       } catch (e) {
@@ -2949,7 +3006,7 @@
     document.getElementById("cfClear" ).addEventListener("click", cfClearAll);
 
     // ─── F9: per-cell comments ─────────────────────────────────
-    const cellNotes = new Map();   // cellId → text
+    let   cellNotes = new Map();   // cellId → text — MS: rebound per sheet
     function saveNote() {
       if (!selectedRC) { appendLog("[note] no cell selected"); return; }
       const txt = document.getElementById("noteInput").value;
@@ -2982,7 +3039,7 @@
     // Locked cells reject local edits (applyCellChange path).
     // Remote ws updates bypass the lock so a peer can still push
     // an authoritative value through.
-    const cellLocked = new Set();   // ids
+    let   cellLocked = new Set();   // ids — MS: rebound per sheet
     function toggleLock() {
       if (!selectedRC) return;
       const id = cellId(selectedRC.row, selectedRC.col);
@@ -2999,7 +3056,7 @@
     // ─── F11: named cells (single-cell aliases) ────────────────
     // `name → "A1"` lookup; resolved on every Ref eval so formulas
     // like `=tax * 100` work the same as `=A1 * 100`.
-    const cellNames = new Map();   // name → cellId string
+    let   cellNames = new Map();   // name → cellId string — MS: rebound per sheet
     function refreshNameList() {
       const text = Array.from(cellNames.entries())
         .map(([n, t]) => `${n}→${t}`).join(", ");
@@ -3177,6 +3234,141 @@
       return (j.cells || []).length;
     }
     document.getElementById("btnExportJson").addEventListener("click", exportJson);
+
+    // ─── MS: multi-sheet workbook ──────────────────────────────
+    // Each sheet keeps its own per-cell Maps + a snapshot of the
+    // AIPL sheetState the renderer reads.  Switching sheets rebinds
+    // the module-scope `cell*` lets to the new sheet's maps so every
+    // existing closure (applyCellChange, evalAst, refreshFind, …)
+    // automatically operates on the active sheet.
+    function newSheetState(name, rows = 10, cols = 8) {
+      return {
+        name,
+        cellValues:   new Map(),
+        cellFormulas: new Map(),
+        cellFormats:  new Map(),
+        cellClocks:   new Map(),
+        cellNotes:    new Map(),
+        cellLocked:   new Set(),
+        cellNames:    new Map(),
+        // sheetState mirror — gets filled in after first switch.
+        sheetSnap: null,
+        rows, cols,
+      };
+    }
+    const workbook = {
+      sheets:    [],   // populated post-Run with the first sheet
+      activeIdx: 0,
+    };
+    function refreshSheetTabs() {
+      const inner = document.getElementById("sheetTabsInner");
+      if (!inner) return;
+      inner.innerHTML = "";
+      for (let i = 0; i < workbook.sheets.length; i++) {
+        const s = workbook.sheets[i];
+        const b = document.createElement("button");
+        b.textContent = s.name;
+        b.title = "click=switch · double-click=rename · right-click=delete";
+        b.style.cssText = "padding:3px 10px;" +
+          (i === workbook.activeIdx
+            ? "background:#2255aa; color:#fff; border-color:#4af;"
+            : "background:#1a1a2a; color:#aac;");
+        b.addEventListener("click", () => switchToSheet(i));
+        b.addEventListener("dblclick", e => {
+          e.preventDefault();
+          const next = prompt("Rename sheet:", s.name);
+          if (next && next !== s.name) { s.name = next; refreshSheetTabs(); }
+        });
+        b.addEventListener("contextmenu", e => {
+          e.preventDefault();
+          if (workbook.sheets.length === 1) {
+            alert("Cannot delete the last sheet"); return;
+          }
+          if (confirm(`Delete "${s.name}"?`)) {
+            workbook.sheets.splice(i, 1);
+            if (workbook.activeIdx >= workbook.sheets.length) {
+              workbook.activeIdx = workbook.sheets.length - 1;
+            }
+            switchToSheet(workbook.activeIdx);
+          }
+        });
+        inner.appendChild(b);
+      }
+    }
+    // Bind the module-scope Maps to a given sheet, and swap the
+    // renderer's sheetState in.  When we leave a sheet we copy the
+    // current AIPL sheetState into sheetSnap, then restore the new
+    // sheet's snapshot on entry.
+    function switchToSheet(idx) {
+      const cur = workbook.sheets[workbook.activeIdx];
+      if (cur && interp && interp.runtime) {
+        // Save the active sheetState snapshot so we can restore it.
+        cur.sheetSnap = interp.runtime.sheetState;
+        cur.rows = cur.sheetSnap.rows;
+        cur.cols = cur.sheetSnap.cols;
+      }
+      workbook.activeIdx = idx;
+      const next = workbook.sheets[idx];
+      cellValues   = next.cellValues;
+      cellFormulas = next.cellFormulas;
+      cellFormats  = next.cellFormats;
+      cellClocks   = next.cellClocks;
+      cellNotes    = next.cellNotes;
+      cellLocked   = next.cellLocked;
+      cellNames    = next.cellNames;
+      if (interp && interp.runtime) {
+        if (next.sheetSnap) {
+          interp.runtime.sheetState = next.sheetSnap;
+        } else {
+          // Brand new sheet — init an empty 10×8 canvas state.
+          interp.runtime._callBuiltin("sheet_init", [next.rows, next.cols],
+                                       { __currentActor: null });
+          next.sheetSnap = interp.runtime.sheetState;
+        }
+        interp.runtime._redrawCanvas();
+        reshapeCanvas(next.rows, next.cols);
+      }
+      // Clear local UI bits that don't belong to the new sheet.
+      selectedRC = null;
+      cellLabel.textContent = "(none)";
+      formulaBar.value = "";
+      historyStack = []; redoStack = [];
+      if (typeof refreshUndoRedoButtons === "function") refreshUndoRedoButtons();
+      if (typeof refreshNameList === "function") refreshNameList();
+      if (typeof refreshGridDims === "function") refreshGridDims();
+      refreshSheetTabs();
+      appendLog(`[sheet] switched to "${next.name}"`);
+    }
+    function addSheet(name) {
+      name = name || `Sheet${workbook.sheets.length + 1}`;
+      const fresh = newSheetState(name);
+      workbook.sheets.push(fresh);
+      switchToSheet(workbook.sheets.length - 1);
+    }
+    document.getElementById("btnAddSheet").addEventListener("click",
+      () => addSheet());
+
+    // Initialise the workbook with the existing live state as "Sheet1".
+    // We do this AFTER runProgram has populated cellValues / sheetState,
+    // so the function below is called from within the runProgram tail.
+    function initWorkbookFromCurrentState() {
+      const sheet0 = newSheetState("Sheet1");
+      // The active state IS this sheet's state — point it at the same
+      // Maps so subsequent edits land in workbook.sheets[0] too.
+      sheet0.cellValues   = cellValues;
+      sheet0.cellFormulas = cellFormulas;
+      sheet0.cellFormats  = cellFormats;
+      sheet0.cellClocks   = cellClocks;
+      sheet0.cellNotes    = cellNotes;
+      sheet0.cellLocked   = cellLocked;
+      sheet0.cellNames    = cellNames;
+      sheet0.sheetSnap    = interp.runtime.sheetState;
+      sheet0.rows         = sheet0.sheetSnap.rows;
+      sheet0.cols         = sheet0.sheetSnap.cols;
+      workbook.sheets     = [sheet0];
+      workbook.activeIdx  = 0;
+      refreshSheetTabs();
+    }
     document.getElementById("btnImportJson").addEventListener("click", () => {
       document.getElementById("jsonFile").click();
     });

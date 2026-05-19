@@ -72,6 +72,7 @@
 | C6  | Live peer cursor sync (color-coded outline + origin label) | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_peer_cursor | ✅ 4 assertion |
 | EQ  | `=` prefix required for formulas; source round-trips Save/Load | `src/browser-abcl/spreadsheet.html` formulaBar commit + currentSheetSnapshot + applySheetSnapshot | ✅ 8 assertion |
 | D5  | Full-state JSON workbook export / import (loss-less) | `src/browser-abcl/spreadsheet.html` buildJsonWorkbook / importJsonWorkbook | ✅ 13 assertion |
+| MS  | Multi-sheet workbook (per-sheet state, `Sheet2!A1` xref, bottom tabs) | `src/browser-abcl/spreadsheet.html` workbook + switchToSheet + parsePrim XRef | ✅ 11 assertion |
 
 ## smoke
 
