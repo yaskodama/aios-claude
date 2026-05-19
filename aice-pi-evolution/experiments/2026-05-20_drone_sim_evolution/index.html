@@ -186,6 +186,26 @@
       </div>
     </div>
 
+    <!-- B4: battery + wind model — realistic constraints. -->
+    <div class="panel">
+      <h2>Battery &amp; Wind <span class="pill" id="windPill">wind 0.20 → E</span></h2>
+      <div class="slider-row">
+        <span style="min-width:24px">dir</span>
+        <input type="range" id="windDir" min="0" max="359" value="0">
+        <span id="windDirVal" style="min-width:48px;text-align:right">0°</span>
+      </div>
+      <div class="slider-row">
+        <span style="min-width:24px">mag</span>
+        <input type="range" id="windMag" min="0" max="60" value="20">
+        <span id="windMagVal" style="min-width:48px;text-align:right">0.20</span>
+      </div>
+      <div class="slider-row">
+        <span style="min-width:24px">drain</span>
+        <input type="range" id="batDrain" min="0" max="20" value="0">
+        <span id="batDrainVal" style="min-width:48px;text-align:right">off</span>
+      </div>
+    </div>
+
     <!-- B1: fleet sizing — K1 information-collecting UAVs and K2
          guidance UAVs, applied on Reset. -->
     <div class="panel">
@@ -512,20 +532,42 @@ class UAV {
     this.escortDest=null;  // shelter id when escorting
     this.state='idle';
     this.speed=0.00006;    // per ms in normalised (0..1) units
+    this.battery = 100;    // B4: 0..100 percent
+    this.landed  = false;  // true when battery hit 0 → grounded
   }
   setPath(ids){ this.path = ids.slice(); this.targetIdx=1; }
   step(dt){
+    // B4: battery 0 → UAV is grounded, no motion.
+    if (this.landed){ this.state = 'landed'; return; }
     if (this.path.length<2 || this.targetIdx>=this.path.length){
       this.state='atNode'; return;
     }
     const tgt = N(this.path[this.targetIdx]);
     const dx=tgt.x-this.x, dy=tgt.y-this.y;
     const dist=Math.hypot(dx,dy);
-    const step=this.speed*dt;
-    // A3: track UAV2 cumulative travel distance for the stats panel.
+    // B4: wind affects effective speed.  Forward dot wind gives a
+    // signed multiplier in [-1, +1] times wind magnitude.
+    let speedMul = 1;
+    if (dist > 1e-9 && typeof wind === 'object'){
+      const fx = dx/dist, fy = dy/dist;
+      const proj = fx*wind.x + fy*wind.y;     // [-|wind|, +|wind|]
+      speedMul = Math.max(0.2, 1 + proj);     // clamp so headwind ≥ 20%
+    }
+    const step = this.speed * dt * speedMul;
     const moved = Math.min(step, dist);
+    // A3: track UAV2 cumulative travel distance for the stats panel.
     if (this.label === 'UAV2' && typeof stats !== 'undefined') {
       stats.uav2DistAccum += moved;
+    }
+    // B4: drain battery proportional to moved distance (normalised
+    // 0..1 units).  battery 0 → land and stop.
+    if (typeof batteryDrain === 'number'){
+      this.battery -= moved * batteryDrain * 100;  // scale: 0.6 → ~6%/u
+      if (this.battery <= 0){
+        this.battery = 0; this.landed = true; this.state = 'landed';
+        log('SYS', `[battery] ${this.label}#${this.idx||1} landed (0%) at (${this.x.toFixed(2)},${this.y.toFixed(2)})`, 'ev');
+        return;
+      }
     }
     if (step>=dist){
       this.x=tgt.x; this.y=tgt.y;
@@ -533,6 +575,10 @@ class UAV {
       this.targetIdx++;
       if (this.targetIdx>=this.path.length){ this.state='arrived'; }
       else this.state='moving';
+      // B4: near-shelter charge — top off when we stop ON a shelter.
+      if (N(this.atId).shelter && this.battery < 100){
+        this.battery = Math.min(100, this.battery + 10);
+      }
     } else {
       this.x += dx/dist*step;
       this.y += dy/dist*step;
@@ -547,6 +593,9 @@ class UAV {
 let uav1, uav2;
 let uav1Fleet = [], uav2Fleet = [];
 let fleetK1 = 1, fleetK2 = 1;
+/* B4: wind vector + battery drain coefficient. */
+const wind = { x: 0.20, y: 0 };       // unit-ish vector; magnitude ≤ 1
+let batteryDrain = 0;                 // %/normalised-unit moved (default off — opt-in)
 
 /* ── core simulation ── */
 let sim = null;
@@ -1020,6 +1069,28 @@ function drawBackground(){
   bgx.font='10px ui-monospace,Menlo,monospace';
   bgx.fillText('N ↑',16,22);
   bgx.fillText('SCALE: 1 UNIT ≈ 200 m',W-180,H-14);
+  // B4: live wind arrow — head in top-right corner, scaled by magnitude.
+  const mag = Math.hypot(wind.x, wind.y);
+  if (mag > 0.001){
+    const cx = W - 60, cy = 36;
+    const len = 24 + mag * 60;
+    const ang = Math.atan2(wind.y, wind.x);
+    const ex = cx + Math.cos(ang)*len/2, ey = cy + Math.sin(ang)*len/2;
+    const sx = cx - Math.cos(ang)*len/2, sy = cy - Math.sin(ang)*len/2;
+    bgx.strokeStyle='rgba(124,242,194,0.85)'; bgx.lineWidth=2;
+    bgx.beginPath(); bgx.moveTo(sx,sy); bgx.lineTo(ex,ey); bgx.stroke();
+    // arrowhead
+    const ah = 6;
+    const ax = ex - Math.cos(ang)*ah, ay = ey - Math.sin(ang)*ah;
+    bgx.beginPath();
+    bgx.moveTo(ex,ey);
+    bgx.lineTo(ax + Math.cos(ang+Math.PI/2)*ah*0.6, ay + Math.sin(ang+Math.PI/2)*ah*0.6);
+    bgx.lineTo(ax - Math.cos(ang+Math.PI/2)*ah*0.6, ay - Math.sin(ang+Math.PI/2)*ah*0.6);
+    bgx.closePath(); bgx.fillStyle='rgba(124,242,194,0.85)'; bgx.fill();
+    bgx.fillStyle='rgba(124,242,194,0.85)';
+    bgx.fillText(`wind ${mag.toFixed(2)}`, cx-30, cy-14);
+    bgx.lineWidth=1;
+  }
 }
 
 function drawNode(n){
@@ -1104,10 +1175,27 @@ function drawUAV(u){
   // label + carry indicator
   ctx.fillStyle=u.colour;
   ctx.font='10px ui-monospace,monospace';
-  ctx.fillText(u.label,12,-8);
+  const lbl = u.label + (u.idx > 1 ? `#${u.idx}` : '');
+  ctx.fillText(lbl, 12, -8);
   if (u.carry>0){
     ctx.fillStyle=getCSS('--warn');
     ctx.fillText('▲'+u.carry, 12, 6);
+  }
+  // B4: battery bar under the drone (28 px wide, 3 px tall, green→red).
+  const bx = -14, by = 14;
+  ctx.strokeStyle = 'rgba(159,179,255,0.5)';
+  ctx.lineWidth   = 0.8;
+  ctx.strokeRect(bx, by, 28, 3);
+  const frac = Math.max(0, Math.min(1, u.battery / 100));
+  ctx.fillStyle = u.landed ? '#ff4d4d'
+                : (u.battery < 25 ? '#ffb000' : '#7cf2c2');
+  ctx.fillRect(bx, by, 28 * frac, 3);
+  ctx.fillStyle = u.colour;
+  ctx.font = '8px ui-monospace,monospace';
+  ctx.fillText(`${Math.round(u.battery)}%`, 16, 19);
+  if (u.landed){
+    ctx.fillStyle = '#ff4d4d';
+    ctx.fillText('LANDED', -18, 32);
   }
   ctx.restore();
 }
@@ -1446,6 +1534,39 @@ document.getElementById('fleetK2Slider').addEventListener('input', e => {
 document.getElementById('btnApplyFleet').addEventListener('click', () => {
   resetSim();
   log('SYS', `[fleet] applied K1=${fleetK1} K2=${fleetK2}`, 'ev');
+});
+
+/* B4: wind direction / magnitude / battery drain sliders. */
+function refreshWindPill(){
+  const mag = Math.hypot(wind.x, wind.y);
+  const deg = (Math.atan2(wind.y, wind.x) * 180 / Math.PI + 360) % 360;
+  const compass = ['E','SE','S','SW','W','NW','N','NE'];
+  const slot = Math.round(deg / 45) % 8;
+  document.getElementById('windPill').textContent =
+    `wind ${mag.toFixed(2)} → ${compass[slot]}`;
+  drawBackground();   // re-render the wind arrow
+}
+document.getElementById('windDir').addEventListener('input', e => {
+  const deg = +e.target.value || 0;
+  const mag = Math.hypot(wind.x, wind.y);
+  const rad = deg * Math.PI / 180;
+  wind.x = Math.cos(rad) * mag;
+  wind.y = Math.sin(rad) * mag;
+  document.getElementById('windDirVal').textContent = `${deg}°`;
+  refreshWindPill();
+});
+document.getElementById('windMag').addEventListener('input', e => {
+  const newMag = (+e.target.value || 0) / 100;
+  const curMag = Math.hypot(wind.x, wind.y) || 1;
+  wind.x = wind.x / curMag * newMag;
+  wind.y = wind.y / curMag * newMag;
+  document.getElementById('windMagVal').textContent = newMag.toFixed(2);
+  refreshWindPill();
+});
+document.getElementById('batDrain').addEventListener('input', e => {
+  batteryDrain = (+e.target.value || 0) / 10;
+  document.getElementById('batDrainVal').textContent =
+    batteryDrain > 0 ? `${batteryDrain.toFixed(1)} %/u` : 'off';
 });
 
 /* ─────────────────────────────────────────────────────────────
