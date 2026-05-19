@@ -21,6 +21,10 @@
     #formatLabel { color: #aef; font-size: 0.78rem; }
     #formatMenu { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; }
     #formatMenu option { background: #1a1a2a; }
+    #rangeRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; width: 720px; }
+    #rangeLabel { color: #aef; font-size: 0.78rem; }
+    #rangeInput { background: #181828; color: #fff; border: 1px solid #335; padding: 3px 6px; font-family: monospace; width: 140px; }
+    #chart { background: #fafafe; border: 1px solid #335; display: block; margin-top: 4px; }
     #controls { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; }
     button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446; cursor: pointer; font-family: monospace; }
     button:hover { background: #334; }
@@ -88,6 +92,17 @@
       <option value="date">Date (YYYY-MM-DD)</option>
     </select>
   </div>
+
+  <div id="rangeRow">
+    <span id="rangeLabel">range:</span>
+    <input id="rangeInput" type="text" value="A1:C3" placeholder="e.g. A1:C3">
+    <button id="btnSortAsc"  title="Sort selected range by 1st col ↑">🔽 Sort ↑</button>
+    <button id="btnSortDesc" title="Sort selected range by 1st col ↓">🔼 Sort ↓</button>
+    <button id="btnFilter"   title="Hide rows where 1st col is empty/zero">🧹 Filter ≠ 0</button>
+    <button id="btnChart"    title="Render horizontal bar chart">📊 Chart</button>
+  </div>
+
+  <canvas id="chart" width="720" height="180"></canvas>
 
   <div id="controls">
     <button id="btnRun">▶ Run</button>
@@ -873,6 +888,183 @@
                              { __currentActor: null });
       }
       appendLog(`[format] ${id} → ${fmt}   (${display})`);
+    });
+
+    // ─── U4: sort / filter / bar chart ──────────────────────────
+    function parseRangeStr(s) {
+      const m = String(s || "").trim().match(/^\$?([A-Z])\$?(\d+):\$?([A-Z])\$?(\d+)$/);
+      if (!m) return null;
+      const c0 = RANGE_COLS.indexOf(m[1]);
+      const c1 = RANGE_COLS.indexOf(m[3]);
+      const r0 = Number(m[2]) - 1;
+      const r1 = Number(m[4]) - 1;
+      return {
+        c0: Math.min(c0, c1), c1: Math.max(c0, c1),
+        r0: Math.min(r0, r1), r1: Math.max(r0, r1),
+      };
+    }
+
+    function sortRangeBy(rangeStr, dir) {
+      const rg = parseRangeStr(rangeStr);
+      if (!rg) { appendLog("[sort] invalid range: " + rangeStr); return; }
+      const { c0, c1, r0, r1 } = rg;
+      const rows = [];
+      for (let r = r0; r <= r1; r++) {
+        const cols = [];
+        for (let c = c0; c <= c1; c++) {
+          const id = pairToId(c, r);
+          cols.push({
+            val:     cellValues.get(id),
+            formula: cellFormulas.get(id),
+            fmt:     cellFormats.get(id),
+          });
+        }
+        rows.push(cols);
+      }
+      rows.sort((x, y) => {
+        const xv = x[0].val, yv = y[0].val;
+        if (xv === yv) return 0;
+        const cmp = (typeof xv === "number" && typeof yv === "number")
+                    ? xv - yv
+                    : (String(xv) < String(yv) ? -1 : 1);
+        return dir === "desc" ? -cmp : cmp;
+      });
+      for (let i = 0; i < rows.length; i++) {
+        const r = r0 + i;
+        for (let j = 0; j < rows[i].length; j++) {
+          const c = c0 + j;
+          const cell = rows[i][j];
+          const id = pairToId(c, r);
+          if (cell.fmt === undefined) cellFormats.delete(id);
+          else cellFormats.set(id, cell.fmt);
+          const kind = cell.formula ? "Formula" : "Value";
+          applyCellChange(r, c, cell.val === undefined ? "" : cell.val,
+                          kind, cell.formula || null);
+        }
+      }
+      appendLog(`[sort] ${rangeStr} ${dir === "desc" ? "↓" : "↑"} (${rows.length} rows)`);
+    }
+
+    function filterNonZero(rangeStr) {
+      const rg = parseRangeStr(rangeStr);
+      if (!rg) { appendLog("[filter] invalid range: " + rangeStr); return; }
+      const { c0, c1, r0, r1 } = rg;
+      const kept = [];
+      for (let r = r0; r <= r1; r++) {
+        const cols = [];
+        for (let c = c0; c <= c1; c++) {
+          const id = pairToId(c, r);
+          cols.push({
+            val:     cellValues.get(id),
+            formula: cellFormulas.get(id),
+            fmt:     cellFormats.get(id),
+          });
+        }
+        const firstVal = cols[0].val;
+        const keep = (typeof firstVal === "number") ? firstVal !== 0
+                                                    : (firstVal !== "" && firstVal !== undefined);
+        if (keep) kept.push(cols);
+      }
+      // Write kept rows back at the top, clear the rest.
+      let i = 0;
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const id = pairToId(c, r);
+          if (i < kept.length) {
+            const cell = kept[i][c - c0];
+            if (cell.fmt === undefined) cellFormats.delete(id);
+            else cellFormats.set(id, cell.fmt);
+            const kind = cell.formula ? "Formula" : "Value";
+            applyCellChange(r, c, cell.val === undefined ? "" : cell.val,
+                            kind, cell.formula || null);
+          } else {
+            cellValues.delete(id);
+            cellFormulas.delete(id);
+            cellFormats.delete(id);
+            interp.runtime._callBuiltin("sheet_cell",
+                                        [r, c, "", "Value"],
+                                        { __currentActor: null });
+          }
+        }
+        i++;     // one output row written, advance the kept[] pointer.
+      }
+      appendLog(`[filter] ${rangeStr} kept ${kept.length} / ${r1 - r0 + 1} rows`);
+    }
+
+    function renderChart(rangeStr) {
+      const rg = parseRangeStr(rangeStr);
+      if (!rg) { appendLog("[chart] invalid range: " + rangeStr); return; }
+      const { c0, c1, r0, r1 } = rg;
+      // Read directly from sheetState (always up-to-date) instead of
+      // the cellValues mirror (which may still be empty if the user
+      // clicks chart before the initial-sync setTimeout has fired).
+      const sheetCells = (interp && interp.runtime && interp.runtime.sheetState)
+                         ? interp.runtime.sheetState.cells : [];
+      const lookupCell = (col, row) => {
+        const c = sheetCells.find(c => c.col === col && c.row === row);
+        if (!c) return cellValues.get(pairToId(col, row));
+        const n = Number(c.val);
+        return (!Number.isNaN(n) && c.val !== "") ? n : c.val;
+      };
+      // Gather (label, value) pairs.  If width ≥ 2, col 0 = labels,
+      // col 1 = values.  Else label = row index, value = col 0.
+      const pairs = [];
+      for (let r = r0; r <= r1; r++) {
+        let label, value;
+        if (c1 - c0 >= 1) {
+          label = String(lookupCell(c0,     r) ?? "");
+          value = Number(lookupCell(c0 + 1, r)) || 0;
+        } else {
+          label = pairToId(c0, r);
+          value = Number(lookupCell(c0, r)) || 0;
+        }
+        pairs.push({ label, value });
+      }
+      const chart = document.getElementById("chart");
+      const ctx = chart.getContext("2d");
+      const W = chart.width, H = chart.height;
+      ctx.fillStyle = "#fafafe"; ctx.fillRect(0, 0, W, H);
+      if (pairs.length === 0) {
+        ctx.fillStyle = "#888"; ctx.font = "13px monospace";
+        ctx.fillText("(empty range)", 12, 24);
+        return;
+      }
+      const maxV = Math.max(...pairs.map(p => Math.abs(p.value)), 1);
+      const labelW = 80, valueW = 60;
+      const barAreaW = W - labelW - valueW - 16;
+      const rowH = Math.floor((H - 20) / pairs.length);
+      ctx.font = "12px monospace";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i < pairs.length; i++) {
+        const y = 10 + i * rowH + rowH / 2;
+        // Label
+        ctx.fillStyle = "#222"; ctx.textAlign = "left";
+        ctx.fillText(pairs[i].label, 8, y);
+        // Bar
+        const bw = Math.max(2, (Math.abs(pairs[i].value) / maxV) * barAreaW);
+        ctx.fillStyle = pairs[i].value >= 0 ? "#2255aa" : "#aa3322";
+        ctx.fillRect(labelW + 4, y - rowH / 2 + 4, bw, rowH - 8);
+        // Value
+        ctx.fillStyle = "#444"; ctx.textAlign = "right";
+        ctx.fillText(formatValue(pairs[i].value, "number"), W - 8, y);
+      }
+      ctx.fillStyle = "#666"; ctx.textAlign = "left";
+      ctx.font = "10px monospace";
+      ctx.fillText(`bar chart — range ${rangeStr} — max=${maxV}`, 8, H - 4);
+      appendLog(`[chart] ${rangeStr} — ${pairs.length} bars, max=${maxV}`);
+    }
+
+    document.getElementById("btnSortAsc").addEventListener("click", () => {
+      sortRangeBy(document.getElementById("rangeInput").value, "asc");
+    });
+    document.getElementById("btnSortDesc").addEventListener("click", () => {
+      sortRangeBy(document.getElementById("rangeInput").value, "desc");
+    });
+    document.getElementById("btnFilter").addEventListener("click", () => {
+      filterNonZero(document.getElementById("rangeInput").value);
+    });
+    document.getElementById("btnChart").addEventListener("click", () => {
+      renderChart(document.getElementById("rangeInput").value);
     });
 
     refreshUndoRedoButtons();
