@@ -1,0 +1,191 @@
+{
+  "trend": {
+    "deltas": {
+      "type_safety": 0.0,
+      "concurrency_model": 0.5,
+      "ownership_model": 0.0
+    },
+    "normalized": {
+      "type_safety": 0.0,
+      "concurrency_model": 1.0,
+      "ownership_model": 0.0
+    },
+    "new_axis_values": [
+      [
+        "paradigm",
+        "ParallelOOP"
+      ],
+      [
+        "state_representation",
+        "symbol_owned"
+      ],
+      [
+        "concurrency_model",
+        "actor_messages"
+      ]
+    ],
+    "path": [
+      "I0003",
+      "I0009"
+    ]
+  },
+  "gaps": [
+    {
+      "descriptor": {
+        "paradigm": "assembler"
+      },
+      "near_score": 0.324,
+      "distance_to_filled": 1,
+      "coherent": true
+    },
+    {
+      "descriptor": {
+        "paradigm": "Java_OOP"
+      },
+      "near_score": 0.324,
+      "distance_to_filled": 1,
+      "coherent": false
+    },
+    {
+      "descriptor": {
+        "paradigm": "FunctionalOOP"
+      },
+      "near_score": 0.324,
+      "distance_to_filled": 1,
+      "coherent": false
+    }
+  ],
+  "meta_fitness": {
+    "I0001": {
+      "trend_alignment": 0.5,
+      "frontier_coverage": 0.3333333333333333,
+      "novelty": 0.4,
+      "evolvability": 0.8333333333333334,
+      "cross_task_generality": 0.0,
+      "implementability": 0.76
+    },
+    "I0003": {
+      "trend_alignment": 0.3125,
+      "frontier_coverage": 0.5,
+      "novelty": 0.6,
+      "evolvability": 1.0,
+      "cross_task_generality": 0.0,
+      "implementability": 0.79
+    },
+    "I0006": {
+      "trend_alignment": 0.2777777777777778,
+      "frontier_coverage": 0.4166666666666667,
+      "novelty": 0.19999999999999996,
+      "evolvability": 0.16666666666666666,
+      "cross_task_generality": 0.0,
+      "implementability": 0.75
+    },
+    "I0009": {
+      "trend_alignment": 0.4166666666666667,
+      "frontier_coverage": 0.6666666666666666,
+      "novelty": 0.19999999999999996,
+      "evolvability": 0.3333333333333333,
+      "cross_task_generality": 0.0,
+      "implementability": 0.87
+    }
+  },
+  "rankings": [
+    {
+      "scenario": "conservative",
+      "weights": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0001",
+          "composite": 0.459,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.6666666666666666
+        },
+        {
+          "individual_id": "I0003",
+          "composite": 0.414125,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        },
+        {
+          "individual_id": "I0009",
+          "composite": 0.39466666666666667,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.0
+        }
+      ]
+    },
+    {
+      "scenario": "innovative",
+      "weights": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0003",
+          "composite": 0.565125,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.3333333333333333
+        },
+        {
+          "individual_id": "I0001",
+          "composite": 0.428,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.0
+        },
+        {
+          "individual_id": "I0009",
+          "composite": 0.3843333333333333,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "general_purpose",
+      "weights": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0003",
+          "composite": 0.384875,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.6666666666666666
+        },
+        {
+          "individual_id": "I0001",
+          "composite": 0.3636666666666667,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.0
+        },
+        {
+          "individual_id": "I0009",
+          "composite": 0.34650000000000003,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 1.0
+        }
+      ]
+    }
+  ],
+  "discoveries": {
+    "axes": [],
+    "values": {}
+  }
+}
