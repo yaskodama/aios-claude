@@ -1,14 +1,10 @@
-// Philosophers5Xinu.abcl
-// Xinu 上で 5 人の哲学者問題を可視化する。
-// 各 Fork / Philosopher は別の Xinu thread (アクター) として動く。
-// Start / Stop ボタンで一斉に動かす/止める。
-
+// Philosophers5Xinu.abcl — MINIMAL annotations
 class Fork {
-  var idx: int    = 0;
-  var held: int   = 0;
-  var holder: int = 0;
+  var idx    = 0;
+  var held   = 0;
+  var holder = 0;
 
-  method init(i: int) {
+  method init(i) {
     idx  = i;
     held = 0;
     xinu_gui_set_fork_free(idx);
@@ -34,16 +30,16 @@ class Fork {
 }
 
 class Philosopher {
-  var idx: int       = 0;
-  var state: int     = 0;
-  var counter: int   = 0;
-  var left_idx: int  = 0;
-  var right_idx: int = 0;
-  var left_fork: any  = 0;
-  var right_fork: any = 0;
-  var running: int   = 0;
+  var idx       = 0;
+  var state     = 0;
+  var counter   = 0;
+  var left_idx  = 0;
+  var right_idx = 0;
+  var left_fork:  any = 0;   // actor ref
+  var right_fork: any = 0;   // actor ref
+  var running   = 0;
 
-  method init(i: int, li: int, ri: int, lf, rf) {
+  method init(i, li, ri, lf, rf) {
     idx       = i;
     left_idx  = li;
     right_idx = ri;
@@ -91,7 +87,7 @@ class Philosopher {
     } else {
       if (state == 2) {
         state = 3;
-        counter = 60 + idx * 3;
+        counter = 40 + idx * 6;
         xinu_gui_set_phil(idx, 2);
       }
     }
@@ -132,19 +128,13 @@ class Controller {
     p3 = new Philosopher(3, 3, 4, f3, f4);
     p4 = new Philosopher(4, 4, 0, f4, f0);
 
-    xinu_gui_dining_init(5);
-
     xinu_gui_register_ticker(p0);
     xinu_gui_register_ticker(p1);
     xinu_gui_register_ticker(p2);
     xinu_gui_register_ticker(p3);
     xinu_gui_register_ticker(p4);
-
     xinu_gui_add_button("Start",  40, 26, 90, 30, self, "start");
     xinu_gui_add_button("Stop",  510, 26, 90, 30, self, "stop");
-
-    // 起動と同時に動かす (Stop で停止、Start で再開できる)
-    send self.start();
   }
 
   method start() {

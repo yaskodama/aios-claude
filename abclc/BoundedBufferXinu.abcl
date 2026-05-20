@@ -4,10 +4,10 @@
 // 入力速度バー (track 0) と出力速度バー (track 1) で各 idle 待機時間を制御。
 
 class Buffer {
-  var capacity: int = 20;
-  var count: int    = 0;
+  var capacity = 20;
+  var count = 0;
 
-  method init(cap: int) {
+  method init(cap) {
     capacity = cap;
     count    = 0;
   }
@@ -34,13 +34,13 @@ class Buffer {
 }
 
 class Producer {
-  var idx: int     = 0;
-  var state: int   = 0;
-  var counter: int = 0;
+  var idx = 0;
+  var state = 0;
+  var counter = 0;
   var buffer: any  = 0;
-  var running: int = 0;
+  var running = 0;
 
-  method init(i: int, buf) {
+  method init(i, buf) {
     idx     = i;
     buffer  = buf;
     state   = 0;
@@ -92,13 +92,13 @@ class Producer {
 }
 
 class Consumer {
-  var idx: int     = 0;
-  var state: int   = 0;
-  var counter: int = 0;
+  var idx = 0;
+  var state = 0;
+  var counter = 0;
   var buffer: any  = 0;
-  var running: int = 0;
+  var running = 0;
 
-  method init(i: int, buf) {
+  method init(i, buf) {
     idx     = i;
     buffer  = buf;
     state   = 0;

@@ -1,27 +1,23 @@
-// Rotate4LinesXinu.abcl
-// Xinu 上で 4 本の線分を回転させる AIPL プログラム + Start/Stop ボタン。
-// 各 Spinner は Xinu thread (アクター) として動き、tick で角度更新。
-// Controller はボタン押下を受けて全 spinner に start/stop を broadcast。
-
+// Rotate4LinesXinu.abcl — MINIMAL annotations
+// Only annotate fields that hold actor refs ("s1..s4 : any").
+// Numeric fields infer from initializer; method params infer from body.
 class Spinner {
-  var idx: int = 0;
-  var angle: float = 0.;
-  var speed: int = 5;
-  var cx: int = 0;
-  var cy: int = 0;
-  var radius: int = 60;
-  var running: int = 1;
-  var rr: int = 200;
-  var gg: int = 220;
-  var bb: int = 255;
+  var idx     = 0;
+  var angle   = 0.;
+  var speed   = 5;
+  var cx      = 0;
+  var cy      = 0;
+  var radius  = 60;
+  var running = 1;
+  var rr = 200; var gg = 220; var bb = 255;
 
-  method init(i: int, sp: int, mx: int, my: int, r: int, g: int, b: int) {
+  method init(i, sp, mx, my, r, g, b) {
     idx = i;
     speed = sp;
     cx = mx;
     cy = my;
     rr = r; gg = g; bb = b;
-    running = 1;     // 起動時は走っている状態に
+    running = 1;
     send self.tick();
   }
 
@@ -48,21 +44,18 @@ class Spinner {
 }
 
 class Controller {
-  var s1: any = 0; var s2: any = 0; var s3: any = 0; var s4: any = 0;
+  var s1: any = 0; var s2: any = 0;
+  var s3: any = 0; var s4: any = 0;
 
   method init() {
-    // 正方形の 4 角
     s1 = new Spinner(0, 3, 200, 160, 255, 100, 100);
     s2 = new Spinner(1, 5, 440, 160, 100, 220, 130);
     s3 = new Spinner(2, 7, 200, 320, 100, 150, 255);
     s4 = new Spinner(3, 9, 440, 320, 240, 200, 100);
-
     xinu_gui_register_ticker(s1);
     xinu_gui_register_ticker(s2);
     xinu_gui_register_ticker(s3);
     xinu_gui_register_ticker(s4);
-
-    // 画面上端 (640x480 LCD、ステータスバー直下) にボタン配置
     xinu_gui_add_button("Start",  40, 26, 90, 30, self, "start");
     xinu_gui_add_button("Stop",  510, 26, 90, 30, self, "stop");
   }
