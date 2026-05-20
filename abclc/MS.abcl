@@ -1,22 +1,22 @@
-object Line {
-  float angle = 0;
-  float cx = 320;
-  float cy = 240;
-  float length = 100;
+class Line {
+  var angle = 0.;
+  var cx = 320.;
+  var cy = 240.;
+  var length = 100.;
 
   method spin() {
-    float x1 = cx + length * cos(angle);
-    float y1 = cy + length * sin(angle);
-    float x2 = cx - length * cos(angle);
-    float y2 = cy - length * sin(angle);
+    var x1 = cx + length * cos(angle);
+    var y1 = cy + length * sin(angle);
+    var x2 = cx - length * cos(angle);
+    var y2 = cy - length * sin(angle);
     call sdl_clear();
     call sdl_line(x1, y1, x2, y2);
     call sdl_present();
     angle = angle + 0.1;
-    send self spin;
+    send self.spin();
   }
 }
 
-Line l1;
-Line l2;
-Line l3;
+var l1 = new Line();
+var l2 = new Line();
+var l3 = new Line();

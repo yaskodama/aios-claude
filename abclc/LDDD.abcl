@@ -1,9 +1,9 @@
-object Line {
-  float cx = 200.0;
-  float cy = 200.0;
-  float angle = 0.0;
-  float offset = 0.0;
-  float len = 50.0;
+class Line {
+  var cx = 200.0;
+  var cy = 200.0;
+  var angle = 0.0;
+  var offset = 0.0;
+  var len = 50.0;
 
   method start() {
     call sdl_clear();
@@ -15,47 +15,17 @@ object Line {
 //    if (angle >= 360.0) {
 //      angle = 0.0;
 //    }
-    if angle >= 360.0 then
-      angle = 0.0;
-    else
-      angle = angle;
+    if (angle >= 360.0) { angle = 0.0; } else { angle = angle; }
 
-    float rad = (angle + offset) * 3.14159 / 180.0;
-    float dx = len * cos(rad);
-    float dy = len * sin(rad);
-    float x1 = cx - dx;
-    float y1 = cy - dy;
-    float x2 = cx + dx;
-    float y2 = cy + dy;
+    var rad = (angle + offset) * 3.14159 / 180.0;
+    var dx = len * cos(rad);
+    var dy = len * sin(rad);
+    var x1 = cx - dx;
+    var y1 = cy - dy;
+    var x2 = cx + dx;
+    var y2 = cy + dy;
     call sdl_line(x1, y1, x2, y2);    
-    send self rotate;
+    send self.rotate();
   }
 }
 
-    float xx5=xx4+(20*scale);
-    call sdl_line(xx5+(15*scale),yy1+(25*scale),xx5,yy1+(25*scale));
-    call sdl_line(xx5,yy1+(25*scale),xx5,yy1+(35*scale));
-    call sdl_line(xx5,yy1+(35*scale),xx5+(15*scale),yy1+(35*scale));
-    call sdl_line(xx5+(15*scale),yy1+(35*scale),xx5+(15*scale),yy1+(40*scale));
-    call sdl_line(xx5+(15*scale),yy1+(40*scale),xx5,yy1+(40*scale));
-    float xx6=xx5+(20*scale);
-    call sdl_line(xx6,yy1+(25*scale),xx6,yy1+(40*scale));
-    call sdl_line(xx6,yy1+(25*scale),xx6+(10*scale),yy1+(25*scale));
-    call sdl_line(xx6+(10*scale),yy1+(25*scale),xx6+(10*scale),yy1+(30*scale));
-    call sdl_line(xx6,yy1+(30*scale),xx6+(10*scale),yy1+(30*scale));
-    float xx7=xx6+(15*scale);
-    call sdl_line(xx7+(15*scale),yy1+(25*scale),xx7,yy1+(25*scale));
-    call sdl_line(xx7,yy1+(25*scale),xx7,yy1+(32*scale));
-    call sdl_line(xx7,yy1+(32*scale),xx7+(15*scale),yy1+(32*scale));
-    call sdl_line(xx7+(15*scale),yy1+(32*scale),xx7+(15*scale),yy1+(40*scale));
-    call sdl_line(xx7+(15*scale),yy1+(40*scale),xx7,yy1+(40*scale));
-    float xx8=xx7+(20*scale);
-    call sdl_line(xx8,yy1+(20*scale),xx8,yy1+(40*scale));
-    call sdl_line(xx8,yy1+(15*scale),xx8,yy1+(17*scale));
-    float xx9=xx8+(10*scale);
-    call sdl_line(xx9,yy1+(20*scale),xx9,yy1+(40*scale));
-    call sdl_line(xx9-(5*scale),yy1+(20*scale),xx9+(5*scale),yy1+(20*scale));
-    float xx10=xx9+(15*scale);
-    call sdl_line(xx10,yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
-    call sdl_line(xx10-(14*scale),yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
-    call sdl_line(xx10+(7*scale),yy1+(30*scale),xx10+(7*scale),yy1+(40*scale));

@@ -1,4 +1,4 @@
-object Window {
+class Window {
   method create(width, height, title) {
     call openWindow(width, height, title);
   }
@@ -10,13 +10,13 @@ object Window {
   }
 }
 
-object Line {
-  float cx = 200.0;
-  float cy = 200.0;
-  float angle = 0.0;
-  float offset = 0.0;
-  float len = 50.0;
-  object window;
+class Line {
+  var cx = 200.0;
+  var cy = 200.0;
+  var angle = 0.0;
+  var offset = 0.0;
+  var len = 50.0;
+  var window = nil;
 
   method rotate() {
     angle = angle + 5.0;
@@ -24,26 +24,15 @@ object Line {
       angle = 0.0;
     }
 
-    float rad = (angle + offset) * 3.14159 / 180.0;
-    float dx = len * cos(rad);
-    float dy = len * sin(rad);
-    float x1 = cx - dx;
-    float y1 = cy - dy;
-    float x2 = cx + dx;
-    float y2 = cy + dy;
+    var rad = (angle + offset) * 3.14159 / 180.0;
+    var dx = len * cos(rad);
+    var dy = len * sin(rad);
+    var x1 = cx - dx;
+    var y1 = cy - dy;
+    var x2 = cx + dx;
+    var y2 = cy + dy;
 
-    nsend window drawLine(x1, y1, x2, y2);
-    nsend self rotate;
   }
 }
 
-Window win;
-nsend win create(400, 400, "Rotating Lines");
-
-Line line1 { window = win; offset = 0.0; };
-Line line2 { window = win; offset = 120.0; };
-Line line3 { window = win; offset = 240.0; };
-
-send line1 rotate;
-send line2 rotate;
-send line3 rotate;
+var win = new Window();

@@ -1,8 +1,8 @@
-object Pinger {
+class Pinger {
   method start() {
     call print("Pinger starting");
-    send ponger ping();
+
  }
 }
 
-Pinger pinger;
+var pinger = new Pinger();

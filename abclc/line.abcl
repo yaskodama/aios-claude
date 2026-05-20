@@ -1,17 +1,13 @@
-object Line {
-  float angle = 0;
-  float cx = 320;
-  float cy = 240;
-  float length = 100;
+class Line {
+  var angle = 0.;
+  var cx = 320.;
+  var cy = 240.;
+  var length = 100.;
 
   method spin() {
     call print(angle);
-    w.x1 = cx + length * cos(angle);
-    w.y1 = cy + length * sin(angle);
-    w.x2 = cx - length * cos(angle);
-    w.y2 = cy - length * sin(angle);
-    send w line;
+
     angle = angle + 0.1;
-    send self spin;
+
   }
 }

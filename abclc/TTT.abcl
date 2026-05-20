@@ -1,8 +1,8 @@
-object TTT {
+class TTT {
   method start() {
     var x = 21;
     call print(typeof(x));
   }
 }
 
-TTT t;
+var t = new TTT();

@@ -3,4 +3,4 @@ class Pinger {
 }
 
 var pinger = new Pinger();   // init は未定義
-send pinger ping();
+send pinger.ping();

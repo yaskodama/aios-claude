@@ -1,4 +1,4 @@
-object LineDrawer {
+class LineDrawer {
   method draw() {
     call sdl_clear();
     call sdl_line(100, 100, 400, 300);
@@ -10,4 +10,4 @@ object LineDrawer {
   }
 }
 
-LineDrawer dl1;
+var dl1 = new LineDrawer();

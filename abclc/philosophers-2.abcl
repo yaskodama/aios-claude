@@ -1,70 +1,55 @@
-object Fork0 { float state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self take; } } method put() { state = 0.0; } };
-object Fork1 { float state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self take; } } method put() { state = 0.0; } };
-object Fork2 { float state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self take; } } method put() { state = 0.0; } };
-object Fork3 { float state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self take; } } method put() { state = 0.0; } };
-object Fork4 { float state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self take; } } method put() { state = 0.0; } };
+class Fork0 { var state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self.take(); } } method put() { state = 0.0; } };
+class Fork1 { var state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self.take(); } } method put() { state = 0.0; } };
+class Fork2 { var state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self.take(); } } method put() { state = 0.0; } };
+class Fork3 { var state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self.take(); } } method put() { state = 0.0; } };
+class Fork4 { var state = 0.0; method take() { if (state == 0.0) { state = 1.0; } else { send self.take(); } } method put() { state = 0.0; } };
 
-object Philosopher0 {
-  float count = 0.0;
+class Philosopher0 {
+  var count = 0.0;
   method think_eat() {
-    send Fork0 take;
-    send Fork1 take;
+
     count = count + 1.0;
     call print(count);
-    send Fork0 put;
-    send Fork1 put;
-    send self think_eat;
+
   }
 };
 
-object Philosopher1 {
-  float count = 0.0;
+class Philosopher1 {
+  var count = 0.0;
   method think_eat() {
-    send Fork1 take;
-    send Fork2 take;
+
     count = count + 1.0;
     call print(count);
-    send Fork1 put;
-    send Fork2 put;
-    send self think_eat;
+
   }
 };
 
-object Philosopher2 {
-  float count = 0.0;
+class Philosopher2 {
+  var count = 0.0;
   method think_eat() {
-    send Fork2 take;
-    send Fork3 take;
+
     count = count + 1.0;
     call print(count);
-    send Fork2 put;
-    send Fork3 put;
-    send self think_eat;
+
   }
 };
 
-object Philosopher3 {
-  float count = 0.0;
+class Philosopher3 {
+  var count = 0.0;
   method think_eat() {
-    send Fork3 take;
-    send Fork4 take;
+
     count = count + 1.0;
     call print(count);
-    send Fork3 put;
-    send Fork4 put;
-    send self think_eat;
+
   }
 };
 
-object Philosopher4 {
-  float count = 0.0;
+class Philosopher4 {
+  var count = 0.0;
   method think_eat() {
-    send Fork4 take;
-    send Fork0 take;
+
     count = count + 1.0;
     call print(count);
-    send Fork4 put;
-    send Fork0 put;
-    send self think_eat;
+
   }
 };

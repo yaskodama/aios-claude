@@ -1,18 +1,17 @@
-object Ponger {
-  float cnt = 0;
+class Ponger {
+  var cnt = 0.;
   method ping(x, y) {
     cnt = cnt + x + y;
     call print("pong: " + cnt);
   }
 }
 
-Ponger ponger;
-
-object Pinger {
+var ponger = new Ponger();
+class Pinger {
   method start() {
-    send ponger ping(1, 2);
-    send ponger ping(3, 4);
+    send ponger.ping(1, 2);
+    send ponger.ping(3, 4);
   }
 }
 
-Pinger pinger;
+var pinger = new Pinger();

@@ -1,25 +1,23 @@
-object Line {
-  float x1 = 100.0;
-  float y1 = 100.0;
-  float x2 = 200.0;
-  float y2 = 100.0;
-  float angle = 0.0;
+class Line {
+  var x1 = 100.0;
+  var y1 = 100.0;
+  var x2 = 200.0;
+  var y2 = 100.0;
+  var angle = 0.0;
 
   method rotate() {
     angle = angle + 5.0;
     if (angle >= 360.0) {
       angle = 0.0;
     }
-    float cx = (x1 + x2) / 2.0;
-    float cy = (y1 + y2) / 2.0;
-    float len = 50.0;
-    float rad = angle * 3.14159 / 180.0;
-    float nx1 = cx - len * cos(rad);
-    float ny1 = cy - len * sin(rad);
-    float nx2 = cx + len * cos(rad);
-    float ny2 = cy + len * sin(rad);
+    var cx = (x1 + x2) / 2.0;
+    var cy = (y1 + y2) / 2.0;
+    var len = 50.0;
+    var rad = angle * 3.14159 / 180.0;
+    var nx1 = cx - len * cos(rad);
+    var ny1 = cy - len * sin(rad);
+    var nx2 = cx + len * cos(rad);
+    var ny2 = cy + len * sin(rad);
 
-    nsend window drawLine(nx1, ny1, nx2, ny2);
-    nsend self rotate;
   }
 }
