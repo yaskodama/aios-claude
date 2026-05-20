@@ -1,0 +1,265 @@
+// AIPL_XinuRazPi_RemoteRPC.aice  (2026-05-20)
+//
+// Host PC (macOS) から QEMU 上の Embedded Xinu / AIPL ランタイムに
+// 対して、テキスト行プロトコル経由でリモートに actor を spawn し、
+// 既存 actor へ message を send する RPC channel を実装する.
+//
+//   背景 (この aice の前提):
+//     - AIPL の C ランタイム (--xinu) は 2026-05-20 時点で
+//       R0/R1, P1/P2/P3/P4, F1/F2/F3/F4, G1/G2/G3/G5 + N1(partial)
+//       が完成済 (memory: project_xinu_razpi_aipl).
+//     - F1 (DistCheckpoint) で actor field を runtime accessor 経由で
+//       読み書きする abcl_object_field_{get,set,count,class_id} が
+//       既に runtime prelude に存在する.今回はこれを spawn/send 経路
+//       でも再利用する.
+//     - N1 (TCP/IP via smc91c111) は smc91c111 driver の上流問題で
+//       connect/send/recv が partial 失敗中.このため Host↔Xinu 通信
+//       には NIC ではなく QEMU の "-serial tcp:" 機能で UART1 を
+//       直接ホスト TCP socket に晒す方式を採用する.
+//     - QEMU versatilepb は PL011 UART を 2 ch 持つ.UART0 は既存
+//       kernel console (xsh / wmcon の入出力).UART1 を RPC channel
+//       として独立に専有する → 既存 shell に干渉しない.
+//
+//   Round の位置づけ:
+//     Round 1 終盤の追加トラック (N2 WS Bridge が partial blocked
+//     な間の代替経路).Round 1 完了基準には算入しないが、N3
+//     (multi-Pi cluster) へ進む前に「Host↔node 1 本」を確実に
+//     通すための地ならし.
+
+aice AIPL_XinuRazPi_RemoteRPC {
+  dialect = "aice_evolution_v2";
+
+  task = "Host PC (macOS) から QEMU 上で動く AIPL/Xinu ランタイムに対し、テキスト行プロトコルで (a) 新規 actor の spawn、(b) 既存 actor への message send、(c) actor の field 読み取り、(d) 在席 actor の列挙 を行えるようにする.物理 channel は QEMU の -serial tcp:127.0.0.1:5555,server=on,wait=off で UART1 をホスト TCP socket に晒し、Xinu 側に UART1 driver + RPC dispatcher thread を追加.Host 側には bash+nc / Python の 2 種の参照クライアントを置き、smoke で round-trip を検証する.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
+
+  seed_from {
+    base_compiler        = "src/aipl2c.ml --xinu  + src/c_translator.ml:gen_program_xinu";
+    base_runtime         = "abcl_object_field_{get,set,count,class_id} accessors (F1 で導入済)";
+    base_actor_lifecycle = "abcl_enqueue(sender,receiver,method,n_args,args) + objects[] table (n_objects auto-grows on `new ClassName`)";
+    base_class_table     = "objects[id].class_id + abcl_class_prio() (P2 で導入済)";
+    base_kernel          = "/Users/kodamay/projects/xinu-raz/xinu  (arm-qemu, PL011 UART0=console, PL011 UART1=空き)";
+    base_toolchain       = "arm-none-eabi-gcc + qemu-system-arm + dune 3.20";
+    parity_anchor        = "F1 DistCheckpoint で確立した runtime accessor 経路";
+  }
+
+  // ─── 評価タスク = phase 候補 ───────────────────────────────────
+  evaluation_tasks {
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction H — Host ↔ Xinu RPC channel
+    // ═══════════════════════════════════════════════════════════
+
+    task H1_Uart1ChannelDriver {
+      spec = "Xinu に PL011 UART1 (versatilepb の 0x101F2000) 用 device driver を追加.UART0 の既存 driver と同じ API (kgetc/kputc) で `uart1Getc` / `uart1Putc` を公開.QEMU 起動時に -serial tcp:127.0.0.1:5555,server=on,wait=off を渡せば、host から socket 接続で TX/RX が透過に流れる.kernel console (UART0) には干渉しない.";
+      weight = 0.15;
+      acceptance = "4 assertion: (1) host が nc localhost 5555 で接続可、(2) host send → Xinu uart1Getc で受信、(3) Xinu uart1Putc → host で受信、(4) QEMU 起動後 UART0 の xsh プロンプトが従来通り出る.";
+    }
+
+    task H2_RpcLineProtocol {
+      spec = "UART1 上に流れる行 (LF 終端) を解析するパーサと、行を組み立てる送信 helper を追加.4 命令 — `SPAWN <class>` / `SEND <actor_id> <method> [<arg> ...]` / `QUERY <actor_id> <field_idx>` / `LIST` — をサポート.返信は `OK <key>=<value> [...]` または `ERR <reason>`.引数は decimal int のみ (Phase H2 では文字列引数を保留).";
+      weight = 0.15;
+      acceptance = "5 assertion: (1) SPAWN→OK actor_id=N が返る、(2) SEND→OK queued、(3) QUERY→OK value=N で field 値が読める、(4) LIST→OK n_actors=N、(5) 未知の opcode は ERR で蹴る.";
+    }
+
+    task H3_RpcDispatcherThread {
+      spec = "UART1 から行を読み続け、H2 のパーサに渡し、結果を UART1 に書き戻す Xinu thread `rpc_dispatcher_main` を追加.actor spawn は class id から動的に `new <Class>` 相当の処理 (= n_objects++ + class_id 設定 + 初期 fields[] zero-fill + (任意で) init() の enqueue) を実行.thread は kernel main から resume() され、UART1 の read で sleep する non-busy 設計.";
+      weight = 0.15;
+      acceptance = "4 assertion: (1) 1 接続あたり順序保証されたエコー往復、(2) spawn が n_objects を実際に増やす、(3) send が target actor の mailbox に届く ([aipl] first-recv マーカーで確認)、(4) dispatcher thread が cpu busy-wait しない (heartbeat tick の刻みが乱れない).";
+    }
+
+    task H4_SamplePrograms {
+      spec = "AIPL 側 sample `abclc/RemoteRpcDemoXinu.abcl` を追加.2 class を public 化: `Counter` (var n=0; method bump(){ n=n+1; print(7000+n); } method dump(){ print(8000+n); }) と `Greeter` (var who_tag=0; method set_who(t){ who_tag=t; print(9000+t); } method hello(){ print(10000+who_tag); }).Host 側 reference client は 2 種: (a) bash+nc 版 `host_rpc_demo.sh` で 8 行コマンドを流す、(b) Python 版 `host_rpc_demo.py` (stdlib のみ) で同じシーケンスを socket API 経由で実行.";
+      weight = 0.12;
+      acceptance = "6 assertion: (1) AIPL 側で Counter/Greeter class が register 済で起動時 spawn 0、(2) bash client が SPAWN Counter→SEND bump×2→SEND dump で 7001/7002/8002 digest を吐く、(3) Greeter の set_who(42)+hello で 9042/10042 digest、(4) LIST が n_actors=2、(5) Python client が同じ digest を観測、(6) shell (UART0 xsh$) は client 接続中も使える.";
+    }
+
+    task H5_SmokeAndRegression {
+      spec = "Host↔Xinu RPC を自動検証する `_smoke_remote_rpc.sh` を追加.QEMU を bg で起動 (-serial UART0=stdio に redirect、UART1=tcp socket) → host_rpc_demo.sh / .py を順に流す → QEMU stdio を grep して digest 確認 → QEMU 停止.既存の R_BackwardCompat (_smoke_backwardcompat.sh) は引き続き 100% PASS.";
+      weight = 0.10;
+      acceptance = "5 assertion: bash client smoke PASS、python client smoke PASS、UART0 console PASS、QEMU clean shutdown、R_BackwardCompat が 2/2 維持.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═══════════════════════════════════════════════════════════
+
+    task H_BackwardCompat {
+      spec = "既存 17 smoke (_smoke_r1.sh, _smoke_p1.sh ... _smoke_f2.sh, _smoke_backwardcompat.sh) が全 PASS 維持.特に UART0 を使う _smoke_p4 (SchedVizXinu の csv 出力) と F1/F2 の chkpt/lww 出力が新 UART1 driver 導入で壊れていないこと.";
+      weight = 0.08;
+      acceptance = "全既存 smoke が PASS、kernel.elf の binary サイズ増加が +8KB 以内.";
+    }
+
+    task ImplCost {
+      spec = "RemoteRPC 全 5 phase 合計で xinu-raz 側 +200..+400 LOC、AIPL 側 +50..+150 LOC、Host CLI +60..+120 LOC.実装上のトレードオフ: (i) JSON parser を持ち込むと LOC が膨らむので text 命令はスペース区切り decimal int に限定、(ii) UART1 driver は IRQ を使わず polling + sleep(8ms) の方が PL011 IRQ 線引き回しより低コスト.";
+      weight = 0.05;
+    }
+  }
+
+  // ─── 実装順序 (依存関係) ─────────────────────────────────────
+  implementation_order {
+    // H1 で物理 channel を確立 → H2 でプロトコル → H3 で dispatcher
+    // → H4 で sample → H5 で自動 smoke.順方向 dep のみ、並行作業は
+    // H2 (parser) と H4 (AIPL sample) のみ可.
+    step H1_Uart1ChannelDriver  { dep = "Round 1 R0/R1"; }
+    step H2_RpcLineProtocol     { dep = "H1"; }
+    step H3_RpcDispatcherThread { dep = "H1 + H2"; }
+    step H4_SamplePrograms      { dep = "H3";  note = "AIPL sample は H2 と並行可"; }
+    step H5_SmokeAndRegression  { dep = "H4"; }
+    step H_BackwardCompat       { dep = "H5"; }
+  }
+
+  // ─── アーキテクチャ決定 ──────────────────────────────────────
+  decisions {
+
+    decision channel_topology {
+      // -serial pipe: より -serial tcp: を選んだ理由: macOS の
+      // mkfifo は QEMU の serial が non-blocking open しないので
+      // EWOULDBLOCK で詰まる.TCP socket は QEMU 側で正しく
+      // blocking ↔ non-blocking が選べる + 既存ツール (nc, python
+      // socket) との接続性が圧倒的に高い.
+      primary   = "QEMU -serial tcp:127.0.0.1:5555,server=on,wait=off";
+      secondary = "-serial pipe:/tmp/aipl_rpc  (検討、ただし macOS では非推奨)";
+      tertiary  = "smc91c111 経由 TCP socket (N1 完成後の future option)";
+      console   = "UART0 はそのまま QEMU の stdio (xsh$ 接続)";
+      rpc       = "UART1 を独占 — RX/TX を rpc_dispatcher_main thread が占有";
+    }
+
+    decision protocol_format {
+      // JSON / msgpack を入れると Xinu 側のパーサ LOC が爆発する.
+      // 単純な「opcode SP arg SP arg … LF」の text に絞る.
+      framing      = "LF (0x0A) terminated lines";
+      max_line_len = "256 bytes (= MAX_RPC_LINE)";
+      opcodes      = "SPAWN | SEND | QUERY | LIST | PING";
+      arg_format   = "space-separated decimal int (TInt only); string args は Phase H6+ で別途検討";
+      reply_ok     = "OK key=value [key=value ...]";
+      reply_err    = "ERR <short_reason>";
+      reply_async  = "EVT id=N method=NAME arg=V (actor が外向き emit するときの notify; H4 では未使用)";
+    }
+
+    decision actor_registration {
+      // SPAWN <class_name> で class を名前引きするため、abcl_program.c
+      // に class table (idx → name) を出力する必要がある.今は
+      // F_<Class>_<field> 形式の enum だけがあるので、追加で
+      // `static const char *abcl_class_names[];` を c_translator が
+      // 吐けば良い.aipl2c に minimum 30 LOC 程度の追加.
+      table       = "abcl_class_names[] : const char *";
+      lookup      = "rpc 側で strcmp ループ; class 数が小さい (<32) ので O(N) OK";
+      auto_init   = "spawn 時に init() メソッドを mailbox に enqueue.失敗時は actor は alive のまま (= F1 と同じ意味論)";
+      shutdown    = "今 phase では DESTROY 命令を提供しない — actor は kernel halt まで生存";
+    }
+
+    decision security_posture {
+      // -serial tcp は 127.0.0.1 にバインド.外部公開はしない.
+      bind        = "127.0.0.1 only — 外部ネットには出さない";
+      auth        = "なし (実機で N3 移行する際に再検討)";
+      max_clients = "1 (QEMU の -serial は 1 接続のみ受ける)";
+    }
+
+    decision external_repo {
+      xinu_raz       = "/Users/kodamay/projects/xinu-raz/xinu  (UART1 driver の追加が必要 — apps/abcl_xinu_rpc.c + device/uart-pl011/uart1*.c)";
+      changes_record = "Xinu 側に手を入れた phase は commit message に明記";
+    }
+  }
+
+  // ─── 検証 (期待 assertion 合計) ──────────────────────────────
+  verification {
+    direction_H  = "24 assertion (H1:4 + H2:5 + H3:4 + H4:6 + H5:5)";
+    cross_cut    = "8 assertion (H_BackwardCompat:2 + ImplCost:n/a)";
+    grand_total  = "32 assertion for RemoteRPC track";
+    smoke_files  = [
+      "_smoke_h1.sh        — UART1 ↔ host TCP echo",
+      "_smoke_h2.sh        — RPC parser unit-ish (1 opcode at a time)",
+      "_smoke_h3.sh        — dispatcher thread spawn/send round-trip",
+      "_smoke_remote_rpc.sh — H4 sample + H5 end-to-end via bash + python",
+      "_smoke_backwardcompat.sh は既存どおり"
+    ];
+  }
+
+  // ─── ファイル更新範囲 ─────────────────────────────────────────
+  file_impact {
+    primary = [
+      "src/c_translator.ml::gen_program_xinu  (~30 LOC: abcl_class_names[] emission + spawn-by-name helper)",
+      "abclc/RemoteRpcDemoXinu.abcl           (~60 LOC: Counter + Greeter)"
+    ];
+    new_files = [
+      "aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/_smoke_h{1,2,3}.sh",
+      "aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/_smoke_remote_rpc.sh",
+      "aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/host_rpc_demo.sh",
+      "aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/host_rpc_demo.py"
+    ];
+    external = [
+      "/Users/kodamay/projects/xinu-raz/xinu/device/uart-pl011/uart1*.c  (~120 LOC: PL011 UART1 driver)",
+      "/Users/kodamay/projects/xinu-raz/xinu/apps/abcl_xinu_rpc.c         (~200 LOC: line parser + dispatcher thread + spawn-by-name resolver)",
+      "/Users/kodamay/projects/xinu-raz/xinu/apps/Makerules               (~2 LOC: add abcl_xinu_rpc.c)",
+      "/Users/kodamay/projects/xinu-raz/xinu/system/main.c                (~5 LOC: create() + ready() for rpc_dispatcher_main)"
+    ];
+    untouched = [
+      "src/typing_env.ml          (RPC は AIPL から呼ばない、host 側からのみなので extern 追加不要)",
+      "browser-abcl 系 (spreadsheet/drone-sim)"
+    ];
+  }
+
+  // ─── 実行例 (sample プログラム — H4 と直結) ────────────────
+  sample_session {
+
+    // AIPL 側: 起動時には何もインスタンス化しない.Counter / Greeter
+    // class が宣言だけされていれば、host から SPAWN で生成できる.
+    aipl_side {
+      file = "abclc/RemoteRpcDemoXinu.abcl";
+      classes = [
+        "class Counter { var n = 0; method bump() { n = n + 1; print(7000+n); } method dump() { print(8000+n); } }",
+        "class Greeter { var who_tag = 0; method set_who(t) { who_tag = t; print(9000+t); } method hello() { print(10000+who_tag); } }"
+      ];
+      globals = "なし — 起動時 actor 数 = 0";
+    }
+
+    // Host bash クライアント: nc で UART1 socket に接続して 8 命令.
+    host_bash_demo {
+      file = "host_rpc_demo.sh";
+      protocol = "nc -q 1 127.0.0.1 5555";
+      commands = [
+        "PING",
+        "SPAWN Counter",
+        "SEND 0 bump",
+        "SEND 0 bump",
+        "SEND 0 dump",
+        "SPAWN Greeter",
+        "SEND 1 set_who 42",
+        "SEND 1 hello",
+        "LIST"
+      ];
+      expected_replies = [
+        "OK pong=1",
+        "OK actor_id=0 class=Counter",
+        "OK queued method=bump",
+        "OK queued method=bump",
+        "OK queued method=dump",
+        "OK actor_id=1 class=Greeter",
+        "OK queued method=set_who",
+        "OK queued method=hello",
+        "OK n_actors=2"
+      ];
+      expected_kernel_digests = [
+        "7001 (Counter.bump #1)",
+        "7002 (Counter.bump #2)",
+        "8002 (Counter.dump => 2)",
+        "9042 (Greeter.set_who(42))",
+        "10042 (Greeter.hello => 42)"
+      ];
+    }
+
+    // Host Python クライアント: stdlib socket のみ.bash 版と
+    // 同じシーケンスを流す.戻り値を辞書化して assert.
+    host_python_demo {
+      file        = "host_rpc_demo.py";
+      requires    = "Python 3 stdlib only (socket + sys + time)";
+      api         = "send(line) / recv_line() / call(opcode, *args) -> dict";
+      behaviour   = "PING -> SPAWN x2 -> SEND x5 -> LIST と同シーケンスを実行し、各応答の OK / key=value を辞書 parse して assert.";
+      exit_code   = "0 if 全 assert PASS、1 if any fail";
+    }
+  }
+
+  // ─── 最終目標 ─────────────────────────────────────────────────
+  goal = "Host PC (mac) から QEMU 上の AIPL/Xinu に対して、ネットワーク NIC を経由せず、QEMU の -serial tcp socket 経由でテキスト行プロトコルでリモート actor を spawn・送信できる経路を確立する.bash と Python の 2 種類の参照クライアントが両方とも同じ digest sequence (Counter.bump → 7001 → 7002 → 8002、Greeter.set_who(42) → 9042 → 10042) を引き出せること.既存の UART0 / xsh shell, R_BackwardCompat, 17 既存 smoke は全て無傷.将来の N3 multi-Pi cluster で同プロトコルを inter-node にも使い回す前提のスケーラビリティ.";
+}
