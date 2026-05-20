@@ -39,9 +39,9 @@ class Philosopher {
   var counter   = 0;
   var left_idx  = 0;
   var right_idx = 0;
-  var left_fork  = 0;
-  var right_fork = 0;
-  var running   = 0;
+  var left_fork  = nil;
+  var right_fork = nil;
+  var running    = 0;
 
   method init(i: int, li: int, ri: int, lf, rf) {
     idx       = i;
@@ -116,8 +116,8 @@ class Philosopher {
 }
 
 class Controller {
-  var p0 = ""; var p1 = ""; var p2 = ""; var p3 = ""; var p4 = "";
-  var f0 = 0; var f1 = 0; var f2 = 0; var f3 = 0; var f4 = 0;
+  var p0 = nil; var p1 = nil; var p2 = nil; var p3 = nil; var p4 = nil;
+  var f0 = nil; var f1 = nil; var f2 = nil; var f3 = nil; var f4 = nil;
 
   method init() {
     f0 = new Fork(0);

@@ -198,6 +198,31 @@ let prelude () : env =
   add_mono e "xinu_gui_buf_put"         (TFun ([TInt], TUnit));
   add_mono e "xinu_gui_buf_take"        (TFun ([TInt], TUnit));
 
+  (* ---- Non-Xinu GUI surface — same shapes as the xinu_gui_* family
+     but used by the abclc/*Gui.abcl SDL-backed variants on macOS /
+     Linux.  Without these declarations the same int/any unification
+     issues surface as with the Xinu versions before R0. ---- *)
+  add_mono e "gui_open"                 (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "gui_run"                  (TFun ([], TUnit));
+  add_mono e "gui_set_line"             (TFun ([TAny;TAny;TAny;TAny;TAny;TAny;TAny;TAny], TUnit));
+  add_mono e "gui_register_ticker"      (TFun ([TAny], TUnit));
+  add_mono e "gui_add_button"           (TFun ([TString;TInt;TInt;TInt;TInt;TAny;TString], TUnit));
+  add_mono e "gui_add_slider"           (TFun ([TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TInt;TString], TUnit));
+  add_mono e "gui_slider_value"         (TFun ([TInt], TInt));
+  add_mono e "gui_set_fork_free"        (TFun ([TInt], TUnit));
+  add_mono e "gui_set_fork_held"        (TFun ([TInt; TInt], TUnit));
+  add_mono e "gui_set_phil"             (TFun ([TInt; TInt], TUnit));
+  add_mono e "gui_set_actor"            (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "gui_buf_setup"            (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "gui_buf_setup"            (TFun ([TInt; TInt; TInt; TInt], TUnit));
+  add_mono e "gui_buf_put"              (TFun ([TInt], TUnit));
+  add_mono e "gui_buf_take"             (TFun ([TInt], TUnit));
+  add_mono e "gui_dining_init"          (TFun ([TInt], TUnit));
+  add_mono e "gui_disaster_setup"       (TFun ([TInt], TUnit));
+  add_mono e "gui_disaster_setup"       (TFun ([TInt; TInt; TInt], TUnit));
+  add_mono e "gui_disaster_reset"       (TFun ([], TUnit));
+  add_mono e "gui_disaster_step"        (TFun ([], TUnit));
+
   (* 3) typeof : 各型 or 多相。ここでは各型を列挙 *)
   add_mono e "typeof" (TFun ([TInt],    TString));
   add_mono e "typeof" (TFun ([TFloat],  TString));

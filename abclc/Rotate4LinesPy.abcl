@@ -41,7 +41,7 @@ class Spinner {
 }
 
 class Controller {
-  var s1 = ""; var s2 = ""; var s3 = ""; var s4 = "";
+  var s1 = nil; var s2 = nil; var s3 = nil; var s4 = nil;
 
   method init() {
     // 中心が正方形の 4 頂点になる配置 (640x500, 中央)
