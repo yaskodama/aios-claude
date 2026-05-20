@@ -222,6 +222,13 @@ let prelude () : env =
   add_mono e "sched_viz_stop"           (TFun ([], TInt));
   add_mono e "sched_viz_sample"         (TFun ([], TInt));
 
+  (* ---- N1 TCP/IP builtins (apps/abcl_xinu_net.c) ---- *)
+  add_mono e "net_init"                 (TFun ([TInt], TInt));
+  add_mono e "net_connect"              (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
+  add_mono e "net_send"                 (TFun ([TInt; TString], TInt));
+  add_mono e "net_recv"                 (TFun ([TInt; TInt], TInt));
+  add_mono e "net_close"                (TFun ([TInt], TInt));
+
   (* ---- Non-Xinu GUI surface — same shapes as the xinu_gui_* family
      but used by the abclc/*Gui.abcl SDL-backed variants on macOS /
      Linux.  Without these declarations the same int/any unification
