@@ -248,6 +248,16 @@ let prelude () : env =
   add_mono e "checkpoint_list"          (TFun ([], TInt));
   add_mono e "checkpoint_clear"         (TFun ([], TInt));
 
+  (* ---- F2 LWW cell semantics — direct port of the browser-abcl
+     spreadsheet's Last-Writer-Wins store.  Keys are ints, values are
+     ints, ts is a monotonic counter (use lww_tick to obtain one). ---- *)
+  add_mono e "lww_write"                (TFun ([TInt; TInt; TInt], TInt));
+  add_mono e "lww_read"                 (TFun ([TInt], TInt));
+  add_mono e "lww_ts"                   (TFun ([TInt], TInt));
+  add_mono e "lww_size"                 (TFun ([], TInt));
+  add_mono e "lww_clear"                (TFun ([], TInt));
+  add_mono e "lww_tick"                 (TFun ([], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));

@@ -1,0 +1,71 @@
+// LwwCellsXinu.abcl
+// F2 demo: Last-Writer-Wins cell semantics.
+//
+// Sheet is a writer that pushes cells with explicit timestamps.  The
+// scenario exercises every LWW invariant:
+//   (a) write(k=1, v=100, ts=10) → accepted
+//   (b) read(1) == 100
+//   (c) write(k=1, v=200, ts=20) → accepted (newer)
+//   (d) read(1) == 200
+//   (e) write(k=1, v=50,  ts=5)  → REJECTED (older); read unchanged
+//   (f) write(k=1, v=999, ts=20) → REJECTED (tie, strict >)
+//   (g) write(k=2, v=42,  ts=15) → accepted (different key)
+//   (h) size == 2
+//   (i) lww_tick is monotonic
+//   (j) clear → size == 0
+
+class Sheet {
+  var v1 = 0;
+  var v2 = 0;
+
+  method init() {
+    // (a) initial write
+    var r1 = lww_write(1, 100, 10);
+    print(1000 + r1);                   // 1001 (accepted)
+    v1 = lww_read(1);
+    print(2000 + v1);                   // 2100
+
+    // (c) newer write — accept
+    var r2 = lww_write(1, 200, 20);
+    print(1000 + r2);                   // 1001
+    v1 = lww_read(1);
+    print(2000 + v1);                   // 2200
+
+    // (e) older write — reject
+    var r3 = lww_write(1, 50, 5);
+    print(1000 + r3);                   // 1000 (rejected)
+    v1 = lww_read(1);
+    print(2000 + v1);                   // 2200 (unchanged)
+
+    // (f) tie ts — also rejected (strict >)
+    var r4 = lww_write(1, 999, 20);
+    print(1000 + r4);                   // 1000
+    v1 = lww_read(1);
+    print(2000 + v1);                   // 2200
+
+    // (g) different key — accepted
+    var r5 = lww_write(2, 42, 15);
+    print(1000 + r5);                   // 1001
+    v2 = lww_read(2);
+    print(3000 + v2);                   // 3042
+
+    // (h) size == 2
+    var sz = lww_size();
+    print(4000 + sz);                   // 4002
+
+    // (i) lww_tick monotonic — should be > 20 (since g_lamport bumped
+    // by every accepted write to its ts).  First tick = 21, second = 22.
+    var t1 = lww_tick();
+    var t2 = lww_tick();
+    print(5000 + t1);                   // 5021
+    print(5000 + t2);                   // 5022
+
+    // (j) clear
+    var cleared = lww_clear();
+    print(6000 + cleared);              // 6002
+    var sz2 = lww_size();
+    print(4000 + sz2);                  // 4000
+  }
+}
+
+var s = new Sheet();
