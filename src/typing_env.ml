@@ -217,6 +217,13 @@ let prelude () : env =
   add_mono e "fb_get_aa"                (TFun ([], TInt));
   add_mono e "fb_fill_rect"             (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
 
+  (* ---- G2 bitmap font text — reuse WM's 8x8 font (FONT_SCALE=2 →
+     effective 16x16 cell).  fb_text takes a String, fb_char takes an
+     ASCII int so the codegen does not need to slice a String. ---- *)
+  add_mono e "fb_text"                  (TFun ([TInt; TInt; TString; TInt], TInt));
+  add_mono e "fb_char"                  (TFun ([TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_text_size"             (TFun ([TString], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));
