@@ -1,0 +1,105 @@
+{
+  "name": "AIPL_XinuRazPi_RemoteRPC",
+  "task": "Host PC (macOS) から QEMU 上で動く AIPL/Xinu ランタイムに対し、テキスト行プロトコルで (a) 新規 actor の spawn、(b) 既存 actor への message send、(c) actor の field 読み取り、(d) 在席 actor の列挙 を行えるようにする.物理 channel は QEMU の -serial tcp:127.0.0.1:5555,server=on,wait=off で UART1 をホスト TCP socket に晒し、Xinu 側に UART1 driver + RPC dispatcher thread を追加.Host 側には bash+nc / Python の 2 種の参照クライアントを置き、smoke で round-trip を検証する.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "H1_Uart1ChannelDriver",
+      "H2_RpcLineProtocol",
+      "H3_RpcDispatcherThread",
+      "H4_SamplePrograms",
+      "H5_SmokeAndRegression",
+      "H_BackwardCompat",
+      "ImplCost"
+    ],
+    "evaluator": "mock_v1",
+    "reviewers": []
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}
