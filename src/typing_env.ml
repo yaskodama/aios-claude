@@ -224,6 +224,16 @@ let prelude () : env =
   add_mono e "fb_char"                  (TFun ([TInt; TInt; TInt; TInt], TInt));
   add_mono e "fb_text_size"             (TFun ([TString], TInt));
 
+  (* ---- G3 mouse dispatch — register/clear callbacks, synthesise
+     events from AIPL (for smoke testing) and read packed state.
+     Actor self is TAny so any concrete class can subscribe. ---- *)
+  add_mono e "mouse_on_click"           (TFun ([TAny; TString], TInt));
+  add_mono e "mouse_on_move"            (TFun ([TAny; TString], TInt));
+  add_mono e "mouse_on_release"         (TFun ([TAny; TString], TInt));
+  add_mono e "mouse_unsubscribe"        (TFun ([TAny], TInt));
+  add_mono e "mouse_inject"             (TFun ([TInt; TInt; TInt; TInt], TInt));
+  add_mono e "mouse_state"              (TFun ([], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));
