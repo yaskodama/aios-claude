@@ -1043,6 +1043,31 @@ void abcl_shutdown(void) {
   wake_all_actors();
 }
 
+/* F1: public accessors over the static `objects[]` table.  Used by
+   abcl_xinu_chkpt.c to snapshot / restore actor fields without
+   re-declaring the object_t layout in two files.  Returns 1 on
+   success, 0 on a bad slot or field index. */
+int abcl_object_field_count(void) { return MAX_FIELDS; }
+
+int abcl_object_field_get(int obj_id, int field_idx, value_t *out) {
+  if (obj_id < 0 || obj_id >= n_objects) return 0;
+  if (field_idx < 0 || field_idx >= MAX_FIELDS) return 0;
+  *out = objects[obj_id].fields[field_idx];
+  return 1;
+}
+
+int abcl_object_field_set(int obj_id, int field_idx, value_t v) {
+  if (obj_id < 0 || obj_id >= n_objects) return 0;
+  if (field_idx < 0 || field_idx >= MAX_FIELDS) return 0;
+  objects[obj_id].fields[field_idx] = v;
+  return 1;
+}
+
+int abcl_object_class_id(int obj_id) {
+  if (obj_id < 0 || obj_id >= n_objects) return -1;
+  return objects[obj_id].class_id;
+}
+
 /* Xinu の queue.h にある enqueue() と名前が衝突するのでリネーム。
    以降 abcl 側のコードでは enqueue マクロで本関数を呼ぶ。 */
 /* R1 smoke markers: print the FIRST send + FIRST recv to the serial

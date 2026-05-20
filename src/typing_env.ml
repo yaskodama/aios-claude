@@ -240,6 +240,14 @@ let prelude () : env =
   add_mono e "fb_image"                 (TFun ([TInt; TInt; TInt; TInt; TAny], TInt));
   add_mono e "fb_image_solid"           (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
 
+  (* ---- F1 distributed checkpoint — local-node phase.  self is TAny
+     so any concrete actor can snapshot itself; tag is a free-form
+     string used to look the snapshot up later. ---- *)
+  add_mono e "checkpoint_save"          (TFun ([TAny; TString], TInt));
+  add_mono e "checkpoint_load"          (TFun ([TAny; TString], TInt));
+  add_mono e "checkpoint_list"          (TFun ([], TInt));
+  add_mono e "checkpoint_clear"         (TFun ([], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));
