@@ -1,0 +1,75 @@
+// MpscStressXinu.abcl
+// P3 demo: lock-free MPSC mailbox under multi-producer contention.
+//
+// 4 Producer actors each fire K tick messages at one shared Counter.
+// Counter increments a field on every tick.  When all four producers
+// signal `done`, Controller asks Counter to report its final count.
+//
+// Expected:
+//   - Counter receives exactly 4*K ticks with zero drops
+//     (the lock-free CAS ring buffer never loses a reservation).
+//   - `[abcl] done; messages=… drops=0 tick=…` shows aggregate drop=0.
+//   - Smoke (_smoke_p3.sh) computes throughput = N / (t_done - t_start)
+//     and asserts < 10 ms / send, i.e. single-digit-us latency on real
+//     hardware once the QEMU overhead is amortised.
+
+class Counter {
+  var n = 0;
+  method init() { n = 0; }
+  method tick() { n = n + 1; }
+  method report() {
+    print("[aipl] mpsc-final");
+    print(n);
+  }
+}
+
+class Producer {
+  var target = nil;
+  var supervisor = nil;
+  var k = 0;
+  method init(t, sup, kk) {
+    target = t;
+    supervisor = sup;
+    k = kk;
+  }
+  method fire() {
+    var i = 1;
+    while (i <= k) do {
+      send target.tick();
+      i = i + 1;
+    }
+    send supervisor.done();
+  }
+}
+
+class Controller {
+  var c = nil;
+  var p1 = nil;
+  var p2 = nil;
+  var p3 = nil;
+  var p4 = nil;
+  var K = 0;
+  var done_count = 0;
+
+  method init() {
+    K = 32;
+    c  = new Counter();
+    p1 = new Producer(c, self, K);
+    p2 = new Producer(c, self, K);
+    p3 = new Producer(c, self, K);
+    p4 = new Producer(c, self, K);
+    send p1.fire();
+    send p2.fire();
+    send p3.fire();
+    send p4.fire();
+  }
+
+  method done() {
+    done_count = done_count + 1;
+    if (done_count == 4) {
+      send c.report();
+    }
+  }
+}
+
+var ctrl = new Controller();

@@ -902,13 +902,17 @@ let gen_program ?(max_messages = 12) (p : program) : string =
 (* ===================== Xinu 用ランタイム ===================== *)
 
 let runtime_prelude_xinu = {|#include <stddef.h>
+#include <stdint.h>
 #include <kernel.h>
 #include <thread.h>
 #include <semaphore.h>
+#include <clock.h>     /* P3: clkticks for throughput markers */
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_MAILBOX 16
+/* P3: bumped from 16 to 64 so the lock-free MPSC ring can sustain
+   higher producer fan-in without back-pressure dropping messages. */
+#define MAX_MAILBOX 64
 #define MAX_OBJECTS 16
 #define MAX_FIELDS  16
 #define MAX_ARGS    8
@@ -978,10 +982,25 @@ typedef struct {
   value_t     args[MAX_ARGS];
 } message_t;
 
+/* P3: lock-free MPSC bounded ring buffer (Vyukov style, single consumer).
+   - `enq` is bumped via CAS by multiple producers, no critical section.
+   - `deq` is touched only by the owning actor's thread, so a plain
+     atomic store suffices.
+   - `slot_seq[i]` is a per-slot sequence stamp; producer sees its slot
+     ready when seq==pos, consumer sees ready payload when seq==pos+1,
+     and the consumer recycles the slot for the producer at pos+CAP by
+     storing seq=pos+CAP.  Initialized so slot_seq[i]=i.
+   - `items` is a counting semaphore kept solely so the receiver can
+     block on empty.  Lock-free bookkeeping eliminates wait()/signal()
+     on the producer path's critical section (only the kernel signal()
+     call into `items` remains, which is ISR-safe in Xinu).
+*/
 typedef struct {
   message_t msgs[MAX_MAILBOX];
-  int       head, tail;
-  semaphore mu;
+  volatile uint32_t slot_seq[MAX_MAILBOX];
+  volatile uint32_t enq;
+  volatile uint32_t deq;
+  volatile uint32_t drops;   /* producer-side drop counter (full mailbox) */
   semaphore items;
 } mailbox_t;
 
@@ -998,9 +1017,11 @@ static int      n_objects = 0;
 static semaphore objects_mu;
 
 static void mailbox_init(mailbox_t *mb) {
-  mb->head = 0;
-  mb->tail = 0;
-  mb->mu    = semcreate(1);
+  int i;
+  mb->enq   = 0;
+  mb->deq   = 0;
+  mb->drops = 0;
+  for (i = 0; i < MAX_MAILBOX; i++) mb->slot_seq[i] = (uint32_t)i;
   mb->items = semcreate(0);
 }
 
@@ -1043,27 +1064,73 @@ void abcl_log_first_recv(int self_id, const char *method) {
   signal(print_mu);
 }
 
+/* P3 lock-free MPSC enqueue.
+   The hot path has zero kernel disable()/restore() — only LDREX/STREX
+   pairs (GCC __atomic primitives on ARMv6+).  The trailing signal() on
+   `items` is the only kernel call; it is safe to invoke from an ISR
+   because Xinu's signal() handles its own irq mask. */
 void abcl_enqueue(int sender, int receiver, const char *method,
                   int n_args, value_t *args) {
   if (receiver < 0 || receiver >= n_objects) return;
   abcl_log_first_send(receiver, method);
   mailbox_t *mb = &objects[receiver].mbox;
-  wait(mb->mu);
-  if (mb->tail - mb->head < MAX_MAILBOX) {
-    int idx = mb->tail % MAX_MAILBOX;
+  uint32_t pos;
+  uint32_t idx;
+  uint32_t cur;
+  int retries;
+
+  /* (1) Reserve a slot.  Loop: load enq, verify slot is free
+     (slot_seq==pos), CAS-bump enq.  Bounded retry. */
+  for (retries = 0; retries < 256; retries++) {
+    pos = __atomic_load_n(&mb->enq, __ATOMIC_ACQUIRE);
+    if (pos - __atomic_load_n(&mb->deq, __ATOMIC_ACQUIRE) >= (uint32_t)MAX_MAILBOX) {
+      /* Bounded ring is full — back off briefly and retry.  After
+         several yields, give up so a stuck consumer can't deadlock
+         a producer thread. */
+      if (retries > 16) {
+        __atomic_fetch_add(&mb->drops, 1, __ATOMIC_RELAXED);
+        return;
+      }
+      yield();
+      continue;
+    }
+    idx = pos % (uint32_t)MAX_MAILBOX;
+    cur = __atomic_load_n(&mb->slot_seq[idx], __ATOMIC_ACQUIRE);
+    if (cur != pos) {
+      /* Slot not yet recycled by consumer — retry (rare under MPSC). */
+      continue;
+    }
+    if (__atomic_compare_exchange_n(&mb->enq, &pos, pos + 1,
+                                    /*weak=*/0,
+                                    __ATOMIC_ACQ_REL,
+                                    __ATOMIC_ACQUIRE)) {
+      break;  /* won reservation */
+    }
+    /* CAS lost — another producer grabbed pos; retry. */
+  }
+  if (retries >= 256) {
+    __atomic_fetch_add(&mb->drops, 1, __ATOMIC_RELAXED);
+    return;
+  }
+
+  /* (2) Write payload — we have exclusive ownership of slot[idx]
+     because slot_seq[idx]==pos blocked any other producer. */
+  mb->msgs[idx].sender   = sender;
+  mb->msgs[idx].receiver = receiver;
+  mb->msgs[idx].method   = method;
+  mb->msgs[idx].n_args   = n_args;
+  {
     int i;
-    mb->msgs[idx].sender   = sender;
-    mb->msgs[idx].receiver = receiver;
-    mb->msgs[idx].method   = method;
-    mb->msgs[idx].n_args   = n_args;
     for (i = 0; i < n_args && i < MAX_ARGS; i++)
       mb->msgs[idx].args[i] = args[i];
-    mb->tail++;
-    signal(mb->mu);
-    signal(mb->items);
-  } else {
-    signal(mb->mu);
   }
+
+  /* (3) Publish — releasing store on slot_seq makes the payload
+     visible to the consumer. */
+  __atomic_store_n(&mb->slot_seq[idx], pos + 1, __ATOMIC_RELEASE);
+
+  /* (4) Wake the consumer if blocked. */
+  signal(mb->items);
 }
 
 /* 以降の生成コードでは abcl_enqueue を enqueue として書く */
@@ -1236,22 +1303,37 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  for (;;) {\n";
   emit "    message_t m;\n";
   emit "    int idx;\n";
+  emit "    uint32_t pos;\n";
+  emit "    uint32_t slot;\n";
+  emit "    int spin;\n";
   emit "    if (global_shutdown) break;\n";
   emit "    wait(mb->items);\n";
   emit "    if (global_shutdown) break;\n";
-  emit "    wait(mb->mu);\n";
-  emit "    if (mb->head == mb->tail) { signal(mb->mu); continue; }\n";
-  emit "    m = mb->msgs[mb->head % MAX_MAILBOX];\n";
-  emit "    mb->head++;\n";
-  emit "    signal(mb->mu);\n";
+  emit "    /* P3: lock-free MPSC consumer.  We are the only consumer for\n";
+  emit "       this mailbox, so deq does not need CAS.  Spin on slot_seq\n";
+  emit "       until the producer's release-store of pos+1 is visible. */\n";
+  emit "    pos  = __atomic_load_n(&mb->deq, __ATOMIC_ACQUIRE);\n";
+  emit "    slot = pos % (uint32_t)MAX_MAILBOX;\n";
+  emit "    for (spin = 0; spin < 1024; spin++) {\n";
+  emit "      if (__atomic_load_n(&mb->slot_seq[slot], __ATOMIC_ACQUIRE) == pos + 1) break;\n";
+  emit "    }\n";
+  emit "    if (__atomic_load_n(&mb->slot_seq[slot], __ATOMIC_ACQUIRE) != pos + 1) {\n";
+  emit "      /* Spurious wake (e.g. wake_all_actors during shutdown) — retry. */\n";
+  emit "      continue;\n";
+  emit "    }\n";
+  emit "    m = mb->msgs[slot];\n";
+  emit "    /* Recycle slot for producer at pos+MAX_MAILBOX. */\n";
+  emit "    __atomic_store_n(&mb->slot_seq[slot], pos + (uint32_t)MAX_MAILBOX, __ATOMIC_RELEASE);\n";
+  emit "    __atomic_store_n(&mb->deq, pos + 1, __ATOMIC_RELEASE);\n";
   emit "    abcl_log_first_recv(self_id, m.method);\n";
   emit "    wait(counter_mu);\n";
   emit "    idx = ++messages_processed;\n";
   emit "    signal(counter_mu);\n";
-  emit "    /* P1: every 25 dispatches print one liveness marker. */\n";
+  emit "    /* P1: every 25 dispatches print one liveness marker.\n";
+  emit "       P3: also include clkticks so a smoke can compute throughput. */\n";
   emit "    if (idx % 25 == 0) {\n";
   emit "      wait(print_mu);\n";
-  emit "      kprintf(\"[aipl] alive msg=%d\\r\\n\", idx);\n";
+  emit "      kprintf(\"[aipl] alive msg=%d tick=%d\\r\\n\", idx, (int)clkticks);\n";
   emit "      signal(print_mu);\n";
   emit "    }\n";
   emit "    if (_abcl_cap > 0 && idx > _abcl_cap) {\n";
@@ -1274,7 +1356,7 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  kprintf(\"\\r\\n[abcl] starting...\\r\\n\");\n";
   (* R1 smoke marker — stable string for `grep aipl-start` in the
      QEMU -nographic serial log. *)
-  emit "  kprintf(\"[aipl] start\\r\\n\");\n";
+  emit "  kprintf(\"[aipl] start tick=%d\\r\\n\", (int)clkticks);\n";
   let g_ctx = make_ctx ~cname:"" ~fields:[] ~params:[] ~mname:"" in
   emit "  /* phase 1: alloc all globals */\n";
   List.iter
@@ -1332,7 +1414,16 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
     gs;
   emit "  /* wait for shutdown */\n";
   emit "  while (!global_shutdown) sleep(50);\n";
-  emit "  kprintf(\"[abcl] done; messages=%d\\r\\n\", messages_processed);\n";
+  emit "  /* P3: aggregate mailbox-drop counters across all objects so a\n";
+  emit "     smoke can verify lock-free MPSC didn't lose messages. */\n";
+  emit "  {\n";
+  emit "    int i;\n";
+  emit "    uint32_t total_drops = 0;\n";
+  emit "    for (i = 0; i < n_objects; i++)\n";
+  emit "      total_drops += objects[i].mbox.drops;\n";
+  emit "    kprintf(\"[abcl] done; messages=%d drops=%u tick=%d\\r\\n\",\n";
+  emit "            messages_processed, (unsigned)total_drops, (int)clkticks);\n";
+  emit "  }\n";
   emit "  return OK;\n";
   emit "}\n";
 
