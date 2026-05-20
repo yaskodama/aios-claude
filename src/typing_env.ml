@@ -203,6 +203,19 @@ let prelude () : env =
   add_mono e "xinu_gui_buf_put"         (TFun ([TInt], TUnit));
   add_mono e "xinu_gui_buf_take"        (TFun ([TInt], TUnit));
 
+  (* ---- G1 framebuffer primitives — declared as Int return (1 ok / 0
+     bad-args) so they integrate with the relational overload
+     resolution used by the rest of the codebase.  Coordinates are
+     plain Int; the colour argument is a packed 24-bit Int. ---- *)
+  add_mono e "fb_pixel"                 (TFun ([TInt; TInt; TInt], TInt));
+  add_mono e "fb_line"                  (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_circle"                (TFun ([TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_triangle"              (TFun ([TInt; TInt; TInt; TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_rrect"                 (TFun ([TInt; TInt; TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_dashed_line"           (TFun ([TInt; TInt; TInt; TInt; TInt; TInt], TInt));
+  add_mono e "fb_set_aa"                (TFun ([TInt], TInt));
+  add_mono e "fb_get_aa"                (TFun ([], TInt));
+
   (* ---- Non-Xinu GUI surface — same shapes as the xinu_gui_* family
      but used by the abclc/*Gui.abcl SDL-backed variants on macOS /
      Linux.  Without these declarations the same int/any unification
