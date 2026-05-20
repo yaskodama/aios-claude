@@ -215,6 +215,12 @@ let prelude () : env =
   add_mono e "fb_dashed_line"           (TFun ([TInt; TInt; TInt; TInt; TInt; TInt], TInt));
   add_mono e "fb_set_aa"                (TFun ([TInt], TInt));
   add_mono e "fb_get_aa"                (TFun ([], TInt));
+  add_mono e "fb_fill_rect"             (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
+
+  (* ---- P4 SchedulingVisualizer ---- *)
+  add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
+  add_mono e "sched_viz_stop"           (TFun ([], TInt));
+  add_mono e "sched_viz_sample"         (TFun ([], TInt));
 
   (* ---- Non-Xinu GUI surface — same shapes as the xinu_gui_* family
      but used by the abclc/*Gui.abcl SDL-backed variants on macOS /

@@ -1,0 +1,56 @@
+// SchedVizXinu.abcl
+// P4 demo: scheduling visualizer.
+//
+// Controller starts sched_viz_start(period_ms) which spawns a Xinu
+// thread that samples thrtab[] every period_ms, emits CSV trace, and
+// draws a 4-bar chart in the upper-right corner of the framebuffer.
+//
+// Three worker actors are spawned at different priorities so the
+// occupancy distribution between READY / CURR / SLEEP / RECV is
+// observably non-trivial across samples.
+
+class HiWorker priority(high) {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { hits = hits + 1; }
+}
+
+class MdWorker {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { hits = hits + 1; }
+}
+
+class LoWorker priority(low) {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { hits = hits + 1; }
+}
+
+class Controller {
+  var hi = nil;
+  var md = nil;
+  var lo = nil;
+
+  method init() {
+    hi = new HiWorker();
+    md = new MdWorker();
+    lo = new LoWorker();
+    // 300 ms sampling so the smoke (5-sec QEMU window) captures
+    // roughly 10+ samples — plenty to derive 4-state occupancy.
+    sched_viz_start(300);
+    send self.fire();
+  }
+
+  method fire() {
+    var i = 1;
+    while (i <= 12) do {
+      send hi.tick();
+      send md.tick();
+      send lo.tick();
+      i = i + 1;
+    }
+  }
+}
+
+var ctrl = new Controller();
