@@ -96,6 +96,27 @@ aice AIPL_XinuRazPi_RemoteRPC {
     }
   }
 
+  // ─── レビュアー (進化計算の選択圧) ──────────────────────────
+  evaluator = "ai_v1";
+
+  reviewers {
+
+    reviewer R1_RPCSafety {
+      persona = "あなたは R1 (RPC 経路の安全性) を判定するレビュアーです。候補設計 (paradigm, state_representation, concurrency_model, type_safety, effect_handling, ownership_model の 6 軸) を見て、host から送られてくる任意のテキスト行 (途中切断 / 不正な opcode / 引数欠落 / 範囲外 actor_id / 長すぎる行 / 連続改行) に対して Xinu kernel を panic させず ERR 応答に逃せるかを判定する。スコア基準: 1.0 = type_safety=high/dependent + effect_handling=algebraic/capability (異常系を型/効果で枠取り)、0.7 = type_safety=medium + effect_handling=monadic、0.3 = type_safety=low、0.0 = type_safety=none。半角数字の decimal で答えてください。";
+      weight = 0.35;
+    }
+
+    reviewer R2_ConcurrencyCorrectness {
+      persona = "あなたは R2 (並行正しさ) を判定するレビュアーです。候補設計の concurrency_model と state_representation を見て、UART1 dispatcher thread と AIPL actor mailbox との間でメッセージ順序 + 排他が崩れず、SPAWN/SEND が race condition なく観測できるかを判定する。スコア基準: 1.0 = actor_messages または csp_channels (mailbox 隔離)、0.7 = structured (構造化並行)、0.3 = threads_locks (手動 mutex 管理)、0.0 = none. 半角数字の decimal で答えてください。";
+      weight = 0.30;
+    }
+
+    reviewer R3_Implementability {
+      persona = "あなたは R3 (Xinu 上での実装容易さ) を判定するレビュアーです。candidate の paradigm と ownership_model を見て、arm-qemu の PL011 UART1 driver + dispatcher thread + abcl_xinu_rpc.c (~200 LOC 想定) として現実的に実装できるかを判定する。基準: 1.0 = C / ParallelOOP / FunctionalOOP + ownership=none/gc/rc (素直に Xinu のメモリ管理に乗る)、0.7 = Java_OOP + gc、0.3 = Functional 純粋系 (closure/再帰の Xinu 上コストが高い)、0.0 = assembler (high-level な actor を載せにくい) または ownership=linear/borrow_check (Xinu に linear-type machinery がない)。半角数字の decimal で答えてください。";
+      weight = 0.35;
+    }
+  }
+
   // ─── 実装順序 (依存関係) ─────────────────────────────────────
   implementation_order {
     // H1 で物理 channel を確立 → H2 でプロトコル → H3 で dispatcher

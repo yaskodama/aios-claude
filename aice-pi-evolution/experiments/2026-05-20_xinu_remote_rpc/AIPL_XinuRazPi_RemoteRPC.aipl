@@ -492,8 +492,29 @@ class Reviewer {
 // --------------------------------------------------------------------
 
 class Evaluator {
-  method init() { reply(0); }
-  method score_for_task(genome, profile) { reply(0.0); }
+  var r1 = 0;
+  var r2 = 0;
+  var r3 = 0;
+
+  method init(rev1, rev2, rev3) {
+    r1 = rev1;
+    r2 = rev2;
+    r3 = rev3;
+  }
+
+  method score_for_task(genome, profile) {
+    var f1 = future r1.score(genome, profile);
+    var f2 = future r2.score(genome, profile);
+    var f3 = future r3.score(genome, profile);
+    var s1 = await(f1);
+    var w1 = now r1.get_weight();
+    var s2 = await(f2);
+    var w2 = now r2.get_weight();
+    var s3 = await(f3);
+    var w3 = now r3.get_weight();
+    var combined = s1 * w1 + s2 * w2 + s3 * w3;
+    reply(combined);
+  }
 }
 
 // --------------------------------------------------------------------
@@ -641,8 +662,8 @@ class Coordinator {
   var profiles = 0;
   var worker = 0;
 
-  var seed_count = 8;
-  var generations = 30;
+  var seed_count = 4;
+  var generations = 10;
   var cell_axes_csv = "paradigm";
   var task_csv = "H1_Uart1ChannelDriver,H2_RpcLineProtocol,H3_RpcDispatcherThread,H4_SamplePrograms,H5_SmokeAndRegression,H_BackwardCompat,ImplCost";
   var next_id = 0;
@@ -727,8 +748,10 @@ var elite = new EliteMap();
 var lineage = new Lineage();
 var profiles = new TaskProfiles();
 
-// no reviewers configured
-var eval_actor = new Evaluator();
+var rev1 = new Reviewer("R1_RPCSafety", "あなたは R1 (RPC 経路の安全性) を判定するレビュアーです。候補設計 (paradigm, state_representation, concurrency_model, type_safety, effect_handling, ownership_model の 6 軸) を見て、host から送られてくる任意のテキスト行 (途中切断 / 不正な opcode / 引数欠落 / 範囲外 actor_id / 長すぎる行 / 連続改行) に対して Xinu kernel を panic させず ERR 応答に逃せるかを判定する。スコア基準: 1.0 = type_safety=high/dependent + effect_handling=algebraic/capability (異常系を型/効果で枠取り)、0.7 = type_safety=medium + effect_handling=monadic、0.3 = type_safety=low、0.0 = type_safety=none。半角数字の decimal で答えてください。", 1, 0.35, util, digits);
+var rev2 = new Reviewer("R2_ConcurrencyCorrectness", "あなたは R2 (並行正しさ) を判定するレビュアーです。候補設計の concurrency_model と state_representation を見て、UART1 dispatcher thread と AIPL actor mailbox との間でメッセージ順序 + 排他が崩れず、SPAWN/SEND が race condition なく観測できるかを判定する。スコア基準: 1.0 = actor_messages または csp_channels (mailbox 隔離)、0.7 = structured (構造化並行)、0.3 = threads_locks (手動 mutex 管理)、0.0 = none. 半角数字の decimal で答えてください。", 1, 0.3, util, digits);
+var rev3 = new Reviewer("R3_Implementability", "あなたは R3 (Xinu 上での実装容易さ) を判定するレビュアーです。candidate の paradigm と ownership_model を見て、arm-qemu の PL011 UART1 driver + dispatcher thread + abcl_xinu_rpc.c (~200 LOC 想定) として現実的に実装できるかを判定する。基準: 1.0 = C / ParallelOOP / FunctionalOOP + ownership=none/gc/rc (素直に Xinu のメモリ管理に乗る)、0.7 = Java_OOP + gc、0.3 = Functional 純粋系 (closure/再帰の Xinu 上コストが高い)、0.0 = assembler (high-level な actor を載せにくい) または ownership=linear/borrow_check (Xinu に linear-type machinery がない)。半角数字の decimal で答えてください。", 1, 0.35, util, digits);
+var eval_actor = new Evaluator(rev1, rev2, rev3);
 var worker = new Worker(util, eval_actor, profiles);
 var coord = new Coordinator(util, generator, eval_actor, elite, lineage, profiles, worker);
 send coord.run();

@@ -1068,6 +1068,10 @@ int abcl_object_class_id(int obj_id) {
   return objects[obj_id].class_id;
 }
 
+/* H3 RPC: expose total live actor count so the dispatcher LIST command
+   can answer without walking the table. */
+int abcl_n_objects(void) { return n_objects; }
+
 /* Xinu の queue.h にある enqueue() と名前が衝突するのでリネーム。
    以降 abcl 側のコードでは enqueue マクロで本関数を呼ぶ。 */
 /* R1 smoke markers: print the FIRST send + FIRST recv to the serial
