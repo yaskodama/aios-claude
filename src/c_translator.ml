@@ -409,7 +409,12 @@ let rec gen_stmt ~ctx ?(indent = 2) (s : stmt) =
       emitf "%s  }\n" ind;
       emitf "%s}\n" ind
   | Return None -> emitf "%sreturn;\n" ind
-  | Return (Some e) -> emitf "%sreturn /* %s */ 0;\n" ind (gen_expr ~ctx e)
+  | Return (Some e) ->
+      (* Xinu/POSIX method dispatch is void-typed (return value goes
+         elsewhere via send/reply), so we evaluate the expression for
+         side effects and discard it instead of emitting a typed
+         return that the C compiler would reject under -Wreturn-type. *)
+      emitf "%s(void)(%s); return;\n" ind (gen_expr ~ctx e)
 
 (* ---------- メソッド ---------- *)
 let gen_method ~cname ~fields (md : method_decl) =
