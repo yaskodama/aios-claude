@@ -234,6 +234,12 @@ let prelude () : env =
   add_mono e "mouse_inject"             (TFun ([TInt; TInt; TInt; TInt], TInt));
   add_mono e "mouse_state"              (TFun ([], TInt));
 
+  (* ---- G5 image bitmap — blit packed 0xRRGGBB int arrays.  arr
+     is TAny so the same call works whether the array came back as
+     V_OBJ (typical) or V_INT (legacy id). ---- *)
+  add_mono e "fb_image"                 (TFun ([TInt; TInt; TInt; TInt; TAny], TInt));
+  add_mono e "fb_image_solid"           (TFun ([TInt; TInt; TInt; TInt; TInt], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));
