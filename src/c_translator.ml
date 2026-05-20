@@ -1112,6 +1112,38 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   List.iteri (fun i (c : class_decl) -> emitf "#define CLASS_%s %d\n" c.cname i) cs;
   emit "\n";
 
+  (* P2: per-class Xinu priority.  high=30, normal=INITPRIO(20), low=10.
+     Tuned so high preempts normal/low whenever ready, but normal/low
+     still progress while the high actor blocks on its mailbox. *)
+  emit "/* P2: AIPL class -> Xinu priority */\n";
+  List.iter
+    (fun (c : class_decl) ->
+      let n = match c.cpriority with
+        | High   -> 30
+        | Normal -> 20  (* INITPRIO *)
+        | Low    -> 10
+      in
+      emitf "#define ABCL_PRIO_%s %d\n" c.cname n)
+    cs;
+  emit "static int abcl_class_prio(int class_id) {\n";
+  emit "  switch (class_id) {\n";
+  List.iter
+    (fun (c : class_decl) ->
+      emitf "  case CLASS_%s: return ABCL_PRIO_%s;\n" c.cname c.cname)
+    cs;
+  emit "  default: return INITPRIO;\n";
+  emit "  }\n";
+  emit "}\n";
+  emit "static const char* abcl_class_name(int class_id) {\n";
+  emit "  switch (class_id) {\n";
+  List.iter
+    (fun (c : class_decl) ->
+      emitf "  case CLASS_%s: return \"%s\";\n" c.cname c.cname)
+    cs;
+  emit "  default: return \"?\";\n";
+  emit "  }\n";
+  emit "}\n\n";
+
   (* 前方宣言 *)
   List.iter
     (fun (c : class_decl) ->
@@ -1174,10 +1206,21 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "}\n\n";
 
   emit "static void spawn_actor(int id) {\n";
+  emit "  int prio;\n";
+  emit "  int actual;\n";
   emit "  if (objects[id].started) return;\n";
   emit "  objects[id].started = 1;\n";
-  emit "  objects[id].tid = create((void*)abcl_actor_main, 4096, INITPRIO,\n";
+  emit "  prio = abcl_class_prio(objects[id].class_id);\n";
+  emit "  objects[id].tid = create((void*)abcl_actor_main, 4096, prio,\n";
   emit "                            \"abcl-actor\", 1, id);\n";
+  (* P2 assertion-1: emit the priority that Xinu actually assigned so the
+     smoke can grep + compare against the AIPL-side ABCL_PRIO_* constant. *)
+  emit "  actual = getprio(objects[id].tid);\n";
+  emit "  wait(print_mu);\n";
+  emit "  kprintf(\"[aipl] prio class=%s id=%d tid=%d want=%d got=%d\\r\\n\",\n";
+  emit "          abcl_class_name(objects[id].class_id), id,\n";
+  emit "          (int)objects[id].tid, prio, actual);\n";
+  emit "  signal(print_mu);\n";
   emit "  ready(objects[id].tid, RESCHED_NO);\n";
   emit "}\n\n";
 

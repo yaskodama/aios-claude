@@ -27,6 +27,7 @@ rule token = parse
 
   (* --- キーワード/記号 --- *)
 | "class"      { CLASS }
+| "priority"   { PRIORITY }
 | "become"     { BECOME }
 | "method"     { METHOD }
 | "function"   { FUNCTION }

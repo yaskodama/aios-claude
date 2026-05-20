@@ -15,6 +15,7 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token <int> INTLIT
 %token <string> STRINGLIT
 %token METHOD FLOAT CALL SEND UNSAFESEND REMOTE
+%token PRIORITY  /* P2: actor scheduling priority class — `priority(high|normal|low)` */
 %token NOW FUTURE AWAIT
 %token IF THEN ELSE WHILE DO
 %token ASSIGN PLUS MINUS TIMES DIV LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COLON SEMICOLON COMMA
@@ -58,8 +59,10 @@ arg_list:
   | arg_list COMMA expr        { $1 @ [$3] }
 
 decl:
-  | CLASS ID LBRACE fields methods RBRACE  { Class { cname = $2; fields = $4; methods = $5 } }
-  | CLASS ID LBRACE methods RBRACE         { Class { cname = $2; fields = []; methods = $4 } }
+  | CLASS ID priority_opt LBRACE fields methods RBRACE
+      { Class { cname = $2; cpriority = $3; fields = $5; methods = $6 } }
+  | CLASS ID priority_opt LBRACE methods RBRACE
+      { Class { cname = $2; cpriority = $3; fields = []; methods = $5 } }
   | FUNCTION ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
       { let (names, tys) = List.split $4 in
         Function { fn_name = $2; fn_params = names; fn_param_types = tys;
@@ -75,6 +78,18 @@ decl:
   | SEND send_target DOT ID LPAREN args RPAREN SEMICOLON               { Global (mk_stmt1 1 (Send ($2, $4, $6))) }
   | UNSAFESEND send_target DOT ID LPAREN args RPAREN SEMICOLON         { Global (mk_stmt1 1 (UnsafeSend ($2, $4, $6))) }
   | ID LPAREN args RPAREN SEMICOLON        { Global (mk_stmt1 1 (CallStmt ($1, $3))) }
+
+/* P2: optional priority(high|normal|low) clause between class name
+   and brace.  `priority(normal)` is also accepted explicitly. */
+priority_opt:
+  | /* empty */                                  { Ast.Normal }
+  | PRIORITY LPAREN ID RPAREN
+      { match $3 with
+        | "high"   -> Ast.High
+        | "normal" -> Ast.Normal
+        | "low"    -> Ast.Low
+        | s        -> raise (Syntax_error (loc_of_rhs 3,
+                        "unknown priority `" ^ s ^ "` — expected high|normal|low")) }
 
 fields:
   | field { [$1] }

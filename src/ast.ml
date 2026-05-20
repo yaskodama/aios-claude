@@ -105,10 +105,15 @@ type method_decl = {
    body : stmt;
 }
 
+(* P2: actor scheduling priority class.  Default is [Normal] so all
+   pre-P2 classes keep their previous Xinu INITPRIO behaviour. *)
+type priority = High | Normal | Low
+
 type class_decl = {
   cname : string;
   fields : stmt list;
   methods : method_decl list;
+  cpriority : priority;
 }
 
 type function_decl = {
