@@ -77,18 +77,23 @@ let prelude () : env =
   let add_mx2 f = add_mono e f (TFun ([TFloat; TInt], TFloat)) in
   List.iter add_mx2 [ "+"; "-"; "*"; "/" ];
 
-  (* 2.5.2) 二項関係 *)
-  let add_f4 f = add_mono e f (TFun ([TFloat; TFloat], TBool)) in
-  List.iter add_f4 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
-  let add_f5 f = add_mono e f (TFun ([TInt; TInt], TBool)) in
-  List.iter add_f5 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
-  let add_f6 f = add_mono e f (TFun ([TString; TString], TBool)) in
-  List.iter add_f6 [ "=="; "!=" ];
-  (* 2.5.3) 二項関係: int と float の混在 — 算術と同じく許容 *)
+  (* 2.5.2) 二項関係.  Register the mixed-numeric overloads FIRST so
+     they are tried LAST (add_mono PREPENDS to the scheme list, so the
+     most recently registered overload is tried first).  This way
+     `i < n` with `i: int` and `n` a fresh tvar prefers the (int,int)
+     arm and pins `n` to int — without this ordering, the (int,float)
+     arm would match first and pin `n` to float, breaking later
+     assignments like `n_workers = n;` to an int-typed field. *)
   let add_mxr1 f = add_mono e f (TFun ([TInt; TFloat], TBool)) in
   List.iter add_mxr1 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
   let add_mxr2 f = add_mono e f (TFun ([TFloat; TInt], TBool)) in
   List.iter add_mxr2 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
+  let add_f6 f = add_mono e f (TFun ([TString; TString], TBool)) in
+  List.iter add_f6 [ "=="; "!=" ];
+  let add_f4 f = add_mono e f (TFun ([TFloat; TFloat], TBool)) in
+  List.iter add_f4 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
+  let add_f5 f = add_mono e f (TFun ([TInt; TInt], TBool)) in
+  List.iter add_f5 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
 
   (* reply : 'a -> unit  （まずは多相でもOK。型が厳しいなら int/float/string の overload に） *)
   let a = fresh_tvar () in
