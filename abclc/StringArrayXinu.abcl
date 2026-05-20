@@ -1,0 +1,44 @@
+// StringArrayXinu.abcl
+// F4 demo: strings + int arrays in the Xinu C runtime.
+//
+// Three demos run from Probe.init:
+//   1. str_concat round-trips:  "hello" + " " + "world" should equal "hello world"
+//   2. array OOB detection:     reading index -1 and index N+10 of a length-N array
+//                               should print [aipl] array OOB markers, no panic.
+//   3. 200-cycle alloc/free leak check: array_new + array_free in a loop —
+//                               heap_stats at the end should report in_use=0.
+
+class Probe {
+  var ok = 0;
+  var hello = "";
+  var combo = "";
+
+  method init() {
+    // --- (3) string concat / eq -----------------------------------
+    hello = str_concat("hello", " ");
+    combo = str_concat(hello, "world");
+    ok    = str_eq(combo, "hello world");
+    print(combo);
+    print(ok);
+
+    // --- (2) array OOB ---------------------------------------------
+    var a = array_new(5, 7);          // [7,7,7,7,7]
+    print(array_get(a, 0));            // 7
+    print(array_get(a, 4));            // 7
+    array_set(a, 2, 99);
+    print(array_get(a, 2));            // 99
+    print(array_get(a, 99));           // OOB -> 0 + marker
+    array_free(a);
+
+    // --- (1) 200-cycle alloc/free ----------------------------------
+    var i = 1;
+    while (i <= 200) do {
+      var t = array_new(4, 0);
+      array_free(t);
+      i = i + 1;
+    }
+    heap_stats();                      // expects in_use=0
+  }
+}
+
+var p = new Probe();

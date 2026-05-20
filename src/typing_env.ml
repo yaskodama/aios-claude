@@ -229,6 +229,18 @@ let prelude () : env =
   add_mono e "net_recv"                 (TFun ([TInt; TInt], TInt));
   add_mono e "net_close"                (TFun ([TInt], TInt));
 
+  (* ---- F4 strings + int arrays (apps/abcl_xinu_str.c) ---- *)
+  add_mono e "str_concat"               (TFun ([TString; TString], TString));
+  add_mono e "str_len"                  (TFun ([TString], TInt));
+  add_mono e "str_eq"                   (TFun ([TString; TString], TInt));
+  add_mono e "str_int"                  (TFun ([TInt], TString));
+  (* array_new/get/set/len/push/free coexist with the polymorphic
+     declarations earlier in this file — these monomorphic Xinu
+     bindings just make sure the overload solver settles on TInt
+     for the slot-id return value. *)
+  add_mono e "array_free"               (TFun ([TInt], TInt));
+  add_mono e "heap_stats"               (TFun ([], TInt));
+
   (* ---- Non-Xinu GUI surface — same shapes as the xinu_gui_* family
      but used by the abclc/*Gui.abcl SDL-backed variants on macOS /
      Linux.  Without these declarations the same int/any unification
