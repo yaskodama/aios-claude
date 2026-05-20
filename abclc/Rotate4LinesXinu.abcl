@@ -1,6 +1,8 @@
-// Rotate4LinesXinu.abcl — MINIMAL annotations
-// Only annotate fields that hold actor refs ("s1..s4 : any").
-// Numeric fields infer from initializer; method params infer from body.
+// Rotate4LinesXinu.abcl
+// Xinu 上で 4 本の線分を回転させる AIPL プログラム + Start/Stop ボタン。
+// 各 Spinner は Xinu thread (アクター) として動き、tick で角度更新。
+// Controller はボタン押下を受けて全 spinner に start/stop を broadcast。
+// 型注釈は使わず、Spinner 参照を保持する s1..s4 だけ `nil` で初期化。
 class Spinner {
   var idx     = 0;
   var angle   = 0.;
@@ -44,8 +46,8 @@ class Spinner {
 }
 
 class Controller {
-  var s1: any = 0; var s2: any = 0;
-  var s3: any = 0; var s4: any = 0;
+  var s1= nil; var s2= nil;
+  var s3= nil; var s4= nil;
 
   method init() {
     s1 = new Spinner(0, 3, 200, 160, 255, 100, 100);

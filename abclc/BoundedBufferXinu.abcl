@@ -37,7 +37,7 @@ class Producer {
   var idx = 0;
   var state = 0;
   var counter = 0;
-  var buffer: any  = 0;
+  var buffer= nil;
   var running = 0;
 
   method init(i, buf) {
@@ -95,7 +95,7 @@ class Consumer {
   var idx = 0;
   var state = 0;
   var counter = 0;
-  var buffer: any  = 0;
+  var buffer= nil;
   var running = 0;
 
   method init(i, buf) {
@@ -149,9 +149,9 @@ class Consumer {
 }
 
 class Controller {
-  var buf: any = 0;
-  var p0: any = 0; var p1: any = 0; var p2: any = 0;
-  var c0: any = 0; var c1: any = 0; var c2: any = 0;
+  var buf= nil;
+  var p0= nil; var p1= nil; var p2= nil;
+  var c0= nil; var c1= nil; var c2= nil;
 
   method init() {
     buf = new Buffer(20);

@@ -189,6 +189,7 @@ let rec gen_expr_typed ~ctx (e : expr) : string * Types.ty =
   | Var x ->
       if x = "self"   then ("self_id", Types.TActor (ctx.cname, []))
       else if x = "sender" then ("sender_id", Types.TActor ("", []))
+      else if x = "nil" then ("mk_int(0L)", Types.TAny)
       else if List.mem x ctx.params then begin
         match List.assoc_opt x ctx.param_types with
         | Some t when is_concrete t -> (Printf.sprintf "p_%s" x, Types.repr t)

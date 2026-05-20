@@ -44,6 +44,14 @@ let prelude () : env =
   let a1 = fresh_tvar () in
   add_poly e "print" (Forall ([(!a1).id], TFun ([TVar a1], TUnit)));
 
+  (* `nil` is a typed sentinel that infers to TAny.  Use it to
+     declare a field that will later hold an actor reference:
+        var fork = nil;        // instead of `var fork: any = 0;`
+        fork = new Fork(0);    // unifies fine — actor vs any
+     Codegen lowers `nil` to a 0 / null per backend (see
+     `gen_expr_typed` Var arm). *)
+  add_mono e "nil" TAny;
+
   (* IMPORTANT: overload-resolution order matters because pick_overload
      uses destructive unification and accepts the FIRST matching scheme.
      `add_mono`/`add_poly` PREPEND to the scheme list, so the LATEST
