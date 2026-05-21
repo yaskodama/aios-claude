@@ -72,37 +72,60 @@ python3 aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/host_diners.py
 Browse to `http://127.0.0.1:8181/` while any diners launcher runs to
 see the live Xinu actor table.
 
+## Landed in this session's tail
+
+- **`wait(ms)` AIPL builtin for --xinu** (abclcp `0244fc2`, xinu-raz
+  `bf00977`).  c_translator mangles `wait` → `b_wait` to avoid the
+  Xinu-kernel `wait(semaphore)` collision.  `apps/abcl_xinu_wait.c`
+  implements it as a thin `sleep(ms)` wrapper.  Used in
+  `abclc/DiningPhilosophersDistXinu_NoMain.abcl::fork_denied` for a
+  20-ms retry backoff (was an unbounded native-speed retry loop).
+
+- **`SPAWN ref:N`** (xinu-raz `499a27b`) — tokens prefixed with
+  `ref:` resolve to V_OBJ instead of V_INT, so SPAWNed Philosophers
+  receive real actor refs in `f_low`/`f_high`.
+
+- **`etherWrite` MMU_RESET_TX on tx-never-done** (xinu-raz `bc908a0`)
+  — previously only the alloc-failure path called MMU_RESET_TX.  The
+  completion-timeout path now does too; without it a stuck TX page
+  would linger and the next ARP refresh from SLIRP would knock the
+  kernel over.
+
+Bootstrap demo now reliably completes 2 of 3 PC philosophers
+(P3 ≈ 25 attempts, P2 ≈ 90 attempts) plus both Xinu Philosophers.
+P1 still hits a `tx never done`-correlated reboot maybe 1 run in 2
+on a long-running QEMU; see follow-up #1 below.
+
 ## Open follow-ups (none are blocking)
 
-1. **AIPL `wait(ms)` builtin for --xinu codegen**
-   - Typing env registers `wait : int|float -> unit` but the Xinu
-     code path emits a generic extern that collides with Xinu's
-     kernel `wait(semaphore)`.  Cleanest fix: add a `delay_ms`
-     builtin and emit it as `sleep(N);` (= Xinu kernel sleep, ms).
-   - Currently this means the Xinu philosophers can't be paced —
-     they finish their 10/20/100 meals essentially instantaneously.
-     That's fine for correctness but lopsided next to the PC
-     side's ~150 ms eat cadence.  See the "wait(200) bombed" arc
-     in the diners commit log for the workaround we used (remove
-     the wait, accept the asymmetry).
+1. **smc91c111 AUTO_RELEASE doesn't work under QEMU**
+   - Even with MMU_RESET_TX on both stuck paths, QEMU's smc91c111
+     model never asserts INT_TX so each TX leaks its page.  After a
+     few SLIRP-initiated ARP probes (~5-10 s apart) the chip state
+     degrades enough that the kernel takes a fault and reboots.
+   - **Proper fix**: implement AUTO_RELEASE in software — when
+     etherInterrupt sees INT_TX (or our poller catches it), read
+     the packet number from the chip's TX FIFO header and issue
+     `MMU_RELEASE_PACKET <pkt>`.  ~60-100 LOC in
+     `device/smc91c111/etherInterrupt.c`.
+   - Real-Pi hardware should be unaffected: IRQ 25 will fire,
+     AUTO_RELEASE is genuine silicon.  This is a QEMU-only nuisance.
 
-2. **`SPAWN` accepts only V_INT args**
+2. **`SPAWN` accepts only V_INT / V_OBJ args**
    - String / float init arguments aren't reachable yet.  Adding
      them needs handle_spawn to detect quoted tokens (a la
      `SPAWN Greeter 0 "hello"`).  Not blocking any current sample.
 
 3. **smc91c111 IRQ poller is a band-aid**
-   - The driver still leaks TX pages on the QEMU model (we MMU_RESET_TX
-     on alloc failure as a fallback) and the IRQ line never asserts
-     so we run a 5-ms `etherPoll` thread instead of relying on IRQ 25.
-     Real Pi hardware should fire IRQ normally — the poller will be
-     redundant there but harmless.
+   - The driver still relies on the 5-ms `etherPoll` thread because
+     IRQ 25 never asserts on QEMU.  Real-Pi hardware will fire IRQ
+     normally — the poller becomes redundant there but harmless.
 
 4. **Debug kprintfs**
-   - `etherWrite.c` still kprintfs every `tx len=N` / `tx alloc ok` /
-     `tx never done`.  For production usage these are noisy on UART0
-     but they don't cause functional issues; gating them on a `DEBUG`
-     `#ifdef` is the natural cleanup pass.
+   - `etherWrite.c` still kprintfs every `tx len=N` / `tx alloc ok`
+     / `tx never done (MMU_RESET_TX recovered)`.  Useful while the
+     smc91c111 saga continues; gate behind `#ifdef DEBUG` once #1
+     lands.
 
 5. **Round 2 Gemini evolution** — gen 2 of 15 captured in
    `out/AIPL_XinuRazPi_Round2.abcl_lineage.json`.  Best individual
