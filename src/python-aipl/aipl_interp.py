@@ -7,6 +7,7 @@ messages via Interpreter.dispatch().
 
 import io
 import math
+import socket as _socket
 import sys
 import threading
 import time
@@ -3008,6 +3009,139 @@ def _b_spawn(args, frame, interp):
         return None
 
 
+# ============================================================
+#  TCP socket builtins — used by AIPL host programs that drive a
+#  remote Xinu UART1 RPC channel.  Each handle is an int; the
+#  underlying socket + buffered RX data live in a process-global
+#  dict keyed by handle.  All five primitives are thread-safe at
+#  the socket layer (blocking ops release the GIL) but the
+#  AIPL-level caller is responsible for serialising request/reply
+#  pairs on the same handle — typically by routing all I/O
+#  through a single coordinator actor.
+# ============================================================
+
+_TCP_CONNS_LOCK = threading.Lock()
+_TCP_CONNS = {}                # handle -> {"sock": socket, "buf": bytes}
+_TCP_NEXT_ID = [1]
+
+
+def _tcp_register(sock) -> int:
+    with _TCP_CONNS_LOCK:
+        h = _TCP_NEXT_ID[0]
+        _TCP_NEXT_ID[0] += 1
+        _TCP_CONNS[h] = {"sock": sock, "buf": b""}
+    return h
+
+
+def _tcp_entry(handle):
+    with _TCP_CONNS_LOCK:
+        return _TCP_CONNS.get(int(handle))
+
+
+def _b_tcp_connect(args, frame, interp):
+    """tcp_connect(host: str, port: int [, timeout_s: float]) -> handle."""
+    if len(args) < 2:
+        return -1
+    host = str(args[0])
+    port = int(args[1])
+    timeout = float(args[2]) if len(args) >= 3 else 10.0
+    try:
+        s = _socket.create_connection((host, port), timeout=timeout)
+        s.settimeout(timeout)
+        return _tcp_register(s)
+    except OSError as e:
+        print(f"[tcp_connect] {host}:{port}: {e}", flush=True)
+        return -1
+
+
+def _b_tcp_send_line(args, frame, interp):
+    """tcp_send_line(handle, line: str) -> int_bytes_written.  Appends
+    "\\n" to the line.  -1 on error."""
+    if len(args) < 2:
+        return -1
+    entry = _tcp_entry(args[0])
+    if entry is None:
+        return -1
+    line = str(args[1])
+    data = (line + "\n").encode("ascii", errors="replace")
+    try:
+        entry["sock"].sendall(data)
+        return len(data)
+    except OSError as e:
+        print(f"[tcp_send_line] {e}", flush=True)
+        return -1
+
+
+def _b_tcp_send_bytes(args, frame, interp):
+    """tcp_send_bytes(handle, blob: str) -> int_bytes_written.  Raw —
+    no newline appended.  Used for the LOAD body that follows
+    `LOAD name <n>\\n`."""
+    if len(args) < 2:
+        return -1
+    entry = _tcp_entry(args[0])
+    if entry is None:
+        return -1
+    blob = args[1]
+    if isinstance(blob, str):
+        data = blob.encode("utf-8", errors="replace")
+    elif isinstance(blob, (bytes, bytearray)):
+        data = bytes(blob)
+    else:
+        data = str(blob).encode("utf-8")
+    try:
+        entry["sock"].sendall(data)
+        return len(data)
+    except OSError as e:
+        print(f"[tcp_send_bytes] {e}", flush=True)
+        return -1
+
+
+def _b_tcp_recv_line(args, frame, interp):
+    """tcp_recv_line(handle [, timeout_s]) -> str (without trailing
+    CR/LF) or "" on close/timeout.  Buffers leftover bytes for the
+    next call."""
+    if len(args) < 1:
+        return ""
+    entry = _tcp_entry(args[0])
+    if entry is None:
+        return ""
+    sock = entry["sock"]
+    if len(args) >= 2:
+        try:
+            sock.settimeout(float(args[1]))
+        except (TypeError, ValueError):
+            pass
+    while b"\n" not in entry["buf"]:
+        try:
+            chunk = sock.recv(512)
+        except OSError:
+            return ""
+        if not chunk:
+            break
+        entry["buf"] += chunk
+    line, sep, rest = entry["buf"].partition(b"\n")
+    if sep == b"":
+        # No newline seen and recv returned empty — connection closed.
+        return ""
+    entry["buf"] = rest
+    return line.decode("ascii", errors="replace").rstrip("\r")
+
+
+def _b_tcp_close(args, frame, interp):
+    """tcp_close(handle) -> 0 ok / -1 unknown."""
+    if len(args) < 1:
+        return -1
+    with _TCP_CONNS_LOCK:
+        entry = _TCP_CONNS.pop(int(args[0]), None)
+    if entry is None:
+        return -1
+    try:
+        entry["sock"].close()
+    except OSError:
+        pass
+    return 0
+
+
 _BUILTINS = {
     "print":   _b_print,
     "println": _b_print,
@@ -3050,6 +3184,13 @@ _BUILTINS = {
     # JSON.
     "json_parse":     _b_json_parse,
     "json_stringify": _b_json_stringify,
+    # TCP socket (host programs talking to a remote AIPL or to the
+    # Xinu UART1 RPC channel).
+    "tcp_connect":     _b_tcp_connect,
+    "tcp_send_line":   _b_tcp_send_line,
+    "tcp_send_bytes":  _b_tcp_send_bytes,
+    "tcp_recv_line":   _b_tcp_recv_line,
+    "tcp_close":       _b_tcp_close,
     "sleep":   _b_sleep,
     "now_ms":  _b_now_ms,
     "str":     _b_str,

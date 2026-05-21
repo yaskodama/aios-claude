@@ -1,0 +1,171 @@
+// host_diners_dynamic.aipl
+// Pure-AIPL host orchestrator — same job as host_diners_dynamic.py
+// but written in AIPL and run by the Python AIPL interpreter on the
+// host PC.
+//
+// Flow:
+//   1. Open a TCP socket to Xinu's UART1 RPC dispatcher
+//      (127.0.0.1:5555 by default).
+//   2. Drain the boot greeting ("OK ready=1").
+//   3. PING / LIST sanity.
+//   4. Upload a short AIPL source string via the LOAD <name> <bytes>
+//      protocol — Xinu writes it to /home/dyn.abcl.
+//   5. COMPILE dyn — Xinu invokes its in-kernel abclcTranslate +
+//      ccCompile to produce /home/dyn (bytecode a.out).
+//   6. RUN dyn — Xinu's aoutRun executes the bytecode; output
+//      ("[dyn] hello from in-Xinu compile, x=7007") lands on UART0.
+//   7. Spawn 3 Philosopher actors that loop SEND/QUERY against the
+//      pre-existing Xinu Fork actors (F0..F4) until each has eaten
+//      MEALS_PER_PHILOSOPHER (default 5) times.
+//   8. Final LIST + tcp_close.
+//
+// All socket I/O is routed through a single Coordinator actor so
+// the (send line, recv reply) pair stays atomic across the three
+// Philosopher actors that share the connection.
+
+class Coordinator {
+  var sock = 0;
+
+  method init(host, port) {
+    sock = tcp_connect(host, port, 10.0);
+    if (sock <= 0) {
+      print("FAIL: tcp_connect failed");
+    }
+    // Drain the boot greeting ("OK ready=1") — best effort.
+    var banner = tcp_recv_line(sock, 0.5);
+    print("[greet] " + banner);
+  }
+
+  // rpc("PING") -> "OK pong=1" etc.  Synchronous via reply().
+  // (`call` is an AIPL parser keyword, so the method is named `rpc`.)
+  method rpc(line) {
+    tcp_send_line(sock, line);
+    var r = tcp_recv_line(sock, 10.0);
+    reply(r);
+  }
+
+  // load(name, source) — same LOAD <name> <bytes>\\n<body> protocol
+  // as host_diners_dynamic.py.  Returns the reply.
+  method do_load(name, body) {
+    var header = "LOAD " + name + " " + str_len(body);
+    tcp_send_line(sock, header);
+    tcp_send_bytes(sock, body);
+    var r = tcp_recv_line(sock, 10.0);
+    reply(r);
+  }
+
+  method close() {
+    tcp_close(sock);
+    reply(0);
+  }
+}
+
+class Philosopher {
+  // (Py-I has no `nil` literal — use 0 for the default actor ref;
+  // it's overwritten by init() before any method-send happens.)
+  var coord = 0;
+  var my_id = 0;
+  var lo_fork = 0;
+  var hi_fork = 0;
+  var meals_target = 5;
+  var meals_done = 0;
+  var attempts = 0;
+
+  method init(c, pid, lo, hi, target) {
+    coord = c;
+    my_id = pid;
+    lo_fork = lo;
+    hi_fork = hi;
+    meals_target = target;
+    meals_done = 0;
+    attempts = 0;
+    send self.try_eat();
+  }
+
+  // All logic inlined inside try_eat — avoids `now self.X` (which
+  // deadlocks an actor that's still inside an outer `now` on itself
+  // in the Python AIPL runtime).
+  method try_eat() {
+    print("  [P" + my_id + " enter try_eat meals=" + meals_done + "/" + meals_target + "]");
+    if (meals_done >= meals_target) {
+      print("  [P" + my_id + "] done after " + attempts + " attempts");
+    } else {
+      attempts = attempts + 1;
+
+      // --- try acquire low fork ---
+      var send_lo = "SEND " + lo_fork + " acquire " + my_id;
+      var _ack1 = now coord.rpc(send_lo);
+      sleep(0.025);
+      var q_lo = now coord.rpc("QUERY " + lo_fork + " 0");
+      var want_lo = "value=" + my_id;
+      var pos_lo = str_index(q_lo, want_lo);
+      var got_lo = 0;
+      if (pos_lo >= 0) {
+        var tail_lo = str_sub(q_lo, pos_lo + str_len(want_lo));
+        if (str_len(tail_lo) == 0) { got_lo = 1; }
+      }
+
+      if (got_lo == 0) {
+        sleep(0.030);
+        send self.try_eat();
+      } else {
+        // --- try acquire high fork ---
+        var send_hi = "SEND " + hi_fork + " acquire " + my_id;
+        var _ack2 = now coord.rpc(send_hi);
+        sleep(0.025);
+        var q_hi = now coord.rpc("QUERY " + hi_fork + " 0");
+        var want_hi = "value=" + my_id;
+        var pos_hi = str_index(q_hi, want_hi);
+        var got_hi = 0;
+        if (pos_hi >= 0) {
+          var tail_hi = str_sub(q_hi, pos_hi + str_len(want_hi));
+          if (str_len(tail_hi) == 0) { got_hi = 1; }
+        }
+
+        if (got_hi == 0) {
+          var rel1 = "SEND " + lo_fork + " release " + my_id;
+          var _r1 = now coord.rpc(rel1);
+          sleep(0.030);
+          send self.try_eat();
+        } else {
+          // --- eat ---
+          meals_done = meals_done + 1;
+          print("  [P" + my_id + " ate meal=" + meals_done + "] (attempts=" + attempts + ")");
+          sleep(0.040);
+          var rel_hi = "SEND " + hi_fork + " release " + my_id;
+          var rel_lo = "SEND " + lo_fork + " release " + my_id;
+          var _r2 = now coord.rpc(rel_hi);
+          var _r3 = now coord.rpc(rel_lo);
+          sleep(0.010);
+          send self.try_eat();
+        }
+      }
+    }
+  }
+}
+
+// ---- Main orchestration --------------------------------------------
+
+var coord = new Coordinator("127.0.0.1", 5555);
+
+// Sanity checks first.
+print("=== sanity ===");
+print("PING -> " + (now coord.rpc("PING")));
+print("LIST -> " + (now coord.rpc("LIST")));
+
+// Upload + compile + run a small AIPL source through Xinu's
+// in-kernel toolchain.  abclc subset: class + method + printf,
+// then main { new + send }.  Prints 7007 to UART0 on success.
+print("=== dynamic compile ===");
+var dyn_src = "class Greeter {\n  method run() {\n    printf(\"[dyn] hello from in-Xinu compile, x=%d\\n\", 7007);\n  }\n}\n\nmain {\n  new Greeter g;\n  send g.run();\n}\n";
+print("LOAD    -> " + (now coord.do_load("dyn", dyn_src)));
+print("COMPILE -> " + (now coord.rpc("COMPILE dyn")));
+print("RUN     -> " + (now coord.rpc("RUN dyn")));
+
+// Spawn 3 PC philosophers — each is a real AIPL actor running in
+// its own thread, all sharing `coord` for socket I/O.  P4 + P5 are
+// already alive on the Xinu side from boot.
+print("=== dining philosophers (3 PC + 2 Xinu, meals=5 each) ===");
+var p1 = new Philosopher(coord, 1, 0, 4, 5);
+var p2 = new Philosopher(coord, 2, 0, 1, 5);
+var p3 = new Philosopher(coord, 3, 1, 2, 5);
