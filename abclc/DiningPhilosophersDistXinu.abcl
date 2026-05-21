@@ -23,9 +23,9 @@
 //     P4 (X):   low=F2  high=F3
 //     P5 (X):   low=F3  high=F4
 //
-// Each philosopher eats 3 times then stops.  Eat marker:
+// Each philosopher eats 10 times then stops.  Eat marker:
 //   60000 + 10 * pid + meal_idx
-// e.g. P4's first meal -> 60040; P5's last meal -> 60052.
+// e.g. P4's first meal -> 60040; P5's last meal -> 60059.
 // Done marker: 70000 + pid.
 
 class Fork {
@@ -51,7 +51,7 @@ class Philosopher {
   var my_id     = 0;
   var f_low     = nil;
   var f_high    = nil;
-  var meals     = 3;
+  var meals     = 10;
   var meal_idx  = 0;
   var state     = 0;   // 0 = idle, 1 = have_low, 2 = eating-in-progress
 
@@ -59,7 +59,7 @@ class Philosopher {
     my_id    = id_arg;
     f_low    = lo;
     f_high   = hi;
-    meals    = 3;
+    meals    = 10;
     meal_idx = 0;
     state    = 0;
     send self.try_eat();

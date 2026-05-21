@@ -30,10 +30,11 @@ import time
 
 HOST = os.environ.get("RPC_HOST", "127.0.0.1")
 PORT = int(os.environ.get("RPC_PORT", "5555"))
-MEALS_PER_PHILOSOPHER = 3
+MEALS_PER_PHILOSOPHER = int(os.environ.get("MEALS", "10"))
 ACQUIRE_POLL_MS  = 25
 RETRY_BACKOFF_MS = 30
 EAT_PAUSE_MS     = 40
+JOIN_TIMEOUT_S   = float(os.environ.get("DINERS_TIMEOUT", "300"))
 
 PC_PHILOSOPHERS = [
     # (pid, low_fork, high_fork)
@@ -138,7 +139,8 @@ def philosopher_thread(rpc: SharedRpc, pid: int, low: int, high: int) -> None:
 
 def main() -> int:
     print(f"--- host diners on {HOST}:{PORT} "
-          f"({len(PC_PHILOSOPHERS)} PC + 2 Xinu) ---")
+          f"({len(PC_PHILOSOPHERS)} PC + 2 Xinu, "
+          f"meals={MEALS_PER_PHILOSOPHER} each) ---")
     rpc = SharedRpc()
     threads = []
     for (pid, low, high) in PC_PHILOSOPHERS:
@@ -152,9 +154,9 @@ def main() -> int:
 
     rc = 0
     for t in threads:
-        t.join(timeout=90.0)
+        t.join(timeout=JOIN_TIMEOUT_S)
         if t.is_alive():
-            print(f"FAIL {t.name} did not finish within 90s")
+            print(f"FAIL {t.name} did not finish within {JOIN_TIMEOUT_S:.0f}s")
             rc = 1
 
     rpc.close()
