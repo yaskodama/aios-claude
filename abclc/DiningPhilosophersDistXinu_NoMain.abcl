@@ -99,6 +99,13 @@ class Philosopher {
       send f_low.release(my_id);
       state = 0;
     }
+    // Real backoff: AIPL wait(ms) (mangled to b_wait → Xinu kernel
+    // sleep(ms)).  Without this, fork_denied → try_eat → acquire
+    // → fork_denied loops at native dispatch speed (~800K msg/sec)
+    // when a PC philosopher holds a contested fork, overflowing
+    // the kernel mailbox and rebooting Xinu.  20 ms is well below
+    // the PC eat-cycle (~150 ms) yet long enough to avoid runaway.
+    wait(20);
     send self.try_eat();
   }
 }

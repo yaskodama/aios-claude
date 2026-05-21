@@ -116,6 +116,7 @@ let mangle = function
   | "tan"  -> "b_tan"
   | "sqrt" -> "b_sqrt"
   | "abs"  -> "b_abs"
+  | "wait" -> "b_wait"   (* avoid colliding with Xinu kernel's wait(sem) *)
   | f      -> f
 
 (* ---------- AST 走査：外部関数の名前を収集 ---------- *)
