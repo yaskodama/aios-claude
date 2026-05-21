@@ -1261,7 +1261,7 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "static void dispatch(int, int, const char*, value_t*, int);\n";
   emit "static int  alloc_obj(int class_id, int n_args, value_t* args);\n";
   emit "static void spawn_actor(int id);\n";
-  emit "static int  create_obj(int class_id, int n_args, value_t* args);\n";
+  emit "int         create_obj(int class_id, int n_args, value_t* args);\n";
   emit "thread      abcl_actor_main(int self_id);\n\n";
 
   (* グローバル変数 (object id を保持) *)
@@ -1333,10 +1333,25 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  ready(objects[id].tid, RESCHED_NO);\n";
   emit "}\n\n";
 
-  emit "static int create_obj(int class_id, int n_args, value_t* args) {\n";
+  emit "int create_obj(int class_id, int n_args, value_t* args) {\n";
   emit "  int id = alloc_obj(class_id, n_args, args);\n";
   emit "  spawn_actor(id);\n";
   emit "  return id;\n";
+  emit "}\n\n";
+
+  (* Reverse lookup: class name -> class_id (-1 if unknown).  Used by
+     abcl_xinu_rpc.c's SPAWN command so the host PC can instantiate
+     pre-linked classes by name at runtime. *)
+  emit "static int _abcl_streq(const char *a, const char *b) {\n";
+  emit "  while (*a && *b && *a == *b) { a++; b++; }\n";
+  emit "  return (*a == 0 && *b == 0) ? 1 : 0;\n";
+  emit "}\n";
+  emit "int abcl_lookup_class_id(const char *name) {\n";
+  List.iter
+    (fun (c : class_decl) ->
+      emitf "  if (_abcl_streq(name, \"%s\")) return CLASS_%s;\n" c.cname c.cname)
+    cs;
+  emit "  return -1;\n";
   emit "}\n\n";
 
   (* actor 本体 (Xinu process) *)

@@ -1,0 +1,145 @@
+// host_diners_bootstrap.abcl
+// Pure-AIPL host that DYNAMICALLY bootstraps the Xinu side:
+//   1. LOAD  /home/diners.abcl <- transfer the AIPL source text
+//   2. SPAWN Fork × 5           <- instantiate the 5 fork actors
+//   3. SPAWN Philosopher × 2    <- instantiate Xinu P4 and P5
+//   4. SEND  <P4>.try_eat       <- kick the Xinu philosophers
+//   5. SEND  <P5>.try_eat
+//   6. Run 3 PC philosophers (P1/P2/P3) just like host_diners.abcl
+//
+// The Xinu kernel is built from DiningPhilosophersDistXinu_NoMain.abcl —
+// it has the Fork and Philosopher CLASSES linked at compile time but
+// NO top-level `new`, so the actor table is empty until this host
+// drives the SPAWN sequence.
+//
+// All remote-actor messaging uses the standard `remote()` form —
+// here through the Py-I builtins remote_call (= send remote().M)
+// and remote_now (= now remote().M).  The SPAWN/LOAD path is exposed
+// as the "_" meta-actor on Xinu's UART1 RPC dispatcher.
+
+class Philosopher {
+  var my_id        = 0;
+  var lo_fork      = "0";
+  var hi_fork      = "0";
+  var meals_target = 20;
+  var meals_done   = 0;
+  var attempts     = 0;
+  var hub = "uart1://127.0.0.1:5555";
+
+  method init(pid, lo, hi, target) {
+    my_id = pid; lo_fork = lo; hi_fork = hi;
+    meals_target = target;
+    meals_done = 0; attempts = 0;
+    print("  [P" + my_id + "] thinking (low=F" + lo_fork
+          + " high=F" + hi_fork + ")");
+    send self.try_eat();
+  }
+
+  method try_eat() {
+    if (meals_done >= meals_target) {
+      print("  [P" + my_id + "] done after " + attempts + " attempts");
+    } else {
+      attempts = attempts + 1;
+
+      remote_call(hub, lo_fork, "acquire", my_id);
+      sleep(0.025);
+      var hlo = remote_now(hub, lo_fork, "field", 0);
+      if (hlo != my_id) {
+        sleep(0.030);
+        send self.try_eat();
+      } else {
+        remote_call(hub, hi_fork, "acquire", my_id);
+        sleep(0.025);
+        var hhi = remote_now(hub, hi_fork, "field", 0);
+        if (hhi != my_id) {
+          remote_call(hub, lo_fork, "release", my_id);
+          sleep(0.030);
+          send self.try_eat();
+        } else {
+          sleep(0.150);
+          meals_done = meals_done + 1;
+          if (meals_done <= 10) {
+            print("  [P" + my_id + " ate meal=" + meals_done
+                  + "] (attempts=" + attempts + ")");
+          } else {
+            var bucket = meals_done - ((meals_done / 10) * 10);
+            if (bucket == 0) {
+              print("  [P" + my_id + " ate meal=" + meals_done
+                    + "] (attempts=" + attempts + ")");
+            }
+          }
+          sleep(0.040);
+          remote_call(hub, hi_fork, "release", my_id);
+          remote_call(hub, lo_fork, "release", my_id);
+          sleep(0.010);
+          send self.try_eat();
+        }
+      }
+    }
+  }
+}
+
+// ---- Main: bootstrap the Xinu actor world from scratch ---------------
+
+print("=== pure-AIPL diners (bootstrap mode) ===");
+print("    Xinu has Fork+Philosopher classes linked but no instances.");
+print("    PC drives SPAWN to instantiate the actor topology.");
+
+var hub_url = "uart1://127.0.0.1:5555";
+
+print("");
+print("[boot] PING -> " + remote_now(hub_url, "_", "ping"));
+print("[boot] LIST -> " + remote_now(hub_url, "_", "list"));
+
+// 1. Transfer the AIPL source text to Xinu (= LOAD).  The source
+//    body is sent as raw bytes; Xinu writes it into /home/diners.abcl.
+//    We don't actually re-compile it (the classes are already linked)
+//    but the source-transfer step is what the demo asks for, and the
+//    file is left on Xinu's memfs so `xsh$ cat /home/diners.abcl`
+//    confirms the round-trip.
+// Keep src ASCII-only — str_len() returns the char count while the
+// wire sends UTF-8 bytes; any multi-byte glyph here would desync the
+// next RPC (Xinu reads `len` bytes, leftovers contaminate SPAWN).
+var src = "// dining philosophers - bootstrapped at runtime\n"
+        + "// (the actor classes are pre-linked in the kernel)\n"
+        + "// SPAWN sequence will follow.\n";
+var src_len = str_len(src);
+print("");
+print("[boot] LOAD  diners (" + src_len + " bytes) ...");
+remote_call(hub_url, "_", "load", "diners", src_len, src);
+
+// 2. Spawn the actor topology over RPC.  Each SPAWN returns the new
+//    actor_id; we record them so the philosophers can address forks
+//    by id.  Order is deterministic: forks become 0..4, then philos.
+print("[boot] SPAWN actor topology ...");
+var f0_id = remote_now(hub_url, "_", "spawn", "Fork");
+var f1_id = remote_now(hub_url, "_", "spawn", "Fork");
+var f2_id = remote_now(hub_url, "_", "spawn", "Fork");
+var f3_id = remote_now(hub_url, "_", "spawn", "Fork");
+var f4_id = remote_now(hub_url, "_", "spawn", "Fork");
+print("       Fork ids:  " + f0_id + " " + f1_id + " " + f2_id + " " + f3_id + " " + f4_id);
+
+// Xinu P4 (my_id=4, lo=F2, hi=F3), P5 (my_id=5, lo=F3, hi=F4)
+var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, f2_id, f3_id);
+var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, f3_id, f4_id);
+print("       Xinu P4 id=" + p4_id + "  P5 id=" + p5_id);
+
+// 3. Kick the Xinu philosophers — they don't auto-call try_eat because
+//    their init() doesn't (they were created without going through a
+//    top-level main block).  A bare SEND on UART1 starts them.
+print("[boot] kick Xinu philosophers ...");
+remote_call(hub_url, p4_id, "try_eat");
+remote_call(hub_url, p5_id, "try_eat");
+
+print("");
+print("[boot] new LIST -> " + remote_now(hub_url, "_", "list"));
+print("");
+
+// 4. Three PC philosophers — same topology as host_diners.abcl, but
+//    the fork ids come from the SPAWN replies rather than being
+//    hard-coded.  Cast to string so remote_call's <to_actor> is a
+//    string id.
+print("=== diners running: 3 PC + 2 Xinu, meals=20 each ===");
+var p1 = new Philosopher(1, "" + f0_id, "" + f4_id, 20);
+var p2 = new Philosopher(2, "" + f0_id, "" + f1_id, 20);
+var p3 = new Philosopher(3, "" + f1_id, "" + f2_id, 20);

@@ -471,7 +471,42 @@ def _uart1_remote_send(hostport: str, to_actor: str, method: str,
     """Async wire form for the Fork/Counter/Greeter style actors:
        SEND <id> <method> [arg1] [arg2] ...
     The Xinu RPC dispatcher acks with "OK method=... id=...".  We
-    drop the ack here because fire-and-forget semantics."""
+    drop the ack here because fire-and-forget semantics.
+
+    When to_actor is the meta-actor "_" we map a few method names to
+    the dispatcher's own opcodes (LOAD/COMPILE/RUN) so AIPL programs
+    can drive the dynamic-compile path through the same `remote()`
+    surface as regular actor sends."""
+    if to_actor == "_":
+        if method == "load":
+            # args = (name, byte_count, body_str)
+            if len(args) < 3:
+                raise ValueError("remote_call(_, 'load', name, len, body)")
+            name, blen, body = str(args[0]), int(args[1]), str(args[2])
+            header = f"LOAD {name} {blen}"
+            s = _uart1_get_socket(hostport)
+            with _UART1_LOCK:
+                buf_holder = _UART1_BUFS.setdefault(hostport, [b""])
+                s.sendall((header + "\n").encode("ascii"))
+                s.sendall(body.encode("utf-8"))
+                # The dispatcher ACKs with "OK loaded bytes=N"; drain
+                # it so subsequent calls stay aligned.
+                _uart1_recv_line(s, buf_holder)
+            return
+        if method == "compile":
+            _uart1_call(hostport, f"COMPILE {args[0]}")
+            return
+        if method == "run":
+            _uart1_call(hostport, f"RUN {args[0]}")
+            return
+        if method == "spawn":
+            # Spelled the same as remote_now's spawn; for fire-and-
+            # forget we still need the ack to keep wire alignment.
+            cls = str(args[0])
+            extra = " ".join(str(a) for a in args[1:])
+            cmd = f"SPAWN {cls}" + (" " + extra if extra else "")
+            _uart1_call(hostport, cmd)
+            return
     parts = ["SEND", str(to_actor), method] + [str(a) for a in args]
     _uart1_call(hostport, " ".join(parts))
 
@@ -501,6 +536,25 @@ def _uart1_remote_call_sync(hostport: str, to_actor: str, method: str,
         if extras:
             return header + "  [" + " | ".join(extras) + "]"
         return header
+    if method == "spawn":
+        # remote_now(hub, "_", "spawn", "ClassName", [init_args...])
+        # → "SPAWN <ClassName> <a1> <a2> ..."  → "OK actor_id=N"
+        cls = str(args[0]) if args else ""
+        extra = " ".join(str(a) for a in args[1:])
+        cmd = f"SPAWN {cls}" + (" " + extra if extra else "")
+        line = _uart1_call(hostport, cmd)
+        if line.startswith("OK"):
+            for tok in line[3:].split():
+                if tok.startswith("actor_id="):
+                    try:
+                        return int(tok.split("=", 1)[1])
+                    except ValueError:
+                        pass
+        return -1
+    if method == "compile":
+        return _uart1_call(hostport, f"COMPILE {args[0]}")
+    if method == "run":
+        return _uart1_call(hostport, f"RUN {args[0]}")
     # Fallback: SEND-style as a sync call returning the dispatcher's
     # ack line ("OK method=... id=..." or "ERR ...").
     parts = ["SEND", str(to_actor), method] + [str(a) for a in args]
