@@ -1243,7 +1243,7 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
   emit "  default: return INITPRIO;\n";
   emit "  }\n";
   emit "}\n";
-  emit "static const char* abcl_class_name(int class_id) {\n";
+  emit "const char* abcl_class_name(int class_id) {\n";
   emit "  switch (class_id) {\n";
   List.iter
     (fun (c : class_decl) ->
