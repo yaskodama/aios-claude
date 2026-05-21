@@ -1072,6 +1072,14 @@ int abcl_object_class_id(int obj_id) {
    can answer without walking the table. */
 int abcl_n_objects(void) { return n_objects; }
 
+/* S3 DeadlineHints: expose the Xinu tid_typ that backs an AIPL actor,
+   so the set_deadline builtin can translate an obj_id into the
+   actual thread id that the kernel's setdeadline() takes. */
+int abcl_object_tid(int obj_id) {
+  if (obj_id < 0 || obj_id >= n_objects) return -1;
+  return (int)objects[obj_id].tid;
+}
+
 /* Xinu の queue.h にある enqueue() と名前が衝突するのでリネーム。
    以降 abcl 側のコードでは enqueue マクロで本関数を呼ぶ。 */
 /* R1 smoke markers: print the FIRST send + FIRST recv to the serial
@@ -1441,9 +1449,23 @@ let gen_program_xinu ?(max_messages = 20) (p : program) : string =
               ^ "}"
           in
           emitf "  enqueue(-1, %s, \"%s\", %d, %s);\n" rid meth n argstr
-      | CallStmt _ ->
-          (* Xinu 版では top-level の任意呼び出しはサポート外 (PingPong には不要) *)
-          ()
+      | CallStmt (f, args) when f = "print" ->
+          let arg = List.hd args in
+          emitf "  v_print(%s);\n" (gen_expr ~ctx:g_ctx arg)
+      | CallStmt (f, args) ->
+          (* Top-level extern call.  Used for one-shot setup
+             primitives like S3's set_deadline() that must run AFTER
+             actors are spawned (phase 2) but BEFORE the first
+             enqueue (phase 3 sends below). *)
+          let n = List.length args in
+          let argstr =
+            if n = 0 then "NULL"
+            else
+              "(value_t[]){"
+              ^ String.concat ", " (List.map (gen_expr ~ctx:g_ctx) args)
+              ^ "}"
+          in
+          emitf "  %s(%d, %s);\n" (mangle f) n argstr
       | _ -> ())
     gs;
   emit "  /* wait for shutdown */\n";

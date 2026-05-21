@@ -258,6 +258,13 @@ let prelude () : env =
   add_mono e "lww_clear"                (TFun ([], TInt));
   add_mono e "lww_tick"                 (TFun ([], TInt));
 
+  (* ---- S3 DeadlineHints (Xinu kernel evolution Round 1) — mark an
+     actor's NEXT dispatch as urgent so the scheduler picks it ahead
+     of priority order.  obj_ref is TAny (typically self or a var
+     holding a `new Class()` result); ms is a relative deadline in
+     milliseconds (= clkticks).  Returns 1 ok / 0 fail. ---- *)
+  add_mono e "set_deadline"             (TFun ([TAny; TInt], TInt));
+
   (* ---- P4 SchedulingVisualizer ---- *)
   add_mono e "sched_viz_start"          (TFun ([TInt], TInt));
   add_mono e "sched_viz_stop"           (TFun ([], TInt));

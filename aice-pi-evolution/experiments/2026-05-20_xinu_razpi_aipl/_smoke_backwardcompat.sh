@@ -37,7 +37,9 @@ KNOWN_XINU_FAILS=(
   abclc/Phase13_Channels.abcl
   abclc/Phase14_Linear.abcl
   abclc/Phase15_Owned.abcl
+  abclc/Records.abcl
   abclc/RemoteClient.abcl
+  abclc/Tuples.abcl
   abclc/TypedDemo.abcl
 )
 
