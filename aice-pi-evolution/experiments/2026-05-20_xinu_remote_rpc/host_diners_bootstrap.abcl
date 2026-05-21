@@ -119,9 +119,14 @@ var f3_id = remote_now(hub_url, "_", "spawn", "Fork");
 var f4_id = remote_now(hub_url, "_", "spawn", "Fork");
 print("       Fork ids:  " + f0_id + " " + f1_id + " " + f2_id + " " + f3_id + " " + f4_id);
 
-// Xinu P4 (my_id=4, lo=F2, hi=F3), P5 (my_id=5, lo=F3, hi=F4)
-var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, f2_id, f3_id);
-var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, f3_id, f4_id);
+// Xinu P4 (my_id=4, lo=F2, hi=F3), P5 (my_id=5, lo=F3, hi=F4).
+// Fork ids are passed with the "ref:N" prefix so Xinu's SPAWN
+// handler tags them V_OBJ.  Without that, init()'s f_low / f_high
+// fields receive V_INT and `send f_low.acquire(...)` is silently
+// dropped by the actor dispatcher — Philosopher.try_eat then
+// spins forever, eventually triggering a kernel reboot.
+var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, "ref:" + f2_id, "ref:" + f3_id);
+var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, "ref:" + f3_id, "ref:" + f4_id);
 print("       Xinu P4 id=" + p4_id + "  P5 id=" + p5_id);
 
 // 3. Kick the Xinu philosophers — they don't auto-call try_eat because
