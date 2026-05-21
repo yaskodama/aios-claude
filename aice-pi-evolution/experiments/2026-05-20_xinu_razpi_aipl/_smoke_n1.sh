@@ -96,14 +96,22 @@ wait "$ECHO_PID" 2>/dev/null || true
 PASS=0; FAIL=0
 
 echo "  -- assertion (1) net_init / DHCP --"
+# Either cold path ([aipl] net_init ok ip=10.0.2.X) or warm path
+# (auto-init ran first → [abcl_net] autoinit ok ip=10.0.2.X +
+# subsequent [aipl] net_init already-up).
 if grep -aE '\[aipl\] net_init ok ip=10\.0\.2\.' "$LOG" >/dev/null; then
   PASS=$((PASS+1))
   ip=$(grep -aE '\[aipl\] net_init ok ip=' "$LOG" | head -1 | sed -E 's/.*ip=([0-9.]+).*/\1/')
   echo "  PASS (1) DHCP got ip=$ip"
+elif grep -aE '\[abcl_net\] autoinit ok ip=10\.0\.2\.' "$LOG" >/dev/null \
+  && grep -aE '\[aipl\] net_init already-up' "$LOG" >/dev/null; then
+  PASS=$((PASS+1))
+  ip=$(grep -aE '\[abcl_net\] autoinit ok ip=' "$LOG" | head -1 | sed -E 's/.*ip=([0-9.]+).*/\1/')
+  echo "  PASS (1) NIC up via abcl_net_autoinit (ip=$ip)"
 else
   FAIL=$((FAIL+1))
   echo "  FAIL (1) net_init did not get a 10.0.2.* IP"
-  grep -aE 'net_init|dhcp|DHCP' "$LOG" | head -5
+  grep -aE 'net_init|autoinit|dhcp|DHCP' "$LOG" | head -5
 fi
 
 echo "  -- assertion (2) net_connect --"
