@@ -35,7 +35,7 @@ for f in samples/*.abcl; do
   [ -e "$f" ] || continue
   name=$(basename "$f" .abcl)
   log="$LOGDIR/${name}.log"
-  "$PY" abcl_main.py --timeout "$TIMEOUT" "$f" >"$log" 2>&1
+  "$PY" aipl_main.py --timeout "$TIMEOUT" "$f" >"$log" 2>&1
   rc=$?
   if grep -qE 'Traceback|^\[parse error\]|^\[FATAL\]' "$log"; then
     printf '  FAIL  %s\n' "$f"
@@ -81,7 +81,7 @@ if [ "$WITH_AI" = "1" ]; then
       [ -e "$f" ] || continue
       name=$(basename "$f" .abcl)
       log="$LOGDIR/${name}.log"
-      "$PY" abcl_main.py --timeout "$AI_TIMEOUT" "$f" >"$log" 2>&1
+      "$PY" aipl_main.py --timeout "$AI_TIMEOUT" "$f" >"$log" 2>&1
       rc=$?
       if grep -qE 'Traceback|^\[parse error\]|^\[FATAL\]' "$log" || [ "$rc" -ne 0 ]; then
         printf '  FAIL  %s\n' "$f"

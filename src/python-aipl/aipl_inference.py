@@ -615,9 +615,10 @@ def _infer_expr(infer: Inference, env: Env, e: Any) -> Any:
     if Var and isinstance(e, Var):
         sch = env.lookup(e.name)
         if sch is None:
-            infer.issues.append(InferenceIssue(
-                kind="unbound", msg=f"unbound variable: {e.name}",
-                location=getattr(e, "loc", "")))
+            # Unknown identifier — gradual fallback (fresh tvar, no error).
+            # Mirrors OCaml/JS-B behavior: AIPL has many globally-visible
+            # builtin classes (AI, …) and constants that aren't in env
+            # but are valid at runtime.  See `feedback_js_hm_port`.
             return infer.fresh()
         return instantiate(infer, sch)
     # Negation
@@ -741,8 +742,20 @@ def _infer_binop(infer: Inference, env: Env, e: Any) -> Any:
     op = e.op
     lhs = _infer_expr(infer, env, e.lhs)
     rhs = _infer_expr(infer, env, e.rhs)
-    if op in ("+", "-", "*", "/", "mod"):
-        # Try Int by default; allow Real if either side is Real.
+    if op == "+":
+        # String concatenation: if either side resolves to Str, the
+        # result is Str — match OCaml infer.ml::pick_overload's
+        # `"+", TString, _ -> TString` rule.  This permits the common
+        # `print("foo " + n)` idiom without an Int-vs-Str unify error.
+        lhs_r = apply(infer.subst, lhs)
+        rhs_r = apply(infer.subst, rhs)
+        if (isinstance(lhs_r, TCon) and lhs_r.name == "Str") or \
+           (isinstance(rhs_r, TCon) and rhs_r.name == "Str"):
+            return T_STR
+        # Otherwise numeric: constrain both to the same type.
+        infer.constrain(lhs, rhs, where=f"{op} operands")
+        return lhs
+    if op in ("-", "*", "/", "mod"):
         infer.constrain(lhs, rhs, where=f"{op} operands")
         return lhs
     if op in ("==", "!=", "<", ">", "<=", ">="):
@@ -779,8 +792,10 @@ def _infer_method_dispatch(infer: Inference, env: Env, e: Any, is_future: bool) 
     else:
         sch = env.lookup(target)
         if sch is None:
-            infer.issues.append(InferenceIssue(
-                kind="unbound", msg=f"unknown actor: {target}"))
+            # Unknown actor target — gradual fallback (no error).
+            # The runtime resolves the name dynamically; AIPL has
+            # global builtins (e.g. AI) that aren't in env but are
+            # always reachable.
             return infer.fresh()
         target_t = instantiate(infer, sch)
         target_t = apply(infer.subst, target_t)
@@ -820,9 +835,13 @@ def _infer_call(infer: Inference, env: Env, e: Any) -> Any:
         bsig = _lookup_builtin_signature(e.name)
         if bsig is not None:
             return _check_builtin_call(infer, env, e, bsig)
-        infer.issues.append(InferenceIssue(
-            kind="unbound", msg=f"unknown function: {e.name}",
-            location=getattr(e, "loc", "")))
+        # Unknown function — treat as gradually typed (Dyn -> Dyn).
+        # Mirrors OCaml `infer.ml`'s "unknown function 'X' treated as
+        # gradual (any -> any)" warning and JS-B/JS-N's CallExpr arm
+        # that returns a fresh TVar without erroring.  We still walk
+        # args for side effects so any nested unify constraints land.
+        for a in e.args:
+            _infer_expr(infer, env, a)
         return infer.fresh()
     fn_t = instantiate(infer, fn)
     arg_ts = [_infer_expr(infer, env, a) for a in e.args]
@@ -956,8 +975,23 @@ def _infer_stmt(infer: Inference, env: Env, s: Any) -> None:
         rhs_t = _infer_expr(infer, env, s.expr)
         sch = env.lookup(s.name)
         if sch:
-            infer.constrain(instantiate(infer, sch), rhs_t,
-                            where=f"assign to {s.name}")
+            lhs_t = instantiate(infer, sch)
+            lhs_r = apply(infer.subst, lhs_t)
+            rhs_r = apply(infer.subst, rhs_t)
+            # Sentinel widening: if both sides are concrete distinct
+            # TCons (e.g. `var left = 0;` initial Int vs later
+            # `left = sender;` Actor), rebind the name to Dyn instead
+            # of emitting a unify error.  Mirrors the gradual-escape
+            # rule used by JS-B (walkForFieldWidening) and matches
+            # OCaml's TAny absorption.  Only applies to sentinel-style
+            # mismatch — both sides must be concrete TCons with
+            # different names.
+            if (isinstance(lhs_r, TCon) and isinstance(rhs_r, TCon)
+                    and lhs_r.name != rhs_r.name
+                    and lhs_r != T_DYN and rhs_r != T_DYN):
+                env.bind(s.name, Scheme((), T_DYN))
+                return
+            infer.constrain(lhs_t, rhs_t, where=f"assign to {s.name}")
         return
     if If and isinstance(s, If):
         c_t = _infer_expr(infer, env, s.cond)
@@ -1257,13 +1291,15 @@ def _parse_annotation(ann: str, infer: Inference) -> Any:
     m = re.match(r"^List\s*<\s*(.+)\s*>$", s)
     if m:
         return TCon("List", (_parse_annotation(m.group(1), infer),))
-    # Bare type names
-    if s == "Int": return T_INT
-    if s == "Bool": return T_BOOL
-    if s == "Str": return T_STR
-    if s == "Real": return T_REAL
-    if s == "Rat": return T_RAT
-    if s == "Unit": return T_UNIT
+    # Bare type names — case-insensitive primitive lookup so that
+    # `var n: int` and `var n: Int` both produce T_INT.  Previously the
+    # lowercase forms fell through to the nominal-class fallback and
+    # were minted as TCon("int") (a bogus class), then failed to unify
+    # against T_INT from literals — see the "cannot unify Int with int"
+    # diagnostic that flooded ~38/40 samples.
+    low = s.lower()
+    if low in _TYPECK_NAME_MAP:
+        return _TYPECK_NAME_MAP[low]
     if s == "Dyn":  return T_DYN
     # Identifier: nominal class type
     m = _TYPE_NAME_RE.match(s)
