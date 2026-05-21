@@ -1,0 +1,134 @@
+{
+  "name": "AIPL_XinuRPi5_Round1",
+  "task": "Embedded Xinu を Raspberry Pi 5 (BCM2712 / Cortex-A76 / AArch64) で起動させる新プラットフォーム arm-rpi5 を作る.Round 0 (= leex の AArch64 boot を Xinu の build pipeline に合体させた、PL011 hello-world まで) を経て、Round 1 で Xinu 本体 (scheduler / threads / clock / IRQ / framebuffer / GPIO / UART RPC / AIPL ランタイム) を Pi 5 上で立ち上げる.全 phase は (1) arm-none-eabi → aarch64-none-elf ツールチェーンに切替えた make が通る ✅、(2) firmware (config.txt + kernel_2712.img) が boot ✅、(3) UART0 に Xinu バナーが出て xsh$ プロンプトに到達 ✅、(4) arm-qemu (versatilepb) + arm-rpi3 の既存 smoke が regression-clean ✅ の 4 段ゲートを通る.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "B0_Toolchain",
+      "B1_AArch64BootStub",
+      "B2_Kernel2712Image",
+      "U0_PL011UART",
+      "U1_KprintfMin",
+      "M0_FlatIdentityMap",
+      "M1_KernelHeap",
+      "S0_AArch64ContextSwitch",
+      "S1_GICAndTimer",
+      "X0_XshOnRPi5",
+      "X1_AbclProgramOnRPi5",
+      "N0_RP1Discover",
+      "N1_FramebufferMailbox",
+      "R_LegacyPlatformsUnchanged",
+      "ImplCost"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "R_BootBringup",
+        "persona": "あなたは R_BootBringup を判定するレビュアーです。候補設計 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety の 7 軸) が、AArch64 Pi 5 上の早期 boot (firmware → loader.S → C main → UART hello) を成立させる現実性を判定する。重視: (a) arch_target が arm_rpi5 or arm_aarch64 を取れる、(b) memory_alloc が起動初期にシンプル (bump / freelist) で済む、(c) isolation が none か user_kernel_split に留まり MMU 初期化が単段、(d) concurrency_safety が critical_section / spinlock で AArch64 atomics の最小利用に収まる。スコア基準: 1.0 = arch_target=arm_rpi5 + memory_alloc=freelist + isolation=none、0.7 = arch_target=arm_rpi3 + memory_alloc=freelist + isolation=user_kernel_split、0.3 = arch_target=arm_versatilepb + memory_alloc=buddy + isolation=user_kernel_split (= レガシー寄り)、0.0 = arch_target=x86_64 + memory_alloc=demand_paged + isolation=container_like (= 軸が違う)。半角数字の decimal で答えてください。",
+        "weight": 0.3
+      },
+      {
+        "name": "R_AArch64SchedulerImpl",
+        "persona": "あなたは R_AArch64SchedulerImpl を判定するレビュアーです。候補設計の scheduler + concurrency_safety + ipc_primitive を見て、AArch64 (AAPCS64) で動く Xinu のスレッド + ctxsw + clock IRQ を実装する困難度を判定する。基準: 1.0 = scheduler=priority_static + concurrency_safety=critical_section + ipc_primitive=sem_mailbox (= 既存 Xinu パターンをそのまま AArch64 ABI に焼き直す、最小コスト)、0.7 = scheduler=priority_aging + concurrency_safety=spinlock + ipc_primitive=actor_lockfree (= ロックフリー mailbox を AArch64 atomics で組み直す追加コスト)、0.3 = scheduler=mlfq or edf_soft + concurrency_safety=lock_free (= 時計割り込み内で MLFQ 維持は AArch64 でも組めるが Round 1 後半相当)、0.0 = scheduler=cfs_like + concurrency_safety=rcu (= 複雑、Linux 寄り、Round 1 では不可)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_Pi5HardwareReality",
+        "persona": "あなたは R_Pi5HardwareReality を判定するレビュアーです。候補の arch_target + isolation + memory_alloc が、Raspberry Pi 5 (BCM2712 / Cortex-A76 / RP1 / VideoCore VII / 0x107C000000 MMIO) という実物の hardware と整合する程度を判定する。基準: 1.0 = arch_target=arm_rpi5 + isolation=none or user_kernel_split + memory_alloc=freelist or buddy (= まさに Pi 5 を狙った設計)、0.7 = arch_target=multi_arch + isolation=user_kernel_split (= Pi 5 も含まれるが汎用)、0.3 = arch_target=arm_rpi3 (= 旧 Pi、Pi 5 で動かそうとすると config.txt / kernel image 名から手を入れる必要)、0.0 = arch_target=x86_64 or riscv32 (= 物理的に Pi 5 で動かない)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_LegacyBackwardCompat",
+        "persona": "あなたは R_LegacyBackwardCompat を判定するレビュアーです。Round 1 + Round 2 + kernel-evo が arm-qemu で築いた smoke ベース (17 AIPL smokes + RemoteRPC 2 + kernel-evo S1-S4/Sec1 + memfs/make + N1 4/4 + 3 diners variants) を Pi 5 platform 追加で壊さない確率を判定する。重視: (a) arch_target=multi_arch なら arm-qemu と共存、(b) isolation / memory_alloc / ipc_primitive を既存値から動かさない、(c) platform-specific コードは新ディレクトリ (compile/platforms/arm-rpi5/) に分離。スコア基準: 1.0 = arch_target=multi_arch + isolation 等は全て Round 2 baseline と同じ (= 純粋追加)、0.7 = arch_target=arm_rpi5 specialised + isolation 据置 (= 共存だが整理コストあり)、0.3 = arch_target=arm_rpi5 + memory_alloc or isolation が更新 (= 既存 platform にも波及)、0.0 = arch_target=arm_rpi5 + ipc_primitive=tuple_space (= AIPL mailbox 全替えで既存全壊)。半角数字の decimal で答えてください。",
+        "weight": 0.2
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}
