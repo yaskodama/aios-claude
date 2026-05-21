@@ -329,10 +329,135 @@ def _publish_remote_out(hostport: str, to_actor: str, method: str, sync: bool):
         pass
 
 
+# ─── uart1:// scheme — talk Xinu RPC dispatcher over a serial TCP socket
+#
+# When a remote() call addresses "uart1://host:port", the wire protocol is
+# the line-oriented Xinu UART1 RPC (PING/SEND/QUERY/LIST) instead of the
+# JSON/HTTP gateway.  This lets pure-AIPL programs orchestrate the Xinu
+# AIPL actor table without going through the HTTP gateway (which would
+# need Xinu's smc91c111 stack + a JSON parser).
+#
+# Method-to-wire mapping:
+#   send remote(uart1://...).M(a1, a2, ...)  →  "SEND <actor> M a1 a2\n"
+#   now  remote(uart1://...).field(N)        →  "QUERY <actor> N\n"
+#                                             →  reply parsed as int
+#                                                ("OK value=K"  → K)
+#   now  remote(uart1://...).ping()          →  "PING\n"   → raw reply line
+#   now  remote(uart1://...).list()          →  "LIST\n"   → raw reply line
+import socket
+import threading
+
+_UART1_SOCKETS: dict = {}
+_UART1_LOCK = threading.Lock()
+
+def _is_uart1(hostport: str) -> bool:
+    return isinstance(hostport, str) and hostport.startswith("uart1://")
+
+def _uart1_target(hostport: str) -> tuple:
+    raw = hostport[len("uart1://"):]
+    if ":" in raw:
+        host, port_s = raw.split(":", 1)
+        return host, int(port_s)
+    return raw, 5555
+
+def _uart1_get_socket(hostport: str) -> socket.socket:
+    """One socket per uart1 endpoint, lazily opened.  The Xinu UART1
+    dispatcher is single-client (QEMU `-serial tcp:...` accepts one
+    connection), so a single shared socket with an external lock is
+    the right model."""
+    with _UART1_LOCK:
+        s = _UART1_SOCKETS.get(hostport)
+        if s is not None:
+            return s
+        host, port = _uart1_target(hostport)
+        s = socket.create_connection((host, port), timeout=10.0)
+        s.settimeout(10.0)
+        # Drain the boot greeting if any (e.g. "OK ready=1").
+        try:
+            s.settimeout(0.3)
+            s.recv(256)
+        except (socket.timeout, TimeoutError, OSError):
+            pass
+        s.settimeout(10.0)
+        _UART1_SOCKETS[hostport] = s
+        return s
+
+def _uart1_recv_line(s: socket.socket, buf_holder: list) -> str:
+    """Read one \\n-terminated line, buffering leftovers."""
+    buf = buf_holder[0] if buf_holder else b""
+    while b"\n" not in buf:
+        chunk = s.recv(512)
+        if not chunk:
+            break
+        buf += chunk
+    line, _, rest = buf.partition(b"\n")
+    if buf_holder:
+        buf_holder[0] = rest
+    else:
+        buf_holder.append(rest)
+    return line.decode("ascii", errors="replace").rstrip("\r")
+
+# Persistent recv buffer per socket so partial reads survive across calls.
+_UART1_BUFS: dict = {}
+
+def _uart1_call(hostport: str, command: str) -> str:
+    """Send `command` (without trailing newline), return one reply line.
+    Lock-serialised so concurrent actors don't interleave on the wire."""
+    s = _uart1_get_socket(hostport)
+    with _UART1_LOCK:
+        buf_holder = _UART1_BUFS.setdefault(hostport, [b""])
+        s.sendall((command + "\n").encode("ascii"))
+        return _uart1_recv_line(s, buf_holder)
+
+def _uart1_remote_send(hostport: str, to_actor: str, method: str,
+                       args: list) -> None:
+    """Async wire form for the Fork/Counter/Greeter style actors:
+       SEND <id> <method> [arg1] [arg2] ...
+    The Xinu RPC dispatcher acks with "OK method=... id=...".  We
+    drop the ack here because fire-and-forget semantics."""
+    parts = ["SEND", str(to_actor), method] + [str(a) for a in args]
+    _uart1_call(hostport, " ".join(parts))
+
+def _uart1_remote_call_sync(hostport: str, to_actor: str, method: str,
+                            args: list):
+    """Sync remote() calls.  Special methods:
+       field(i) -> int           (= QUERY <actor> i, parse "value=K")
+       ping()   -> str           (= PING)
+       list()   -> str           (= LIST)
+       (other)  -> raw reply line (=SEND-style; not usually useful sync)"""
+    if method == "field":
+        idx = int(args[0]) if args else 0
+        line = _uart1_call(hostport, f"QUERY {to_actor} {idx}")
+        # "OK value=K" → K, "ERR ..." → None
+        if line.startswith("OK"):
+            for tok in line[3:].split():
+                if tok.startswith("value="):
+                    try:
+                        return int(tok.split("=", 1)[1])
+                    except ValueError:
+                        return tok.split("=", 1)[1]
+        return None
+    if method == "ping":
+        return _uart1_call(hostport, "PING")
+    if method == "list":
+        return _uart1_call(hostport, "LIST")
+    # Fallback: SEND-style as a sync call returning the dispatcher's
+    # ack line ("OK method=... id=..." or "ERR ...").
+    parts = ["SEND", str(to_actor), method] + [str(a) for a in args]
+    return _uart1_call(hostport, " ".join(parts))
+
+
 def remote_send(hostport: str, to_actor: str, method: str,
                 args: list, from_name: str = "") -> None:
     """Fire-and-forget remote send.  Matches the OCaml
     Remote_client.remote_send wire format."""
+    if _is_uart1(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=False)
+        try:
+            _uart1_remote_send(hostport, to_actor, method, args)
+        except OSError as e:
+            print(f"[remote_send uart1] {hostport}/{to_actor}.{method} failed: {e}")
+        return
     url = f"http://{hostport}/api/json/send"
     payload = json.dumps({
         "to":     to_actor,
@@ -357,6 +482,12 @@ def remote_call_sync(hostport: str, to_actor: str, method: str,
     """Synchronous remote call: blocks until the receiver's actor
     method calls reply(value) (or returns without one — then None).
     Returns the JSON-decoded reply value."""
+    if _is_uart1(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=True)
+        try:
+            return _uart1_remote_call_sync(hostport, to_actor, method, args)
+        except OSError as e:
+            raise RuntimeError(f"remote_call uart1 {hostport}/{to_actor}.{method} failed: {e}")
     url = f"http://{hostport}/api/json/call?timeout_ms={int(timeout_s * 1000)}"
     payload = json.dumps({
         "to":     to_actor,

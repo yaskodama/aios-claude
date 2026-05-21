@@ -3,14 +3,14 @@
 # are written in AIPL.
 #
 # Xinu side : abclc/DiningPhilosophersDistXinu.abcl  (Fork×5 + P4/P5)
-# PC   side : aice-pi-evolution/.../host_diners.aipl (Coordinator + P1/P2/P3)
+# PC   side : aice-pi-evolution/.../host_diners.abcl (Coordinator + P1/P2/P3)
 #
 # Pipeline:
 #   1. aipl2c the Xinu sample → C → arm-qemu kernel
 #   2. launch QEMU with UART1 RPC on TCP 5555 + smc91c111 SLIRP
 #      (hostfwd: 127.0.0.1:8181 → 10.0.2.15:80 for the Xinu HTTP
 #      dashboard so the same browser endpoint works as before)
-#   3. python3 -u aipl_main.py host_diners.aipl  ←  PC side is AIPL,
+#   3. python3 -u aipl_main.py host_diners.abcl  ←  PC side is AIPL,
 #      not Python — the Python here is just the interpreter
 #
 # Ctrl-C cleans up QEMU + PC AIPL via trap.
@@ -22,7 +22,7 @@ REPO="$(cd "$HERE/../../.." && pwd)"
 XINU="${XINU_RAZ:-/Users/kodamay/projects/xinu-raz/xinu}"
 COMPILER_ROOT="${COMPILER_ROOT:-/opt/homebrew/bin/arm-none-eabi-}"
 SAMPLE="${SAMPLE:-abclc/DiningPhilosophersDistXinu.abcl}"
-HOST_AIPL="${HOST_AIPL:-$HERE/../2026-05-20_xinu_remote_rpc/host_diners.aipl}"
+HOST_AIPL="${HOST_AIPL:-$HERE/../2026-05-20_xinu_remote_rpc/host_diners.abcl}"
 
 CONSOLE_PORT="${CONSOLE_PORT:-5554}"
 RPC_PORT="${RPC_PORT:-5555}"
@@ -80,13 +80,15 @@ echo "  PC   side : AIPL  ($(basename "$HOST_AIPL"))"
 echo "  Xinu HTTP : http://127.0.0.1:${HOST_HTTP_PORT}/"
 echo "============================================================"
 
-echo "--- [4/4] run PC-side AIPL host_diners.aipl ---"
+echo "--- [4/4] run PC-side AIPL host_diners.abcl ---"
 # `--idle-ms` is set short so the Python AIPL runtime exits once all
-# three Philosopher actors are idle (= all done eating).  Total time
-# should be a few seconds.
+# three Philosopher actors are idle (= all done eating).  With 100
+# meals × 3 PC philos the worst-case is ~30 min in the AIPL message
+# dispatcher; we cap at 1 hour so the launcher doesn't hang
+# indefinitely on a deadlock.
 RPC_HOST=127.0.0.1 RPC_PORT="$RPC_PORT" \
 python3 -u "$REPO/src/python-aipl/aipl_main.py" "$HOST_AIPL" \
-    --timeout 300 --idle-ms 5000 || true
+    --timeout 3600 --idle-ms 5000 || true
 
 echo ""
 echo "--- done ---"
