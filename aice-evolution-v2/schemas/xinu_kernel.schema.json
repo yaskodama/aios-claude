@@ -1,0 +1,79 @@
+{
+  "name": "xinu_kernel",
+  "axes": {
+    "scheduler": [
+      "round_robin",
+      "priority_static",
+      "priority_aging",
+      "mlfq",
+      "edf_soft",
+      "cfs_like"
+    ],
+    "memory_alloc": [
+      "bump",
+      "freelist",
+      "buddy",
+      "slab",
+      "demand_paged",
+      "cow"
+    ],
+    "ipc_primitive": [
+      "sem_mailbox",
+      "channel_typed",
+      "capability",
+      "tuple_space",
+      "actor_lockfree"
+    ],
+    "isolation": [
+      "none",
+      "user_kernel_split",
+      "mmu_per_process",
+      "capability_token",
+      "container_like"
+    ],
+    "arch_target": [
+      "arm_versatilepb",
+      "arm_rpi3",
+      "arm_rpi4",
+      "x86_64",
+      "riscv32",
+      "multi_arch"
+    ],
+    "power_mgmt": [
+      "always_on",
+      "halt_idle",
+      "dvfs",
+      "deep_sleep"
+    ],
+    "concurrency_safety": [
+      "critical_section",
+      "spinlock",
+      "lock_free",
+      "rcu",
+      "stm"
+    ]
+  },
+  "ordinal_axes": {
+    "scheduler":          ["round_robin", "priority_static", "priority_aging", "mlfq", "edf_soft", "cfs_like"],
+    "memory_alloc":       ["bump", "freelist", "buddy", "slab", "demand_paged", "cow"],
+    "isolation":          ["none", "user_kernel_split", "capability_token", "mmu_per_process", "container_like"],
+    "power_mgmt":         ["always_on", "halt_idle", "dvfs", "deep_sleep"],
+    "concurrency_safety": ["critical_section", "spinlock", "lock_free", "rcu", "stm"]
+  },
+  "coherence": [
+    {"if": {"isolation": "mmu_per_process"},   "then_in":  {"memory_alloc": ["demand_paged", "cow", "buddy", "slab"]}},
+    {"if": {"isolation": "container_like"},    "then_in":  {"memory_alloc": ["demand_paged", "cow"]}},
+    {"if": {"memory_alloc": "cow"},            "then_in":  {"isolation": ["mmu_per_process", "container_like"]}},
+    {"if": {"memory_alloc": "demand_paged"},   "then_in":  {"isolation": ["mmu_per_process", "container_like", "capability_token"]}},
+    {"if": {"arch_target": "arm_versatilepb"}, "then_in":  {"memory_alloc": ["bump", "freelist", "buddy", "slab"]}},
+    {"if": {"arch_target": "arm_versatilepb"}, "then_in":  {"isolation": ["none", "user_kernel_split", "capability_token"]}},
+    {"if": {"scheduler": "edf_soft"},          "then_in":  {"power_mgmt": ["always_on", "halt_idle"]}},
+    {"if": {"scheduler": "cfs_like"},          "then_in":  {"concurrency_safety": ["lock_free", "rcu"]}},
+    {"if": {"power_mgmt": "dvfs"},             "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "x86_64"]}},
+    {"if": {"power_mgmt": "deep_sleep"},       "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "x86_64", "riscv32"]}},
+    {"if": {"ipc_primitive": "capability"},    "then_in":  {"isolation": ["capability_token", "mmu_per_process", "container_like"]}},
+    {"if": {"ipc_primitive": "tuple_space"},   "then_not": {"concurrency_safety": "critical_section"}}
+  ],
+  "open_axes": true,
+  "notes": "Gene axes for evolving Embedded Xinu's kernel subsystems (scheduler, memory, IPC, isolation, target arch, power, concurrency).  ordinal_axes give a partial order so trend-vector extraction sees 'higher = more sophisticated'.  coherence rules prevent nonsense combinations like demand_paged on a non-MMU bare-versatilepb kernel."
+}

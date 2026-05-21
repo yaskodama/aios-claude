@@ -1,0 +1,137 @@
+{
+  "name": "Xinu_KernelEvolution_Round1",
+  "task": "Embedded Xinu の kernel subsystem を 5 軸 (scheduler / memory_alloc / isolation / arch_target / power_mgmt / concurrency_safety / ipc_primitive) で進化させる.各 phase は (1) xinu-raz を build できる、(2) qemu-system-arm -M versatilepb で boot して xsh$ プロンプトに到達、(3) AIPL Round 1 系の既存 17 smoke + RemoteRPC 系の 1 smoke (host_diners.py の 5-哲学者 round-trip) が全て PASS、の 3 段ゲートを通過する.実 Raspberry Pi 移植 (arm_rpi3 軸) は smoke harness の都合上、arm-qemu と並走できる範囲で扱う.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 30,
+    "seed_count": 8,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "S1_PriorityAging",
+      "S2_MLFQ",
+      "S3_DeadlineHints",
+      "S4_IdlePower",
+      "M1_BuddyAllocator",
+      "M2_SlabCache",
+      "M3_DemandPaging",
+      "N1f_FixSmc91c111",
+      "N2_ZeroCopyBuffers",
+      "N3_SocketSyscalls",
+      "A1_ArmRpi3Port",
+      "A2_MmuBringup",
+      "A3_RealRpiGPIO",
+      "Sec1_StackCanaries",
+      "Sec2_CapTokens",
+      "Sec3_MeasuredBoot",
+      "R_AiplBackwardCompat",
+      "ImplCost"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "R_KernelSafety",
+        "persona": "あなたは R_KernelSafety を判定するレビュアーです。候補設計 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety の 7 軸) を見て、Embedded Xinu の kernel として『誤った user code が kernel を panic させない』『double-free / use-after-free / race-stack-corruption が起きない』『割り込み中の disable() 漏れで dead-lock しない』を判定する。スコア基準: 1.0 = isolation=mmu_per_process or container_like + concurrency_safety=lock_free/rcu/stm + memory_alloc=demand_paged/cow (= 強い空間分離 + 安全な並行制御 + page-fault 経由の lazy commit)、0.7 = isolation=capability_token + concurrency_safety=lock_free + memory_alloc=slab/buddy (= ケーパビリティ + lockfree、メモリ管理は古典)、0.3 = isolation=user_kernel_split + concurrency_safety=spinlock + memory_alloc=freelist (= 基本的な分離のみ)、0.0 = isolation=none + concurrency_safety=critical_section + memory_alloc=bump (= 教育用最小)。半角数字の decimal で答えてください。",
+        "weight": 0.3
+      },
+      {
+        "name": "R_PerformanceLatency",
+        "persona": "あなたは R_PerformanceLatency を判定するレビュアーです。候補設計の scheduler と concurrency_safety を見て、AIPL actor の message-passing 平均 latency p99 と、wake-from-idle latency、IRQ → user-thread dispatch latency を推定する。スコア基準: 1.0 = scheduler=cfs_like + concurrency_safety=lock_free/rcu (= 公平 + 競合フリー、p99 < 100us 想定)、0.7 = scheduler=mlfq + concurrency_safety=lock_free (= 階層 + lockfree)、0.3 = scheduler=priority_aging + concurrency_safety=spinlock、0.0 = scheduler=round_robin + concurrency_safety=critical_section (= ベース)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_ImplementabilityArm",
+        "persona": "あなたは R_ImplementabilityArm を判定するレビュアーです。candidate の arch_target と memory_alloc / isolation の組合せが、実 Raspberry Pi 3/4 (32-bit AArch32 mode) + arm-qemu の両方で現実的に実装できるかを判定する。基準: 1.0 = arch_target=arm_rpi3 or arm_rpi4 + memory_alloc=buddy/slab + isolation=user_kernel_split or capability_token (= MMU の標準的な使い方、500-1500 LOC で書ける)、0.7 = arch_target=multi_arch + memory_alloc=buddy + isolation=user_kernel_split (= マルチアーキ抽象、1500-3000 LOC)、0.3 = arch_target=x86_64 or riscv32 (= Xinu 既存資産との不一致、3000+ LOC)、0.0 = arch_target=arm_versatilepb + memory_alloc=demand_paged or cow (= MMU を晒さない VersatilePB で page management は意味薄)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_AiplBackwardCompat",
+        "persona": "あなたは R_AiplBackwardCompat を判定するレビュアーです。候補設計の変更が AIPL Round 1 で確立した 17 smoke + RemoteRPC host_rpc_demo / host_diners を壊さない確率を判定する。重視: (a) Xinu の API surface (semcreate/wait/signal, create/ready/sleep, kprintf, getmem/freemem, mailbox interface) を ABI 互換に保てるか、(b) UART0 console と UART1 RPC を両方 alive に保てるか、(c) AIPL 生成 C コード (apps/abcl_program.c) の前提 (object_t layout / abcl_enqueue 引数) を破らないか。スコア基準: 1.0 = ipc_primitive=sem_mailbox or actor_lockfree + isolation=none/user_kernel_split (= AIPL の MPSC + critical-section パターンをそのまま支える)、0.7 = ipc_primitive=channel_typed (新 API だが旧 API も並走)、0.3 = ipc_primitive=capability + isolation=container_like (= 大幅 ABI 変更で旧 sample の修正が必要)、0.0 = ipc_primitive=tuple_space (= 完全に違う model)。半角数字の decimal で答えてください。",
+        "weight": 0.2
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}

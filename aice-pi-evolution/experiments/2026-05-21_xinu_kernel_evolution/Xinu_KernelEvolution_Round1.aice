@@ -1,0 +1,339 @@
+// Xinu_KernelEvolution_Round1.aice  (2026-05-21)
+//
+// Evolves Embedded Xinu itself — scheduler, memory allocator, IPC
+// primitives, isolation model, target architecture, power, and
+// concurrency-safety strategy — instead of evolving AIPL on top of
+// Xinu (that is AIPL_XinuRazPi_Round1.aice; this file is its sibling).
+//
+//   Baseline (2026-05-21):
+//     - kernel: Embedded Xinu @ /Users/kodamay/projects/xinu-raz/xinu
+//     - arch: arm-qemu (versatilepb / arm1176 / no MMU active)
+//     - scheduler: priority + round-robin within priority band, no aging
+//     - memory: simple freelist-style getmem()/freemem()
+//     - ipc: Xinu semaphores + msg port + (project-local) AIPL MPSC
+//            mailbox (P3 round of AIPL_XinuRazPi_Round1.aice)
+//     - isolation: none (single address space, kernel and apps share)
+//     - power: always-on (qemu tight loop in idle thread)
+//     - net: smc91c111 init OK, send/recv partial (N1 of AIPL Round 1)
+//     - existing 17 AIPL smoke files in
+//       aice-pi-evolution/experiments/2026-05-20_xinu_razpi_aipl/
+//       and 4 in 2026-05-20_xinu_remote_rpc/ — every one must stay
+//       green after each phase (R_AiplBackwardCompat).
+//
+//   Why a separate round?  Round 1 of AIPL_XinuRazPi treated Xinu as
+//   a fixed host and evolved AIPL features on top of it.  This Round
+//   1 inverts the relationship: AIPL is the workload, Xinu is the
+//   variable.  Sharing the same QEMU smoke harness means progress
+//   on either side is observable via the same gating.
+
+aice Xinu_KernelEvolution_Round1 {
+  dialect = "aice_evolution_v2";
+
+  task = "Embedded Xinu の kernel subsystem を 5 軸 (scheduler / memory_alloc / isolation / arch_target / power_mgmt / concurrency_safety / ipc_primitive) で進化させる.各 phase は (1) xinu-raz を build できる、(2) qemu-system-arm -M versatilepb で boot して xsh$ プロンプトに到達、(3) AIPL Round 1 系の既存 17 smoke + RemoteRPC 系の 1 smoke (host_diners.py の 5-哲学者 round-trip) が全て PASS、の 3 段ゲートを通過する.実 Raspberry Pi 移植 (arm_rpi3 軸) は smoke harness の都合上、arm-qemu と並走できる範囲で扱う.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json";
+
+  seed_from {
+    base_kernel        = "/Users/kodamay/projects/xinu-raz/xinu  (arm-qemu, PL110/PL050/PL011 wired, WM running)";
+    base_scheduler     = "priority_static (Xinu INITPRIO + round-robin within band, no aging)";
+    base_memory_alloc  = "freelist-style getmem/freemem (no slab, no buddy)";
+    base_ipc_primitive = "sem_mailbox + actor_lockfree (AIPL P3 MPSC ring buffer)";
+    base_isolation     = "none — kernel + apps in one 32-bit flat space";
+    base_arch_target   = "arm_versatilepb only — PL110 1024x1024 framebuffer, no MMU on";
+    base_power_mgmt    = "always_on — idle thread spins, host CPU stays busy";
+    base_concurrency   = "critical_section (disable/restore) plus P3-introduced lock_free on the AIPL mailbox path";
+    smoke_baseline     = "17 AIPL smokes in 2026-05-20_xinu_razpi_aipl/ PASS, plus host_rpc_demo.py 9/9 PASS, plus host_diners.py 5x10=50 meals PASS";
+    parity_anchor      = "AIPL CE-1..13 + DR-1..13 across 6 runtimes (project_aipl_nextgen_parity)";
+  }
+
+  // ─── 評価タスク = phase 候補 ───────────────────────────────────
+  evaluation_tasks {
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction S — Scheduler evolution
+    // ═══════════════════════════════════════════════════════════
+
+    task S1_PriorityAging {
+      spec = "scheduler 軸を priority_static → priority_aging に進める.各 ready thread の effective_prio を 100ms ごとに +1 (上限 = base+5) で aging させる.再選択時に base にリセット.AIPL Round 1 の P2 priority class (high/normal/low → 30/20/10) と整合 — high が long-running になっても normal を完全に飢えさせない.実装は system/clkinit.c に hook、system/resched.c の reorder にもう一段の compare を入れる.";
+      weight = 0.08;
+      acceptance = "4 assertion: (1) high-prio thread が CPU 占有しても normal thread の getstk が 1s 以内に動く、(2) 既存 P2 sample (Priority3Xinu) の 4 assertion 全部 PASS、(3) DiningPhilosophers の P2 starvation (現状 21 attempts 待ち) が半減、(4) panic 無し.";
+    }
+
+    task S2_MLFQ {
+      spec = "scheduler 軸を priority_aging → mlfq に進める.3 階層 queue (interactive/normal/batch)、quantum は 10ms/40ms/160ms.I/O wait から復帰した thread は interactive に促進、quantum 使い切った thread は降格.AIPL actor は mailbox wait で interactive に居続けるので応答性が出る.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) mailbox-bound AIPL actor の latency p99 が現状比 1/2 以下、(2) busy-loop の background thread が interactive を blocking しない、(3) 全 AIPL smoke 17 個 PASS、(4) クォンタム 設定が runtime で出力されて観察可能.";
+    }
+
+    task S3_DeadlineHints {
+      spec = "scheduler 軸を mlfq → edf_soft に進める.thread に optional deadline_ms field を追加、deadline 持ち thread は earliest-deadline-first で選ばれる.deadline 過ぎたら interactive に降格 (= もはや real-time でない通常 thread に戻す).AIPL 側からは `priority(realtime, deadline=N)` で要求できる.";
+      weight = 0.07;
+      acceptance = "3 assertion: (1) 100ms deadline の AIPL actor が 100ms 以内に dispatch される、(2) deadline 過ぎた thread が他を blocking しない、(3) 既存 sample 全 PASS.";
+    }
+
+    task S4_IdlePower {
+      spec = "power_mgmt 軸を always_on → halt_idle に進める.idle thread を WFE/WFI 命令 (arm-qemu でも認識) でCPU を halt させる.QEMU host CPU 使用率の低下と、実機 RPi での電力削減の両方が目的.scheduler が ready thread を投入した瞬間 IRQ で wake.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) idle 時 host top で qemu-system-arm が < 5% CPU、(2) 任意 AIPL smoke が wake-from-idle latency < 20ms で完了、(3) panic 無し.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction M — Memory allocator evolution
+    // ═══════════════════════════════════════════════════════════
+
+    task M1_BuddyAllocator {
+      spec = "memory_alloc 軸を freelist → buddy に進める.16-byte ~ 64KB の 12 size class、bitmap で空き管理.fragmentation を抑えて長時間動かしても getmem 失敗しない.既存 getmem/freemem は内部で buddy に委譲、ABI 互換維持.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) 200 cycle alloc/free leak smoke (F4 既存) で in_use=0、(2) 大小混在の負荷 (16B x 1000 + 4KB x 100) で external fragmentation < 15%、(3) AIPL array_pool が壊れない (StringArrayXinu)、(4) panic 無し.";
+    }
+
+    task M2_SlabCache {
+      spec = "memory_alloc 軸を buddy → slab に進める.actor object_t / mailbox_t / value_t array を fixed-size slab に流し込む.alloc が constant time に、cache line aligned で SMP 移行時のメリット先取り.buddy は backing として残す.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) actor 生成が 1us 以下 (現状 measure 後の基準値の 1/2)、(2) MpscStressXinu 4 producers x 32 msgs 全配信、(3) heap_stats で slab 別 in_use カウントが見える.";
+    }
+
+    task M3_DemandPaging {
+      spec = "memory_alloc 軸を slab → demand_paged に進める.arm-rpi3 platform で MMU を on (TTBR + 1MB section、まずは flat identity map).page-fault handler を実装、初回 access で zero page を割り当てる.arm-versatilepb は coverage 維持のため flat-map fallback.";
+      weight = 0.08;
+      acceptance = "4 assertion: (1) MMU enable 後も既存 sample が動く (arm-qemu 経由)、(2) 大きな array_new (1MB) が page-fault 経由で確保される、(3) arm_rpi3 qemu image で boot 到達、(4) panic 無し.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction N — Network stack evolution (N1 partial fix + 拡張)
+    // ═══════════════════════════════════════════════════════════
+
+    task N1f_FixSmc91c111 {
+      spec = "AIPL Round 1 N1 で partial だった smc91c111 driver を完成させる.connect/send/recv が QEMU SLIRP 越しに動く.driver は割り込み駆動の RX FIFO + 4-page TX buffer.netInit 経由で TCP socket が AIPL net_connect/net_send で取れる.";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) host から ping 10.0.2.15 が返ってくる (8/10 以上 reply)、(2) TcpEchoClientXinu sample が 10.0.2.2:7 にエコー、(3) net_init/net_send/net_recv の AIPL smoke 4/4 PASS、(4) panic 無し.";
+    }
+
+    task N2_ZeroCopyBuffers {
+      spec = "ipc_primitive 軸を sem_mailbox → channel_typed と並列で、network buffer も zero-copy chain (sk_buff-like) に進化.driver から socket layer まで pkt をコピーせず参照渡し.AIPL net_send は string を直接 zero-copy chunk に乗せる.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) 1MB の AIPL net_send が memcpy 1 回以下、(2) RX 1Gbps 相当 (qemu 制約下では 100Mbps 相当) で drop 0、(3) AIPL smoke 全 PASS.";
+    }
+
+    task N3_SocketSyscalls {
+      spec = "BSD-ish socket() / bind() / listen() / accept() / send() / recv() syscall を kernel surface に追加 (svc number 別).AIPL の N1 builtin は薄い wrapper になる.user-space (= AIPL actor) と kernel net stack が clean な API で分離.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) AIPL net builtin が syscall を 1 個ずつ trampoline して通る、(2) 既存 sample 動作変化なし、(3) socket fd が actor scope で reference-counted.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction A — Architecture target evolution
+    // ═══════════════════════════════════════════════════════════
+
+    task A1_ArmRpi3Port {
+      spec = "arch_target 軸を arm_versatilepb → arm_rpi3 に進める.compile/platforms/arm-rpi3 を新設、BCM2837 mailbox 経由で GPIO + framebuffer + UART を初期化.qemu-system-arm -M raspi3b で boot 到達.既存 versatilepb image はそのまま動く (multi target build).";
+      weight = 0.10;
+      acceptance = "4 assertion: (1) make PLATFORM=arm-rpi3 succeed、(2) qemu raspi3b で xsh$ プロンプト、(3) PL011 UART1 RPC が rpi3 上でも host から socket で叩ける、(4) versatilepb smoke 全 PASS (regression なし).";
+    }
+
+    task A2_MmuBringup {
+      spec = "isolation 軸を none → user_kernel_split に進める.arm-rpi3 上で MMU を on にし、kernel addr space と user (= AIPL) addr space を別 TTBR で分離.svc 命令で kernel に入る.shared mapped region は AIPL mailbox の物理ページのみ.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) user-mode から kernel addr に write すると DataAbort で trap、(2) AIPL message passing は依然動く、(3) MmuStressXinu sample (新規) で 100 件 trap を観察.";
+    }
+
+    task A3_RealRpiGPIO {
+      spec = "arch_target 軸が arm_rpi3 を取った状態で、AIPL Round 1 で blocked だった G4 RealPiGPIO を完成.gpio_set/clear/read builtin を BCM2837 GPIO register 経由で実装.qemu raspi3b はGPIO peripherals を full エミュレートしない箇所があるので、smoke は実機 RPi3/4 と並走.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) 実機 Pi で LED 1 が点灯、(2) gpio_read で SW1 が読める、(3) AIPL Round 1 既存 sample (qemu 側) regression なし.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction Sec — Security primitives
+    // ═══════════════════════════════════════════════════════════
+
+    task Sec1_StackCanaries {
+      spec = "concurrency_safety / isolation の前段として、kernel全 .c を -fstack-protector-strong でビルドし、各関数 prologue に canary、epilogue で verify.canary mismatch は kernel panic に持って行く.";
+      weight = 0.04;
+      acceptance = "3 assertion: (1) make passes with stack-protector、(2) AIPL smoke 17 PASS、(3) 故意 stack-smash の demo で canary trap が rise.";
+    }
+
+    task Sec2_CapTokens {
+      spec = "isolation 軸を user_kernel_split → capability_token に進める.kernel が発行する 64-bit token を AIPL actor が握り、socket fd / file handle / mailbox など resource は token 経由でしか触れない.forgery 検出時は actor を kill.";
+      weight = 0.07;
+      acceptance = "3 assertion: (1) 故意 forged token の syscall が EPERM で蹴られる、(2) AIPL Round 1 sample 全 PASS (token は AIPL runtime が隠蔽)、(3) 全 token が actor 終了時に drop される (leak 0).";
+    }
+
+    task Sec3_MeasuredBoot {
+      spec = "boot 時に kernel image + AIPL program の SHA-256 を log + RPi3 OTP 比較.改竄検知時は serial に hash mismatch 出力後 halt.";
+      weight = 0.03;
+      acceptance = "2 assertion: (1) clean image で expected hash が serial に出る、(2) 1 byte 改竄でboot 失敗.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═══════════════════════════════════════════════════════════
+
+    task R_AiplBackwardCompat {
+      spec = "各 phase 完了時に AIPL Round 1 の 17 smoke (R1/P1-P4/F1-F4/G1-G3/G5/N1部分) + RemoteRPC の host_rpc_demo.py (9/9) + host_diners.py (50 meals) + _smoke_backwardcompat.sh (2/2 gate) が全部 PASS.regression が出たら phase 取り消し.";
+      weight = 0.10;
+      acceptance = "全 19 smoke が 100% PASS、_smoke_backwardcompat の --check Gate1 が 82/82 維持.";
+    }
+
+    task ImplCost {
+      spec = "Round 1 全 13 phase 合計で xinu-raz +2000..+5000 LOC を許容.aipl2c 側は変更 0 を原則.kernel.elf binary size 増加は 200KB 以内.";
+      weight = 0.04;
+    }
+  }
+
+  // ─── レビュアー (Gemini 進化計算の選択圧) ───────────────────
+  evaluator = "ai_v1";
+
+  reviewers {
+
+    reviewer R_KernelSafety {
+      persona = "あなたは R_KernelSafety を判定するレビュアーです。候補設計 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety の 7 軸) を見て、Embedded Xinu の kernel として『誤った user code が kernel を panic させない』『double-free / use-after-free / race-stack-corruption が起きない』『割り込み中の disable() 漏れで dead-lock しない』を判定する。スコア基準: 1.0 = isolation=mmu_per_process or container_like + concurrency_safety=lock_free/rcu/stm + memory_alloc=demand_paged/cow (= 強い空間分離 + 安全な並行制御 + page-fault 経由の lazy commit)、0.7 = isolation=capability_token + concurrency_safety=lock_free + memory_alloc=slab/buddy (= ケーパビリティ + lockfree、メモリ管理は古典)、0.3 = isolation=user_kernel_split + concurrency_safety=spinlock + memory_alloc=freelist (= 基本的な分離のみ)、0.0 = isolation=none + concurrency_safety=critical_section + memory_alloc=bump (= 教育用最小)。半角数字の decimal で答えてください。";
+      weight = 0.30;
+    }
+
+    reviewer R_PerformanceLatency {
+      persona = "あなたは R_PerformanceLatency を判定するレビュアーです。候補設計の scheduler と concurrency_safety を見て、AIPL actor の message-passing 平均 latency p99 と、wake-from-idle latency、IRQ → user-thread dispatch latency を推定する。スコア基準: 1.0 = scheduler=cfs_like + concurrency_safety=lock_free/rcu (= 公平 + 競合フリー、p99 < 100us 想定)、0.7 = scheduler=mlfq + concurrency_safety=lock_free (= 階層 + lockfree)、0.3 = scheduler=priority_aging + concurrency_safety=spinlock、0.0 = scheduler=round_robin + concurrency_safety=critical_section (= ベース)。半角数字の decimal で答えてください。";
+      weight = 0.25;
+    }
+
+    reviewer R_ImplementabilityArm {
+      persona = "あなたは R_ImplementabilityArm を判定するレビュアーです。candidate の arch_target と memory_alloc / isolation の組合せが、実 Raspberry Pi 3/4 (32-bit AArch32 mode) + arm-qemu の両方で現実的に実装できるかを判定する。基準: 1.0 = arch_target=arm_rpi3 or arm_rpi4 + memory_alloc=buddy/slab + isolation=user_kernel_split or capability_token (= MMU の標準的な使い方、500-1500 LOC で書ける)、0.7 = arch_target=multi_arch + memory_alloc=buddy + isolation=user_kernel_split (= マルチアーキ抽象、1500-3000 LOC)、0.3 = arch_target=x86_64 or riscv32 (= Xinu 既存資産との不一致、3000+ LOC)、0.0 = arch_target=arm_versatilepb + memory_alloc=demand_paged or cow (= MMU を晒さない VersatilePB で page management は意味薄)。半角数字の decimal で答えてください。";
+      weight = 0.25;
+    }
+
+    reviewer R_AiplBackwardCompat {
+      persona = "あなたは R_AiplBackwardCompat を判定するレビュアーです。候補設計の変更が AIPL Round 1 で確立した 17 smoke + RemoteRPC host_rpc_demo / host_diners を壊さない確率を判定する。重視: (a) Xinu の API surface (semcreate/wait/signal, create/ready/sleep, kprintf, getmem/freemem, mailbox interface) を ABI 互換に保てるか、(b) UART0 console と UART1 RPC を両方 alive に保てるか、(c) AIPL 生成 C コード (apps/abcl_program.c) の前提 (object_t layout / abcl_enqueue 引数) を破らないか。スコア基準: 1.0 = ipc_primitive=sem_mailbox or actor_lockfree + isolation=none/user_kernel_split (= AIPL の MPSC + critical-section パターンをそのまま支える)、0.7 = ipc_primitive=channel_typed (新 API だが旧 API も並走)、0.3 = ipc_primitive=capability + isolation=container_like (= 大幅 ABI 変更で旧 sample の修正が必要)、0.0 = ipc_primitive=tuple_space (= 完全に違う model)。半角数字の decimal で答えてください。";
+      weight = 0.20;
+    }
+  }
+
+  // ─── 実装順序 (依存関係) ─────────────────────────────────────
+  implementation_order {
+    // 最初に scheduler 系を固める — S1 は単独で着手可能、S2/S3 は S1
+    // の上に積む.
+    step S1_PriorityAging       { dep = "baseline"; }
+    step S2_MLFQ                { dep = "S1"; }
+    step S3_DeadlineHints       { dep = "S2"; }
+    step S4_IdlePower           { dep = "S1";  note = "S1 と並行可"; }
+
+    // memory は scheduler とは独立に進められる.A1 (arm-rpi3) 着手
+    // までは M3 (demand_paged) は技術的に検証できないので M3 は A1 後.
+    step M1_BuddyAllocator      { dep = "baseline"; }
+    step M2_SlabCache           { dep = "M1"; }
+    step M3_DemandPaging        { dep = "M2 + A1"; }
+
+    // network は N1 partial を直すところから.
+    step N1f_FixSmc91c111       { dep = "baseline"; }
+    step N2_ZeroCopyBuffers     { dep = "N1f + M1"; }
+    step N3_SocketSyscalls      { dep = "N2"; }
+
+    // arm-rpi3 移植は I/O 全体に波及するので A1 を Round 1 後半に.
+    step A1_ArmRpi3Port         { dep = "S1 + M1"; }
+    step A2_MmuBringup          { dep = "A1"; }
+    step A3_RealRpiGPIO         { dep = "A1";  note = "qemu で smoke 不可、実機"; }
+
+    // security は順序最後 — kernel surface が安定してから.
+    step Sec1_StackCanaries     { dep = "baseline";  note = "並行可"; }
+    step Sec2_CapTokens         { dep = "A2 + N3"; }
+    step Sec3_MeasuredBoot      { dep = "A1"; }
+  }
+
+  // ─── アーキテクチャ決定 ──────────────────────────────────────
+  decisions {
+
+    decision target_arch_strategy {
+      // primary は引き続き arm-qemu — smoke の自動化が前提だから。
+      // 並走で arm-rpi3 を準備し、Sec/Power 系の検証は実機でも回せる
+      // ようにする.
+      primary    = "arm-qemu (versatilepb) — every phase still boots there";
+      secondary  = "arm-rpi3 (BCM2837) — added by A1, exercised by A2/A3/Sec";
+      tertiary   = "実機 RPi3 / RPi4 — A3, Sec3";
+      forbidden  = "x86_64 と riscv は Round 1 では着手しない (multi_arch axis 値は将来用)";
+    }
+
+    decision build_pipeline {
+      compiler_arm_qemu = "make PLATFORM=arm-qemu COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-";
+      compiler_arm_rpi3 = "make PLATFORM=arm-rpi3 COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-";
+      runner_qemu       = "qemu-system-arm -M versatilepb -cpu arm1176 -m 256M ...";
+      runner_qemu_rpi3  = "qemu-system-arm -M raspi3b -m 1024 ...";
+      runner_real       = "ssh pi@<host> ./run.sh (実機経由 — Sec3 + A3 用)";
+    }
+
+    decision smoke_strategy {
+      method     = "QEMU -nographic + UART0 stdio + UART1 tcp socket + grep on stdout";
+      timeout    = "60-180 秒 (phase 別)";
+      regression_floor = "AIPL Round 1 の 17 smoke + RemoteRPC の 2 smoke + _smoke_backwardcompat.sh (--check Gate1 82/82) を absolute 不変条件として保持";
+    }
+
+    decision external_repo {
+      xinu_raz       = "/Users/kodamay/projects/xinu-raz/xinu  (= 進化対象本体、別 git)";
+      abclcp_project = "/Users/kodamay/ocaml-app/abclcp-project (= AIPL/aipl2c — 変更ゼロ原則、kernel ABI が動いたら追従)";
+      changes_record = "Xinu 側のコミットは apps/system/device/include の subdir 別にバンドル";
+    }
+
+    decision rollback_policy {
+      // phase ごとに kernel.elf を build → smoke 落ちたら revert.
+      strategy  = "前 phase の commit SHA を保存、smoke fail で git reset --hard";
+      ckpt_freq = "phase 完了時に xinu-raz を tag 付き commit";
+    }
+  }
+
+  // ─── 検証 (期待 assertion 合計) ──────────────────────────────
+  verification {
+    direction_S   = "14 assertion (S1:4 + S2:4 + S3:3 + S4:3)";
+    direction_M   = "11 assertion (M1:4 + M2:3 + M3:4)";
+    direction_N   = "10 assertion (N1f:4 + N2:3 + N3:3)";
+    direction_A   = "10 assertion (A1:4 + A2:3 + A3:3)";
+    direction_Sec =  "8 assertion (Sec1:3 + Sec2:3 + Sec3:2)";
+    cross_cut     = "AIPL Round 1 17 smoke + RemoteRPC 2 smoke + R_BackwardCompat 2 gate を不変に保つ";
+    grand_total   = "53 assertion for Xinu Kernel Round 1";
+  }
+
+  // ─── ファイル更新範囲 ─────────────────────────────────────────
+  file_impact {
+    primary_xinu_raz = [
+      "system/resched.c, ksched.c                 (~150-400 LOC: S1/S2/S3)",
+      "system/clkinit.c, clkint.c                 (~50-100 LOC: S1 aging, S4 idle halt)",
+      "mem/getmem.c, freemem.c, kmalloc.c (new)   (~400-800 LOC: M1/M2)",
+      "device/smc91c111/*                          (~300-500 LOC: N1f)",
+      "system/socket.c (new), include/socket.h    (~400 LOC: N3)",
+      "compile/platforms/arm-rpi3/* (new)         (~200 LOC config + lds)",
+      "system/mmu.c (new) + arch/arm/mmu_*.S      (~600 LOC: M3/A2)",
+      "system/syscall.c (new)                     (~300 LOC: Sec2 cap tokens)"
+    ];
+    untouched = [
+      "abclcp-project/src/*  (= aipl2c)            — ABI 互換のため 原則不変",
+      "abclcp-project/abclc/*Xinu.abcl             — kernel 変更は AIPL から透過",
+      "browser-abcl / spreadsheet / drone-sim      — 完全に独立"
+    ];
+    new_files = [
+      "aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/_smoke_<phase>.sh",
+      "aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/report/<phase>.md"
+    ];
+  }
+
+  // ─── 実行例 (進化計算の起動コマンド) ─────────────────────────
+  sample_session {
+
+    parse_only {
+      cmd = "cd aice-evolution-v2 && python3 -m src.cli --no-run -o ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/ ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aice";
+      output = "Xinu_KernelEvolution_Round1.ga.json (parse 確認)";
+    }
+
+    generate_aipl {
+      cmd = "cd aice-evolution-v2 && python3 -m src.cli --no-run --abcl -o ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/ ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aice";
+      output = "Xinu_KernelEvolution_Round1.aipl (= MAP-Elites orchestrator)";
+      post   = "ファイル名を .aipl に rename + use_ai 0 -> 1 を patch (RemoteRPC 同様)";
+    }
+
+    run_evolution {
+      requires = "GEMINI_API_KEY が export 済、google-genai SDK が import 可";
+      cmd      = "AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl --timeout 1800 --idle-ms 600000";
+      output   = "out/Xinu_KernelEvolution_Round1.abcl_lineage.json";
+      duration = "20-40 分 (seed=6 + gen=20 + 4 reviewers x 13 tasks ~= 1400 LLM calls)";
+    }
+  }
+
+  // ─── 最終目標 ─────────────────────────────────────────────────
+  goal = "Round 1 全 13 phase (S1-S4 + M1-M3 + N1f-N3 + A1-A3 + Sec1-Sec3) 完了後、Embedded Xinu が (a) 飢餓を起こさない MLFQ scheduler + idle 時 host CPU を解放、(b) buddy + slab + (rpi 上で) demand-paged memory、(c) smc91c111 NIC が完全に動作 + zero-copy socket、(d) arm-rpi3 platform 移植 + MMU + user/kernel 分離、(e) stack canaries + capability token + measured boot のセキュリティ層 — を獲得する.AIPL Round 1 の 17 smoke + RemoteRPC の 2 smoke は absolute 不変条件として保持.進化計算の出力は MAP-Elites の cell ごと champion 設計案 (e.g. cell=scheduler=mlfq) + 推奨 implementation_order.";
+}
