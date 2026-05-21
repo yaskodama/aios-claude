@@ -82,13 +82,14 @@ echo "============================================================"
 
 echo "--- [4/4] run PC-side AIPL host_diners.abcl ---"
 # `--idle-ms` is set short so the Python AIPL runtime exits once all
-# three Philosopher actors are idle (= all done eating).  With 100
-# meals × 3 PC philos the worst-case is ~30 min in the AIPL message
-# dispatcher; we cap at 1 hour so the launcher doesn't hang
-# indefinitely on a deadlock.
+# three Philosopher actors are idle (= all done eating).  With
+# 20 meals × 3 PC philos the worst case is ~15 min in the AIPL
+# message dispatcher (P3 may starve briefly on F1); we cap at
+# 1800 sec (30 min) so the launcher doesn't hang indefinitely on
+# a deadlock.
 RPC_HOST=127.0.0.1 RPC_PORT="$RPC_PORT" \
 python3 -u "$REPO/src/python-aipl/aipl_main.py" "$HOST_AIPL" \
-    --timeout 3600 --idle-ms 5000 || true
+    --timeout 1800 --idle-ms 5000 || true
 
 echo ""
 echo "--- done ---"

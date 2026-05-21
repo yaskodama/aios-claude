@@ -34,7 +34,7 @@ class Philosopher {
   var my_id        = 0;
   var lo_fork      = "0";   // string actor id "0".."4"
   var hi_fork      = "0";
-  var meals_target = 100;
+  var meals_target = 20;
   var meals_done   = 0;
   var attempts     = 0;
 
@@ -109,7 +109,7 @@ class Philosopher {
 
 // ---- Main orchestration --------------------------------------------
 
-print("=== pure-AIPL diners: 3 PC + 2 Xinu, meals=100 each (PC) ===");
+print("=== pure-AIPL diners: 3 PC + 2 Xinu, meals=20 each ===");
 
 var hub_url = "uart1://127.0.0.1:5555";
 
@@ -119,6 +119,6 @@ print("LIST -> " + remote_now(hub_url, "_", "list"));
 // Three PC philosophers — each is a real AIPL actor running in its
 // own thread.  The Xinu side hosts F0..F4 (Forks) and P4 + P5 at
 // the same UART1 endpoint, all addressed by their numeric actor id.
-var p1 = new Philosopher(1, "0", "4", 100);
-var p2 = new Philosopher(2, "0", "1", 100);
-var p3 = new Philosopher(3, "1", "2", 100);
+var p1 = new Philosopher(1, "0", "4", 20);
+var p2 = new Philosopher(2, "0", "1", 20);
+var p3 = new Philosopher(3, "1", "2", 20);

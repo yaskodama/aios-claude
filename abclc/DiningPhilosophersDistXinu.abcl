@@ -23,10 +23,11 @@
 //     P4 (X):   low=F2  high=F3
 //     P5 (X):   low=F3  high=F4
 //
-// Each philosopher eats 10 times then stops.  Eat marker:
-//   60000 + 10 * pid + meal_idx
-// e.g. P4's first meal -> 60040; P5's last meal -> 60059.
-// Done marker: 70000 + pid.
+// Each philosopher eats 20 times then stops.  Eat marker:
+//   60000 + 100 * pid + meal_idx
+// e.g. P4's first meal -> 60400, last -> 60419.
+//      P5's first meal -> 60500, last -> 60519.
+// Done marker: 70000 + pid  (e.g. P4 -> 70004, P5 -> 70005).
 
 class Fork {
   var holder = 0;     // 0 = free; >= 1 = pid currently holding
@@ -51,7 +52,7 @@ class Philosopher {
   var my_id     = 0;
   var f_low     = nil;
   var f_high    = nil;
-  var meals     = 10;
+  var meals     = 20;
   var meal_idx  = 0;
   var state     = 0;   // 0 = idle, 1 = have_low, 2 = eating-in-progress
 
@@ -59,7 +60,7 @@ class Philosopher {
     my_id    = id_arg;
     f_low    = lo;
     f_high   = hi;
-    meals    = 10;
+    meals    = 20;
     meal_idx = 0;
     state    = 0;
     send self.try_eat();
@@ -79,7 +80,10 @@ class Philosopher {
       send f_high.acquire(my_id);
     } else {
       // state == 1 -> we already had low; this grant is for high.
-      print(60000 + 10 * my_id + meal_idx);
+      // Marker range: 60000 + 100*pid + meal_idx
+      //   P4 (my_id=4) : 60400..60419 (20 meals)
+      //   P5 (my_id=5) : 60500..60519 (20 meals)
+      print(60000 + 100 * my_id + meal_idx);
       meal_idx = meal_idx + 1;
       meals    = meals    - 1;
       send f_high.release(my_id);
