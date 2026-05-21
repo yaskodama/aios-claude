@@ -1,0 +1,10 @@
+[
+  {"id":"I1","genome":"paradigm=assembler|state_representation=ADT|concurrency_model=threads_locks|type_safety=none|effect_handling=algebraic_effects|ownership_model=rc","parent":"","score":0.054666666666666680,"generation":0,"operator":"seed","cell":"paradigm=assembler"},
+  {"id":"I2","genome":"paradigm=Functional|state_representation=ADT|concurrency_model=actor_messages|type_safety=low|effect_handling=capability|ownership_model=borrow_check","parent":"","score":0.470999999999999860,"generation":0,"operator":"seed","cell":"paradigm=Functional"},
+  {"id":"I3","genome":"paradigm=C|state_representation=ADT|concurrency_model=none|type_safety=low|effect_handling=implicit|ownership_model=rc","parent":"","score":0.0,"generation":0,"operator":"seed","cell":"paradigm=C"},
+  {"id":"I4","genome":"paradigm=C|state_representation=global_num|concurrency_model=actor_messages|type_safety=none|effect_handling=implicit|ownership_model=gc","parent":"","score":0.0460,"generation":0,"operator":"seed","cell":"paradigm=C"},
+  {"id":"I5","genome":"paradigm=FunctionalOOP|state_representation=ADT|concurrency_model=structured|type_safety=dependent|effect_handling=implicit|ownership_model=rc","parent":"","score":0.339999999999999970,"generation":0,"operator":"seed","cell":"paradigm=FunctionalOOP"},
+  {"id":"I6","genome":"paradigm=FunctionalOOP|state_representation=symbol_owned|concurrency_model=threads_locks|type_safety=low|effect_handling=monadic|ownership_model=gc","parent":"","score":0.157000000000000030,"generation":0,"operator":"seed","cell":"paradigm=FunctionalOOP"},
+  {"id":"I7","genome":"paradigm=C|state_representation=global_num|concurrency_model=actor_messages|type_safety=none|effect_handling=implicit|ownership_model=gc","parent":"","score":0.0279999999999999940,"generation":1,"operator":"uniform_crossover","cell":"paradigm=C"},
+  {"id":"I8","genome":"paradigm=assembler|state_representation=register_int|concurrency_model=threads_locks|type_safety=none|effect_handling=algebraic_effects|ownership_model=rc","parent":"","score":0.060000000000000010,"generation":2,"operator":"axis_resample","cell":"paradigm=assembler"}
+]

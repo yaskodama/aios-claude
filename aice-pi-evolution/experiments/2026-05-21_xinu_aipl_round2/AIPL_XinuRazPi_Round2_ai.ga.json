@@ -1,0 +1,134 @@
+{
+  "name": "AIPL_XinuRazPi_Round2_ai",
+  "task": "AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) でさらに進化させる.Round 1 + その後のトラック (LOAD/COMPILE/RUN, pure-AIPL host, WM Console, readline+history, halt, in-Xinu memfs, in-Xinu make) を base に、(D) In-Xinu Developer Experience、(C) Multi-Pi Cluster、(O) Observability + Profiling の 3 方向で進化.全 phase は (1) aipl2c の .abcl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で xsh$ プロンプト到達 ✅ + (4) Round 1 の 17 smoke + RemoteRPC の 2 smoke + 既存 backwardcompat gate が全 PASS、の 4 段ゲートを通過すること.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "paradigm"
+    ],
+    "generations": 15,
+    "seed_count": 12,
+    "open_axes": false,
+    "rng_seed": 7
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "D1_AiplRepl",
+      "D2_LineEditor",
+      "D3_HotReload",
+      "D4_BreakpointDebugger",
+      "D5_ModuleSystem",
+      "C1_ClusterBootstrap",
+      "C2_RemoteSpawn",
+      "C3_ActorMigration",
+      "C4_ClusterLWW",
+      "O1_ActorLatencyHistogram",
+      "O2_FramebufferDashboard",
+      "O3_DistributedTrace",
+      "O4_MemoryProfiler",
+      "R_BackwardCompat",
+      "ImplCost"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "R_DevExperience",
+        "persona": "あなたは R_DevExperience を判定するレビュアーです。候補設計 (paradigm / state_model / concurrency / type_strength / effect_handling / ownership の 6 軸) を見て、Xinu の中で AIPL を書く・走らせる・直す サイクル (REPL / editor / hot-reload / debugger / module system) が現実的に立ち上げられるかを判定する。スコア基準: 1.0 = paradigm=ParallelOOP + state_model=symbol_owned + type_strength=high (= 静的型 + actor-local state、REPL で再宣言してもクラッシュしにくい)、0.7 = paradigm=ParallelOOP + state_model=local + type_strength=medium (= 型情報あり、shadow が限定)、0.3 = paradigm=FunctionalOOP + state_model=immutable (= 純粋関数で REPL は容易だが hot-reload が状態転送で複雑)、0.0 = paradigm=BASIC + type_strength=low (= 型情報 0、エディタ補完 / debugger が役立たない)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_DistributedCorrectness",
+        "persona": "あなたは R_DistributedCorrectness を判定するレビュアーです。candidate の concurrency / state_model / ownership を見て、multi-Pi cluster で (a) actor の remote spawn が deadlock を起こさない、(b) actor migration が in-flight message を失わない、(c) cluster LWW が CRDT として monotonic に収束する、を判定する。基準: 1.0 = concurrency=actor_messages + state_model=symbol_owned + ownership=affine_per_actor (= state がアクター単位で閉じる + linear ownership、migration 安全)、0.7 = concurrency=actor_messages + state_model=local + ownership=gc (= mailbox 中心、GC が後始末)、0.3 = concurrency=csp_channels + state_model=shared_locked (= channel 経由だが共有状態あり)、0.0 = concurrency=threads_shared + state_model=global_mutable (= 古典 thread + 共有変数、cluster 化困難)。半角数字の decimal で答えてください。",
+        "weight": 0.3
+      },
+      {
+        "name": "R_ObservabilityCoverage",
+        "persona": "あなたは R_ObservabilityCoverage を判定するレビュアーです。候補の type_strength / effect_handling / state_model が、(a) per-actor latency histogram、(b) framebuffer dashboard、(c) distributed trace、(d) memory profiler、の 4 機能の実装容易性と低オーバヘッドを担保するかを判定する。基準: 1.0 = effect_handling=algebraic_effects + type_strength=high (= effect で計測 hook を型レベル安全に挿入、overhead < 5%)、0.7 = effect_handling=capability + type_strength=medium (= ケーパビリティで profiler を渡せる)、0.3 = effect_handling=monad + type_strength=low (= monad だが型が弱く trace 連鎖が脆い)、0.0 = effect_handling=none (= hook が ad-hoc、measurement が AIPL ランタイム本体に hard-code)。半角数字の decimal で答えてください。",
+        "weight": 0.2
+      },
+      {
+        "name": "R_BackwardCompat",
+        "persona": "あなたは R_BackwardCompat を判定するレビュアーです。候補設計の変更が AIPL Round 1 で確立した 17 smoke + RemoteRPC host_rpc_demo / host_diners + kernel evo Round 1 の S1-S4/Sec1 smoke + memfs/make smoke を壊さない確率を判定する。重視: (a) gen_program_xinu の出力 (apps/abcl_program.c) が現行の object_t / mailbox API に従っているか、(b) UART0 console と UART1 RPC を両方 alive に保てるか、(c) WM Console + readline + memfs の前提 (RAMDISK0 layout、escape sequence の解釈、循環 history) を破らないか、(d) in-kernel abclc + cc + aoutRun のサブセット (PUSH/ADD/PRINT 等の stack VM) を破らないか。スコア基準: 1.0 = paradigm=ParallelOOP + state_model=symbol_owned + concurrency=actor_messages (= Round 1 の主軸とほぼ同じ、変更影響 < 5%)、0.7 = paradigm=ParallelOOP + state_model=local + concurrency=actor_messages (= ほぼ同じだが state model だけ移行コストあり)、0.3 = paradigm=FunctionalOOP or BASIC (= ABI 変更で旧 sample の修正が必要)、0.0 = paradigm=C (= AIPL 抽象を捨てて C 直書きに退化、Round 1 全資産が無効)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}
