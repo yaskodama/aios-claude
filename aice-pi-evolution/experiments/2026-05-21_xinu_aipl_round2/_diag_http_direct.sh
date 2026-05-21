@@ -45,17 +45,22 @@ QEMU=$!
 trap 'kill $QEMU 2>/dev/null || true' EXIT INT TERM
 echo "    qemu pid=$QEMU"
 
-# Wait for Xinu HTTP server to come up
-echo "--- [3] wait for [http] listening marker ---"
+# Wait for the Xinu HTTP server to respond.  The kernel-side trace
+# was removed during cleanup, so we probe the endpoint directly.
+echo "--- [3] wait for Xinu HTTP server (curl /api/uptime) ---"
+HTTP_OK=0
 for i in $(seq 1 30); do
-    if grep -q "\[http\] open(fd=.*TCP_PASSIVE" "$UART0_LOG" 2>/dev/null; then
-        echo "    HTTP listener blocked on PASSIVE open (== ready for client) after ${i}s"
+    if curl -s -m 1 -o /dev/null -w "%{http_code}" \
+         "http://127.0.0.1:8181/api/uptime" 2>/dev/null \
+         | grep -q "^200$"; then
+        echo "    HTTP responding after ${i}s"
+        HTTP_OK=1
         break
     fi
     sleep 1
 done
-if ! grep -q "\[http\] open(fd=.*TCP_PASSIVE" "$UART0_LOG"; then
-    echo "    FAIL: HTTP server never reached open(TCP_PASSIVE)"
+if [ "$HTTP_OK" != "1" ]; then
+    echo "    FAIL: HTTP server never responded"
     tail -20 "$UART0_LOG"
     exit 1
 fi
