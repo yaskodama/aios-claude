@@ -129,12 +129,22 @@ var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, "ref:" + f2_id, 
 var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, "ref:" + f3_id, "ref:" + f4_id);
 print("       Xinu P4 id=" + p4_id + "  P5 id=" + p5_id);
 
-// 3. Kick the Xinu philosophers — they don't auto-call try_eat because
-//    their init() doesn't (they were created without going through a
-//    top-level main block).  A bare SEND on UART1 starts them.
-print("[boot] kick Xinu philosophers ...");
-remote_call(hub_url, p4_id, "try_eat");
-remote_call(hub_url, p5_id, "try_eat");
+// 3. Xinu philosophers are SPAWNED but intentionally NOT kicked.
+//    The Xinu Philosopher.fork_denied path has no backoff — when a
+//    PC philosopher holds a Xinu-needed fork (F2/F3/F4) for tens of
+//    ms, the resulting retry loop generates 800K+ msg/sec, overflows
+//    the kernel mailbox, and reboots Xinu within seconds.  Solving
+//    that needs a `wait(ms)` AIPL builtin on the Xinu codegen path
+//    (see Round 2 NEXT_SESSION.md follow-up #1).
+//
+//    For the bootstrap *demo* the SPAWN of P4/P5 is enough to
+//    illustrate the LOAD + SPAWN pipeline (the actors are visible
+//    in /api/state and via LIST).  The actual diners run below uses
+//    just the three PC philosophers — they don't share any fork
+//    with the dormant Xinu philos, so contention stays in the
+//    well-tested PC AIPL space.
+print("[boot] Xinu philosophers P4/P5 spawned but left idle");
+print("       (demo: SPAWN visible in LIST, contention stays on PC side)");
 
 print("");
 print("[boot] new LIST -> " + remote_now(hub_url, "_", "list"));
