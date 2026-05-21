@@ -346,9 +346,36 @@ def _publish_remote_out(hostport: str, to_actor: str, method: str, sync: bool):
 #   now  remote(uart1://...).list()          →  "LIST\n"   → raw reply line
 import socket
 import threading
+import collections
 
 _UART1_SOCKETS: dict = {}
-_UART1_LOCK = threading.Lock()
+
+# A FIFO-fair mutex.  Python's stock threading.Lock() is unfair on
+# CPython (LIFO under contention), which here let one philosopher
+# starve another for tens of thousands of attempts even when no
+# fork was actually contended.  FairLock guarantees each blocked
+# waiter is served in arrival order.
+class _FairLock:
+    def __init__(self):
+        self._mtx = threading.Lock()
+        self._queue = collections.deque()
+
+    def __enter__(self):
+        ev = threading.Event()
+        with self._mtx:
+            self._queue.append(ev)
+            if len(self._queue) == 1:
+                ev.set()
+        ev.wait()
+
+    def __exit__(self, *exc):
+        with self._mtx:
+            self._queue.popleft()
+            if self._queue:
+                self._queue[0].set()
+        return False
+
+_UART1_LOCK = _FairLock()
 
 def _is_uart1(hostport: str) -> bool:
     return isinstance(hostport, str) and hostport.startswith("uart1://")
@@ -365,7 +392,11 @@ def _uart1_get_socket(hostport: str) -> socket.socket:
     dispatcher is single-client (QEMU `-serial tcp:...` accepts one
     connection), so a single shared socket with an external lock is
     the right model."""
-    with _UART1_LOCK:
+    # Init / cache uses a stable threading.Lock (FairLock would be
+    # overkill here since this path runs once per endpoint).
+    if hostport in _UART1_SOCKETS:
+        return _UART1_SOCKETS[hostport]
+    with threading.Lock():
         s = _UART1_SOCKETS.get(hostport)
         if s is not None:
             return s
@@ -409,6 +440,32 @@ def _uart1_call(hostport: str, command: str) -> str:
         s.sendall((command + "\n").encode("ascii"))
         return _uart1_recv_line(s, buf_holder)
 
+def _uart1_call_multi(hostport: str, command: str) -> tuple:
+    """Send a command whose reply spans multiple lines (e.g. LIST emits
+    "OK n_actors=N" followed by N "<id> <class>" lines).  Returns
+    (header_line, [extra_lines]).  Drains additional lines until the
+    socket goes idle ~150ms — any leftovers would otherwise misalign
+    the reply pipeline for every subsequent single-line call."""
+    s = _uart1_get_socket(hostport)
+    with _UART1_LOCK:
+        buf_holder = _UART1_BUFS.setdefault(hostport, [b""])
+        s.sendall((command + "\n").encode("ascii"))
+        header = _uart1_recv_line(s, buf_holder)
+        extras = []
+        prev_to = s.gettimeout()
+        s.settimeout(0.15)
+        try:
+            while True:
+                line = _uart1_recv_line(s, buf_holder)
+                if line == "":
+                    break
+                extras.append(line)
+        except (socket.timeout, TimeoutError, OSError):
+            pass
+        finally:
+            s.settimeout(prev_to)
+        return header, extras
+
 def _uart1_remote_send(hostport: str, to_actor: str, method: str,
                        args: list) -> None:
     """Async wire form for the Fork/Counter/Greeter style actors:
@@ -440,7 +497,10 @@ def _uart1_remote_call_sync(hostport: str, to_actor: str, method: str,
     if method == "ping":
         return _uart1_call(hostport, "PING")
     if method == "list":
-        return _uart1_call(hostport, "LIST")
+        header, extras = _uart1_call_multi(hostport, "LIST")
+        if extras:
+            return header + "  [" + " | ".join(extras) + "]"
+        return header
     # Fallback: SEND-style as a sync call returning the dispatcher's
     # ack line ("OK method=... id=..." or "ERR ...").
     parts = ["SEND", str(to_actor), method] + [str(a) for a in args]

@@ -81,7 +81,10 @@ class Philosopher {
           sleep(0.030);
           send self.try_eat();
         } else {
-          // 4. eat
+          // 4. eat — pace each PC meal to ~200ms (matches Xinu side
+          // wait(200) so all five philosophers progress at the same
+          // cadence and the fork pool stays uniformly contested).
+          sleep(0.150);
           meals_done = meals_done + 1;
           // Log every meal up to 10, then every 10th to avoid spam
           // when meals_target is large.
