@@ -1,5 +1,93 @@
 # 次回セッション再起動メモ + プロジェクト総括
 
+## 2026-05-23: AIPL-v4 (Ollama proposer) Stage-1 smoke test 完了
+
+### 結果サマリ
+- **Ollama (gemma2:2b) を proposer にして Stage-1 に LLM-generated candidates を 4 個追加**
+- **LLM 提案の L4 (`backoff, n=3, alpha=0.2`) が ppl 11.34 を達成** — 既存ベースライン N1 (ppl 15.52) を **-27% (=27% 改善)** で上回る
+- ただし `reviewers.py` の reproducibility 評価が `uses_external_api=True` で -2 → norm スコアは N1 (2.167) が勝者表示。実 ppl での発見と rubric の評価軸の差を確認できた
+- 1 回目の Ollama 呼び出しで 4/4 candidates valid (rejection 0、19.84s)
+- 完全な lineage: `out/aipl_v4_stage1_20260523_113801.json`
+
+### 構成
+| 役割 | ファイル |
+|---|---|
+| メインドライバ | `local-genai/aipl_v4_evolve.py` (新規 327 行) |
+| ベースライン (touch せず) | `local-genai/evolve.py` + `stages.py` + `candidates/ngram_real.py` |
+| Ollama | `brew install ollama` で導入、`gemma2:2b` (1.6GB) pull 済み |
+| デーモン起動 | `nohup /opt/homebrew/opt/ollama/bin/ollama serve > /tmp/ollama_serve.log 2>&1 &` |
+
+### 各 LLM 候補の結果
+| name | style | n | alpha | ppl | rationale |
+|---|---|---:|---:|---:|---|
+| **L4** | backoff | 3 | 0.20 | **11.34** | Reduce complexity by exploring a 3-gram model with backoff |
+| L5 | plain | 1 | 1.80 | 18.60 | Explore the single unigram option for potential sparsity mitigation |
+| L2 | backoff | 4 | 0.70 | 40.61 | Backoff n-grams improve performance on sparse datasets |
+| L3 | plain | 5 | 1.50 | 102.82 | Explore high-order unigrams for improved context capture |
+
+### コマンド (再現用)
+```sh
+# 1. Ollama daemon (起動済みなら省略)
+nohup /opt/homebrew/opt/ollama/bin/ollama serve > /tmp/ollama_serve.log 2>&1 &
+
+# 2. Stage-1 smoke test (LLM 4 candidates + 既存 N1/N2/N3 baselines)
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --llm-candidates 4
+
+# 3. サニティ確認 (LLM 無効化、ベースラインだけ)
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --no-llm
+
+# 4. 別モデルで試す
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --model llama3.2:3b --llm-candidates 6
+```
+
+### 残課題 / 次の改善余地
+1. **rubric 修正**: 現状 LLM 提案は `uses_external_api=True` で reproducibility -2 されるが、シード固定+lineage 保存で実質再現可能。`reviewers.py` を「LLM 提案でも lineage に proposer/model/prompt を保存していれば減点しない」改修案あり。
+2. **Stage-2 以降への展開**: 今は Stage-1 (n-gram) のみ。CharRNN/TinyTransformer 段にも proposer を拡張するには、`evolve.py` の `evaluate_stage_n` (design estimator) 側と統合する必要あり。
+3. **モデル比較**: gemma2:2b 以外 (llama3.2:3b, qwen2.5:3b, phi3:mini) の proposal 品質横並び評価。
+4. **AIPL 完全自動ループ**: 親 = LLM, 子 = LLM, …の世代交代型ループ。現状は 1 stage = 1 ラウンドで終わる。
+
+### 追加実験 (同日): 5 回集計でヒット率測定
+
+`gemma2:2b` を 4 候補 × 5 回 (= 20 LLM 提案) で安定性測定:
+
+| Run | LLM 最良 candidate | best ppl | vs N1 (15.52) |
+|:--:|---|---:|---:|
+| 1 | L5 `plain n=5 α=0.1` | 26.36 | −70% (悪化) |
+| 2 | L2b `plain n=3 α=2.0` | 42.76 | −176% (悪化) |
+| 3 | **L3 `backoff n=5 α=0.05`** | **12.70** | **+18% (改善)** ✅ |
+| 4 | L1 `backoff n=4 α=0.2` | 18.99 | −22% (悪化) |
+| 5 | L4 `plain n=2 α=1.8` | 19.24 | −24% (悪化) |
+
+- **ヒット率 = 5 回中 1 回 (20%)** 単独計測、本セッション既存 2 回を合算で **7 回中 2 回 ≈ 29%**
+- LLM call cost: 平均 3.7s (初回 5.3s、以降キャッシュ 3 秒台)
+- 勝ちパターン: **`backoff + n≥3 + α≤0.2`** (実勝 2 回は両方このパターン)
+- 負けパターン: **`plain + n≥5 + α≥1.0`** (必ず ppl > 100、5-gram のスパース性を高 α で均してしまい unigram 退化)
+
+### 推奨される次のチューニング
+```sh
+# 1) 温度を下げて勝ちパターンに収束させる
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --llm-candidates 6 --temperature 0.4
+
+# 2) 候補プールを増やしてヒット確率を上げる (8 個独立なら少なくとも 1 勝 ≈ 83%)
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --llm-candidates 8
+
+# 3) 別モデルで比較
+ollama pull llama3.2:3b
+local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --model llama3.2:3b --llm-candidates 4
+```
+
+### 起動チェックリスト (再起動時)
+1. `cd /Users/kodamay/ocaml-app/abclcp-project` (絶対パスでも可)
+2. Ollama デーモン確認: `curl -s http://127.0.0.1:11434/api/tags >/dev/null && echo up || echo down`
+   - down なら: `nohup /opt/homebrew/opt/ollama/bin/ollama serve > /tmp/ollama_serve.log 2>&1 &`
+3. モデル確認: `ollama list` (gemma2:2b が無ければ `ollama pull gemma2:2b` ─ 約 1.6GB)
+4. 実行: `local-genai/.venv/bin/python local-genai/aipl_v4_evolve.py --llm-candidates 4`
+5. `--no-llm` で baselines だけのサニティラン (ppl 15.52 出れば OK)
+
+---
+
+
+
 ## 再起動時に Claude に入力する文 (コピペ用)
 
 ```
