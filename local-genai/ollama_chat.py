@@ -177,25 +177,113 @@ def _sanitize_history(history: list) -> list[dict]:
     return clean
 
 
-def respond(user_msg: str, history: list, model: str, system_prompt: str, temperature: float):
+# ---------------------------------------------------------------------------
+# Spreadsheet ingest: .xlsx / .xls / .csv → compact markdown the LLM can read
+# ---------------------------------------------------------------------------
+
+DOC_MAX_ROWS = 40
+DOC_MAX_COLS = 20
+DOC_MAX_CHARS = 8000
+
+
+def _read_table_file(path: str) -> dict:
+    """Return {sheet_name: DataFrame}. .csv → single 'CSV' sheet; Excel → all sheets."""
+    import pandas as pd
+    low = path.lower()
+    if low.endswith(".csv"):
+        return {"CSV": pd.read_csv(path)}
+    if low.endswith(".tsv"):
+        return {"TSV": pd.read_csv(path, sep="\t")}
+    # .xlsx via openpyxl, .xls via xlrd (if present). sheet_name=None → all sheets.
+    return pd.read_excel(path, sheet_name=None)
+
+
+def _df_to_markdown(df, max_rows: int, max_cols: int) -> str:
+    import pandas as pd
+    d = df.iloc[:max_rows, :max_cols]
+    cols = [str(c) for c in d.columns]
+    if not cols:
+        return "(空)"
+    out = ["| " + " | ".join(cols) + " |",
+           "| " + " | ".join(["---"] * len(cols)) + " |"]
+    for _, row in d.iterrows():
+        cells = []
+        for v in row:
+            s = "" if pd.isna(v) else str(v)
+            cells.append(s.replace("\n", " ").replace("|", "\\|"))
+        out.append("| " + " | ".join(cells) + " |")
+    return "\n".join(out)
+
+
+def spreadsheet_to_text(path: str) -> tuple[str | None, str]:
+    """Parse a spreadsheet into compact markdown tables + a status string.
+
+    Returns (doc_text, status). doc_text is None on failure (status holds
+    the error). Large sheets are truncated to DOC_MAX_ROWS/COLS/CHARS so the
+    payload stays inside small local models' context windows.
+    """
+    try:
+        sheets = _read_table_file(path)
+    except ImportError as e:
+        return None, f"[依存不足] {e} — `pip install openpyxl` が必要かもしれません"
+    except Exception as e:
+        return None, f"[読み込みエラー] {e}"
+    parts, summary = [], []
+    for name, df in sheets.items():
+        nrows, ncols = df.shape
+        summary.append(f"{name} ({nrows}行×{ncols}列)")
+        note = ""
+        if nrows > DOC_MAX_ROWS or ncols > DOC_MAX_COLS:
+            note = (f" — 先頭 {min(nrows, DOC_MAX_ROWS)}行×"
+                    f"{min(ncols, DOC_MAX_COLS)}列のみ表示")
+        table = _df_to_markdown(df, DOC_MAX_ROWS, DOC_MAX_COLS)
+        parts.append(f"### シート「{name}」 (全 {nrows}行×{ncols}列{note})\n{table}")
+    text = "\n\n".join(parts)
+    if len(text) > DOC_MAX_CHARS:
+        text = text[:DOC_MAX_CHARS] + "\n…(文字数上限のため以下省略)"
+    return text, "読み込み完了: " + " / ".join(summary)
+
+
+def _on_file_upload(file_path):
+    """gradio File upload handler → (doc_state_text, status_markdown)."""
+    if not file_path:
+        return "", "（ファイル未選択）"
+    text, status = spreadsheet_to_text(file_path)
+    if text is None:
+        return "", f"❌ {status}"
+    print(f"[upload] {file_path} → {status} ({len(text)} chars)", flush=True)
+    return text, f"✅ {status}"
+
+
+def _clear_doc():
+    return "", "（ファイル未選択）", None
+
+
+def respond(user_msg: str, history: list, model: str, system_prompt: str,
+            temperature: float, doc_context: str = ""):
     msgs = []
     if system_prompt and system_prompt.strip():
         msgs.append({"role": "system", "content": system_prompt.strip()})
+    if doc_context and doc_context.strip():
+        msgs.append({"role": "system", "content":
+            "ユーザーがアップロードした表データ (Excel/CSV) です。"
+            "この内容を根拠に、推測せず表の値に基づいて回答してください。"
+            "数値の集計を求められたら表から計算してください。\n\n" + doc_context})
     msgs.extend(_sanitize_history(history))
     msgs.append({"role": "user", "content": str(user_msg)})
-    print(f"[respond] model={model} n_msgs={len(msgs)}", flush=True)
+    print(f"[respond] model={model} n_msgs={len(msgs)} doc={'Y' if doc_context else 'N'}", flush=True)
     return ollama_chat(msgs, model, temperature)
 
 
 def _submit_message(user_msg: str, history: list, model: str,
-                    system_prompt: str, temperature: float):
+                    system_prompt: str, temperature: float, doc_context: str = ""):
     """Append user msg, call ollama, append assistant msg. Returns (new_history, cleared_textbox)."""
     user_msg = (user_msg or "").strip()
     if not user_msg:
         return history or [], ""
     history = list(history or [])
     history.append({"role": "user", "content": user_msg})
-    reply = respond(user_msg, history[:-1], model, system_prompt, temperature)
+    reply = respond(user_msg, history[:-1], model, system_prompt, temperature, doc_context)
     history.append({"role": "assistant", "content": reply})
     return history, ""
 
@@ -319,10 +407,10 @@ def _hands_free_chunk(audio_chunk, state, lang_hint):
     return state, gr.update(value=text), gr.update(value=None)
 
 
-def _maybe_auto_submit(msg_text, history, model, system_prompt, temperature):
+def _maybe_auto_submit(msg_text, history, model, system_prompt, temperature, doc_context=""):
     """Auto-submit ONLY if msg_text is non-empty. Otherwise no-op."""
     if msg_text and msg_text.strip():
-        return _submit_message(msg_text, history, model, system_prompt, temperature)
+        return _submit_message(msg_text, history, model, system_prompt, temperature, doc_context)
     return history or [], msg_text or ""
 
 
@@ -351,6 +439,16 @@ def build_ui() -> gr.Blocks:
             value=DEFAULT_SYSTEM, lines=4, label="System prompt",
             info="空欄にすれば system prompt なしで送信",
         )
+        with gr.Row():
+            doc_file = gr.File(
+                label="📄 Excel / CSV をアップロード (表の中身を質問できます)",
+                file_types=[".xlsx", ".xls", ".csv", ".tsv"],
+                file_count="single",
+            )
+            with gr.Column():
+                doc_status = gr.Markdown("（ファイル未選択）")
+                doc_clear = gr.Button("添付クリア", size="sm")
+        doc_state = gr.State("")
         with gr.Row():
             hands_free = gr.Checkbox(
                 label="🎙️ Hands-free mode (無音 1.2s で自動送信して停止)",
@@ -430,14 +528,25 @@ def build_ui() -> gr.Blocks:
             show_progress="hidden",
         ).then(
             fn=_maybe_auto_submit,
-            inputs=[msg, chatbot, model, system, temp],
+            inputs=[msg, chatbot, model, system, temp, doc_state],
             outputs=[chatbot, msg],
+        )
+
+        # Excel/CSV アップロード → パースして doc_state に保持 + status 表示
+        doc_file.upload(
+            fn=_on_file_upload,
+            inputs=[doc_file],
+            outputs=[doc_state, doc_status],
+        )
+        doc_clear.click(
+            fn=_clear_doc,
+            outputs=[doc_state, doc_status, doc_file],
         )
 
         # 送信: Send ボタン or Enter
         submit_args = dict(
             fn=_submit_message,
-            inputs=[msg, chatbot, model, system, temp],
+            inputs=[msg, chatbot, model, system, temp, doc_state],
             outputs=[chatbot, msg],
         )
         send_btn.click(**submit_args)
