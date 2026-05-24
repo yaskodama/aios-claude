@@ -262,6 +262,45 @@ class ContextConditionalKN(KneserNeyNGram):
         return discounted + lam * lower
 
 
+class ContextConditionalKN2(KneserNeyNGram):
+    """G2+ hyperparameterized variant of ContextConditionalKN.
+
+    Same idea (D varies by context count tier) but with tier boundaries
+    and per-tier multipliers exposed as genome parameters instead of
+    hard-coded constants.
+
+        sparse_max:    ctx_total <= sparse_max -> D = alpha * mult_sparse
+        dense_min:     ctx_total >= dense_min  -> D = alpha * mult_dense
+        (between):                              -> D = alpha * mult_mid (= 1.0)
+
+    Genome shape:
+        {style: "kn_ctx2", n, alpha,
+         sparse_max, dense_min, mult_sparse, mult_dense}
+    """
+
+    def __init__(self, n: int, alpha: float,
+                 sparse_max: int = 2, dense_min: int = 11,
+                 mult_sparse: float = 1.3, mult_dense: float = 0.6,
+                 mult_mid: float = 1.0):
+        super().__init__(n, alpha)
+        self.sparse_max = int(sparse_max)
+        self.dense_min = int(dense_min)
+        self.D_sparse = max(0.01, min(0.99, mult_sparse * self.D))
+        self.D_mid = max(0.01, min(0.99, mult_mid * self.D))
+        self.D_dense = max(0.01, min(0.99, mult_dense * self.D))
+
+    def _discount_for_ctx_total(self, ctx_total: int) -> float:
+        if ctx_total <= self.sparse_max:
+            return self.D_sparse
+        if ctx_total >= self.dense_min:
+            return self.D_dense
+        return self.D_mid
+
+    # Same _highest_prob / _continuation_prob as ContextConditionalKN:
+    _highest_prob = ContextConditionalKN._highest_prob
+    _continuation_prob = ContextConditionalKN._continuation_prob
+
+
 class ModifiedKneserNeyNGram(KneserNeyNGram):
     """Modified KN with 3 discount levels D1, D2, D3+ based on count class.
 
@@ -304,3 +343,225 @@ class ModifiedKneserNeyNGram(KneserNeyNGram):
         lam = (avg_D * n1plus) / ctx_total
         lower = self._continuation_prob(n - 1, ctx[1:], nxt)
         return discounted + lam * lower
+
+
+class KnCtxMod(ModifiedKneserNeyNGram):
+    """Orthogonal hybrid of Modified-KN (count-tier) and kn_ctx2 (context-tier).
+
+    Effective discount for an n-gram (ctx, w) with raw count c and context
+    total ctx_total is:
+
+        D_eff(c, ctx_total) = D_count(c) * ctx_mult(ctx_total)
+
+    where D_count(c) is MKN's classical 3-tier discount (D1=0.7α, D2=α,
+    D3+=1.3α) and ctx_mult is the kn_ctx2 context multiplier:
+
+        sparse  (ctx_total <= sparse_max):  mult_sparse
+        dense   (ctx_total >= dense_min):   mult_dense
+        middle:                             mult_mid (=1.0 by default)
+
+    Backoff weight uses D2 * ctx_mult as the per-ctx average discount.
+    Lower-order continuation probs use single-D KN with ctx-multiplier
+    (inherited via ContextConditionalKN2 semantics — applied here directly
+    so the class does not need multiple inheritance).
+
+    Degenerate case: when mult_sparse = mult_dense = mult_mid = 1.0,
+    the model is exactly ModifiedKneserNeyNGram(n, alpha). Verified in
+    tests / search baseline.
+
+    Genome shape:
+        {style: "kn_ctx_mod", n, alpha,
+         sparse_max, dense_min, mult_sparse, mult_dense}
+    """
+
+    def __init__(self, n: int, alpha: float,
+                 sparse_max: int = 2, dense_min: int = 11,
+                 mult_sparse: float = 1.0, mult_dense: float = 1.0,
+                 mult_mid: float = 1.0):
+        super().__init__(n, alpha)
+        self.sparse_max = int(sparse_max)
+        self.dense_min = int(dense_min)
+        self.mult_sparse = float(mult_sparse)
+        self.mult_mid = float(mult_mid)
+        self.mult_dense = float(mult_dense)
+
+    def _ctx_mult(self, ctx_total: int) -> float:
+        if ctx_total <= self.sparse_max:
+            return self.mult_sparse
+        if ctx_total >= self.dense_min:
+            return self.mult_dense
+        return self.mult_mid
+
+    @staticmethod
+    def _clamp(d: float) -> float:
+        return max(0.01, min(0.99, d))
+
+    def _highest_prob(self, ctx: tuple, nxt: int) -> float:
+        n = self.n
+        if n == 1:
+            total = self.totals[1][()] or 1
+            c = self.counts[1][()].get(nxt, 0)
+            return (c + 1e-3) / (total + VOCAB * 1e-3)
+        ctx_total = self.totals[n].get(ctx, 0)
+        if ctx_total == 0:
+            return self._continuation_prob(n - 1, ctx[1:], nxt)
+        c = self.counts[n].get(ctx, {}).get(nxt, 0)
+        mult = self._ctx_mult(ctx_total)
+        D = self._clamp(self._discount_for_count(c) * mult)
+        discounted = max(c - D, 0) / ctx_total
+        n1plus = self.n1plus_right[n].get(ctx, 0)
+        avg_D = self._clamp(self.D2 * mult)
+        lam = (avg_D * n1plus) / ctx_total
+        lower = self._continuation_prob(n - 1, ctx[1:], nxt)
+        return discounted + lam * lower
+
+    def _continuation_prob(self, k: int, ctx: tuple, nxt: int) -> float:
+        # Single-D KN at lower orders, with context-tier multiplier applied.
+        if k == 1:
+            num = self._n1plus_left_byte.get(nxt, 0)
+            den = self._n1plus_dot_dot or 1
+            return (num + 1e-9) / (den + 256 * 1e-9)
+        full = ctx + (nxt,)
+        left_ext = self.cont_left_extensions[k].get(full)
+        num = len(left_ext) if left_ext else 0
+        den = 0
+        for w in self.counts[k].get(ctx, {}):
+            ext = self.cont_left_extensions[k].get(ctx + (w,))
+            if ext:
+                den += len(ext)
+        if den == 0:
+            if k == 1:
+                return 1.0 / (VOCAB + 1)
+            return self._continuation_prob(k - 1, ctx[1:] if k > 1 else (), nxt)
+        ctx_total = self.totals[k].get(ctx, 0)
+        D = self._clamp(self.D * self._ctx_mult(ctx_total))
+        discounted = max(num - D, 0) / den
+        n1plus = self.n1plus_right[k].get(ctx, 0)
+        lam = (D * n1plus) / den if den > 0 else 0.0
+        lower = self._continuation_prob(k - 1, ctx[1:] if k > 1 else (), nxt)
+        return discounted + lam * lower
+
+
+def _count_class_counts(word_counts: dict) -> tuple[int, int, int]:
+    """(N1, N2, N3+) = number of distinct continuations with count ==1, ==2, >=3."""
+    n1 = n2 = n3 = 0
+    for c in word_counts.values():
+        if c == 1:
+            n1 += 1
+        elif c == 2:
+            n2 += 1
+        else:
+            n3 += 1
+    return n1, n2, n3
+
+
+class ModifiedKneserNeyExactNGram(ModifiedKneserNeyNGram):
+    """Modified-KN with the *exact* Chen+Goodman backoff weight.
+
+    The parent class approximates the per-context backoff mass as
+    `gamma ≈ D2 * N1+(ctx) / ctx_total`, which does NOT make the
+    highest-order distribution sum to 1. The exact weight is
+
+        gamma(ctx) = [D1*N1(ctx) + D2*N2(ctx) + D3+*N3+(ctx)] / ctx_total
+
+    where N_k(ctx) is the number of distinct continuations of ctx seen
+    exactly k times (N3+ = seen >= 3 times). Using the same per-count
+    discounts in the numerator (discounted mass removed) and the backoff
+    weight guarantees Σ_w P(w|ctx) = 1 (given the lower order is proper).
+    """
+
+    def train(self, data: bytes) -> None:
+        super().train(data)
+        self._cc: dict = {}
+        n = self.n
+        if n >= 2:
+            for ctx, wc in self.counts[n].items():
+                self._cc[ctx] = _count_class_counts(wc)
+
+    def _highest_prob(self, ctx: tuple, nxt: int) -> float:
+        n = self.n
+        if n == 1:
+            total = self.totals[1][()] or 1
+            c = self.counts[1][()].get(nxt, 0)
+            return (c + 1e-3) / (total + VOCAB * 1e-3)
+        ctx_total = self.totals[n].get(ctx, 0)
+        if ctx_total == 0:
+            return self._continuation_prob(n - 1, ctx[1:], nxt)
+        c = self.counts[n].get(ctx, {}).get(nxt, 0)
+        D = self._discount_for_count(c)
+        discounted = max(c - D, 0) / ctx_total
+        n1, n2, n3 = self._cc.get(ctx, (0, 0, 0))
+        gamma = (self.D1 * n1 + self.D2 * n2 + self.D3 * n3) / ctx_total
+        lower = self._continuation_prob(n - 1, ctx[1:], nxt)
+        return discounted + gamma * lower
+
+
+class KnCtxModExact(KnCtxMod):
+    """KnCtxMod (count-tier × context-tier hybrid) with exact backoff weight.
+
+    Combines:
+      - KnCtxMod's per-count discount scaled by the context-tier multiplier:
+            D_eff(c) = clamp(D_count(c) * ctx_mult(ctx_total))
+      - The exact Chen+Goodman backoff weight using those same D_eff:
+            gamma(ctx) = [D_eff(1)*N1 + D_eff(2)*N2 + D_eff(3+)*N3+] / ctx_total
+
+    Sharing the clamped D_eff between the discounted numerator and gamma
+    keeps Σ_w P(w|ctx) = 1 exactly (given the lower order is proper).
+
+    Degenerate case: mult_sparse=mult_dense=mult_mid=1.0 reduces to
+    ModifiedKneserNeyExactNGram(n, alpha) — NOT to the approximate L5mkn.
+
+    `gamma_scale` multiplies the exact backoff weight. gamma_scale=1.0 is
+    the proper normalized model; gamma_scale>1.0 deliberately over-weights
+    backoff (the implicit regularizer that the old approximate weight gave
+    for free, which helps held-out ppl on a tiny/sparse corpus).
+
+    Genome shape:
+        {style: "kn_ctx_mod_exact", n, alpha,
+         sparse_max, dense_min, mult_sparse, mult_dense, mult_mid, gamma_scale}
+    """
+
+    def __init__(self, n: int, alpha: float,
+                 sparse_max: int = 2, dense_min: int = 11,
+                 mult_sparse: float = 1.0, mult_dense: float = 1.0,
+                 mult_mid: float = 1.0, gamma_scale: float = 1.0):
+        super().__init__(n, alpha, sparse_max=sparse_max, dense_min=dense_min,
+                         mult_sparse=mult_sparse, mult_dense=mult_dense,
+                         mult_mid=mult_mid)
+        self.gamma_scale = float(gamma_scale)
+
+    def train(self, data: bytes) -> None:
+        super().train(data)
+        self._cc: dict = {}
+        n = self.n
+        if n >= 2:
+            for ctx, wc in self.counts[n].items():
+                self._cc[ctx] = _count_class_counts(wc)
+
+    def _highest_prob(self, ctx: tuple, nxt: int) -> float:
+        n = self.n
+        if n == 1:
+            total = self.totals[1][()] or 1
+            c = self.counts[1][()].get(nxt, 0)
+            return (c + 1e-3) / (total + VOCAB * 1e-3)
+        ctx_total = self.totals[n].get(ctx, 0)
+        if ctx_total == 0:
+            return self._continuation_prob(n - 1, ctx[1:], nxt)
+        c = self.counts[n].get(ctx, {}).get(nxt, 0)
+        mult = self._ctx_mult(ctx_total)
+        D1 = self._clamp(self.D1 * mult)
+        D2 = self._clamp(self.D2 * mult)
+        D3 = self._clamp(self.D3 * mult)
+        if c == 1:
+            Dc = D1
+        elif c == 2:
+            Dc = D2
+        elif c >= 3:
+            Dc = D3
+        else:
+            Dc = 0.0
+        discounted = max(c - Dc, 0) / ctx_total
+        n1, n2, n3 = self._cc.get(ctx, (0, 0, 0))
+        gamma = self.gamma_scale * (D1 * n1 + D2 * n2 + D3 * n3) / ctx_total
+        lower = self._continuation_prob(n - 1, ctx[1:], nxt)
+        return discounted + gamma * lower

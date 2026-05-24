@@ -1,0 +1,909 @@
+{
+  "baseline_L5mkn": {
+    "ppl_pinned": 3.535646150529811,
+    "ppl_kodama": 8.494388146011866,
+    "geomean": 5.4802509750515
+  },
+  "trials": [
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.808,
+        "sparse_max": 1,
+        "dense_min": 13,
+        "mult_sparse": 0.87,
+        "mult_dense": 0.83
+      },
+      "ppl_pinned": 3.6403823600881253,
+      "ppl_kodama": 8.963990191400308,
+      "geomean": 5.71247334950253,
+      "dur_s": 0.0452093750000131
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.863,
+        "sparse_max": 2,
+        "dense_min": 10,
+        "mult_sparse": 0.98,
+        "mult_dense": 1.01
+      },
+      "ppl_pinned": 3.6208871815837527,
+      "ppl_kodama": 9.296835499393602,
+      "geomean": 5.801964537038043,
+      "dur_s": 0.04490200000009281
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.484,
+        "sparse_max": 5,
+        "dense_min": 8,
+        "mult_sparse": 1.76,
+        "mult_dense": 1.06
+      },
+      "ppl_pinned": 3.7406491254996452,
+      "ppl_kodama": 9.621714685891178,
+      "geomean": 5.999288176574445,
+      "dur_s": 0.047345792000214715
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.538,
+        "sparse_max": 2,
+        "dense_min": 6,
+        "mult_sparse": 1.32,
+        "mult_dense": 0.97
+      },
+      "ppl_pinned": 3.744558609023794,
+      "ppl_kodama": 9.642912049575923,
+      "geomean": 6.009030648224288,
+      "dur_s": 0.045094167000115704
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.876,
+        "sparse_max": 1,
+        "dense_min": 25,
+        "mult_sparse": 1.56,
+        "mult_dense": 0.85
+      },
+      "ppl_pinned": 3.669555160079491,
+      "ppl_kodama": 10.091274695914203,
+      "geomean": 6.085268205442679,
+      "dur_s": 0.0453695000001062
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.67,
+        "sparse_max": 1,
+        "dense_min": 18,
+        "mult_sparse": 1.84,
+        "mult_dense": 0.93
+      },
+      "ppl_pinned": 3.698931846382608,
+      "ppl_kodama": 10.02319270218147,
+      "geomean": 6.088933132210337,
+      "dur_s": 0.04350645800013808
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.838,
+        "sparse_max": 1,
+        "dense_min": 10,
+        "mult_sparse": 2.45,
+        "mult_dense": 1.07
+      },
+      "ppl_pinned": 3.652195001263045,
+      "ppl_kodama": 10.197219714131247,
+      "geomean": 6.102641630206636,
+      "dur_s": 0.04683095799964576
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.435,
+        "sparse_max": 4,
+        "dense_min": 10,
+        "mult_sparse": 0.87,
+        "mult_dense": 0.37
+      },
+      "ppl_pinned": 3.86063879206808,
+      "ppl_kodama": 9.761872354595686,
+      "geomean": 6.138978994537209,
+      "dur_s": 0.047032916999796726
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.904,
+        "sparse_max": 1,
+        "dense_min": 8,
+        "mult_sparse": 1.88,
+        "mult_dense": 0.7
+      },
+      "ppl_pinned": 3.7237560234779497,
+      "ppl_kodama": 10.250098874426296,
+      "geomean": 6.17809577660378,
+      "dur_s": 0.04555766700013919
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.726,
+        "sparse_max": 4,
+        "dense_min": 6,
+        "mult_sparse": 1.35,
+        "mult_dense": 0.98
+      },
+      "ppl_pinned": 3.727184115107992,
+      "ppl_kodama": 10.352802583901651,
+      "geomean": 6.211827536045025,
+      "dur_s": 0.044193875000019034
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.933,
+        "sparse_max": 3,
+        "dense_min": 13,
+        "mult_sparse": 1.39,
+        "mult_dense": 0.68
+      },
+      "ppl_pinned": 3.758986470950345,
+      "ppl_kodama": 10.510124462348324,
+      "geomean": 6.285492475691274,
+      "dur_s": 0.04404354100006458
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.774,
+        "sparse_max": 3,
+        "dense_min": 8,
+        "mult_sparse": 2.27,
+        "mult_dense": 0.74
+      },
+      "ppl_pinned": 3.764520518122247,
+      "ppl_kodama": 10.623120641822744,
+      "geomean": 6.323840259101244,
+      "dur_s": 0.04668091600024127
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.38,
+        "sparse_max": 5,
+        "dense_min": 18,
+        "mult_sparse": 2.37,
+        "mult_dense": 0.61
+      },
+      "ppl_pinned": 3.7573712182497903,
+      "ppl_kodama": 10.663653443337052,
+      "geomean": 6.329873974210301,
+      "dur_s": 0.0433909590001349
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.519,
+        "sparse_max": 1,
+        "dense_min": 10,
+        "mult_sparse": 0.82,
+        "mult_dense": 0.8
+      },
+      "ppl_pinned": 3.9096859051645305,
+      "ppl_kodama": 10.260658496815791,
+      "geomean": 6.333715489561193,
+      "dur_s": 0.0434811670002091
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.173,
+        "sparse_max": 4,
+        "dense_min": 13,
+        "mult_sparse": 0.99,
+        "mult_dense": 0.48
+      },
+      "ppl_pinned": 3.8326441256787973,
+      "ppl_kodama": 10.47228200558621,
+      "geomean": 6.335339778667105,
+      "dur_s": 0.046487374999742315
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.353,
+        "sparse_max": 2,
+        "dense_min": 8,
+        "mult_sparse": 1.38,
+        "mult_dense": 0.75
+      },
+      "ppl_pinned": 3.7400229641230816,
+      "ppl_kodama": 10.743074223212815,
+      "geomean": 6.338717875098612,
+      "dur_s": 0.04483779200018034
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.406,
+        "sparse_max": 5,
+        "dense_min": 13,
+        "mult_sparse": 2.11,
+        "mult_dense": 0.68
+      },
+      "ppl_pinned": 3.770201770747249,
+      "ppl_kodama": 10.708497081246572,
+      "geomean": 6.353990451500346,
+      "dur_s": 0.044215708000137965
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.409,
+        "sparse_max": 3,
+        "dense_min": 25,
+        "mult_sparse": 1.07,
+        "mult_dense": 0.71
+      },
+      "ppl_pinned": 3.742655375853635,
+      "ppl_kodama": 10.882202104841818,
+      "geomean": 6.381875289349673,
+      "dur_s": 0.044322582999939186
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.905,
+        "sparse_max": 3,
+        "dense_min": 25,
+        "mult_sparse": 1.73,
+        "mult_dense": 1.06
+      },
+      "ppl_pinned": 3.7123310086015637,
+      "ppl_kodama": 10.982453902100819,
+      "geomean": 6.385178476073015,
+      "dur_s": 0.046175583000149345
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.681,
+        "sparse_max": 2,
+        "dense_min": 25,
+        "mult_sparse": 1.26,
+        "mult_dense": 0.84
+      },
+      "ppl_pinned": 4.157853879946972,
+      "ppl_kodama": 9.870821888019783,
+      "geomean": 6.4063589569558586,
+      "dur_s": 0.03202349999992293
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.589,
+        "sparse_max": 5,
+        "dense_min": 18,
+        "mult_sparse": 0.86,
+        "mult_dense": 0.38
+      },
+      "ppl_pinned": 3.9588799449913106,
+      "ppl_kodama": 10.39008915337072,
+      "geomean": 6.413510394156315,
+      "dur_s": 0.04416808399992078
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.549,
+        "sparse_max": 5,
+        "dense_min": 6,
+        "mult_sparse": 1.35,
+        "mult_dense": 0.57
+      },
+      "ppl_pinned": 3.9556375869934315,
+      "ppl_kodama": 10.410759200596297,
+      "geomean": 6.41725723366427,
+      "dur_s": 0.04451533300016308
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.958,
+        "sparse_max": 2,
+        "dense_min": 10,
+        "mult_sparse": 1.28,
+        "mult_dense": 1.08
+      },
+      "ppl_pinned": 3.7270767469000363,
+      "ppl_kodama": 11.258995628898345,
+      "geomean": 6.477896325344839,
+      "dur_s": 0.04526050000004034
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.183,
+        "sparse_max": 3,
+        "dense_min": 6,
+        "mult_sparse": 1.15,
+        "mult_dense": 0.49
+      },
+      "ppl_pinned": 3.8433812510931125,
+      "ppl_kodama": 10.996745126157677,
+      "geomean": 6.501129443483185,
+      "dur_s": 0.04402258400023129
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.142,
+        "sparse_max": 3,
+        "dense_min": 25,
+        "mult_sparse": 1.87,
+        "mult_dense": 0.25
+      },
+      "ppl_pinned": 3.8456489756469168,
+      "ppl_kodama": 11.196081270767301,
+      "geomean": 6.5617222183041175,
+      "dur_s": 0.04654058400001304
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.685,
+        "sparse_max": 5,
+        "dense_min": 8,
+        "mult_sparse": 1.32,
+        "mult_dense": 0.42
+      },
+      "ppl_pinned": 3.9929677364657374,
+      "ppl_kodama": 10.79831586718441,
+      "geomean": 6.5663785198413125,
+      "dur_s": 0.04385316700017938
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.117,
+        "sparse_max": 2,
+        "dense_min": 6,
+        "mult_sparse": 1.63,
+        "mult_dense": 1.0
+      },
+      "ppl_pinned": 3.749534931264124,
+      "ppl_kodama": 11.52778253483243,
+      "geomean": 6.574482739681555,
+      "dur_s": 0.04327220799996212
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.445,
+        "sparse_max": 4,
+        "dense_min": 10,
+        "mult_sparse": 1.77,
+        "mult_dense": 0.38
+      },
+      "ppl_pinned": 3.94668983031265,
+      "ppl_kodama": 11.053684264139324,
+      "geomean": 6.604957476983908,
+      "dur_s": 0.044128958999863244
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.347,
+        "sparse_max": 5,
+        "dense_min": 10,
+        "mult_sparse": 0.86,
+        "mult_dense": 1.05
+      },
+      "ppl_pinned": 4.153309261266434,
+      "ppl_kodama": 10.508549733127024,
+      "geomean": 6.606455700984863,
+      "dur_s": 0.031592792000083136
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.112,
+        "sparse_max": 2,
+        "dense_min": 18,
+        "mult_sparse": 1.19,
+        "mult_dense": 0.21
+      },
+      "ppl_pinned": 3.938559272112066,
+      "ppl_kodama": 11.21420141387879,
+      "geomean": 6.645885716589215,
+      "dur_s": 0.04348320799999783
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.492,
+        "sparse_max": 1,
+        "dense_min": 13,
+        "mult_sparse": 0.82,
+        "mult_dense": 0.88
+      },
+      "ppl_pinned": 4.264781692474172,
+      "ppl_kodama": 10.358728222671438,
+      "geomean": 6.646631814788951,
+      "dur_s": 0.031725541000014346
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.773,
+        "sparse_max": 2,
+        "dense_min": 10,
+        "mult_sparse": 1.95,
+        "mult_dense": 0.95
+      },
+      "ppl_pinned": 4.1690637837778395,
+      "ppl_kodama": 10.601179602604413,
+      "geomean": 6.648081975016734,
+      "dur_s": 0.031516832999841426
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.855,
+        "sparse_max": 1,
+        "dense_min": 8,
+        "mult_sparse": 1.21,
+        "mult_dense": 1.09
+      },
+      "ppl_pinned": 4.156568785507255,
+      "ppl_kodama": 10.75204051964719,
+      "geomean": 6.685177335304929,
+      "dur_s": 0.0310069580000345
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.42,
+        "sparse_max": 2,
+        "dense_min": 10,
+        "mult_sparse": 2.18,
+        "mult_dense": 0.71
+      },
+      "ppl_pinned": 4.009470186161672,
+      "ppl_kodama": 11.21030076151147,
+      "geomean": 6.704279728739376,
+      "dur_s": 0.04598900000019057
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.202,
+        "sparse_max": 1,
+        "dense_min": 25,
+        "mult_sparse": 0.82,
+        "mult_dense": 0.88
+      },
+      "ppl_pinned": 4.196257273269428,
+      "ppl_kodama": 10.71673915588893,
+      "geomean": 6.7059820033034825,
+      "dur_s": 0.031477042000005895
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.302,
+        "sparse_max": 1,
+        "dense_min": 13,
+        "mult_sparse": 0.95,
+        "mult_dense": 0.72
+      },
+      "ppl_pinned": 4.227760891947949,
+      "ppl_kodama": 10.74165560658517,
+      "geomean": 6.73892806671018,
+      "dur_s": 0.03135670800020307
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.604,
+        "sparse_max": 3,
+        "dense_min": 6,
+        "mult_sparse": 2.06,
+        "mult_dense": 1.01
+      },
+      "ppl_pinned": 4.2000033922886715,
+      "ppl_kodama": 10.820855355718766,
+      "geomean": 6.741485682064737,
+      "dur_s": 0.03138774999979432
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 1.331,
+        "sparse_max": 5,
+        "dense_min": 13,
+        "mult_sparse": 1.8,
+        "mult_dense": 0.23
+      },
+      "ppl_pinned": 4.0771354626766945,
+      "ppl_kodama": 11.336300920939461,
+      "geomean": 6.798502371871083,
+      "dur_s": 0.04482166700017842
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.626,
+        "sparse_max": 4,
+        "dense_min": 18,
+        "mult_sparse": 1.13,
+        "mult_dense": 0.29
+      },
+      "ppl_pinned": 4.390539566838962,
+      "ppl_kodama": 10.542768716347346,
+      "geomean": 6.803561067055623,
+      "dur_s": 0.03103674999965733
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.409,
+        "sparse_max": 1,
+        "dense_min": 18,
+        "mult_sparse": 2.19,
+        "mult_dense": 1.07
+      },
+      "ppl_pinned": 4.300963471901535,
+      "ppl_kodama": 10.783373818985924,
+      "geomean": 6.810205349276761,
+      "dur_s": 0.03369375000011132
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.879,
+        "sparse_max": 4,
+        "dense_min": 18,
+        "mult_sparse": 2.35,
+        "mult_dense": 0.46
+      },
+      "ppl_pinned": 4.282868625320331,
+      "ppl_kodama": 10.920339430929834,
+      "geomean": 6.838887272544991,
+      "dur_s": 0.031145124999966356
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.412,
+        "sparse_max": 3,
+        "dense_min": 25,
+        "mult_sparse": 1.81,
+        "mult_dense": 0.6
+      },
+      "ppl_pinned": 4.347019516284179,
+      "ppl_kodama": 10.76347695875845,
+      "geomean": 6.840251779196294,
+      "dur_s": 0.03163875000018379
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.822,
+        "sparse_max": 5,
+        "dense_min": 8,
+        "mult_sparse": 1.68,
+        "mult_dense": 0.71
+      },
+      "ppl_pinned": 4.248236267489433,
+      "ppl_kodama": 11.04235794000911,
+      "geomean": 6.849127351666532,
+      "dur_s": 0.03143054199972539
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.495,
+        "sparse_max": 5,
+        "dense_min": 6,
+        "mult_sparse": 2.12,
+        "mult_dense": 0.67
+      },
+      "ppl_pinned": 4.012564139603678,
+      "ppl_kodama": 11.765517829721942,
+      "geomean": 6.8709457083730445,
+      "dur_s": 0.048038667000128044
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.462,
+        "sparse_max": 4,
+        "dense_min": 6,
+        "mult_sparse": 1.18,
+        "mult_dense": 0.56
+      },
+      "ppl_pinned": 4.269731090661458,
+      "ppl_kodama": 11.071046772420441,
+      "geomean": 6.875346726556469,
+      "dur_s": 0.03154945799997222
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.675,
+        "sparse_max": 5,
+        "dense_min": 18,
+        "mult_sparse": 2.27,
+        "mult_dense": 0.62
+      },
+      "ppl_pinned": 4.293728915971969,
+      "ppl_kodama": 11.018432699138067,
+      "geomean": 6.878238371049682,
+      "dur_s": 0.031646625000121276
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.475,
+        "sparse_max": 5,
+        "dense_min": 13,
+        "mult_sparse": 1.18,
+        "mult_dense": 0.78
+      },
+      "ppl_pinned": 4.226682082787887,
+      "ppl_kodama": 11.20153835099914,
+      "geomean": 6.88079511741408,
+      "dur_s": 0.03199475000019447
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.433,
+        "sparse_max": 4,
+        "dense_min": 25,
+        "mult_sparse": 1.17,
+        "mult_dense": 0.58
+      },
+      "ppl_pinned": 4.2387839096608015,
+      "ppl_kodama": 11.201365117469233,
+      "geomean": 6.890585332623373,
+      "dur_s": 0.031339540999852034
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.218,
+        "sparse_max": 4,
+        "dense_min": 13,
+        "mult_sparse": 1.93,
+        "mult_dense": 0.53
+      },
+      "ppl_pinned": 4.288673835561103,
+      "ppl_kodama": 11.073097577133415,
+      "geomean": 6.891219330254054,
+      "dur_s": 0.031909374999941065
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.98,
+        "sparse_max": 4,
+        "dense_min": 13,
+        "mult_sparse": 1.74,
+        "mult_dense": 0.51
+      },
+      "ppl_pinned": 4.297325292243658,
+      "ppl_kodama": 11.05703949571226,
+      "geomean": 6.89316295195909,
+      "dur_s": 0.031188375000056112
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.191,
+        "sparse_max": 2,
+        "dense_min": 13,
+        "mult_sparse": 2.0,
+        "mult_dense": 0.81
+      },
+      "ppl_pinned": 4.223324905340757,
+      "ppl_kodama": 11.253477802403413,
+      "geomean": 6.8939896340645666,
+      "dur_s": 0.031450041999960376
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.695,
+        "sparse_max": 3,
+        "dense_min": 18,
+        "mult_sparse": 1.66,
+        "mult_dense": 0.43
+      },
+      "ppl_pinned": 4.31714161122258,
+      "ppl_kodama": 11.060369557568686,
+      "geomean": 6.9100782667404905,
+      "dur_s": 0.031942083000103594
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.026,
+        "sparse_max": 1,
+        "dense_min": 10,
+        "mult_sparse": 1.0,
+        "mult_dense": 0.88
+      },
+      "ppl_pinned": 4.216626271277695,
+      "ppl_kodama": 11.380550083262975,
+      "geomean": 6.927302971768899,
+      "dur_s": 0.031077874999937194
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.994,
+        "sparse_max": 5,
+        "dense_min": 8,
+        "mult_sparse": 1.49,
+        "mult_dense": 0.51
+      },
+      "ppl_pinned": 4.282777943664114,
+      "ppl_kodama": 11.257638504856523,
+      "geomean": 6.943627718011917,
+      "dur_s": 0.03131900000016685
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.67,
+        "sparse_max": 1,
+        "dense_min": 8,
+        "mult_sparse": 1.48,
+        "mult_dense": 0.44
+      },
+      "ppl_pinned": 4.394506073870166,
+      "ppl_kodama": 11.402847831898699,
+      "geomean": 7.078833523730875,
+      "dur_s": 0.031223083999975643
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.237,
+        "sparse_max": 3,
+        "dense_min": 6,
+        "mult_sparse": 1.51,
+        "mult_dense": 1.02
+      },
+      "ppl_pinned": 4.218406258471289,
+      "ppl_kodama": 11.925433440507225,
+      "geomean": 7.092695049162798,
+      "dur_s": 0.03145487499978117
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.198,
+        "sparse_max": 1,
+        "dense_min": 8,
+        "mult_sparse": 1.09,
+        "mult_dense": 1.02
+      },
+      "ppl_pinned": 4.218406258471289,
+      "ppl_kodama": 11.925433440507225,
+      "geomean": 7.092695049162798,
+      "dur_s": 0.03194154199991317
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 1.05,
+        "sparse_max": 1,
+        "dense_min": 10,
+        "mult_sparse": 0.85,
+        "mult_dense": 0.22
+      },
+      "ppl_pinned": 4.539084148589161,
+      "ppl_kodama": 11.476952529178474,
+      "geomean": 7.217676447396648,
+      "dur_s": 0.031128500000249915
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 5,
+        "alpha": 0.578,
+        "sparse_max": 4,
+        "dense_min": 8,
+        "mult_sparse": 1.96,
+        "mult_dense": 0.34
+      },
+      "ppl_pinned": 4.268676098356626,
+      "ppl_kodama": 12.86347949644985,
+      "geomean": 7.410130057441368,
+      "dur_s": 0.04557166600034179
+    },
+    {
+      "genome": {
+        "style": "kn_ctx2",
+        "n": 4,
+        "alpha": 0.696,
+        "sparse_max": 5,
+        "dense_min": 8,
+        "mult_sparse": 1.39,
+        "mult_dense": 0.26
+      },
+      "ppl_pinned": 4.644742955991468,
+      "ppl_kodama": 12.802621192002615,
+      "geomean": 7.711347781016055,
+      "dur_s": 0.03195525000000998
+    }
+  ]
+}

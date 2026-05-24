@@ -1,0 +1,164 @@
+{
+  "results": [
+    {
+      "name": "Lkcm3",
+      "style": "kn_ctx_mod",
+      "raw_pinned": 3.4764015056878796,
+      "raw_kodama": 8.343351619196822,
+      "raw_geomean": 5.385614183309016,
+      "fair_pinned": 3.60422660092027,
+      "fair_kodama": 8.870954257335914,
+      "fair_geomean": 5.654461009666352,
+      "dur_s": 0.7755057499998657
+    },
+    {
+      "name": "Lkcm3_exact",
+      "style": "kn_ctx_mod_exact",
+      "raw_pinned": 3.612756069989897,
+      "raw_kodama": 8.852047916017229,
+      "raw_geomean": 5.655111832707878,
+      "fair_pinned": 3.6127560699899,
+      "fair_kodama": 8.852047916017225,
+      "fair_geomean": 5.65511183270788,
+      "dur_s": 0.8127911670017056
+    },
+    {
+      "name": "Lkcm2",
+      "style": "kn_ctx_mod",
+      "raw_pinned": 3.4839743457016654,
+      "raw_kodama": 8.34615499045994,
+      "raw_geomean": 5.392382578416739,
+      "fair_pinned": 3.6106772553191147,
+      "fair_kodama": 8.864529483545383,
+      "fair_geomean": 5.657468955756011,
+      "dur_s": 0.79573608300052
+    },
+    {
+      "name": "L5mkn",
+      "style": "modified_kn",
+      "raw_pinned": 3.535646150529811,
+      "raw_kodama": 8.494388146011866,
+      "raw_geomean": 5.4802509750515,
+      "fair_pinned": 3.605844010893221,
+      "fair_kodama": 8.953922288290162,
+      "fair_geomean": 5.682116424118253,
+      "dur_s": 0.6951395409996621
+    },
+    {
+      "name": "mkn_exact",
+      "style": "kn_ctx_mod_exact",
+      "raw_pinned": 3.6287162023061548,
+      "raw_kodama": 8.900926888683035,
+      "raw_geomean": 5.6832154293592145,
+      "fair_pinned": 3.6287162023061517,
+      "fair_kodama": 8.900926888683031,
+      "fair_geomean": 5.683215429359211,
+      "dur_s": 0.8004044169974804
+    },
+    {
+      "name": "Lkcm",
+      "style": "kn_ctx_mod",
+      "raw_pinned": 3.501521282463802,
+      "raw_kodama": 8.416561879516511,
+      "raw_geomean": 5.428698789424645,
+      "fair_pinned": 3.624441476786925,
+      "fair_kodama": 8.953550229415397,
+      "fair_geomean": 5.696632234574061,
+      "dur_s": 0.8044561669994437
+    },
+    {
+      "name": "Lctx2a",
+      "style": "kn_ctx2",
+      "raw_pinned": 3.6400655513974587,
+      "raw_kodama": 8.964096215737579,
+      "raw_geomean": 5.712258558076541,
+      "fair_pinned": 3.640065551397455,
+      "fair_kodama": 8.964096215737579,
+      "fair_geomean": 5.712258558076538,
+      "dur_s": 0.7327373340012855
+    },
+    {
+      "name": "LkE2",
+      "style": "kneser_ney",
+      "raw_pinned": 3.6438638967121495,
+      "raw_kodama": 9.616590746154664,
+      "raw_geomean": 5.919590174105732,
+      "fair_pinned": 3.6438638967121455,
+      "fair_kodama": 9.616590746154651,
+      "fair_geomean": 5.919590174105725,
+      "dur_s": 0.7170728749988484
+    },
+    {
+      "name": "Lmkn5d2",
+      "style": "modified_kn",
+      "raw_pinned": 3.4912654851430878,
+      "raw_kodama": 9.403551321839881,
+      "raw_geomean": 5.729772610471661,
+      "fair_pinned": 3.642931322492114,
+      "fair_kodama": 10.11431662623143,
+      "fair_geomean": 6.070070909248197,
+      "dur_s": 0.6933054170003743
+    },
+    {
+      "name": "Lctx5b",
+      "style": "kn_ctx",
+      "raw_pinned": 3.7743954652282343,
+      "raw_kodama": 10.399339688546016,
+      "raw_geomean": 6.265079453751252,
+      "fair_pinned": 3.7743954652282325,
+      "fair_kodama": 10.399339688546016,
+      "fair_geomean": 6.26507945375125,
+      "dur_s": 0.7514517499985232
+    },
+    {
+      "name": "Lg6",
+      "style": "backoff",
+      "raw_pinned": 7.154726600626634,
+      "raw_kodama": 19.418939918094043,
+      "raw_geomean": 11.787162762427515,
+      "fair_pinned": 7.154726600626601,
+      "fair_kodama": 19.418939918093965,
+      "fair_geomean": 11.787162762427464,
+      "dur_s": 0.10125037499892642
+    },
+    {
+      "name": "N1",
+      "style": "plain",
+      "raw_pinned": 18.241949016637275,
+      "raw_kodama": 92.37817230190385,
+      "raw_geomean": 41.05067489556613,
+      "fair_pinned": 18.241949016637346,
+      "fair_kodama": 92.37817230190385,
+      "fair_geomean": 41.05067489556621,
+      "dur_s": 0.0033297499976470135
+    }
+  ],
+  "raw_order": [
+    "Lkcm3",
+    "Lkcm2",
+    "Lkcm",
+    "L5mkn",
+    "Lkcm3_exact",
+    "mkn_exact",
+    "Lctx2a",
+    "Lmkn5d2",
+    "LkE2",
+    "Lctx5b",
+    "Lg6",
+    "N1"
+  ],
+  "fair_order": [
+    "Lkcm3",
+    "Lkcm3_exact",
+    "Lkcm2",
+    "L5mkn",
+    "mkn_exact",
+    "Lkcm",
+    "Lctx2a",
+    "LkE2",
+    "Lmkn5d2",
+    "Lctx5b",
+    "Lg6",
+    "N1"
+  ]
+}

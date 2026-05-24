@@ -67,3 +67,41 @@ def perplexity_from_neg_log_prob_nats(total_neg_log_prob: float, count: int) -> 
     if count == 0:
         return float("inf")
     return math.exp(total_neg_log_prob / count)
+
+
+def fair_eval_neg_log_prob_nats(model, data: bytes, vocab: int = 256) -> tuple[float, int]:
+    """Per-context renormalized held-out neg-log-prob in nats.
+
+    Many of our n-gram smoothers do NOT self-normalize: the approximate
+    Modified-KN backoff weight and the Laplace+backoff fallback leave
+    Σ_w P(w|ctx) ≠ 1, which silently inflates or deflates the raw
+    `eval_neg_log_prob_nats` score and makes cross-model ppl comparisons
+    unfair. This evaluator divides each P(next|ctx) by Σ_w P(w|ctx) so
+    every model is scored as a proper distribution.
+
+    Works for any model exposing `.n` and `neg_log_prob(ctx, nxt)` —
+    i.e. NGram, NGramWithBackoff, and every KN-family class. For models
+    that already self-normalize (plain Laplace) this returns the same
+    value as the raw evaluator (up to float error).
+
+    Z is cached per context, so cost is O(vocab × distinct_contexts).
+    """
+    n = getattr(model, "n", 1)
+    start = max(0, n - 1)
+    total, count = 0.0, 0
+    z_cache: dict = {}
+    for i in range(start, len(data)):
+        ctx = tuple(data[i - start:i]) if start > 0 else ()
+        Z = z_cache.get(ctx)
+        if Z is None:
+            Z = 0.0
+            for w in range(vocab):
+                Z += math.exp(-model.neg_log_prob(ctx, w))
+            z_cache[ctx] = Z
+        p = math.exp(-model.neg_log_prob(ctx, data[i]))
+        p = (p / Z) if Z > 0 else 1e-12
+        if p <= 0:
+            p = 1e-12
+        total += -math.log(p)
+        count += 1
+    return total, count
