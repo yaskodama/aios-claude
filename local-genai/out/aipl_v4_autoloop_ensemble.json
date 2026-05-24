@@ -1,0 +1,3818 @@
+{
+  "schema": "aipl_v4_autoloop.v1",
+  "timestamp": "2026-05-23T15:49:22",
+  "corpus_sha256": "9614a5a4d3f6474f004c982e8a2e89f8bdbda367fe55edc6d9d52d72cc48593e",
+  "args": {
+    "model": "gemma2:2b",
+    "models": [
+      "gemma2:2b",
+      "llama3.2:3b"
+    ],
+    "max_gens": 6,
+    "children": 4,
+    "parents_keep": 3,
+    "patience": 2,
+    "temperature": 0.5,
+    "no_llm": false
+  },
+  "generations": [
+    {
+      "gen": 0,
+      "elapsed_sec": 6.1,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.54,
+              "raw_chars": 249,
+              "parsed_count": 2,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1485,
+          "validated_count": 2,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 2.54,
+              "raw_chars": 217,
+              "parsed_count": 2,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1485,
+          "validated_count": 2,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "model_family": "ngram_count",
+            "n": 2,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "n": 2,
+            "alpha": 1.0,
+            "params_observed": 357,
+            "holdout_ppl": 15.518521380764453,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 357,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.1667
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "model_family": "ngram_count",
+            "n": 3,
+            "alpha": 0.5,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "n": 3,
+            "alpha": 0.5,
+            "params_observed": 1879,
+            "holdout_ppl": 17.881757600936062,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 1879,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.882,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "model_family": "ngram_count",
+            "n": 1,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "n": 1,
+            "alpha": 1.0,
+            "params_observed": 29,
+            "holdout_ppl": 18.241949016637275,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 29,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.242,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "name": "L2",
+            "style": "plain",
+            "n": 3,
+            "alpha": 2.0,
+            "rationale": "modest smoothing for trigram baseline",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L2",
+            "style": "llm:plain:n=3:alpha=2",
+            "n": 3,
+            "alpha": 2.0,
+            "params_observed": 1522,
+            "holdout_ppl": 42.762296076349685,
+            "source": "llm",
+            "rationale": "modest smoothing for trigram baseline",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 42.762,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L2",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 1.5,
+            "rationale": "Higher n with backoff to mitigate sparsity",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L2",
+            "style": "llm:backoff:n=4:alpha=1.5",
+            "n": 4,
+            "alpha": 1.5,
+            "params_observed": 5026,
+            "holdout_ppl": 64.51852395009226,
+            "source": "llm",
+            "rationale": "Higher n with backoff to mitigate sparsity",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 64.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lv5",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 1.0,
+            "rationale": "high order with backoff and sharp smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lv5",
+            "style": "llm:backoff:n=5:alpha=1",
+            "n": 5,
+            "alpha": 1.0,
+            "params_observed": 9301,
+            "holdout_ppl": 68.40092279667324,
+            "source": "llm",
+            "rationale": "high order with backoff and sharp smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 68.401,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L3",
+            "style": "plain",
+            "n": 5,
+            "alpha": 0.8,
+            "rationale": "Explore higher-order n-grams for potential improvements",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L3",
+            "style": "llm:plain:n=5:alpha=0.8",
+            "n": 5,
+            "alpha": 0.8,
+            "params_observed": 4275,
+            "holdout_ppl": 76.30960296528033,
+            "source": "llm",
+            "rationale": "Explore higher-order n-grams for potential improvements",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 4275,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 76.31,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 15.518521380764453,
+      "best_name": "N1"
+    },
+    {
+      "gen": 1,
+      "elapsed_sec": 11.19,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.0,
+              "raw_chars": 547,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "L3_unigram_with_backoff",
+                    "style": "backoff",
+                    "n": 3,
+                    "alpha": 0.1,
+                    "rationale": "reduces smoothing effect, potentially improving sparsity"
+                  },
+                  "reason": "bad name: 'L3_unigram_with_backoff'"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1767,
+          "validated_count": 3,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.72,
+              "raw_chars": 349,
+              "parsed_count": null,
+              "rejections": [],
+              "error": "no JSON array in response"
+            },
+            {
+              "attempt": 2,
+              "elapsed": 3.44,
+              "raw_chars": 549,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1767,
+          "validated_count": 4,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L4",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.05,
+            "rationale": "low alpha with high n for sparse context exploration",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4",
+            "style": "llm:backoff:n=5:alpha=0.05",
+            "n": 5,
+            "alpha": 0.05,
+            "params_observed": 9301,
+            "holdout_ppl": 12.695783037367962,
+            "source": "llm",
+            "rationale": "low alpha with high n for sparse context exploration",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 12.696,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "model_family": "ngram_count",
+            "n": 2,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "n": 2,
+            "alpha": 1.0,
+            "params_observed": 357,
+            "holdout_ppl": 15.518521380764453,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 357,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.1667
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "name": "Lx2_char_trigram",
+            "style": "backoff",
+            "n": 3,
+            "alpha": 0.4,
+            "rationale": "targeted trigram backoff for better context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lx2_char_trigram",
+            "style": "llm:backoff:n=3:alpha=0.4",
+            "n": 3,
+            "alpha": 0.4,
+            "params_observed": 1908,
+            "holdout_ppl": 15.815445712374224,
+            "source": "llm",
+            "rationale": "targeted trigram backoff for better context",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1908,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.815,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.9667
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "model_family": "ngram_count",
+            "n": 3,
+            "alpha": 0.5,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "n": 3,
+            "alpha": 0.5,
+            "params_observed": 1879,
+            "holdout_ppl": 17.881757600936062,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 1879,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.882,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "model_family": "ngram_count",
+            "n": 1,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "n": 1,
+            "alpha": 1.0,
+            "params_observed": 29,
+            "holdout_ppl": 18.241949016637275,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 29,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.242,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "name": "L5",
+            "style": "plain",
+            "n": 1,
+            "alpha": 2.5,
+            "rationale": "unigram baseline with very high smoothing to match raw corpus statistics",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5",
+            "style": "llm:plain:n=1:alpha=2.5",
+            "n": 1,
+            "alpha": 2.5,
+            "params_observed": 29,
+            "holdout_ppl": 18.913269871646154,
+            "source": "llm",
+            "rationale": "unigram baseline with very high smoothing to match raw corpus statistics",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 29,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.913,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L5_laplace",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 1.5,
+            "rationale": "exploiting higher order n-grams with increased smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L5_laplace",
+            "style": "llm:backoff:n=5:alpha=1.5",
+            "n": 5,
+            "alpha": 1.5,
+            "params_observed": 9301,
+            "holdout_ppl": 85.4313798267017,
+            "source": "llm",
+            "rationale": "exploiting higher order n-grams with increased smoothing",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 85.431,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 12.695783037367962,
+      "best_name": "L4"
+    },
+    {
+      "gen": 2,
+      "elapsed_sec": 12.46,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.07,
+              "raw_chars": 609,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "L2_char_bigram_laplace",
+                    "style": "plain",
+                    "n": 3,
+                    "alpha": 1.5,
+                    "rationale": "Higher alpha for smoother bigram, potentially capturing more complex dependencies"
+                  },
+                  "reason": "bad name: 'L2_char_bigram_laplace'"
+                },
+                {
+                  "candidate": {
+                    "name": "Lx4_char_quadgram",
+                    "style": "backoff",
+                    "n": 5,
+                    "alpha": 0.1,
+                    "rationale": "Investigating the impact of a larger n-gram context"
+                  },
+                  "reason": "bad name: 'Lx4_char_quadgram'"
+                },
+                {
+                  "candidate": {
+                    "name": "L2_char_penultimate",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 1.2,
+                    "rationale": "Penultimate n-grams for deeper representation, potentially capturing more nuanced patterns"
+                  },
+                  "reason": "bad name: 'L2_char_penultimate'"
+                }
+              ]
+            },
+            {
+              "attempt": 2,
+              "elapsed": 3.43,
+              "raw_chars": 453,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lx3_char_trigram",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 0.2,
+                    "rationale": "explore n-grams beyond 3"
+                  },
+                  "reason": "duplicate name Lx3_char_trigram"
+                },
+                {
+                  "candidate": {
+                    "name": "L5_char_bigram",
+                    "style": "backoff",
+                    "n": 5,
+                    "alpha": 1.5,
+                    "rationale": "larger n-gram for higher-order context"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1744,
+          "validated_count": 3,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.95,
+              "raw_chars": 569,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lg5",
+                    "style": "backoff",
+                    "n": 6,
+                    "alpha": 0.03,
+                    "rationale": "increasing order with sharp smoothing might outperform current best"
+                  },
+                  "reason": "bad n: 6"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1744,
+          "validated_count": 3,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L4",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.05,
+            "rationale": "low alpha with high n for sparse context exploration",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4",
+            "style": "llm:backoff:n=5:alpha=0.05",
+            "n": 5,
+            "alpha": 0.05,
+            "params_observed": 9301,
+            "holdout_ppl": 12.695783037367962,
+            "source": "llm",
+            "rationale": "low alpha with high n for sparse context exploration",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 12.696,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lx5",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.06,
+            "rationale": "slightly sharper smoothing than current best might improve perplexity",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lx5",
+            "style": "llm:backoff:n=5:alpha=0.06",
+            "n": 5,
+            "alpha": 0.06,
+            "params_observed": 9301,
+            "holdout_ppl": 13.759748973805213,
+            "source": "llm",
+            "rationale": "slightly sharper smoothing than current best might improve perplexity",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 13.76,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.9667
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "model_family": "ngram_count",
+            "n": 2,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "n": 2,
+            "alpha": 1.0,
+            "params_observed": 357,
+            "holdout_ppl": 15.518521380764453,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 357,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.1667
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "name": "Lx2_char_trigram",
+            "style": "backoff",
+            "n": 3,
+            "alpha": 0.4,
+            "rationale": "targeted trigram backoff for better context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lx2_char_trigram",
+            "style": "llm:backoff:n=3:alpha=0.4",
+            "n": 3,
+            "alpha": 0.4,
+            "params_observed": 1908,
+            "holdout_ppl": 15.815445712374224,
+            "source": "llm",
+            "rationale": "targeted trigram backoff for better context",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1908,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.815,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.9667
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lx3_char_trigram",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.15,
+            "rationale": "Exploring higher-order context with controlled smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lx3_char_trigram",
+            "style": "llm:backoff:n=4:alpha=0.15",
+            "n": 4,
+            "alpha": 0.15,
+            "params_observed": 5026,
+            "holdout_ppl": 16.225218637063904,
+            "source": "llm",
+            "rationale": "Exploring higher-order context with controlled smoothing",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 16.225,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg2_char_trigram",
+            "style": "plain",
+            "n": 3,
+            "alpha": 0.8,
+            "rationale": "high alpha with a modest n-gram",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lg2_char_trigram",
+            "style": "llm:plain:n=3:alpha=0.8",
+            "n": 3,
+            "alpha": 0.8,
+            "params_observed": 1522,
+            "holdout_ppl": 23.860664643884984,
+            "source": "llm",
+            "rationale": "high alpha with a modest n-gram",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 23.861,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 1,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 6,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Ln4",
+            "style": "plain",
+            "n": 3,
+            "alpha": 1.2,
+            "rationale": "higher alpha for higher-order n-grams could lead to better performance",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Ln4",
+            "style": "llm:plain:n=3:alpha=1.2",
+            "n": 3,
+            "alpha": 1.2,
+            "params_observed": 1522,
+            "holdout_ppl": 30.78300619484533,
+            "source": "llm",
+            "rationale": "higher alpha for higher-order n-grams could lead to better performance",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 30.783,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 1,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 6,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 12.695783037367962,
+      "best_name": "L4"
+    },
+    {
+      "gen": 3,
+      "elapsed_sec": 7.95,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.51,
+              "raw_chars": 480,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1732,
+          "validated_count": 4,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.41,
+              "raw_chars": 496,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lx6",
+                    "style": "plain",
+                    "n": 3,
+                    "alpha": 1.2,
+                    "rationale": "high alpha hurts low-order n-grams, but helps bigrams"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1732,
+          "validated_count": 3,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "Lg5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.02,
+            "rationale": "very sharp backoff with high-order smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg5",
+            "style": "llm:backoff:n=4:alpha=0.02",
+            "n": 4,
+            "alpha": 0.02,
+            "params_observed": 5026,
+            "holdout_ppl": 7.808828630719245,
+            "source": "llm",
+            "rationale": "very sharp backoff with high-order smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 7.809,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 5,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 10,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.1333
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lb5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.08,
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lb5",
+            "style": "llm:backoff:n=4:alpha=0.08",
+            "n": 4,
+            "alpha": 0.08,
+            "params_observed": 5026,
+            "holdout_ppl": 11.972920355898157,
+            "source": "llm",
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 11.973,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.05,
+            "rationale": "low alpha with high n for sparse context exploration",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4",
+            "style": "llm:backoff:n=5:alpha=0.05",
+            "n": 5,
+            "alpha": 0.05,
+            "params_observed": 9301,
+            "holdout_ppl": 12.695783037367962,
+            "source": "llm",
+            "rationale": "low alpha with high n for sparse context exploration",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 12.696,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lx5",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.06,
+            "rationale": "slightly sharper smoothing than current best might improve perplexity",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lx5",
+            "style": "llm:backoff:n=5:alpha=0.06",
+            "n": 5,
+            "alpha": 0.06,
+            "params_observed": 9301,
+            "holdout_ppl": 13.759748973805213,
+            "source": "llm",
+            "rationale": "slightly sharper smoothing than current best might improve perplexity",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 13.76,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.9667
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "model_family": "ngram_count",
+            "n": 2,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "n": 2,
+            "alpha": 1.0,
+            "params_observed": 357,
+            "holdout_ppl": 15.518521380764453,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 357,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.1667
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "name": "La5",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.1,
+            "rationale": "increased n-gram granularity with controlled smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "La5",
+            "style": "llm:backoff:n=5:alpha=0.1",
+            "n": 5,
+            "alpha": 0.1,
+            "params_observed": 9301,
+            "holdout_ppl": 17.698290577339826,
+            "source": "llm",
+            "rationale": "increased n-gram granularity with controlled smoothing",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.698,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lx4",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.2,
+            "rationale": "refined backoff strategy for denser context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lx4",
+            "style": "llm:backoff:n=4:alpha=0.2",
+            "n": 4,
+            "alpha": 0.2,
+            "params_observed": 5026,
+            "holdout_ppl": 18.99183773353708,
+            "source": "llm",
+            "rationale": "refined backoff strategy for denser context",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.992,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 7.808828630719245,
+      "best_name": "Lg5"
+    },
+    {
+      "gen": 4,
+      "elapsed_sec": 7.78,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.69,
+              "raw_chars": 522,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lb5s",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 0.15,
+                    "rationale": "Fine-tune backoff with slightly more smoothing"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "L4a",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 0.2,
+                    "rationale": "Experiment with a slightly less aggressive alpha to find the sweet spot between sharpness and noise"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1715,
+          "validated_count": 2,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.07,
+              "raw_chars": 454,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1715,
+          "validated_count": 4,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "Lg6",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.01,
+            "rationale": "extremely sharp smoothing for high-order context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg6",
+            "style": "llm:backoff:n=4:alpha=0.01",
+            "n": 4,
+            "alpha": 0.01,
+            "params_observed": 5026,
+            "holdout_ppl": 7.154726600626634,
+            "source": "llm",
+            "rationale": "extremely sharp smoothing for high-order context",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 7.155,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 5,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 10,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.1333
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.02,
+            "rationale": "very sharp backoff with high-order smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg5",
+            "style": "llm:backoff:n=4:alpha=0.02",
+            "n": 4,
+            "alpha": 0.02,
+            "params_observed": 5026,
+            "holdout_ppl": 7.808828630719245,
+            "source": "llm",
+            "rationale": "very sharp backoff with high-order smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 7.809,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 5,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 10,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.1333
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lb5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.08,
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lb5",
+            "style": "llm:backoff:n=4:alpha=0.08",
+            "n": 4,
+            "alpha": 0.08,
+            "params_observed": 5026,
+            "holdout_ppl": 11.972920355898157,
+            "source": "llm",
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 11.973,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.05,
+            "rationale": "low alpha with high n for sparse context exploration",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4",
+            "style": "llm:backoff:n=5:alpha=0.05",
+            "n": 5,
+            "alpha": 0.05,
+            "params_observed": 9301,
+            "holdout_ppl": 12.695783037367962,
+            "source": "llm",
+            "rationale": "low alpha with high n for sparse context exploration",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 12.696,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lx3p",
+            "style": "plain",
+            "n": 3,
+            "alpha": 1.5,
+            "rationale": "Exploit high-order structure by adding more smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lx3p",
+            "style": "llm:plain:n=3:alpha=1.5",
+            "n": 3,
+            "alpha": 1.5,
+            "params_observed": 1522,
+            "holdout_ppl": 35.52635019252047,
+            "source": "llm",
+            "rationale": "Exploit high-order structure by adding more smoothing",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 35.526,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lb4",
+            "style": "plain",
+            "n": 3,
+            "alpha": 2.5,
+            "rationale": "high-order bigram baseline with strong smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lb4",
+            "style": "llm:plain:n=3:alpha=2.5",
+            "n": 3,
+            "alpha": 2.5,
+            "params_observed": 1522,
+            "holdout_ppl": 49.31707192288902,
+            "source": "llm",
+            "rationale": "high-order bigram baseline with strong smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 49.317,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4b",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 1.2,
+            "rationale": "Increase n and alpha to capture higher order patterns",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L4b",
+            "style": "llm:backoff:n=5:alpha=1.2",
+            "n": 5,
+            "alpha": 1.2,
+            "params_observed": 9301,
+            "holdout_ppl": 75.74690546356827,
+            "source": "llm",
+            "rationale": "Increase n and alpha to capture higher order patterns",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 75.747,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 7.154726600626634,
+      "best_name": "Lg6"
+    },
+    {
+      "gen": 5,
+      "elapsed_sec": 10.74,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.68,
+              "raw_chars": 536,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lx5",
+                    "style": "backoff",
+                    "n": 5,
+                    "alpha": 0.1,
+                    "rationale": "Exploring higher-order n-gram with fine-grained smoothing"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "L9",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 0.2,
+                    "rationale": "Experimenting with a slightly less aggressive alpha for potential performance boost"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "L6x",
+                    "style": "plain",
+                    "n": 3,
+                    "alpha": 1.5,
+                    "rationale": "High-order n-grams with increased smoothing"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            },
+            {
+              "attempt": 2,
+              "elapsed": 2.68,
+              "raw_chars": 447,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "L7",
+                    "style": "backoff",
+                    "n": 5,
+                    "alpha": 0.1,
+                    "rationale": "increased n-gram size for higher context"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "Lx4",
+                    "style": "backoff",
+                    "n": 4,
+                    "alpha": 0.2,
+                    "rationale": "reduced alpha for more pronounced smoothing"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 1715,
+          "validated_count": 3,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.36,
+              "raw_chars": 511,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1715,
+          "validated_count": 4,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "Lg6",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.01,
+            "rationale": "extremely sharp smoothing for high-order context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg6",
+            "style": "llm:backoff:n=4:alpha=0.01",
+            "n": 4,
+            "alpha": 0.01,
+            "params_observed": 5026,
+            "holdout_ppl": 7.154726600626634,
+            "source": "llm",
+            "rationale": "extremely sharp smoothing for high-order context",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 7.155,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 5,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 10,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.1333
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.02,
+            "rationale": "very sharp backoff with high-order smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg5",
+            "style": "llm:backoff:n=4:alpha=0.02",
+            "n": 4,
+            "alpha": 0.02,
+            "params_observed": 5026,
+            "holdout_ppl": 7.808828630719245,
+            "source": "llm",
+            "rationale": "very sharp backoff with high-order smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 7.809,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 5,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 10,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.1333
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg4s",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.05,
+            "rationale": "sharp smoothing with n>=3 and low alpha for effective context capture",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg4s",
+            "style": "llm:backoff:n=4:alpha=0.05",
+            "n": 4,
+            "alpha": 0.05,
+            "params_observed": 5026,
+            "holdout_ppl": 9.95773651424902,
+            "source": "llm",
+            "rationale": "sharp smoothing with n>=3 and low alpha for effective context capture",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 9.958,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lb5",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.08,
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lb5",
+            "style": "llm:backoff:n=4:alpha=0.08",
+            "n": 4,
+            "alpha": 0.08,
+            "params_observed": 5026,
+            "holdout_ppl": 11.972920355898157,
+            "source": "llm",
+            "rationale": "tighter backoff with moderate smoothing for deeper context",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 11.973,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 4,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 9,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.05
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L2b",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.3,
+            "rationale": "Combining backoff and a slightly less aggressive alpha for potential performance boost",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L2b",
+            "style": "llm:backoff:n=4:alpha=0.3",
+            "n": 4,
+            "alpha": 0.3,
+            "params_observed": 5026,
+            "holdout_ppl": 24.059934644320208,
+            "source": "llm",
+            "rationale": "Combining backoff and a slightly less aggressive alpha for potential performance boost",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 24.06,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 1,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 6,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Ld5",
+            "style": "backoff",
+            "n": 3,
+            "alpha": 1.5,
+            "rationale": "higher order n-gram with stronger smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Ld5",
+            "style": "llm:backoff:n=3:alpha=1.5",
+            "n": 3,
+            "alpha": 1.5,
+            "params_observed": 1908,
+            "holdout_ppl": 35.20580819128394,
+            "source": "llm",
+            "rationale": "higher order n-gram with stronger smoothing",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1908,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 35.206,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L2b+",
+            "style": "plain",
+            "n": 5,
+            "alpha": 1.2,
+            "rationale": "high-order bigram baseline to exploit corpus structure",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L2b+",
+            "style": "llm:plain:n=5:alpha=1.2",
+            "n": 5,
+            "alpha": 1.2,
+            "params_observed": 4275,
+            "holdout_ppl": 92.85738083886557,
+            "source": "llm",
+            "rationale": "high-order bigram baseline to exploit corpus structure",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 4275,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 92.857,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 7.154726600626634,
+      "best_name": "Lg6"
+    }
+  ],
+  "best_ppl_history": [
+    15.518521380764453,
+    12.695783037367962,
+    12.695783037367962,
+    7.808828630719245,
+    7.154726600626634,
+    7.154726600626634
+  ],
+  "winner": {
+    "name": "Lg6",
+    "kind": "llm",
+    "proposed_by": "llama3.2:3b",
+    "holdout_ppl": 7.154726600626634,
+    "genome": {
+      "name": "Lg6",
+      "style": "backoff",
+      "n": 4,
+      "alpha": 0.01,
+      "rationale": "extremely sharp smoothing for high-order context",
+      "source": "llm",
+      "param_class": "32K",
+      "seed": 42,
+      "corpus_pinned": true,
+      "uses_external_api": false,
+      "single_script": true,
+      "proposed_by": "llama3.2:3b"
+    }
+  }
+}

@@ -1,5 +1,298 @@
 # 次回セッション再起動メモ + プロジェクト総括
 
+---
+
+## 🔄 SESSION RESTART (2026-05-23 終了時スナップショット)
+
+### 現在の状態 (1 行)
+**Stage-1 robust champion = `L5mkn` (`modified_kn n=5 α=0.8`) ppl 3.5356** (N1 比 -77.2%、cross-corpus geomean 5.48 で 1 位)。 ローカル単独最高は **`Lmkn5d2` (modified_kn n=5 α=1.5) ppl 3.4913** だが **kodama-lab corpus で負け** ( pinned-specific overfit と判明)。 **G2 (context-conditional KN) 完走 (2026-05-24)**: kn_ctx 実装 + http://www.kodama-lab.com 取り込みでクロスコーパス検証。 **G4 (MAP-Elites) 完走 (2026-05-23)**: archive 22/100 cell、 silver = `LkE2 (kneser_ney n=5 α=0.9) ppl 3.6439`。
+
+### 進化推移 (Stage-1 absolute champion 6 段階)
+```
+15.52 (N1 baseline)
+ ↓  -27%
+11.34 (L4 backoff n=3 α=0.2, gemma2:2b 単発)
+ ↓  -12%
+ 9.96 (Lg4a backoff n=4 α=0.05, gemma2:2b autoloop)
+ ↓  -17%
+ 8.30 (L3d backoff n=3 α=0.08, llama3.2:3b autoloop)
+ ↓  -14%
+ 7.15 (Lg6 backoff n=4 α=0.01, gemma+llama ensemble)
+ ↓  -51%
+ 3.54 (L5mkn modified_kn n=5 α=0.8, ensemble + G1 KN 拡張)  ← 現 champion
+```
+
+### 本セッションで作成・変更したファイル
+| ファイル | 行/サイズ | 内容 |
+|---|---:|---|
+| `local-genai/aipl_v4_autoloop.py` | 410 行 | 完全自動世代交代ループ (elitism + patience + ensemble proposer + KN-aware prompt) |
+| `local-genai/kn_smoothing.py` | 167 行 | `KneserNeyNGram` + `ModifiedKneserNeyNGram` |
+| `local-genai/aipl_v4_evolve.py` | (修正) | evaluate_genome を 4-style dispatch 化、 _validate / PROMPT_TEMPLATE 更新、 name max 4→16 chars |
+| `local-genai/ollama_chat.py` | 122 行 | gradio web chat UI (gemma2:2b + llama3.2:3b 切替、 G1 完了状態の system prompt) |
+| `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.aice` | 195 行 | 次の進化空間 6 グループの設計仕様 |
+| `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.ga.json` | 17.1 KB | GA spec (21 prior_seeds + 8 design axes) |
+| `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.abcl` | 22.1 KB | AIPL runtime プログラム (8-axis MAP-Elites + 4 reviewers) |
+| `local-genai/aipl_v4_map_elites.py` | 410 行 | **G4 実装**: archive-based MAP-Elites (cell = smoothing × n × alpha_bin, 100 cells)。 N1/N2/N3 + 5 prior winner seed → empty-cell 狙いの LLM prompt → cell-best acceptance |
+
+### lineage JSON (実験記録)
+```
+local-genai/out/
+├── aipl_v4_autoloop_20260523_154048.json     gemma 単独 winner Lg4a ppl 9.96
+├── aipl_v4_autoloop_llama32_3b.json          llama 単独 winner L3d ppl 8.30
+├── aipl_v4_autoloop_ensemble.json            gemma+llama ensemble winner Lg6 ppl 7.15
+├── aipl_v4_autoloop_g1_kn.json               G1 KN-aware winner L5mkn ppl 3.54
+└── aipl_v4_map_elites_g4.json                G4 MAP-Elites archive (22/100 cell, silver LkE2 ppl 3.64)  ★ 最新
+```
+
+### G2 + cross-corpus 結果 (2026-05-24)
+
+実装:
+- `local-genai/kn_smoothing.py` に **`ContextConditionalKN` クラス追加** (style="kn_ctx")。 discount D を context count tier で動的調整 (`ctx_total<=2: 1.3α / 3..10: α / >=11: 0.6α`)
+- `aipl_v4_evolve.py` evaluate_genome に kn_ctx dispatch、 `_validate` に kn_ctx 受理、 prompt に G2 family の説明追加
+- `aipl_v4_autoloop.py` の prompt に「at least 1 candidate MUST use kn_ctx」明示
+- **新 corpus `local-genai/corpus/kodama_lab.txt`** (14030 bytes, UTF-8, sha256=`03a30d32...`) を http://www.kodama-lab.com から構築 (home + books + classroom + seminar/clang + seminar/java + cg + literacy + yas01-05 を結合・タグ抜き)
+
+cross-corpus 評価結果 (pinned 9.5KB vs kodama-lab 14KB):
+| Genome | style | n | α | ppl_pinned | ppl_kodama | geomean |
+|---|---|---:|---:|---:|---:|---:|
+| **L5mkn** | modified_kn | 5 | 0.8 | 3.5356 | **8.4944** | **5.48** ⭐ robust |
+| Lmkn5d2 | modified_kn | 5 | 1.5 | **3.4913** | 9.4036 | 5.73 (pinned-overfit) |
+| LkE2 | kneser_ney | 5 | 0.9 | 3.6439 | 9.6166 | 5.92 |
+| Lctx5b | kn_ctx | 5 | 0.9 | 3.7744 | 10.40 | 6.27 |
+| Lg6 | backoff | 4 | 0.01 | 7.1547 | 19.42 | 11.79 |
+| N1 | plain | 1 | 1.0 | 18.24 | 92.38 | 41.05 |
+
+知見:
+- **Lmkn5d2 は pinned で勝つが kodama で負ける**: α=1.5 で MKN の 3 discount tier が全て D=0.99 に飽和 → 「全 discount 飽和 MKN」効果で pinned に過剰適合
+- **L5mkn (α=0.8) が cross-corpus 真王者**: 両コーパスで上位、 generalization 最強
+- **kn_ctx (G2 本命) は default tier では MKN を破れず**: tier boundary (sparse<=2, dense>=11) の手動設定が pessimistic、 改善余地大
+- **kodama-lab corpus は約 2.5 倍難しい**: UTF-8 マルチバイト (日本語 3-byte) で実効 byte-vocab が膨らむ
+
+保存先:
+- G2 autoloop lineage: `local-genai/out/aipl_v4_autoloop_g2_knctx.json`
+- cross-corpus 結果: `local-genai/out/aipl_v4_g2_cross_corpus.json`
+- kodama-lab corpus: `local-genai/corpus/kodama_lab.txt` (sha256 pinned)
+
+### G4 MAP-Elites 結果 (2026-05-23 後半)
+- **Cell 充填**: 8 (seed) → **22 / 100** (.aice 目標 30+ には未達。 patience でなく max-gens=8 で停止、 gen7 で +3 cell なのでもう少し延ばせば 30 行ける見込み)
+- **Family coverage**: plain 3 / backoff 7 / **kneser_ney 7** (前 0!) / **modified_kn 5** (前 1!)
+- **Top-3 ppl が全部 KN/MKN n=5**: L5mkn 3.5356 > **LkE2 (KN n=5 α=0.9) 3.6439** > Le2 (MKN n=5 α=0.35) 4.1627 — single-discount KN も MKN champion と僅差で competitive と判明
+- **明らかな空き cell パターン**: (plain, n=3, *) (plain, n=5, *) (backoff, n=1, *) (KN, n=1, *) — n=1 系と高次 plain は LLM もほぼ触らず
+
+### バックグラウンドプロセス (セッション終了時に running)
+| サーバ | PID | ポート | 用途 |
+|---|---:|---:|---|
+| Ollama daemon | 6507 | 11434 | gemma2:2b + llama3.2:3b ホスティング |
+| gradio chat UI | 7368 | 7861 | http://127.0.0.1:7861/ で対話 |
+
+両方とも nohup なのでマシン再起動まで生き続けます。 止めたい場合:
+```sh
+pkill -f ollama_chat.py
+pkill -f "ollama serve"
+```
+
+### 起動チェックリスト (新セッション開始時)
+```sh
+# 1. cd
+cd /Users/kodamay/ocaml-app/abclcp-project
+
+# 2. Ollama daemon 確認 (down なら起動)
+curl -s http://127.0.0.1:11434/api/tags >/dev/null && echo up || \
+  nohup /opt/homebrew/opt/ollama/bin/ollama serve > /tmp/ollama_serve.log 2>&1 &
+
+# 3. モデル確認 (gemma2:2b と llama3.2:3b の 2 個があれば OK)
+/opt/homebrew/opt/ollama/bin/ollama list
+
+# 4. champion 再現 (約 10 秒)
+local-genai/.venv/bin/python -c "
+import sys; sys.path.insert(0, 'local-genai')
+from common import load_corpus, split_corpus
+from aipl_v4_evolve import evaluate_genome
+raw = load_corpus(); train, holdout = split_corpus(raw)
+r = evaluate_genome({'name':'L5mkn','style':'modified_kn','n':5,'alpha':0.8}, train, holdout)
+print(f'L5mkn ppl = {r[\"holdout_ppl\"]:.4f}  (expected 3.5356)')
+"
+
+# 5. autoloop 再走 (約 1 分、 結果は ppl 3.5-3.6 程度)
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py \
+  --models gemma2:2b,llama3.2:3b --max-gens 8 --children 4 \
+  --parents-keep 3 --patience 3 --temperature 0.5
+
+# 6. chat UI 起動 (オプション)
+nohup local-genai/.venv/bin/python -u local-genai/ollama_chat.py > /tmp/ollama_chat.log 2>&1 &
+open http://127.0.0.1:7861/
+```
+
+### 次の進化候補 (.aice recommended_order 続き)
+| Group | 内容 | 期待 | 工数 |
+|---|---|---|---|
+| **G5** | 3-model ensemble (qwen2.5:3b 追加) | -10-15% improvement の可能性 | 30 分 (pull 含む) |
+| **G4+** | MAP-Elites 続走 (max-gens 12-16) で 30+ cell 到達 + crossover 導入 | archive 30+/100、 LkE2 を crossover 親に MKN×KN ハイブリッド | 30 分 (引数だけ) |
+| **G2** | context-conditional alpha (KN 上に動的 D) | ppl 3.54 → 2.5-3.0 可能性 | 半日 (新 KN 派生実装) |
+| **G3** | 小 BPE (256-512 vocab) | ppl やや悪化、 多様性目的 | 半日 |
+| **G6** | Stage-2 (CharRNN) autoloop | R1/R2/R3 baseline を 1 gen 以内に超え | 1 日 (実訓練含む) |
+
+✅ **G4 完了** (2026-05-23): `aipl_v4_map_elites.py` 実装、 22/100 cell、 silver LkE2 発見。
+✅ **G2 完了** (2026-05-24): `ContextConditionalKN` 実装、 kodama-lab UTF-8 corpus 取り込み、 cross-corpus eval で L5mkn が robust champion と確認。
+
+### G2+ 残課題 (kn_ctx を本当に MKN より強くするには)
+- tier boundary を hyperparam 化 (sparse_max, dense_min を LLM 提案対象に)
+- D 倍率も hyperparam 化 (sparse_mul, dense_mul)
+- modified_kn と kn_ctx を **直交的に組合せ**: count-tier × context-tier の 2D discount matrix → 新 family `kn_ctx_mod`
+
+### Claude 再起動時の起動文 (コピペ用)
+```
+local-genai/NEXT_SESSION.md 冒頭の「🔄 SESSION RESTART」を読み込んで現状把握して下さい。
+
+要点:
+- Stage-1 absolute champion は L5mkn (modified_kn n=5 α=0.8) ppl 3.5356
+- gemma2:2b + llama3.2:3b の Ollama ensemble autoloop で達成
+- 次の進化候補は G5 (3-model ensemble), G4 (MAP-Elites), G2 (context-conditional α)
+- ollama daemon と gradio chat (port 7861) は前セッションから稼働中の可能性
+
+推奨次手と理由を一言で。
+```
+
+---
+
+## 2026-05-23 (PM-4): G1 (Kneser-Ney 拡張) — absolute champion ppl 3.54
+
+`.aice` recommended_order の G1 (smoothing family 拡張) を実装、 autoloop の design space を 2 styles → 4 styles に拡張:
+
+### 新規ファイル
+- `local-genai/kn_smoothing.py` (167 行) — `KneserNeyNGram` + `ModifiedKneserNeyNGram` (drop-in 互換)
+- `aipl_v4_evolve.py:evaluate_genome` を `style ∈ {plain, backoff, kneser_ney, modified_kn}` で dispatch、`_validate` も同期
+- prompt template (gen 0 / gen 1+) に KN-family の使い方と典型 alpha 域 (0.5-0.9) を明記、 「少なくとも 1 候補に kneser_ney or modified_kn を入れて」ガイド追加
+
+### autoloop 結果 (gemma+llama ensemble, max-gens=8 patience=3)
+| Stage | Winner | ppl | vs N1 |
+|---|---|---:|---:|
+| (前回 ensemble Laplace) | `Lg6 backoff n=4 α=0.01` | 7.15 | -54% |
+| **G1 KN-aware ensemble** | **`L5mkn modified_kn n=5 α=0.8`** (llama 提案) | **3.5356** | **-77.2%** |
+
+- Gen 0 で即 L5mkn 発見、 Gen 1-3 improvement なしで patience early stop
+- top 6 全部 ppl < 4.1 (全 KN-family、 旧 backoff/plain は ppl > 17)
+- proposer 内訳: gemma2:2b は `Lkn (KN n=4 α=0.7) ppl 4.13` 等を出し、 llama3.2:3b が新 champion を提案
+
+### KN 事前手動計測 (autoloop 起動前)
+```
+backoff   n=4 α=0.01: 7.1547  ← 前 champion 再現 ✅
+kneser_ney n=3 α=0.7: 5.41
+kneser_ney n=4 α=0.7: 4.13
+modified_kn n=4 α=0.7: 4.11
+modified_kn n=5 α=0.7: 3.59  ← autoloop が再発見 (L5knp by gemma)
+```
+
+### 再現
+```sh
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py \
+  --models gemma2:2b,llama3.2:3b --max-gens 8 --children 4 \
+  --parents-keep 3 --patience 3 --temperature 0.5
+```
+
+- lineage: `local-genai/out/aipl_v4_autoloop_g1_kn.json`
+
+### 次の進化 (.aice recommended_order の続き)
+- **G5**: 3-model ensemble (gemma+llama+qwen2.5:3b)
+- **G4**: MAP-Elites で smoothing × n cell 充填、 未踏 (modified_kn, n=5, α<0.4) 等
+- **G2**: context-conditional alpha (KN の上に重ねる)
+
+---
+
+## 2026-05-23 (PM-3): gemma+llama ensemble — absolute champion ppl 7.15
+
+`aipl_v4_autoloop.py` に `--models <m1,m2,...>` の ensemble モードを追加。各 gen で children を model 間に分割、proposed_by を全 candidate に保存。
+
+| Mode | Final ppl | Winner | vs N1 | Elapsed |
+|---|---:|---|---:|---:|
+| gemma2:2b 単独 | 9.96 | `Lg4a` (gemma) | -35.8% | 44.9s |
+| llama3.2:3b 単独 | 8.30 | `L3d` (llama) | -46.5% | 50.6s |
+| **gemma+llama ensemble** | **7.15** | **`Lg6 backoff n=4 α=0.01`** (llama 提案) | **-53.9%** | 56.2s |
+
+### Per-model 貢献 (ensemble の最終 population, parents-keep=3 由来の生存 elite)
+- llama3.2:3b: top 5 全部 (ppl 7.15, 7.81, 9.96, 11.97, ...)
+- gemma2:2b: 2 個のみ (ppl 24.06, 35.21)、トップ層にゼロ
+
+### ensemble が単独 llama を上回った理由 (推察)
+- gen 0..1 で gemma の弱い提案 (ppl 60+ 圏) が `seen_genome_keys` を太らせ、llama を「やってない領域」へ押し出した
+- 単独 llama は gen 3 で 8.30 に到達後 patience で停止したが、ensemble は gen 3 (7.81) → gen 4 (7.15) と improvement 継続
+- 結果として **どちらも単独では到達しなかった `backoff n=4 α=0.01` を発見**
+
+### 再現
+```sh
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py \
+  --models gemma2:2b,llama3.2:3b --max-gens 6 --children 4 --parents-keep 3 --patience 2 --temperature 0.5
+```
+
+- lineage: `local-genai/out/aipl_v4_autoloop_ensemble.json`
+
+---
+
+## 2026-05-23 (PM-2): llama3.2:3b で autoloop — absolute champion 更新
+
+同じ args で proposer model を llama3.2:3b に差し替え:
+
+| Model | Gen 0 best | Gen 1 best | Gen 3 best | Final ppl | Winner | vs N1 | Total |
+|---|---:|---:|---:|---:|---|---:|---:|
+| gemma2:2b | 15.52 (N1) | 13.24 | 9.9577 | 9.9577 | `Lg4a backoff n=4 α=0.05` | -35.8% | 44.9s |
+| **llama3.2:3b** | **10.24 (L2a)** | 9.9577 | 8.2990 | **8.2990** | **`L3d backoff n=3 α=0.08`** | **-46.5%** | 50.6s |
+
+- **llama3.2:3b が absolute winner**。winner ppl 8.30 で gemma2:2b 9.96 を **-16.7%**、N1 baseline を **-46.5%**
+- llama3.2:3b は **gen 0 で既に baseline 全部超え** (L2a: plain n=2 α=0.01 ppl 10.24)。gemma は gen 3 までかかった
+- 速度差 +13% (50.6 vs 44.9s) は許容範囲、品質改善幅と引き換えに完全に妥当
+- llama3.2:3b lineage: `local-genai/out/aipl_v4_autoloop_llama32_3b.json`
+
+### 再現コマンド
+```sh
+ollama pull llama3.2:3b   # 約 2GB、初回のみ
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py \
+  --model llama3.2:3b --max-gens 6 --children 4 --parents-keep 3 --patience 2 --temperature 0.5
+```
+
+### 推奨次手 (autoloop 拡張)
+1. **設計空間拡張**: `(style, n, alpha)` の 3 軸に加え、chunk-level interpolation 係数や hybrid (e.g. plain + Lidstone) を追加
+2. **複数 LLM ensemble**: gemma2:2b + llama3.2:3b の両方から子を取り、収束加速を試す
+3. **Stage-2 (CharRNN) 拡張**: pytorch_cpu 学習コストありなので、design estimator を残しつつ実訓練版 autoloop に置換するか検討
+
+---
+
+## 2026-05-23 (PM): AIPL-v4 完全自動世代交代ループ実装 + 新 champion
+
+### 結果サマリ
+- **新ドライバ `local-genai/aipl_v4_autoloop.py` (327 行)** で multi-generation 進化ループを実装
+- 構成: Gen 0 = baselines (N1/N2/N3) + LLM 子 4 個 / Gen 1..N = top-K 親 (elitism keep=3) + 親 ppl を表で見せた prompt で LLM 子 4 個。patience=2 で early stop
+- **新 champion: `Lg4a` (`backoff n=4 α=0.05`) ppl 9.9577** — N1 (15.52) 比 **-35.8%**、前ベスト L4 (ppl 11.34) 比 **-12%**
+- best ppl trajectory: gen 0 (15.52) → gen 1 (13.24, -14.7%) → gen 3 (9.96, -24.8%) → gen 4-5 停滞 → patience early stop
+- 全 6 世代 gemma2:2b に 1 回ずつ呼び出し、合計 約 45 秒
+
+### key bug fix
+- `aipl_v4_evolve.py` の `_validate` で name `len <= 4` 制限 → `len <= 16` に緩和
+- これがないと gemma2:2b の自然な命名 (`Lx3_laplace`, `L7_backoff` 等) で勝ちパターン候補が全 reject されていた
+- 旧 max=4 で行った最初の autoloop ラン (`aipl_v4_autoloop_20260523_153925.json`) では gen 2 で `Lx3_laplace`: `backoff n=3 α=0.2` (= 前回 ppl 11.34 champion) が name reject → early stop に追い込まれていた
+
+### 再現コマンド
+```sh
+# Ollama デーモン
+nohup /opt/homebrew/opt/ollama/bin/ollama serve > /tmp/ollama_serve.log 2>&1 &
+
+# 完全自動ループ (約 45 秒)
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py \
+  --max-gens 6 --children 4 --parents-keep 3 --patience 2 --temperature 0.5
+
+# サニティ (baselines のみ、N1=15.52 が出ればOK)
+local-genai/.venv/bin/python local-genai/aipl_v4_autoloop.py --no-llm --max-gens 1
+```
+
+- 最新 lineage: `local-genai/out/aipl_v4_autoloop_20260523_154048.json`
+
+### 残課題 (autoloop 由来の新しい論点)
+1. **モデル比較**: gemma2:2b 単独。llama3.2:3b / qwen2.5:3b で同じ autoloop を回し、収束速度と最終 ppl を比較
+2. **ハイパラ拡張**: 現状 `(style, n, alpha)` の 3 軸のみ。chunk-level interpolation、token vs byte 等の追加軸を design space に入れる
+3. **Stage-2 (CharRNN) 拡張**: `evolve.py:evaluate_stage_n` の design estimator と autoloop を統合
+4. **rubric 修正**: LLM 提案も lineage に prompt/seed/model を保存しているので reproducibility 満点化したい
+
+---
+
 ## 2026-05-23: AIPL-v4 (Ollama proposer) Stage-1 smoke test 完了
 
 ### 結果サマリ

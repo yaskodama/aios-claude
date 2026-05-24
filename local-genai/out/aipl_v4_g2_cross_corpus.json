@@ -1,0 +1,53 @@
+{
+  "schema": "aipl_v4_cross_corpus.v1",
+  "timestamp": "2026-05-24",
+  "corpora": {
+    "pinned": {
+      "sha256": "9614a5a4d3f6474f004c982e8a2e89f8bdbda367fe55edc6d9d52d72cc48593e",
+      "bytes": 9557,
+      "train_bytes": 9079,
+      "holdout_bytes": 478,
+      "description": "Original pinned ASCII corpus (Stage-1 absolute reference)"
+    },
+    "kodama_lab": {
+      "sha256": "03a30d32ca9176a79c0b8cd33235427a9014120847a8c25793c3fe78cc5cecfc",
+      "bytes": 14030,
+      "train_bytes": 13328,
+      "holdout_bytes": 702,
+      "source_url": "http://www.kodama-lab.com/ (homepage + sub-pages)",
+      "pages_included": [
+        "kodama_lab_home.html (2680 B)",
+        "books.html (1381 B)",
+        "classroom/index.html (3970 B)",
+        "seminar/clang/index2.html (3376 B)",
+        "seminar/java/concurr.new/index-j.html (1287 B)",
+        "yas01-yas05.html, literacy/, cg/, seminar/long/ (small)"
+      ],
+      "encoding": "UTF-8 (Japanese + English mix; multi-byte sequences increase effective byte-vocab)",
+      "description": "Secondary cross-corpus for generalization check"
+    }
+  },
+  "panel": [
+    {"name": "N1",       "style": "plain",       "n": 1, "alpha": 1.0,  "ppl_pinned": 18.2419, "ppl_kodama":  92.3782, "geomean": 41.0507},
+    {"name": "Lg6",      "style": "backoff",     "n": 4, "alpha": 0.01, "ppl_pinned":  7.1547, "ppl_kodama":  19.4189, "geomean": 11.7872},
+    {"name": "L5mkn",    "style": "modified_kn", "n": 5, "alpha": 0.8,  "ppl_pinned":  3.5356, "ppl_kodama":   8.4944, "geomean":  5.4803, "label": "cross-corpus champion"},
+    {"name": "LkE2",     "style": "kneser_ney",  "n": 5, "alpha": 0.9,  "ppl_pinned":  3.6439, "ppl_kodama":   9.6166, "geomean":  5.9196},
+    {"name": "Lmkn5d2",  "style": "modified_kn", "n": 5, "alpha": 1.5,  "ppl_pinned":  3.4913, "ppl_kodama":   9.4036, "geomean":  5.7298, "label": "pinned-only champion (overfit)"},
+    {"name": "Lctx5b",   "style": "kn_ctx",      "n": 5, "alpha": 0.9,  "ppl_pinned":  3.7744, "ppl_kodama":  10.3993, "geomean":  6.2651, "label": "G2 kn_ctx best @ default tiers"},
+    {"name": "Lctx4",    "style": "kn_ctx",      "n": 4, "alpha": 0.9,  "ppl_pinned":  4.2409, "ppl_kodama":  10.7453, "geomean":  6.7505},
+    {"name": "Lctx3",    "style": "kn_ctx",      "n": 3, "alpha": 0.7,  "ppl_pinned":  5.4489, "ppl_kodama":  11.8159, "geomean":  8.0239}
+  ],
+  "findings": [
+    "L5mkn (MKN n=5 alpha=0.8) is the cross-corpus champion (geomean 5.48) — generalizes from pinned ASCII to kodama-lab UTF-8 mixed.",
+    "Lmkn5d2 (MKN n=5 alpha=1.5) wins ON pinned (3.49) but LOSES on kodama (9.40 vs L5mkn's 8.49) — high-alpha saturates discount to D=0.99 everywhere, over-blurs when corpus diversity is higher.",
+    "kn_ctx (G2) with the default tier config (sparse<=2 1.3*alpha, mid alpha, dense>=11 0.6*alpha) does NOT beat MKN. Future work: tune tier boundaries or auto-learn discount per tier.",
+    "kodama-lab UTF-8 corpus is ~2.5x harder than pinned ASCII due to multi-byte Japanese (3-byte sequences expand effective byte vocab)."
+  ],
+  "champion": {
+    "by_corpus": {
+      "pinned":     {"name": "Lmkn5d2", "ppl": 3.4913, "caveat": "wins by 1.3% but doesn't generalize"},
+      "kodama":     {"name": "L5mkn",   "ppl": 8.4944},
+      "cross_corpus_geomean": {"name": "L5mkn", "ppl": 5.4803, "verdict": "robust champion"}
+    }
+  }
+}

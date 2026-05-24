@@ -1,0 +1,779 @@
+=== kodama_lab_home.html ===
+JP
+
+CA
+
+KODAMA LAB
+
+Language
+
+↗
+🏃 走るロボット
+
+Hosei University · Faculty of Business Administration
+
+Welcome to Kodama Lab.
+
+A research laboratory exploring informatics, software engineering, and the future of education.
+This site is hosted on Dropbox.
+
+Kodama Studio
+Hosei University
+Instagram
+
+Information
+
+◆Profile
+
+◆Papers
+
+◆Books
+
+▶YouTube
+
+▶Videos
+
+fFacebook
+
+𝕏Twitter
+
+inLinkedIn
+
+Related Sites
+
+01
+
+↗
+
+Research at our laboratory
+
+Lab research themes & projects
+
+↗
+
+Lectures
+
+All teaching materials
+
+↗
+
+Basic Emulator
+
+Run vintage BASIC in your browser
+
+↗
+
+リバーシ
+
+Reversi with replay in your browser
+
+↗
+
+本格将棋
+
+Authentic Japanese chess in your browser
+
+↗
+
+Basic Informatics
+
+Foundation course materials
+
+↗
+
+プログラミン（嘘）
+
+ビジュアルプログラミングのパロディ版
+
+↗
+
+DNCL Emulator
+
+共通テスト用疑似言語（DNCL）をブラウザで実行
+
+↗
+
+Project REE
+
+Real Education / Re-Education
+
+↗
+
+Zemi Matching
+
+Matching students with seminars
+
+↗
+
+LA Hackathon
+
+Los Angeles hackathon archive
+
+↗
+
+YATT — Yet Another Time Table
+
+Course schedule app
+
+↗
+
+Second Life CG Project
+
+Student CG in Second Life
+
+↗
+
+Concurrent Programming in Java
+
+Lecture & code examples
+
+↗
+
+Student's CG Arts
+
+Showcase of student artwork
+
+↗
+
+Seminar Photo
+
+Memories from the lab · 日替わり
+
+↗
+
+Google Classroom
+
+Class portal
+
+↗
+
+Works using Generative AI
+
+Latest experiments with AI
+
+↗
+
+Kodama Lab Thesis (2019)
+
+Graduation collection
+
+↗
+
+Kodama Lab Thesis (2018)
+
+Graduation collection
+
+↗
+
+Kodama Lab Thesis (2016)
+
+Graduation collection
+
+↗
+
+Kodama Lab Thesis (2015)
+
+Graduation collection
+
+↗
+
+Kodama Studio
+
+Personal studio site
+
+↗
+
+Kodama Lab Thesis (2009)
+
+Graduation collection
+
+Research & Lectures
+
+02
+
+Courses & Materials
+
+Recording Attendance System
+
+Concurrent Programming
+
+Visual C++.NET
+
+Concurrent Programming in Java
+
+Computer Literacy
+
+Kodama Laboratory thesis
+
+yas01–yas20
+
+01020304
+05060708
+09101112
+13141516
+17181920
+
+Theory & Seminars
+
+Milner's paper
+
+Theory of Objects
+
+Miniml
+
+Compiler Construction with ML
+
+Long form 1
+
+Long form 2
+
+yas30–yas35
+
+303132
+333435
+
+Topics
+
+03
+
+2019/01/01Happy New Year 2019!
+
+2018/01/01Happy New Year 2018!
+
+2014/01/01Happy New Year 2014!
+
+2013/01/01Happy New Year 2013!
+
+2008/08/15Updating at Obon.
+
+2008/05/05Adding research site.
+
+2008/04/13Introducing to Flash player.
+
+2007/06/19Developing recording attendance system.
+
+2007/06/17We are developing with Aimluck.
+
+2007/06/17Updating Sakai site.
+
+Copyright © 2000–2026 Hosei University
+
+Last update: Tue April 28 11:08:31 JST 2026 · 
+
+Visitors
+—
+from 04/29/2026
+
+=== books.html ===
+情報学基礎,　培風館、B5判 ／ 160 頁 定価2300円
+
+（本体2300円＋税）ISBN978-4-563-01605-0 ／ 刊行2020年11月
+
+＊ご意見＊をよろしくお願いいたします。
+
+実習 Visual C++.NET,　サイエンス社、B5判 ／ 208 頁 定価2205円
+
+（本体2100円＋税）ISBN4-7819-1123-4 ／ 刊行2006年3月
+
+正誤表
+
+Visual C++ 2008 express editionで実行可能
+
+.netによる文字列
+
+s"abc" --> l"efg"
+
+ポインタ演算子
+
+*(アスタリスク) --> ^(ハット)
+
+__box( ) 関数
+
+必要なし
+
+ラジオボタン、チェックボックス
+
+get_checked( ) => checked を参照
+
+set_checked( ) => checked に論理値を代入
+
+Visual C++ [最新版]
+
+新バージョン
+
+対応表
+
+実習 Visual Basic 2005, サイエンス社、B5判 / 208 頁 定価2048 円
+
+(本体1950円　＋ 税） ISBN978-4-7819-1181-6／ 刊行2007年11月 
+
+Visual Basic 2008 Express
+
+(新しい例題）
+
+*ご意見*
+
+実習Word、サイエンス社、B5判 ／ 256 頁 定価２０４８円
+
+(本体1950円　＋　税）ISBN978-4781911977／　刊行2008年４月
+
+*ご意見
+
+ガイドブックC、サイエンス社、A5判 ／ 256 頁 ／ 定価1890円
+
+（本体1800円＋税） ISBN4-7819-0737-7 ／ 刊行1994年7月
+
+予想問題C言語、サイエンス社、A4判
+
+copyright © 2000-2013 hosei university.
+
+last update: thu apr 11 23:44:00 pdt 2013 by
+
+=== classroom_index.html ===
+Google Classroom (2017)
+
+�@����w�ł͊w�K�x���V�X�e�� Classroom �𓱓����܂����B
+
+Google Classroom �͈ȉ��̓����������Ă��܂��B
+
+���ƂɊւ���A���P�[�g���̂邱�Ƃ��ł���B
+
+�o�Ȃ��Ǘ����邱�Ƃ��ł���B
+
+���Ǝ�����z�z���邱�Ƃ��ł���B
+
+�R�[�X�i���Ɓj���Ǘ����邱�Ƃ��ł���B
+
+�f�W�^�����\�[�X�i�X���C�h�E���擙�j�����L���邱�Ƃ��ł���B
+
+�C�x���g���Ǘ����邱�Ƃ��ł���B
+
+�w�K�x���V�X�e���̃N���X�ւ̎��ȓo�^
+
+�w�K�x���V�X�e�� Classroom �́A���ȓo�^���N���X����u���邱�Ƃ��ł��܂��B
+
+�i���O�C������������ł��܂��j
+
+stu.hosei.ac.jp �̃A�J�E���g�Ń��O�C������K�v������܂��Bxxxx@stu.hosei.ac.jp �̃��[���c�[������ł�����E��� ���N���b�N���āu�����ƌ���v���� Classroom ��I�����܂��B
+
+����ɁA�u�����ƌ���v
+
+��:Classroom �Ƀ��O�C���ł��Ȃ��ꍇ�́A���Ƀ��O�C�����Ă���Google��ID��S�ă��O�A�E�g���Ă���ēx���O�C�����ĉ������Bstu.hosei.ac.jp �̃A�J�E���g��Google�̃A�J�E���g�ł����邽�߂ł��B
+
+Classroom �ŃN���X�R�[�h����
+
+�ȉ��̂悤�ȉ�ʂƂȂ�̂ŁA�E��� ���N���b�N���ăN���X�R�[�h����͂���
+
+�N���X�R�[�h�\
+
+�N���X�i���Ɓj
+
+�R�[�h
+
+���Ȋw���K(b)�i���j�� �P,2 �����j2017
+
+vbz5q1
+
+�v���O���~���O����iBASIC�j�i�ؗj�� 1 �����j
+
+622hnpy
+
+�V�X�e���Ǘ��_I�i�ؗj��3�����j2017
+
+vvsbbq
+
+IT���e���V�[�i���j���P�����j2017
+
+mt1cix4
+
+�o�c�w���[�~�}�b�`���O
+
+5ioc5a2
+
+���ʃ[�~
+
+vi43310
+
+���Ȋw���K�ib�j2017
+
+���Ȋw���K�ib�R�[�X�j�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/NDk3OTA5MzU2Mlpa
+
+�v���O���~���O����iBASIC�j
+
+�v���O���~���O����iBASIC�j�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/NDk3OTA5MzA5OFpa
+
+�V�X�e���Ǘ��_I�i2017�j
+
+�V�X�e���Ǘ��_I�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/NDk3OTExMDIzOVpa
+
+IT���e���V�[�i2017�j
+
+IT���e���V�[�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/NDk3OTEyOTA3NVpa
+
+�o�c�w���[�~�}�b�`���O
+
+�o�c�w���[�~�}�b�`���O�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/OTk4NTU5MzNa
+
+���ʃ[�~
+
+���ʃ[�~�́A�ȉ��̂悤�ȉ�ʂƂȂ�܂��B
+
+https://classroom.google.com/u/0/c/NzY0NzUxMzZa
+
+���ƃA���P�[�g
+
+���ƃA���P�[�g�ɉ񓚂��悤�B
+
+�T���v���̃A���P�[�g�������ɂ���܂��B
+
+Classroom �A�v��
+
+iPhone��AAndroid�[���ł̓A�v�����g�p���邱�Ƃ��ł��܂��̂Ő���A�_�E�����[�h���Ē��������Ǝv���܂��B
+
+App Download
+
+Copyright © 2000-2017 Hosei University.
+
+Last update: Tue Apr 7 16:47:08 JST 2015 by
+
+=== seminar_clang_index2.html ===
+目的
+
+ここでは、授業で扱った
+
+Visual C++.NET
+
+プログラムを紹介して
+
+いきます。
+
+教科書
+
+特になし、これから執筆
+
+じゃ。
+
+参考文献
+
+現在選定中
+
+発展的文献
+
+現在選定中
+
+　 　　　　　　
+
+新しいバージョンのVisual C++.NET対応
+
+　新しいバージョンのVisual C++.NET 対応は、教科書に載ってます。
+
+基本的プログラム（2000年版)
+
+ラベルの生成   (例題1)
+
+イベントの記述
+
+ボタンとイベントの記述   (例題2)
+
+時間の計算   (例題3)
+
+円、球に関する計算   (例題2-1)
+
+トグルボタン   (例題4)
+
+線分の回転   (例題5)
+
+一次直線の描画   (例題6)
+
+円の描画   (例題7)
+
+タートルグラフィックス   (例題8)
+
+利子計算   (例題9)
+
+いろいろな図形   (例題10)
+
+簡単な図形   (例題11)
+
+タートルグラフィックス(2)   (例題12)
+
+繰り返しの基礎   (例題13)
+
+繰り返し   (例題14)
+
+エラトヌテネスのふるい   (例題15)
+
+最大公約数と最小公倍数   (例題16)
+
+素因数分解   (例題17)
+
+最大値と最小値   (例題18)
+
+Nまでの和   (例題19)
+
+最大公約数と最小公倍数（２）   (例題20)
+
+swap 関数   (例題21)
+
+チェックボックスの使用   (例題22)
+
+ラジオボタンの使用   (例題23)
+
+桁数の判定   (例題24)
+
+動的配列   (例題25)
+
+分数の計算   （例題26)
+
+文字列配列と文字列の検索   (例題27)
+
+多角形の描画   (例題28)
+
+リストボックスと文字列   (例題29)
+
+文字の検索とカウント   (例題30）
+
+グラフィックス(2000年版)
+
+Rectangle の応用   (例題31) 
+
+再帰定義   (例題32)
+
+コッホ曲線   (例題33)
+
+ドラゴン曲線   (例題34)
+
+回転体を描く   (例題35)
+
+回転体を回す   (例題36)
+
+ソート
+
+簡単な整列   (例題37)
+
+最小法   (例題37-1)
+
+バブルソート   (例題38)
+
+シフト演算   (例題39)
+
+挿入法(2)   (例題40)
+
+挿入法(3)   (例題41)
+
+その他
+
+Visual C++.NETの基礎(2000年版)   
+
+はじめに（コンソールプログラミング）   
+
+簡単な整数値計算   (問題2)
+
+変数とデータ   
+
+簡単な浮動小数点数演算    (問題3)
+
+標準体重   (問題4)
+
+定数
+
+円の円周、面積、球の表面積、体積   (問題5)   
+
+真理表   (問題6)
+
+利子計算   (問題7)
+
+さまざまな文字の表示   (問題8)
+
+数列の和   (問題9)
+
+標準体重と利子計算   (問題10)
+
+最大値と最小値   (問題11)
+
+選択子の問題   (問題12)
+
+月の日数   (問題13)
+
+Nまでの和   (問題14)
+
+Ｎまでの約数   (問題15)
+
+最大公約数と最小公倍数、計算のお話し   
+
+最大公約数と最小公倍数   (問題16)
+
+支払い金額   (問題17)
+
+九九の表   (問題18)
+
+単語のカウント   (問題19)
+
+身長と体重の検索   (問題20)
+
+支払い金額(2)   (問題21)
+
+文字のカウント   (問題22)
+
+Nまでの和   (問題23)
+
+最大公約数と最小公倍数（２）   (問題24)
+
+swap関数   (問題25)
+
+Copyright © 2004/2005 Yasushi KODAMA
+
+Last update: Dec. 18, 2005, 18:55:32 JST by
+
+=== seminar_java_concurr.new_index-j.html ===
+Java による並行オブジェクト指向プログラミング
+
+[ 一つ | 一つ(ダブルバッファ) | 複数 | 複数(ダブルバッファ) | 同期と非同期 | 有限バッファ | English ]
+
+一つのオブジェクトの回転
+
+簡単なクラスを用いて 3D オブジェクトを生成する．
+
+実行
+
+Sample.html
+
+Sample.java
+
+WireFrame.java
+
+FreeSoR.java
+
+次は，ダブルバッファを用いて処理をする． 
+
+実行
+
+Sample05.html
+
+Sample05.java
+
+複数のオブジェクトの回転
+
+これら 3D オブジェクトは，並行に処理される．ここでは， 六個のオブジェクトを生成する．
+
+実行
+
+Sample1.html
+
+Sample1.java
+
+TR.java
+
+次は，ダブルバッファを用いて処理をする． 
+
+実行
+
+Sample15.html
+
+Sample15.java
+
+同期 v.s. 非同期
+
+セマフォを使って，同期，非同期を切替える． さらに，ダブルバッファの機能は追加してある．
+
+実行
+
+Sample2.html
+
+Sample2.java
+
+Bounded Buffers
+
+有限バッファ問題を表現する．
+
+実行
+
+Sample3.html
+
+Sample3.java
+
+次に入力として●を使う．
+
+実行
+
+Sample4.html
+
+Sample4.java
+
+[ 一つ | 一つ(ダブルバッファ) | 複数 | 複数(ダブルバッファ) | 同期と非同期 | 有限バッファ | English ]
+
+=== literacy_index.html ===
+コンピュータリテラシー教材に関するページ
+
+=== cg_index.html ===
+学生によるCG
+
+ 
+
+ 
+
+市ヶ谷キャンパスの学生によるCG
+
+ 
+
+ 
+
+ 
+
+Game?
+
+戦闘機その１
+
+戦闘機その２
+
+制作過程
+
+夜の町
+
+流れ星
+
+室内その１
+
+室内その２
+
+BT
+
+=== seminar_long_index1.html ===
+Word による論文作成について(第 1 回)
+
+[ つぎ | うえ ]
+
+論文は，いわゆるレポートと同じ位の 7, 8 ページから，20, 30 ページ， さらに，卒業論文では，100 ページ近く書く，比較的長い文章となる．
+そのためには，目次や，索引など新たな Word の機能を使う必要がある．
+
+この演習では，数ページの簡単な論文を作成し，それら一つ，一つについて 説明する．では，Word を起動しよう．
+
+新規作成(テンプレート)
+
+タイトルの設定
+
+本文と参考文献
+
+表，脚注の挿入
+
+残りの文章
+
+次回は，さらに，細かな機能について説明しよう．
+
+課題
+
+本日、入力した論文(例)をそのまま印刷せよ。
+
+[ つぎ | うえ ]
+
+yasu@i.hosei.ac.jp

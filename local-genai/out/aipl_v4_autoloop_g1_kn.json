@@ -1,0 +1,2498 @@
+{
+  "schema": "aipl_v4_autoloop.v1",
+  "timestamp": "2026-05-23T17:09:08",
+  "corpus_sha256": "9614a5a4d3f6474f004c982e8a2e89f8bdbda367fe55edc6d9d52d72cc48593e",
+  "args": {
+    "model": "gemma2:2b",
+    "models": [
+      "gemma2:2b",
+      "llama3.2:3b"
+    ],
+    "max_gens": 8,
+    "children": 4,
+    "parents_keep": 3,
+    "patience": 3,
+    "temperature": 0.5,
+    "no_llm": false
+  },
+  "generations": [
+    {
+      "gen": 0,
+      "elapsed_sec": 7.42,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.86,
+              "raw_chars": 239,
+              "parsed_count": 2,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1777,
+          "validated_count": 2,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 3.48,
+              "raw_chars": 328,
+              "parsed_count": 2,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 1777,
+          "validated_count": 2,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L5mkn",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.8,
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5mkn",
+            "style": "llm:modified_kn:n=5:alpha=0.8",
+            "n": 5,
+            "alpha": 0.8,
+            "params_observed": 9301,
+            "holdout_ppl": 3.535646150529811,
+            "source": "llm",
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.536,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lkn",
+            "style": "kneser_ney",
+            "n": 4,
+            "alpha": 0.7,
+            "rationale": "Apply K-Ney smoothing for a small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lkn",
+            "style": "llm:kneser_ney:n=4:alpha=0.7",
+            "n": 4,
+            "alpha": 0.7,
+            "params_observed": 5026,
+            "holdout_ppl": 4.1285214498442855,
+            "source": "llm",
+            "rationale": "Apply K-Ney smoothing for a small corpus",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.129,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4kne",
+            "style": "kneser_ney",
+            "n": 4,
+            "alpha": 0.6,
+            "rationale": "KN with moderate discount level and n=4 for balance between coverage and sparsity",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4kne",
+            "style": "llm:kneser_ney:n=4:alpha=0.6",
+            "n": 4,
+            "alpha": 0.6,
+            "params_observed": 5026,
+            "holdout_ppl": 4.158732237368735,
+            "source": "llm",
+            "rationale": "KN with moderate discount level and n=4 for balance between coverage and sparsity",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.159,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lmkn",
+            "style": "modified_kn",
+            "n": 3,
+            "alpha": 0.8,
+            "rationale": "Modified K-Ney with 3 discount levels on the small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lmkn",
+            "style": "llm:modified_kn:n=3:alpha=0.8",
+            "n": 3,
+            "alpha": 0.8,
+            "params_observed": 1908,
+            "holdout_ppl": 5.4577399854535695,
+            "source": "llm",
+            "rationale": "Modified K-Ney with 3 discount levels on the small corpus",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1908,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 5.458,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "model_family": "ngram_count",
+            "n": 2,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N1",
+            "style": "char_bigram_laplace",
+            "n": 2,
+            "alpha": 1.0,
+            "params_observed": 357,
+            "holdout_ppl": 15.518521380764453,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 357,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 15.519,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 3,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 8,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.1667
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "model_family": "ngram_count",
+            "n": 3,
+            "alpha": 0.5,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N2",
+            "style": "char_trigram_with_backoff",
+            "n": 3,
+            "alpha": 0.5,
+            "params_observed": 1879,
+            "holdout_ppl": 17.881757600936062,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 1879,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.882,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        },
+        {
+          "genome": {
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "model_family": "ngram_count",
+            "n": 1,
+            "alpha": 1.0,
+            "param_class": "32K",
+            "engine": "numpy_only",
+            "training_paradigm": "count_normalize",
+            "deps": [
+              "python>=3.11"
+            ]
+          },
+          "measured": {
+            "name": "N3",
+            "style": "byte_unigram_only",
+            "n": 1,
+            "alpha": 1.0,
+            "params_observed": 29,
+            "holdout_ppl": 18.241949016637275,
+            "source": "baseline"
+          },
+          "estimate": {
+            "params": 29,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.242,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "baseline"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 2,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 10,
+              "max": 10
+            },
+            "normalized_total": 2.0833
+          },
+          "kind": "baseline"
+        }
+      ],
+      "best_ppl": 3.535646150529811,
+      "best_name": "L5mkn"
+    },
+    {
+      "gen": 1,
+      "elapsed_sec": 14.21,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.17,
+              "raw_chars": 485,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 2439,
+          "validated_count": 4,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 6.22,
+              "raw_chars": 543,
+              "parsed_count": null,
+              "rejections": [],
+              "error": "no JSON array in response"
+            },
+            {
+              "attempt": 2,
+              "elapsed": 3.78,
+              "raw_chars": 460,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 2439,
+          "validated_count": 4,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L5mkn",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.8,
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5mkn",
+            "style": "llm:modified_kn:n=5:alpha=0.8",
+            "n": 5,
+            "alpha": 0.8,
+            "params_observed": 9301,
+            "holdout_ppl": 3.535646150529811,
+            "source": "llm",
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.536,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L5knp",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.7,
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L5knp",
+            "style": "llm:modified_kn:n=5:alpha=0.7",
+            "n": 5,
+            "alpha": 0.7,
+            "params_observed": 9301,
+            "holdout_ppl": 3.594388119940331,
+            "source": "llm",
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.594,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4mnk",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 0.9,
+            "rationale": "strong discount for high-order n-grams",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4mnk",
+            "style": "llm:modified_kn:n=4:alpha=0.9",
+            "n": 4,
+            "alpha": 0.9,
+            "params_observed": 5026,
+            "holdout_ppl": 4.0298636909888,
+            "source": "llm",
+            "rationale": "strong discount for high-order n-grams",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.03,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lkn",
+            "style": "kneser_ney",
+            "n": 4,
+            "alpha": 0.7,
+            "rationale": "Apply K-Ney smoothing for a small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lkn",
+            "style": "llm:kneser_ney:n=4:alpha=0.7",
+            "n": 4,
+            "alpha": 0.7,
+            "params_observed": 5026,
+            "holdout_ppl": 4.1285214498442855,
+            "source": "llm",
+            "rationale": "Apply K-Ney smoothing for a small corpus",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.129,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4kne",
+            "style": "kneser_ney",
+            "n": 4,
+            "alpha": 0.6,
+            "rationale": "KN with moderate discount level and n=4 for balance between coverage and sparsity",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4kne",
+            "style": "llm:kneser_ney:n=4:alpha=0.6",
+            "n": 4,
+            "alpha": 0.6,
+            "params_observed": 5026,
+            "holdout_ppl": 4.158732237368735,
+            "source": "llm",
+            "rationale": "KN with moderate discount level and n=4 for balance between coverage and sparsity",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.159,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L5bck",
+            "style": "backoff",
+            "n": 5,
+            "alpha": 0.1,
+            "rationale": "deeper context with sharp smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5bck",
+            "style": "llm:backoff:n=5:alpha=0.1",
+            "n": 5,
+            "alpha": 0.1,
+            "params_observed": 9301,
+            "holdout_ppl": 17.698290577339826,
+            "source": "llm",
+            "rationale": "deeper context with sharp smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.698,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4bk",
+            "style": "backoff",
+            "n": 4,
+            "alpha": 0.2,
+            "rationale": "compact context, backoff for sparse n-grams",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L4bk",
+            "style": "llm:backoff:n=4:alpha=0.2",
+            "n": 4,
+            "alpha": 0.2,
+            "params_observed": 5026,
+            "holdout_ppl": 18.99183773353708,
+            "source": "llm",
+            "rationale": "compact context, backoff for sparse n-grams",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 18.992,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 3.535646150529811,
+      "best_name": "L5mkn"
+    },
+    {
+      "gen": 2,
+      "elapsed_sec": 10.14,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.52,
+              "raw_chars": 570,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "L5knp",
+                    "style": "modified_kn",
+                    "n": 5,
+                    "alpha": 0.8,
+                    "rationale": "Kneser-Ney smoothing with a higher discount for greater context dependence"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "L4mnk2",
+                    "style": "kneser_ney",
+                    "n": 4,
+                    "alpha": 0.7,
+                    "rationale": "Modified Kneser-Ney, smaller n-gram for better efficiency"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 2443,
+          "validated_count": 2,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 5.56,
+              "raw_chars": 582,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lknp",
+                    "style": "kneser_ney",
+                    "n": 4,
+                    "alpha": 0.6,
+                    "rationale": "Kneser-Ney continuity with moderate discounting"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 2443,
+          "validated_count": 3,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L5mkn",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.8,
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5mkn",
+            "style": "llm:modified_kn:n=5:alpha=0.8",
+            "n": 5,
+            "alpha": 0.8,
+            "params_observed": 9301,
+            "holdout_ppl": 3.535646150529811,
+            "source": "llm",
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.536,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L5knp",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.7,
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L5knp",
+            "style": "llm:modified_kn:n=5:alpha=0.7",
+            "n": 5,
+            "alpha": 0.7,
+            "params_observed": 9301,
+            "holdout_ppl": 3.594388119940331,
+            "source": "llm",
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.594,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4mnk",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 0.9,
+            "rationale": "strong discount for high-order n-grams",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4mnk",
+            "style": "llm:modified_kn:n=4:alpha=0.9",
+            "n": 4,
+            "alpha": 0.9,
+            "params_observed": 5026,
+            "holdout_ppl": 4.0298636909888,
+            "source": "llm",
+            "rationale": "strong discount for high-order n-grams",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.03,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L2mnk3",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 0.6,
+            "rationale": "Modified Kneser-Ney with lower alpha for a balance of sparsity and discount",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L2mnk3",
+            "style": "llm:modified_kn:n=4:alpha=0.6",
+            "n": 4,
+            "alpha": 0.6,
+            "params_observed": 5026,
+            "holdout_ppl": 4.150734239725044,
+            "source": "llm",
+            "rationale": "Modified Kneser-Ney with lower alpha for a balance of sparsity and discount",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.151,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg3mkn",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.2,
+            "rationale": "Reduced smoothing strength for modified Kneser-Ney to mitigate sparse high-order distributions",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg3mkn",
+            "style": "llm:modified_kn:n=5:alpha=0.2",
+            "n": 5,
+            "alpha": 0.2,
+            "params_observed": 9301,
+            "holdout_ppl": 4.877594927055886,
+            "source": "llm",
+            "rationale": "Reduced smoothing strength for modified Kneser-Ney to mitigate sparse high-order distributions",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.878,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L1bck",
+            "style": "backoff",
+            "n": 1,
+            "alpha": 0.05,
+            "rationale": "Simple unigram baseline with minimal smoothing to avoid over-smoothing",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L1bck",
+            "style": "llm:backoff:n=1:alpha=0.05",
+            "n": 1,
+            "alpha": 0.05,
+            "params_observed": 29,
+            "holdout_ppl": 17.814168587767522,
+            "source": "llm",
+            "rationale": "Simple unigram baseline with minimal smoothing to avoid over-smoothing",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 29,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 17.814,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 2,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 7,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.8833
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L3bkp",
+            "style": "plain",
+            "n": 3,
+            "alpha": 1.5,
+            "rationale": "Increased alpha to combat sparsity, backoff smoothing for context awareness",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L3bkp",
+            "style": "llm:plain:n=3:alpha=1.5",
+            "n": 3,
+            "alpha": 1.5,
+            "params_observed": 1522,
+            "holdout_ppl": 35.52635019252047,
+            "source": "llm",
+            "rationale": "Increased alpha to combat sparsity, backoff smoothing for context awareness",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 1522,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 35.526,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 3.535646150529811,
+      "best_name": "L5mkn"
+    },
+    {
+      "gen": 3,
+      "elapsed_sec": 9.26,
+      "llm_telemetry": [
+        {
+          "model": "gemma2:2b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.44,
+              "raw_chars": 508,
+              "parsed_count": 4,
+              "rejections": [
+                {
+                  "candidate": {
+                    "name": "Lknp",
+                    "style": "kneser_ney",
+                    "n": 4,
+                    "alpha": 0.7,
+                    "rationale": "K-Ney smoothing on a sparse corpus"
+                  },
+                  "reason": "duplicate genome key"
+                },
+                {
+                  "candidate": {
+                    "name": "Lmkn4",
+                    "style": "kneser_ney",
+                    "n": 4,
+                    "alpha": 0.6,
+                    "rationale": "Experiment with lower discount D in K-Ney to improve sparsity"
+                  },
+                  "reason": "duplicate genome key"
+                }
+              ]
+            }
+          ],
+          "prompt_chars": 2443,
+          "validated_count": 2,
+          "proposer_model": "gemma2:2b"
+        },
+        {
+          "model": "llama3.2:3b",
+          "temperature": 0.5,
+          "requested": 2,
+          "attempts": [
+            {
+              "attempt": 1,
+              "elapsed": 4.77,
+              "raw_chars": 489,
+              "parsed_count": 4,
+              "rejections": []
+            }
+          ],
+          "prompt_chars": 2443,
+          "validated_count": 4,
+          "proposer_model": "llama3.2:3b"
+        }
+      ],
+      "population": [
+        {
+          "genome": {
+            "name": "L5mkn",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.8,
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L5mkn",
+            "style": "llm:modified_kn:n=5:alpha=0.8",
+            "n": 5,
+            "alpha": 0.8,
+            "params_observed": 9301,
+            "holdout_ppl": 3.535646150529811,
+            "source": "llm",
+            "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.536,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L5knp",
+            "style": "modified_kn",
+            "n": 5,
+            "alpha": 0.7,
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "L5knp",
+            "style": "llm:modified_kn:n=5:alpha=0.7",
+            "n": 5,
+            "alpha": 0.7,
+            "params_observed": 9301,
+            "holdout_ppl": 3.594388119940331,
+            "source": "llm",
+            "rationale": "explore higher-order smoothing with a moderate discount",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.594,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg5knp",
+            "style": "kneser_ney",
+            "n": 5,
+            "alpha": 0.6,
+            "rationale": "continuation-count smoothing with moderate discount",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lg5knp",
+            "style": "llm:kneser_ney:n=5:alpha=0.6",
+            "n": 5,
+            "alpha": 0.6,
+            "params_observed": 9301,
+            "holdout_ppl": 3.710608754476922,
+            "source": "llm",
+            "rationale": "continuation-count smoothing with moderate discount",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 9301,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 3.711,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lmkn",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 1.2,
+            "rationale": "high discount to encourage longer sequences",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "Lmkn",
+            "style": "llm:modified_kn:n=4:alpha=1.2",
+            "n": 4,
+            "alpha": 1.2,
+            "params_observed": 5026,
+            "holdout_ppl": 4.003248623726003,
+            "source": "llm",
+            "rationale": "high discount to encourage longer sequences",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.003,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "L4mnk",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 0.9,
+            "rationale": "strong discount for high-order n-grams",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "llama3.2:3b"
+          },
+          "measured": {
+            "name": "L4mnk",
+            "style": "llm:modified_kn:n=4:alpha=0.9",
+            "n": 4,
+            "alpha": 0.9,
+            "params_observed": 5026,
+            "holdout_ppl": 4.0298636909888,
+            "source": "llm",
+            "rationale": "strong discount for high-order n-grams",
+            "proposed_by": "llama3.2:3b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.03,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lmnk",
+            "style": "modified_kn",
+            "n": 4,
+            "alpha": 0.8,
+            "rationale": "Increased discount D in the modified Kneser-Ney",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lmnk",
+            "style": "llm:modified_kn:n=4:alpha=0.8",
+            "n": 4,
+            "alpha": 0.8,
+            "params_observed": 5026,
+            "holdout_ppl": 4.077898447038301,
+            "source": "llm",
+            "rationale": "Increased discount D in the modified Kneser-Ney",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 5026,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 4.078,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 6,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 11,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 2.2167
+          },
+          "kind": "llm"
+        },
+        {
+          "genome": {
+            "name": "Lg3p",
+            "style": "plain",
+            "n": 5,
+            "alpha": 1.2,
+            "rationale": "Higher alpha for a more expansive smoothing on a larger n-gram",
+            "source": "llm",
+            "param_class": "32K",
+            "seed": 42,
+            "corpus_pinned": true,
+            "uses_external_api": false,
+            "single_script": true,
+            "proposed_by": "gemma2:2b"
+          },
+          "measured": {
+            "name": "Lg3p",
+            "style": "llm:plain:n=5:alpha=1.2",
+            "n": 5,
+            "alpha": 1.2,
+            "params_observed": 4275,
+            "holdout_ppl": 92.85738083886557,
+            "source": "llm",
+            "rationale": "Higher alpha for a more expansive smoothing on a larger n-gram",
+            "proposed_by": "gemma2:2b"
+          },
+          "estimate": {
+            "params": 4275,
+            "param_class": "32K",
+            "param_budget": 64000,
+            "over_budget": false,
+            "expected_holdout_ppl": 92.857,
+            "flops_per_token": 2,
+            "train_time_min_estimate": 0.05,
+            "inference_throughput_factor": 1.0,
+            "coherence_violations": [],
+            "measurement_kind": "real_ngram_training_on_pinned_corpus",
+            "source": "llm"
+          },
+          "review": {
+            "quality": {
+              "reviewer": "Quality",
+              "axes": {
+                "ppl_score_class_aware": 0,
+                "loss_trajectory_plausibility": 3,
+                "generation_appropriate_size": 2
+              },
+              "total": 5,
+              "max": 12
+            },
+            "efficiency": {
+              "reviewer": "Efficiency",
+              "axes": {
+                "ppl_per_param": 0,
+                "within_param_budget": 3,
+                "train_time_under_30min": 3,
+                "inference_optimization": 0
+              },
+              "total": 6,
+              "max": 12
+            },
+            "reproducibility": {
+              "reviewer": "Reproducibility",
+              "axes": {
+                "seed_fixed": 2,
+                "corpus_pinned": 2,
+                "no_external_api": 2,
+                "minimal_deps": 0,
+                "single_script": 2,
+                "coherence_penalty": 0,
+                "over_budget_penalty": 0
+              },
+              "total": 8,
+              "max": 10
+            },
+            "normalized_total": 1.7167
+          },
+          "kind": "llm"
+        }
+      ],
+      "best_ppl": 3.535646150529811,
+      "best_name": "L5mkn"
+    }
+  ],
+  "best_ppl_history": [
+    3.535646150529811,
+    3.535646150529811,
+    3.535646150529811,
+    3.535646150529811
+  ],
+  "winner": {
+    "name": "L5mkn",
+    "kind": "llm",
+    "proposed_by": "llama3.2:3b",
+    "holdout_ppl": 3.535646150529811,
+    "genome": {
+      "name": "L5mkn",
+      "style": "modified_kn",
+      "n": 5,
+      "alpha": 0.8,
+      "rationale": "Modified KN with deep context and high smoothing strength for better performance on small corpus",
+      "source": "llm",
+      "param_class": "32K",
+      "seed": 42,
+      "corpus_pinned": true,
+      "uses_external_api": false,
+      "single_script": true,
+      "proposed_by": "llama3.2:3b"
+    }
+  }
+}

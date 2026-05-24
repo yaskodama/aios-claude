@@ -93,7 +93,8 @@ def _eval_plain(model: NGram, holdout: bytes) -> tuple[float, int]:
 
 
 def evaluate_genome(genome: dict, train_bytes: bytes, holdout_bytes: bytes) -> dict:
-    """Train + eval any genome whose style is 'plain' or 'backoff'."""
+    """Train + eval any genome whose style is 'plain', 'backoff',
+    'kneser_ney', or 'modified_kn'."""
     n = int(genome["n"])
     alpha = float(genome["alpha"])
     style = genome["style"]
@@ -102,6 +103,33 @@ def evaluate_genome(genome: dict, train_bytes: bytes, holdout_bytes: bytes) -> d
         model.train(train_bytes)
         nlp, count = model.eval_neg_log_prob_nats(holdout_bytes)
         params = sum(sum(len(d) for d in sub.counts.values()) for sub in model.models)
+    elif style == "kneser_ney":
+        from kn_smoothing import KneserNeyNGram
+        model = KneserNeyNGram(n, alpha)
+        model.train(train_bytes)
+        nlp, count = model.eval_neg_log_prob_nats(holdout_bytes)
+        params = sum(
+            sum(len(d) for d in (model.counts[k] or {}).values())
+            for k in range(1, model.n + 1)
+        )
+    elif style == "modified_kn":
+        from kn_smoothing import ModifiedKneserNeyNGram
+        model = ModifiedKneserNeyNGram(n, alpha)
+        model.train(train_bytes)
+        nlp, count = model.eval_neg_log_prob_nats(holdout_bytes)
+        params = sum(
+            sum(len(d) for d in (model.counts[k] or {}).values())
+            for k in range(1, model.n + 1)
+        )
+    elif style == "kn_ctx":
+        from kn_smoothing import ContextConditionalKN
+        model = ContextConditionalKN(n, alpha)
+        model.train(train_bytes)
+        nlp, count = model.eval_neg_log_prob_nats(holdout_bytes)
+        params = sum(
+            sum(len(d) for d in (model.counts[k] or {}).values())
+            for k in range(1, model.n + 1)
+        )
     else:
         model = NGram(n, alpha)
         model.train(train_bytes)
@@ -125,24 +153,33 @@ PROMPT_TEMPLATE = """You are proposing variants for a character-level n-gram lan
 
 Propose {num} NEW candidates that explore the design space. You may vary:
   - n: integer in {{1, 2, 3, 4, 5}} (1=unigram, 5=quintgram)
-  - alpha: float in 0.01..3.0 (Laplace smoothing; smaller = sharper, larger = smoother)
-  - style: "plain" (single n-gram with Laplace) or "backoff" (n-gram with (n-1)-fallback when context unseen)
+  - alpha: float in 0.01..3.0 (smoothing strength)
+  - style: ONE OF five smoothing families:
+      * "plain"       — Laplace +alpha, single n-gram
+      * "backoff"     — Laplace with (n-1) fallback when context unseen
+      * "kneser_ney"  — Kneser-Ney continuation smoothing (alpha = discount D, 0.5-0.9 typical)
+      * "modified_kn" — Modified Kneser-Ney with 3 discount levels by n-gram COUNT (alpha sets D2)
+      * "kn_ctx"      — Context-conditional KN (G2): D varies by CONTEXT count tier
+                        (sparse ctx_total<=2 -> 1.3*alpha, medium -> alpha, dense >=11 -> 0.6*alpha).
+                        Targets small corpora where most contexts are sparse. Try n in 4-5 and alpha 0.4-0.8.
 
-Tradeoffs to consider:
-  - Higher n captures longer dependency but suffers data sparsity on 9.5KB corpus
-  - "backoff" mitigates sparsity at higher n
-  - Small alpha is sharper but risks zero/near-zero probabilities; large alpha smooths but blurs the distribution
+Tradeoffs:
+  - Higher n captures longer dependency but suffers data sparsity on 9.5KB corpus.
+  - "backoff" mitigates sparsity at higher n.
+  - Kneser-Ney/Modified-KN are known to beat Laplace on small corpora; try them with n in 3-5 and alpha in 0.4-0.9.
+  - kn_ctx is a new G2 family expected to beat modified_kn when many contexts have low counts.
+  - Small alpha (<0.1) is sharper but risks zero probabilities; large alpha (>1.5) blurs.
 
 Output ONLY a JSON array of exactly {num} objects. NO markdown fences. NO commentary.
 Each object MUST have these keys exactly:
-  "name"      : short tag starting with "L" (max 4 chars, e.g. "L1", "Lx2")
-  "style"     : "plain" or "backoff"
+  "name"      : short tag starting with "L" (e.g. "L1", "Lkn", "Lmkn", "Lctx")
+  "style"     : "plain", "backoff", "kneser_ney", "modified_kn", or "kn_ctx"
   "n"         : integer 1..5
   "alpha"     : number in 0.01..3.0
   "rationale" : one sentence why this variant might do well
 
 Example output:
-[{{"name":"L1","style":"backoff","n":4,"alpha":0.1,"rationale":"high order with backoff and sharp smoothing"}},{{"name":"L2","style":"plain","n":2,"alpha":0.3,"rationale":"modest smoothing for bigram baseline"}}]"""
+[{{"name":"Lkn","style":"kneser_ney","n":4,"alpha":0.7,"rationale":"KN with deep context for small corpus"}},{{"name":"L2","style":"backoff","n":3,"alpha":0.2,"rationale":"known winner pattern"}}]"""
 
 
 def call_ollama(prompt: str, model: str, temperature: float, timeout: float) -> str:
@@ -183,9 +220,9 @@ def _validate(c: dict) -> str | None:
     if not isinstance(c, dict):
         return "not a dict"
     name = c.get("name")
-    if not (isinstance(name, str) and 1 <= len(name) <= 4 and name[0].upper() == "L"):
+    if not (isinstance(name, str) and 1 <= len(name) <= 16 and name[0].upper() == "L"):
         return f"bad name: {name!r}"
-    if c.get("style") not in {"plain", "backoff"}:
+    if c.get("style") not in {"plain", "backoff", "kneser_ney", "modified_kn", "kn_ctx"}:
         return f"bad style: {c.get('style')!r}"
     n = c.get("n")
     if not (isinstance(n, int) and 1 <= n <= 5):
