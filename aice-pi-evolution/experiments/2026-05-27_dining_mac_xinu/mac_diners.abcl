@@ -1,0 +1,102 @@
+// mac_diners.abcl
+// Distributed 5-philosopher dining problem — host (Mac) side.
+//
+//   Mac  (this file, Py-I)      : P1 / P2 / P3   — 3 AIPL actors
+//   Xinu (apps/abcl_program.c)  : F0..F4 (Forks) + P4 / P5 — 7 AIPL actors
+//
+// All five Forks live on the Xinu node as AIPL actors (ids 0..4), so both
+// the local Xinu philosophers (P4/P5, via local message sends) and the
+// remote Mac philosophers (P1/P2/P3, via the uart1:// RPC client) contend
+// for the *same* Fork actors.  Because each Fork actor serialises its own
+// mailbox, mutual exclusion holds across the Mac/Xinu boundary.
+//
+// Transport: hub = "uart1://192.168.3.50:5555" routes remote() through
+// Py-I's aipl_remote.py, which speaks the line protocol (SEND/QUERY/PING/
+// LIST) to the Xinu ethernet AIPL-RPC server (apps/abcl_xinu_rpc.c,
+// abcl_rpc_tcp_main) over the LAN78xx TCP stack.
+//
+//   remote_call(hub, "<id>", "acquire", my_id)   ≡ send remote(hub,"<id>").acquire(my_id)
+//   var h = remote_now(hub, "<id>", "field", 0)  ≡ now  remote(hub,"<id>").field(0)
+//
+// Fork sharing (a ring of 5 — each fork shared by exactly two philosophers):
+//   f0: P1,P2   f1: P2,P3   f2: P3,P4*   f3: P4*,P5*   f4: P5*,P1   (*=Xinu)
+// Deadlock-free by resource hierarchy: every philosopher takes its
+// lower-numbered fork before its higher-numbered one.
+//   P1 : lo=F0  hi=F4
+//   P2 : lo=F0  hi=F1
+//   P3 : lo=F1  hi=F2
+//   P4 : lo=F2  hi=F3   (Xinu)
+//   P5 : lo=F3  hi=F4   (Xinu)
+
+class Philosopher {
+  var my_id        = 0;
+  var lo_fork      = "0";   // string Xinu actor id "0".."4"
+  var hi_fork      = "0";
+  var meals_target = 20;
+  var meals_done   = 0;
+  var attempts     = 0;
+  var hub          = "uart1://192.168.3.50:5555";   // Xinu RPC endpoint
+
+  method init(pid, lo, hi, target) {
+    my_id        = pid;
+    lo_fork      = lo;
+    hi_fork      = hi;
+    meals_target = target;
+    meals_done   = 0;
+    attempts     = 0;
+    print("  [P" + my_id + "] thinking (low=F" + lo_fork
+          + " high=F" + hi_fork + ")");
+    send self.try_eat();
+  }
+
+  method try_eat() {
+    if (meals_done >= meals_target) {
+      print("  [P" + my_id + "] DONE after " + attempts + " attempts");
+    } else {
+      attempts = attempts + 1;
+
+      // 1. acquire the lower-numbered fork, then poll its holder
+      remote_call(hub, lo_fork, "acquire", my_id);
+      sleep(0.025);
+      var hlo = remote_now(hub, lo_fork, "field", 0);
+      if (hlo != my_id) {
+        sleep(0.030);
+        send self.try_eat();          // contended — back off, retry
+      } else {
+        // 2. acquire the higher-numbered fork
+        remote_call(hub, hi_fork, "acquire", my_id);
+        sleep(0.025);
+        var hhi = remote_now(hub, hi_fork, "field", 0);
+        if (hhi != my_id) {
+          remote_call(hub, lo_fork, "release", my_id);  // got lo only — yield
+          sleep(0.030);
+          send self.try_eat();
+        } else {
+          // 3. EAT
+          sleep(0.150);
+          meals_done = meals_done + 1;
+          print("  [P" + my_id + " ATE meal=" + meals_done
+                + "] (attempts=" + attempts + ")");
+          sleep(0.040);
+          // 4. release both, higher first (mirror of acquire order)
+          remote_call(hub, hi_fork, "release", my_id);
+          remote_call(hub, lo_fork, "release", my_id);
+          sleep(0.010);
+          send self.try_eat();
+        }
+      }
+    }
+  }
+}
+
+// ---- Main ----------------------------------------------------------
+print("=== distributed diners: 3 Mac + 2 Xinu, forks on Xinu ===");
+
+var hub_url = "uart1://192.168.3.50:5555";
+print("PING -> " + remote_now(hub_url, "_", "ping"));
+print("LIST -> " + remote_now(hub_url, "_", "list"));
+
+// Three Mac philosophers — each a real AIPL actor in its own thread.
+var p1 = new Philosopher(1, "0", "4", 20);
+var p2 = new Philosopher(2, "0", "1", 20);
+var p3 = new Philosopher(3, "1", "2", 20);
