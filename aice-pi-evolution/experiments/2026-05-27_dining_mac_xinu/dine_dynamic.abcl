@@ -28,6 +28,10 @@ var hub = "uart1://192.168.3.50:5555";
 var dine_src = "class Fork { var holder; method acquire(pid) { if (holder == 0) { holder = pid; } } method release(pid) { if (holder == pid) { holder = 0; } } } class Philosopher { var id; var lo; var hi; var state; method seat(a, b, c) { id = a; lo = b; hi = c; state = 0; } method eat() { state = 1; } method done() { state = 2; } } main { new Fork f; new Philosopher p; send f.acquire(1); send p.eat(); }";
 
 print("=== dynamic distributed diners: ship source -> compile on Xinu -> spawn -> dine ===");
+// Reset the Xinu actor table first so this run starts from a clean slate
+// (forks deterministically get ids 0..4), allowing repeated runs without
+// rebooting the Pi.
+print("Xinu RESET -> " + remote_now(hub, "_", "reset"));
 print("Xinu actors BEFORE (expect 0): " + remote_now(hub, "_", "list"));
 
 // --- 1. dynamic code delivery + compilation on the bare Xinu node ---
@@ -52,7 +56,7 @@ class Philosopher {
   var my_id        = 0;
   var lo_fork      = "0";
   var hi_fork      = "0";
-  var meals_target = 200;
+  var meals_target = 50;
   var meals_done   = 0;
   var attempts     = 0;
   var hub          = "uart1://192.168.3.50:5555";
@@ -66,7 +70,8 @@ class Philosopher {
 
   method try_eat() {
     if (meals_done >= meals_target) {
-      print("  [P" + my_id + "] DONE after " + attempts + " attempts");
+      print("  [P" + my_id + "] DONE after " + attempts + " attempts (terminating)");
+      suicide();
     } else {
       attempts = attempts + 1;
       remote_call(hub, lo_fork, "acquire", my_id);
@@ -99,6 +104,6 @@ class Philosopher {
 }
 
 print("--- launching 3 Mac philosophers ---");
-var p1 = new Philosopher(1, "0", "4", 200);
-var p2 = new Philosopher(2, "0", "1", 200);
-var p3 = new Philosopher(3, "1", "2", 200);
+var p1 = new Philosopher(1, "0", "4", 50);
+var p2 = new Philosopher(2, "0", "1", 50);
+var p3 = new Philosopher(3, "1", "2", 50);
