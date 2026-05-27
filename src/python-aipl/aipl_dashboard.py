@@ -167,6 +167,8 @@ def load_program(key: str) -> bool:
         if _run_thread is not None and _run_thread.is_alive():
             _run_thread.join(timeout=2.0)
         _program_stopped = False
+        with _console_lock:                 # fresh console per program load
+            _console_lines.clear()
         _console_append(f"=== loaded: {prog['label']} ===")
         t = threading.Thread(target=_run_program_thread, args=(prog["path"],),
                              name=f"abcl-prog-{key}", daemon=True)
