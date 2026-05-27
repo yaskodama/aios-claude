@@ -126,6 +126,22 @@ def main():
         return
 
     interp = Interpreter(program, transient_checks=args.transient)
+    if args.dashboard:
+        # Wire the running interpreter into the dashboard so /actors can
+        # show the live program + actors + their state (JS-I-style view).
+        try:
+            import aipl_dashboard
+            src_text = ""
+            try:
+                with open(args.source) as _f:
+                    src_text = _f.read()
+            except Exception:
+                pass
+            aipl_dashboard.set_program(interp, src_text, args.source)
+            print(f"[dashboard] actors view: "
+                  f"http://127.0.0.1:{args.dashboard}/actors")
+        except Exception:
+            pass
     try:
         interp.run(idle_ms=args.idle_ms, timeout_s=args.timeout)
     except KeyboardInterrupt:

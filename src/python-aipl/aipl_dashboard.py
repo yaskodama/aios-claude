@@ -54,6 +54,34 @@ def _ide_safe_path(rel: str):
 _dyn_peers_lock = threading.Lock()
 _dyn_peers: set = set()
 
+# ── Live program + actor introspection ────────────────────────────────
+# aipl_main wires the running interpreter (and its source) in here once
+# it is built, so the /actors dashboard can show the current program and
+# every live actor's class / state / fields.
+_introspect_lock = threading.Lock()
+_interp_ref = None
+_program_source = ""
+_program_path = ""
+
+
+def set_program(interp, source_text: str = "", source_path: str = "") -> None:
+    """Register the running interpreter so /actors can introspect it."""
+    global _interp_ref, _program_source, _program_path
+    with _introspect_lock:
+        _interp_ref = interp
+        _program_source = source_text or ""
+        _program_path = source_path or ""
+
+
+def _json_safe(v):
+    """Make an actor field value JSON-serialisable for the dashboard."""
+    if isinstance(v, bool) or isinstance(v, (int, float, str)) or v is None:
+        return v
+    nm = getattr(v, "name", None)            # an Actor reference?
+    if nm is not None:
+        return "<actor %s>" % nm
+    return str(v)
+
 
 def register_peer(hostport: str) -> None:
     h = hostport.strip()
@@ -309,6 +337,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_ide_html()
         elif self.path == "/chat" or self.path.startswith("/chat?"):
             self._serve_chat_html()
+        elif self.path == "/actors" or self.path.startswith("/actors?"):
+            self._serve_actors_html()
+        elif self.path.startswith("/api/actors"):
+            self._serve_actors_json()
+        elif self.path.startswith("/api/program"):
+            self._serve_program_json()
         elif self.path == "/" or self.path.startswith("/?"):
             self._serve_html()
         else:
@@ -557,6 +591,65 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    # ── Actor / program introspection (the JS-I-style live view) ──────
+    def _serve_actors_html(self):
+        self._send_bytes(200, "text/html; charset=utf-8",
+                         _ACTORS_HTML.encode("utf-8"))
+
+    def _serve_actors_json(self):
+        with _introspect_lock:
+            interp = _interp_ref
+        actors = []
+        try:
+            actors = interp.scheduler.all() if interp is not None else []
+        except Exception:
+            actors = []
+        out = {"actors": []}
+        for a in actors:
+            try:
+                cls = getattr(getattr(a, "cls", None), "name", "?")
+                fields = {}
+                for k, v in (getattr(a, "fields", {}) or {}).items():
+                    fields[str(k)] = _json_safe(v)
+                try:
+                    mbox = a.mailbox._q.qsize()
+                except Exception:
+                    mbox = 0
+                stopped = bool(getattr(a, "_stopped", False))
+                state = "stopped" if stopped else ("busy" if mbox > 0 else "idle")
+                out["actors"].append({
+                    "name":    str(getattr(a, "name", "?")),
+                    "class":   str(cls),
+                    "state":   state,
+                    "mailbox": mbox,
+                    "fields":  fields,
+                })
+            except Exception:
+                continue
+        self._send_bytes(200, "application/json",
+                         json.dumps(out).encode("utf-8"))
+
+    def _serve_program_json(self):
+        with _introspect_lock:
+            interp = _interp_ref
+            src    = _program_source
+            path   = _program_path
+        classes = []
+        try:
+            prog = interp.program if interp is not None else None
+            for d in (getattr(prog, "decls", []) or []):
+                if d.__class__.__name__ == "ClassDecl":
+                    classes.append({
+                        "name":    getattr(d, "name", "?"),
+                        "methods": [getattr(m, "name", "?")
+                                    for m in (getattr(d, "methods", []) or [])],
+                    })
+        except Exception:
+            pass
+        body = {"path": path, "source": src, "classes": classes}
+        self._send_bytes(200, "application/json",
+                         json.dumps(body).encode("utf-8"))
 
     def _serve_ide_html(self):
         body = _IDE_HTML.encode("utf-8")
@@ -876,6 +969,55 @@ document.getElementById('reset').addEventListener('click', () => {
 msgEl.focus();
 </script>
 </body></html>
+"""
+
+
+_ACTORS_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><title>Py-I — AIPL actors</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px}
+ h1{color:#88c0d0;font-size:18px;margin:0 0 6px} h2{color:#a3be8c;font-size:14px;margin:18px 0 6px}
+ .meta{color:#7a8a99;font-size:12px;margin-bottom:8px}
+ table{border-collapse:collapse;width:100%;font-size:13px}
+ th,td{border:1px solid #2a3340;padding:4px 8px;text-align:left;vertical-align:top}
+ th{background:#1a2430;color:#88c0d0;position:sticky;top:0}
+ td.busy{color:#ebcb8b;font-weight:bold} td.idle{color:#7a8a99} td.stopped{color:#bf616a}
+ .fields{color:#8fbcbb;white-space:pre-wrap}
+ pre{background:#11161d;border:1px solid #2a3340;padding:10px;overflow:auto;max-height:340px;font-size:12px;color:#cdd6e0}
+ .cls{color:#b48ead}
+</style></head><body>
+<h1>Py-I &mdash; AIPL interpreter (live)</h1>
+<div class="meta">program: <span id="path">(loading)</span> &nbsp;|&nbsp; actors: <b id="count">0</b>
+ &nbsp;|&nbsp; classes: <span id="classes" class="cls"></span> &nbsp;|&nbsp; updated <span id="ts"></span></div>
+<h2>Running actors</h2>
+<table><thead><tr><th>name</th><th>class</th><th>state</th><th>mailbox</th><th>fields (state)</th></tr></thead>
+<tbody id="abody"><tr><td colspan="5">(loading)</td></tr></tbody></table>
+<h2>Current program</h2>
+<pre id="src">(loading)</pre>
+<script>
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+async function loadProg(){
+ try{ const p=await (await fetch('/api/program')).json();
+  document.getElementById('path').textContent=p.path||'(inline)';
+  document.getElementById('classes').textContent=(p.classes||[]).map(c=>c.name).join(', ')||'(none)';
+  document.getElementById('src').textContent=p.source||'(source unavailable)';
+ }catch(e){}
+}
+async function tick(){
+ try{ const a=await (await fetch('/api/actors')).json();
+  document.getElementById('count').textContent=a.actors.length;
+  document.getElementById('ts').textContent=new Date().toLocaleTimeString();
+  const rows=a.actors.map(x=>{
+   const f=Object.entries(x.fields||{}).map(([k,v])=>k+'='+esc(JSON.stringify(v))).join('   ');
+   return '<tr><td>'+esc(x.name)+'</td><td class="cls">'+esc(x['class'])+'</td>'+
+          '<td class="'+x.state+'">'+x.state+'</td><td>'+x.mailbox+'</td>'+
+          '<td class="fields">'+f+'</td></tr>';
+  }).join('');
+  document.getElementById('abody').innerHTML=rows||'<tr><td colspan="5">(no actors)</td></tr>';
+ }catch(e){}
+}
+loadProg(); tick(); setInterval(tick,1000); setInterval(loadProg,5000);
+</script></body></html>
 """
 
 
