@@ -5,8 +5,8 @@ AIPL の各ランタイム（Py-I / OCaml / JS-server / JS-browser / C）に「�
 加えて進化計算パイプライン（goal→.aice→.ga.json→.aipl）の専用ダッシュボードを新設。
 
 ## リポジトリ / ブランチ / HEAD
-- `/Users/kodamay/ocaml-app/abclcp-project`, branch `main`, HEAD `ef3caff`
-  （= Py-I bounded-buffer + speed sliders。**それ以降の本セッション成果は未コミット**）。
+- `/Users/kodamay/ocaml-app/abclcp-project`, branch `main`, HEAD `817cb65`
+  （= 本セッションの全ダッシュボード成果を commit & push 済み。Py-I bounded-buffer は手前の `ef3caff`）。
 - remote `yaskodama/aios-claude`。
 - ★`src/python-aipl/aipl_ai.py` は**未コミットのまま温存**（ユーザ指示・モデル env override）。**触らない・コミットしない**。
 - 言語ルール: チャットは日本語、プログラムの予約語・UI/コンソール文字列は英語。
@@ -106,13 +106,10 @@ python3 src/c_dashboard.py >/tmp/d_c.log 2>&1 &
 URL: 8899/actors · 8080/dashboard · 8700/ · 8090/ · 8765/ · 8095/
 停止: `pkill -f aipl_main.py; pkill -f repl_thread.exe; pkill -f 'sleep 1000000'; pkill -f evolution_dashboard.py; pkill -f 'node server.mjs'; pkill -f 'http.server 8765'; pkill -f c_dashboard.py`
 
-## コミット指針（未確認・要ユーザ判断）
-- **コミット候補**（OCaml/C/JS/進化 ダッシュボード一式）:
-  `src/web_gateway.ml` `src/repl_thread.ml` `src/eval_thread.ml`
-  `src/gateway_dashboard.html` `src/gateway_dashboard.js` `src/gateway_launch.abcl`
-  `src/c_dashboard.py` `src/node-aipl-server/server.mjs`
-  `aice-evolution-v2/evolution_dashboard.py`
-  `abclc/bounded_buffer20.abcl` `abclc/PingPongDemo.abcl`
-- **除外**: `src/python-aipl/aipl_ai.py`（温存）、`out/c_dashboard/`（生成物）。
-- Py-I の bounded-buffer は既に `ef3caff` で commit 済み。
-- 未確認事項: OCaml バッファ可視化の C/P 矢印向き（反転済みだが視覚未確認）。
+## コミット状況
+- 本セッションのダッシュボード一式は `817cb65` で **commit & push 済み**
+  （web_gateway/repl_thread/eval_thread.ml、gateway_dashboard.{html,js}、gateway_launch.abcl、
+  c_dashboard.py、node-aipl-server/server.mjs、evolution_dashboard.py、
+  bounded_buffer20.abcl、PingPongDemo.abcl、本ハンドオフ）。
+- **未コミットのまま**: `src/python-aipl/aipl_ai.py`（温存・触らない）。`out/c_dashboard/` は生成物（無視）。
+- 未確認事項: OCaml バッファ可視化の C/P 矢印向き（反転済みだが視覚未確認。違えば `gateway_dashboard.js` の `flowArrow` 引数順を戻す）。
