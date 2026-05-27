@@ -12,6 +12,28 @@ import threading
 from typing import Optional
 
 
+# ── Run/pause gate (dashboard "開始 / 中断 / 再開" control) ────────────
+# When cleared, every actor worker thread parks at the top of its loop
+# without dequeuing, so pending messages are preserved and processing
+# freezes; setting it resumes all actors.  Running by default.
+_run_gate = threading.Event()
+_run_gate.set()
+
+
+def pause_all() -> None:
+    """中断 — suspend all actor message processing."""
+    _run_gate.clear()
+
+
+def resume_all() -> None:
+    """開始 / 再開 — (re)start all actor message processing."""
+    _run_gate.set()
+
+
+def is_paused() -> bool:
+    return not _run_gate.is_set()
+
+
 class Future:
     """Single-shot result holder used by now-/future-type sends.
 
@@ -99,6 +121,9 @@ class Actor:
 
     def _run(self):
         while not self._stopped:
+            if not _run_gate.is_set():          # paused from the dashboard
+                _run_gate.wait(timeout=0.2)     # park; re-check _stopped/gate
+                continue
             try:
                 msg = self.mailbox.get(timeout=0.05)
             except queue.Empty:

@@ -397,8 +397,27 @@ class _Handler(BaseHTTPRequestHandler):
             self._handle_ide_run()
         elif self.path.startswith("/api/chat/send"):
             self._handle_chat_send()
+        elif self.path.startswith("/api/control"):
+            self._handle_control()
         else:
             self.send_error(404, "Not Found")
+
+    def _handle_control(self):
+        """Start / pause / resume the actor scheduler from the dashboard.
+        Body: {"action": "start" | "pause" | "resume"}."""
+        data = self._read_json_body() or {}
+        action = str(data.get("action", "")).lower()
+        try:
+            import aipl_runtime
+            if action in ("pause", "suspend", "中断"):
+                aipl_runtime.pause_all()
+            elif action in ("start", "resume", "run", "開始", "再開"):
+                aipl_runtime.resume_all()
+            paused = aipl_runtime.is_paused()
+        except Exception:
+            paused = False
+        self._send_bytes(200, "application/json",
+                         json.dumps({"paused": paused}).encode("utf-8"))
 
     def _handle_chat_send(self):
         data = self._read_json_body()
@@ -605,7 +624,12 @@ class _Handler(BaseHTTPRequestHandler):
             actors = interp.scheduler.all() if interp is not None else []
         except Exception:
             actors = []
-        out = {"actors": []}
+        try:
+            import aipl_runtime
+            _paused = aipl_runtime.is_paused()
+        except Exception:
+            _paused = False
+        out = {"paused": _paused, "actors": []}
         for a in actors:
             try:
                 cls = getattr(getattr(a, "cls", None), "name", "?")
@@ -985,8 +1009,19 @@ _ACTORS_HTML = """<!doctype html>
  .fields{color:#8fbcbb;white-space:pre-wrap}
  pre{background:#11161d;border:1px solid #2a3340;padding:10px;overflow:auto;max-height:340px;font-size:12px;color:#cdd6e0}
  .cls{color:#b48ead}
+ .bar{margin:8px 0 4px} button{font-family:inherit;font-size:13px;padding:6px 14px;margin-right:8px;
+   border:1px solid #3b4757;border-radius:5px;background:#1a2430;color:#d8dee9;cursor:pointer}
+ button:hover{background:#243042} #b_start{border-color:#a3be8c} #b_pause{border-color:#ebcb8b}
+ #b_resume{border-color:#88c0d0}
+ #runstate{font-weight:bold;margin-left:8px} .running{color:#a3be8c} .paused{color:#ebcb8b}
 </style></head><body>
 <h1>Py-I &mdash; AIPL interpreter (live)</h1>
+<div class="bar">
+ <button id="b_start" onclick="ctl('start')">&#9654; 開始 Start</button>
+ <button id="b_pause" onclick="ctl('pause')">&#10073;&#10073; 中断 Suspend</button>
+ <button id="b_resume" onclick="ctl('resume')">&#8635; 再開 Resume</button>
+ <span id="runstate" class="running">running</span>
+</div>
 <div class="meta">program: <span id="path">(loading)</span> &nbsp;|&nbsp; actors: <b id="count">0</b>
  &nbsp;|&nbsp; classes: <span id="classes" class="cls"></span> &nbsp;|&nbsp; updated <span id="ts"></span></div>
 <h2>Running actors</h2>
@@ -1003,10 +1038,22 @@ async function loadProg(){
   document.getElementById('src').textContent=p.source||'(source unavailable)';
  }catch(e){}
 }
+function setState(paused){
+ const el=document.getElementById('runstate');
+ el.textContent=paused?'paused':'running';
+ el.className=paused?'paused':'running';
+}
+async function ctl(action){
+ try{ const r=await fetch('/api/control',{method:'POST',
+       headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+  const d=await r.json(); setState(d.paused);
+ }catch(e){}
+}
 async function tick(){
  try{ const a=await (await fetch('/api/actors')).json();
   document.getElementById('count').textContent=a.actors.length;
   document.getElementById('ts').textContent=new Date().toLocaleTimeString();
+  setState(a.paused);
   const rows=a.actors.map(x=>{
    const f=Object.entries(x.fields||{}).map(([k,v])=>k+'='+esc(JSON.stringify(v))).join('   ');
    return '<tr><td>'+esc(x.name)+'</td><td class="cls">'+esc(x['class'])+'</td>'+
