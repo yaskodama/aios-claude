@@ -380,6 +380,41 @@ _UART1_LOCK = _FairLock()
 def _is_uart1(hostport: str) -> bool:
     return isinstance(hostport, str) and hostport.startswith("uart1://")
 
+# ─── http:// scheme — talk to the Xinu HTTP actor gateway ────────────────
+#
+# A remote() call addressing "http://host[:port]" targets the bare-metal
+# xinu-rpi5 actor gateway (system/tcp_server.c + system/actor.c), which
+# exposes:
+#     GET /send?to=<id>&m=<method>&arg=<n>  -> {"ok":1,"actor":id,
+#                                               "method":"m","result":R}
+# So an AIPL actor on the Mac can drive a Xinu actor over real TCP:
+#     send remote("http://192.168.3.100").bump()          (to actor 0)
+#     now  remote("http://192.168.3.100").get()           -> result int
+# Note: a *bare* host:port (no scheme) still means the richer AIPL JSON
+# gateway above; the explicit http:// prefix selects this simple gateway.
+
+def _is_xinu_http(hostport: str) -> bool:
+    return isinstance(hostport, str) and hostport.startswith("http://")
+
+def _xinu_http_send(hostport: str, to_actor: str, method: str, args: list):
+    """GET /send on the Xinu gateway; returns the decoded JSON dict.
+    The gateway's demo actors take a single int arg, so args[0] (if any)
+    maps to &arg=; extra args are ignored for now."""
+    arg = 0
+    if args:
+        try:
+            arg = int(args[0])
+        except (ValueError, TypeError):
+            arg = 0
+    base = hostport.rstrip("/")
+    url = f"{base}/send?to={to_actor}&m={method}&arg={arg}"
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"ok": 0, "raw": raw}
+
 def _uart1_target(hostport: str) -> tuple:
     raw = hostport[len("uart1://"):]
     if ":" in raw:
@@ -574,6 +609,13 @@ def remote_send(hostport: str, to_actor: str, method: str,
         except OSError as e:
             print(f"[remote_send uart1] {hostport}/{to_actor}.{method} failed: {e}")
         return
+    if _is_xinu_http(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=False)
+        try:
+            _xinu_http_send(hostport, to_actor, method, args)
+        except (urllib.error.URLError, OSError) as e:
+            print(f"[remote_send http] {hostport}/{to_actor}.{method} failed: {e}")
+        return
     url = f"http://{hostport}/api/json/send"
     payload = json.dumps({
         "to":     to_actor,
@@ -604,6 +646,13 @@ def remote_call_sync(hostport: str, to_actor: str, method: str,
             return _uart1_remote_call_sync(hostport, to_actor, method, args)
         except OSError as e:
             raise RuntimeError(f"remote_call uart1 {hostport}/{to_actor}.{method} failed: {e}")
+    if _is_xinu_http(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=True)
+        try:
+            d = _xinu_http_send(hostport, to_actor, method, args)
+        except (urllib.error.URLError, OSError) as e:
+            raise RuntimeError(f"remote_call http {hostport}/{to_actor}.{method} failed: {e}")
+        return d.get("result")
     url = f"http://{hostport}/api/json/call?timeout_ms={int(timeout_s * 1000)}"
     payload = json.dumps({
         "to":     to_actor,
