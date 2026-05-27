@@ -1223,6 +1223,15 @@ _ACTORS_HTML = """<!doctype html>
 </div>
 <div class="meta">program: <span id="path">(loading)</span> &nbsp;|&nbsp; actors: <b id="count">0</b>
  &nbsp;|&nbsp; classes: <span id="classes" class="cls"></span> &nbsp;|&nbsp; updated <span id="ts"></span></div>
+<h2>Visualization</h2>
+<canvas id="viz" width="440" height="440"
+  style="background:#0b0f14;border:1px solid #2a3340;border-radius:6px;display:block"></canvas>
+<div style="color:#7a8a99;font-size:11px;margin:4px 0 0">
+  philosophers around the ring (blue=thinking, amber=hungry/waiting, green=eating,
+  grey=done/stopped); forks shown between them, with a green arrow pointing to
+  the philosopher currently holding the fork.
+  Remote programs only show the local (Mac) actors here.
+</div>
 <h2>Running actors</h2>
 <table><thead><tr><th>name</th><th>class</th><th>state</th><th>mailbox</th><th>thread</th><th>fields (state)</th></tr></thead>
 <tbody id="abody"><tr><td colspan="5">(loading)</td></tr></tbody></table>
@@ -1259,11 +1268,101 @@ async function ctl(action){
   if(action==='start'){ setTimeout(tick,400); setTimeout(loadProg,500); }
  }catch(e){}
 }
+function philColor(p){
+ const f=p.fields||{}; const st=String(f.status||'').toLowerCase();
+ if(p.state==='stopped'||st.indexOf('done')>=0||st.indexOf('terminat')>=0) return '#7a8a99';
+ if(st.indexOf('eat')>=0) return '#a3be8c';
+ if(st.indexOf('wait')>=0||st.indexOf('took')>=0||st.indexOf('fork')>=0) return '#ebcb8b';
+ if(st.indexOf('think')>=0) return '#81a1c1';
+ return p.state==='busy' ? '#ebcb8b' : '#81a1c1';
+}
+function drawArrow(ctx,x1,y1,x2,y2,color){
+ const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy); if(len<1) return;
+ const ux=dx/len, uy=dy/len;
+ const sx=x1+ux*9, sy=y1+uy*9;       // start just outside the fork marker
+ const ex=x2-ux*24, ey=y2-uy*24;      // stop at the philosopher node edge
+ ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2.5;
+ ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+ const ah=9, aa=Math.atan2(ey-sy,ex-sx);
+ ctx.beginPath(); ctx.moveTo(ex,ey);
+ ctx.lineTo(ex-ah*Math.cos(aa-0.45), ey-ah*Math.sin(aa-0.45));
+ ctx.lineTo(ex-ah*Math.cos(aa+0.45), ey-ah*Math.sin(aa+0.45));
+ ctx.closePath(); ctx.fill();
+}
+function drawViz(actors){
+ const cv=document.getElementById('viz'); if(!cv) return;
+ const ctx=cv.getContext('2d'); const W=cv.width,H=cv.height;
+ ctx.clearRect(0,0,W,H);
+ const phils=actors.filter(a=>a['class']==='Philosopher'||a['class']==='Node');
+ const forks=actors.filter(a=>a['class']==='Fork');
+ const cx=W/2, cy=H/2, R=Math.min(W,H)*0.33;
+ const n=phils.length||1;
+ // pass 1: philosopher positions, indexed by their pid (id / my_id) so a held
+ // fork can draw an arrow to its holder.
+ const posById={};
+ const philData=phils.map((p,i)=>{
+  const ang=(i/n)*2*Math.PI - Math.PI/2;
+  const px=cx+Math.cos(ang)*R, py=cy+Math.sin(ang)*R;
+  const f=p.fields||{};
+  const pid=(f.id!==undefined)?f.id:f.my_id;
+  if(pid!==undefined && pid!==null) posById[pid]={x:px,y:py};
+  return {p:p, px:px, py:py};
+ });
+ // each fork sits BETWEEN the two philosophers that actually use it (their
+ // lo/hi reference it), so it's drawn adjacent to its real neighbours.
+ const forkUsers={};
+ philData.forEach(({p,px,py})=>{
+  const f=p.fields||{};
+  [f.lo,f.hi].forEach(ref=>{
+   if(ref===undefined||ref===null) return;
+   let nm=String(ref); const m=nm.match(/<actor (.+)>/); if(m) nm=m[1];
+   (forkUsers[nm]=forkUsers[nm]||[]).push({x:px,y:py});
+  });
+ });
+ const nf=forks.length;
+ forks.forEach((fk,i)=>{
+  let fx,fy;
+  const u=forkUsers[fk.name];
+  if(u && u.length){              // midpoint of its users, projected onto ring
+   let mx=0,my=0; u.forEach(q=>{mx+=q.x;my+=q.y;}); mx/=u.length; my/=u.length;
+   const a=Math.atan2(my-cy,mx-cx); fx=cx+Math.cos(a)*R; fy=cy+Math.sin(a)*R;
+  }else{                          // fallback when users are unknown (remote)
+   const a=(i/Math.max(nf,1))*2*Math.PI - Math.PI/2 - Math.PI/Math.max(nf,1);
+   fx=cx+Math.cos(a)*R; fy=cy+Math.sin(a)*R;
+  }
+  const h=(fk.fields||{}).holder||0;
+  if(h && h!==0 && posById[h]) drawArrow(ctx,fx,fy,posById[h].x,posById[h].y,'#a3be8c');
+  const tang=Math.atan2(fy-cy,fx-cx);
+  ctx.fillStyle=(h&&h!==0)?'#a3be8c':'#46505e';
+  ctx.save(); ctx.translate(fx,fy); ctx.rotate(tang+Math.PI/2);
+  ctx.fillRect(-3,-11,6,22); ctx.restore();
+  ctx.fillStyle='#cdd6e0'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText(fk.name+(h?(' -> P'+h):''), fx, fy-14);
+ });
+ // pass 3: philosopher nodes on top.
+ philData.forEach(({p,px,py})=>{
+  ctx.beginPath(); ctx.arc(px,py,22,0,2*Math.PI);
+  ctx.fillStyle=philColor(p); ctx.fill();
+  ctx.lineWidth=2; ctx.strokeStyle='#0b0f14'; ctx.stroke();
+  ctx.fillStyle='#0b0f14'; ctx.font='bold 12px monospace'; ctx.textAlign='center';
+  ctx.fillText(p.name, px, py+1);
+  const f=p.fields||{};
+  const meals=(f.meals!==undefined)?f.meals:((f.meals_done!==undefined)?f.meals_done:((f.hops!==undefined)?f.hops:''));
+  const tgt=(f.target!==undefined)?f.target:((f.meals_target!==undefined)?f.meals_target:'');
+  ctx.fillStyle='#cdd6e0'; ctx.font='11px monospace';
+  if(meals!=='') ctx.fillText('meal '+meals+(tgt!==''?('/'+tgt):''), px, py+38);
+  const lbl=String(f.status||p.state||'');
+  if(lbl){ ctx.fillStyle='#8fbcbb'; ctx.font='10px monospace'; ctx.fillText(lbl.slice(0,22), px, py+52); }
+ });
+ if(phils.length===0){ ctx.fillStyle='#7a8a99'; ctx.font='13px monospace'; ctx.textAlign='center';
+   ctx.fillText('(no philosopher actors - press Start)', cx, cy); }
+}
 async function tick(){
  try{ const a=await (await fetch('/api/actors')).json();
   document.getElementById('count').textContent=a.actors.length;
   document.getElementById('ts').textContent=new Date().toLocaleTimeString();
   setState(a.paused,a.stopped,a.started);
+  drawViz(a.actors);
   const rows=a.actors.map(x=>{
    const f=Object.entries(x.fields||{}).map(([k,v])=>k+'='+esc(JSON.stringify(v))).join('   ');
    const th=(x.alive!==false&&x.thread!=null)?('#'+x.thread):'(dead)';
