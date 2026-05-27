@@ -108,6 +108,7 @@ _PROGRAM_LABELS = {
     "dine_dynamic.abcl": "Dining Philosophers (3 local + 2 remote / Xinu)",
     "mac_diners.abcl":   "Dining Philosophers (3 Mac + 2 Xinu, static)",
     "ring_demo.abcl":    "Token ring (local, 4)",
+    "bounded_buffer.abcl": "Bounded buffer (local, 2 producers + 2 consumers)",
 }
 
 
@@ -202,6 +203,8 @@ def _json_safe(v):
     nm = getattr(v, "name", None)            # an Actor reference?
     if nm is not None:
         return "<actor %s>" % nm
+    if isinstance(v, (list, tuple)):         # arrays (e.g. a ring buffer's slots)
+        return [_json_safe(x) for x in v]
     return str(v)
 
 
@@ -527,6 +530,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._handle_control()
         elif self.path.startswith("/api/load"):
             self._handle_load()
+        elif self.path.startswith("/api/speed"):
+            self._handle_speed()
         else:
             self.send_error(404, "Not Found")
 
@@ -581,6 +586,44 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_bytes(200, "application/json",
                          json.dumps({"paused": paused, "stopped": _program_stopped,
                                      "started": started}).encode("utf-8"))
+
+    def _handle_speed(self):
+        """Live-tune the per-item delay (seconds) of the running bounded-buffer
+        actors from the dashboard sliders.  Body: {"produce_ms", "consume_ms"}.
+        The actor reads its own `delay` field on each loop, so writing the field
+        from here takes effect on the next item without restarting anything."""
+        data = self._read_json_body() or {}
+
+        def _sec(key):
+            v = data.get(key)
+            try:
+                return max(0.0, float(v) / 1000.0)
+            except (TypeError, ValueError):
+                return None
+
+        p_sec = _sec("produce_ms")
+        c_sec = _sec("consume_ms")
+        with _introspect_lock:
+            interp = _interp_ref
+        try:
+            actors = interp.scheduler.all() if interp is not None else []
+        except Exception:
+            actors = []
+        applied = {"Producer": 0, "Consumer": 0}
+        for a in actors:
+            cls = getattr(getattr(a, "cls", None), "name", "")
+            try:
+                fields = getattr(a, "fields", None)
+                if fields is None or "delay" not in fields:
+                    continue
+                if cls == "Producer" and p_sec is not None:
+                    fields["delay"] = p_sec; applied["Producer"] += 1
+                elif cls == "Consumer" and c_sec is not None:
+                    fields["delay"] = c_sec; applied["Consumer"] += 1
+            except Exception:
+                continue
+        self._send_bytes(200, "application/json",
+                         json.dumps({"ok": True, "applied": applied}).encode("utf-8"))
 
     def _handle_chat_send(self):
         data = self._read_json_body()
@@ -1224,13 +1267,26 @@ _ACTORS_HTML = """<!doctype html>
 <div class="meta">program: <span id="path">(loading)</span> &nbsp;|&nbsp; actors: <b id="count">0</b>
  &nbsp;|&nbsp; classes: <span id="classes" class="cls"></span> &nbsp;|&nbsp; updated <span id="ts"></span></div>
 <h2>Visualization</h2>
-<canvas id="viz" width="440" height="440"
-  style="background:#0b0f14;border:1px solid #2a3340;border-radius:6px;display:block"></canvas>
+<canvas id="viz" width="760" height="360"
+  style="background:#0b0f14;border:1px solid #2a3340;border-radius:6px;display:block;max-width:100%"></canvas>
 <div style="color:#7a8a99;font-size:11px;margin:4px 0 0">
   philosophers around the ring (blue=thinking, amber=hungry/waiting, green=eating,
   grey=done/stopped); forks shown between them, with a green arrow pointing to
   the philosopher currently holding the fork.
   Remote programs only show the local (Mac) actors here.
+</div>
+<div id="speedctl" style="display:none;margin:8px 0 0;padding:8px 10px;background:#11161d;border:1px solid #2a3340;border-radius:6px;max-width:760px">
+  <div style="color:#cdd6e0;font-size:12px;margin-bottom:6px">Bounded-buffer speed &mdash; drag to retune the running actors (left = faster, right = slower)</div>
+  <label style="display:flex;align-items:center;gap:8px;color:#81a1c1;font-size:12px;margin:3px 0">
+    <span style="width:120px">Producer interval</span>
+    <input id="pspeed" type="range" min="50" max="2000" step="10" value="300" oninput="pushSpeed()" style="flex:1">
+    <span id="pspeedv" style="width:58px;text-align:right">300 ms</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;color:#a3be8c;font-size:12px;margin:3px 0">
+    <span style="width:120px">Consumer interval</span>
+    <input id="cspeed" type="range" min="50" max="2000" step="10" value="500" oninput="pushSpeed()" style="flex:1">
+    <span id="cspeedv" style="width:58px;text-align:right">500 ms</span>
+  </label>
 </div>
 <h2>Running actors</h2>
 <table><thead><tr><th>name</th><th>class</th><th>state</th><th>mailbox</th><th>thread</th><th>fields (state)</th></tr></thead>
@@ -1265,8 +1321,17 @@ async function ctl(action){
  try{ const r=await fetch('/api/control',{method:'POST',
        headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json(); setState(d.paused,d.stopped,d.started);
-  if(action==='start'){ setTimeout(tick,400); setTimeout(loadProg,500); }
+  if(action==='start'){ setTimeout(tick,400); setTimeout(loadProg,500); setTimeout(pushSpeed,800); }
  }catch(e){}
+}
+async function pushSpeed(){
+ const pe=document.getElementById('pspeed'), ce=document.getElementById('cspeed');
+ if(!pe||!ce) return;
+ const p=+pe.value, c=+ce.value;
+ document.getElementById('pspeedv').textContent=p+' ms';
+ document.getElementById('cspeedv').textContent=c+' ms';
+ try{ await fetch('/api/speed',{method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({produce_ms:p,consume_ms:c})}); }catch(e){}
 }
 function philColor(p){
  const f=p.fields||{}; const st=String(f.status||'').toLowerCase();
@@ -1289,10 +1354,106 @@ function drawArrow(ctx,x1,y1,x2,y2,color){
  ctx.lineTo(ex-ah*Math.cos(aa+0.45), ey-ah*Math.sin(aa+0.45));
  ctx.closePath(); ctx.fill();
 }
+// ── bounded-buffer view ───────────────────────────────────────────────
+// Producers on the left, consumers on the right, the buffer's ring of
+// slots in the middle (filled boxes = live items, drained from `head`).
+function pcColor(a){
+ const f=a.fields||{}; const st=String(f.status||'').toLowerCase();
+ if(a.state==='stopped'||st.indexOf('done')>=0||st.indexOf('terminat')>=0) return '#7a8a99';
+ if(st.indexOf('block')>=0||st.indexOf('wait')>=0||st.indexOf('full')>=0||st.indexOf('empty')>=0) return '#ebcb8b';
+ return '#81a1c1';   // producing / consuming
+}
+function flowArrow(ctx,x1,y1,x2,y2,color){
+ ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2;
+ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+ const mx=(x1+x2)/2, my=(y1+y2)/2, a=Math.atan2(y2-y1,x2-x1), ah=7;
+ ctx.beginPath(); ctx.moveTo(mx,my);
+ ctx.lineTo(mx-ah*Math.cos(a-0.5), my-ah*Math.sin(a-0.5));
+ ctx.lineTo(mx-ah*Math.cos(a+0.5), my-ah*Math.sin(a+0.5));
+ ctx.closePath(); ctx.fill();
+}
+function drawBuffer(ctx,W,H,actors,buf){
+ const cx=W/2, cy=H/2;
+ const prods=actors.filter(a=>a['class']==='Producer');
+ const cons =actors.filter(a=>a['class']==='Consumer');
+ const bf=buf.fields||{};
+ const cap=Number(bf.cap)||5, count=Number(bf.count)||0;
+ const head=Number(bf.head)||0, tail=Number(bf.tail)||0;
+ const slots=Array.isArray(bf.slots)?bf.slots:[];
+ const occ=new Array(cap).fill(false);
+ for(let k=0;k<count;k++) occ[((head+k)%cap+cap)%cap]=true;
+ const hIdx=((head%cap)+cap)%cap, tIdx=((tail%cap)+cap)%cap;
+ const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+ // buffer as a single wide row spanning the canvas; producers feed it from
+ // above, consumers drain it below.
+ const margin=16, gap=4;
+ const bw=Math.max(12, Math.min(46, Math.floor((W-2*margin-(cap-1)*gap)/cap)));
+ const bh=40;
+ const rowW=cap*bw+(cap-1)*gap, gx=cx-rowW/2, gy=cy-bh/2;
+ ctx.textAlign='center';
+ ctx.fillStyle='#cdd6e0'; ctx.font='12px monospace';
+ ctx.fillText('bounded buffer   '+count+'/'+cap+'   head='+hIdx+'   tail='+tIdx, cx, gy-12);
+ for(let i=0;i<cap;i++){
+  const bx=gx+i*(bw+gap);
+  ctx.fillStyle=occ[i]?'#2e4b2e':'#11161d'; ctx.fillRect(bx,gy,bw,bh);
+  ctx.lineWidth=2;
+  ctx.strokeStyle = (i===hIdx)?'#88c0d0' : (i===tIdx)?'#d08770' : (occ[i]?'#a3be8c':'#2a3340');
+  ctx.strokeRect(bx,gy,bw,bh);
+  if(occ[i] && slots[i]!==undefined && bw>=18){
+   ctx.fillStyle='#e5e9f0'; ctx.font=(bw>=28?'12px':'9px')+' monospace'; ctx.textBaseline='middle';
+   ctx.fillText(String(slots[i]), bx+bw/2, gy+bh/2); ctx.textBaseline='alphabetic';
+  }
+ }
+ ctx.font='10px monospace'; ctx.fillStyle='#88c0d0'; ctx.textAlign='center';
+ ctx.fillText('head = next read (cyan)', cx-90, gy+bh+16);
+ ctx.fillStyle='#d08770'; ctx.fillText('tail = next write (orange)', cx+90, gy+bh+16);
+ // producers across the top, consumers across the bottom
+ const placeRow=(list,y,x0,x1)=>{
+  const n=list.length; if(!n) return [];
+  if(n===1) return [{a:list[0],x:(x0+x1)/2,y}];
+  return list.map((a,i)=>({a,x:x0+(x1-x0)*i/(n-1),y}));
+ };
+ const xspread=Math.min(140, cx-40);
+ const P=placeRow(prods, gy-72, cx-xspread, cx+xspread);
+ const C=placeRow(cons,  gy+bh+72, cx-xspread, cx+xspread);
+ P.forEach(o=>flowArrow(ctx,o.x,o.y+20, clamp(o.x,gx+bw/2,gx+rowW-bw/2),gy-5, pcColor(o.a)));
+ C.forEach(o=>flowArrow(ctx, clamp(o.x,gx+bw/2,gx+rowW-bw/2),gy+bh+5, o.x,o.y-20, pcColor(o.a)));
+ const node=(o,prefix,sub)=>{
+  const f=o.a.fields||{};
+  ctx.beginPath(); ctx.arc(o.x,o.y,20,0,2*Math.PI);
+  ctx.fillStyle=pcColor(o.a); ctx.fill();
+  ctx.lineWidth=2; ctx.strokeStyle='#0b0f14'; ctx.stroke();
+  ctx.fillStyle='#0b0f14'; ctx.font='bold 11px monospace'; ctx.textAlign='center';
+  ctx.fillText(prefix+(f.id!==undefined?f.id:''), o.x, o.y+1);
+  ctx.fillStyle='#cdd6e0'; ctx.font='10px monospace';
+  const s=sub(f); if(s) ctx.fillText(s, o.x, o.y-28);
+  const lbl=String(f.status||''); if(lbl){ ctx.fillStyle='#8fbcbb'; ctx.font='9px monospace';
+   ctx.fillText(lbl.slice(0,20), o.x, o.y-40); }
+ };
+ P.forEach(o=>node(o,'P',f=>(f.made!==undefined?('made '+f.made+(f.target!==undefined?'/'+f.target:'')):'')));
+ // consumer sub-label sits below its node (room there); status above.
+ const cnode=(o)=>{
+  const f=o.a.fields||{};
+  ctx.beginPath(); ctx.arc(o.x,o.y,20,0,2*Math.PI);
+  ctx.fillStyle=pcColor(o.a); ctx.fill();
+  ctx.lineWidth=2; ctx.strokeStyle='#0b0f14'; ctx.stroke();
+  ctx.fillStyle='#0b0f14'; ctx.font='bold 11px monospace'; ctx.textAlign='center';
+  ctx.fillText('C'+(f.id!==undefined?f.id:''), o.x, o.y+1);
+  ctx.fillStyle='#cdd6e0'; ctx.font='10px monospace';
+  if(f.got!==undefined) ctx.fillText('got '+f.got, o.x, o.y+33);
+  const lbl=String(f.status||''); if(lbl){ ctx.fillStyle='#8fbcbb'; ctx.font='9px monospace';
+   ctx.fillText(lbl.slice(0,20), o.x, o.y+45); }
+ };
+ C.forEach(cnode);
+ ctx.fillStyle='#7a8a99'; ctx.font='11px monospace'; ctx.textAlign='center';
+ ctx.fillText('producers', cx, 14); ctx.fillText('consumers', cx, H-6);
+}
 function drawViz(actors){
  const cv=document.getElementById('viz'); if(!cv) return;
  const ctx=cv.getContext('2d'); const W=cv.width,H=cv.height;
  ctx.clearRect(0,0,W,H);
+ const bufs=actors.filter(a=>a['class']==='Buffer');
+ if(bufs.length){ drawBuffer(ctx,W,H,actors,bufs[0]); return; }
  const phils=actors.filter(a=>a['class']==='Philosopher'||a['class']==='Node');
  const forks=actors.filter(a=>a['class']==='Fork');
  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.33;
@@ -1363,6 +1524,8 @@ async function tick(){
   document.getElementById('ts').textContent=new Date().toLocaleTimeString();
   setState(a.paused,a.stopped,a.started);
   drawViz(a.actors);
+  const isBuf=a.actors.some(x=>x['class']==='Buffer'||x['class']==='Producer'||x['class']==='Consumer');
+  const sc=document.getElementById('speedctl'); if(sc) sc.style.display=isBuf?'block':'none';
   const rows=a.actors.map(x=>{
    const f=Object.entries(x.fields||{}).map(([k,v])=>k+'='+esc(JSON.stringify(v))).join('   ');
    const th=(x.alive!==false&&x.thread!=null)?('#'+x.thread):'(dead)';
