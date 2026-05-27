@@ -181,6 +181,7 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     # I/O — text
     "print":          "function(args:any+) -> unit",
     "println":        "function(args:any+) -> unit",
+    "suicide":        "function() -> unit",
     "read_file":      "function(path:string) -> string",
     "write_file":     "function(path:string, content:string) -> int",
     "append_file":    "function(path:string, content:string) -> int",
@@ -1096,8 +1097,35 @@ def _to_str(v):
 #
 # Each builtin: fn(args, frame, interp) -> return value (or None)
 
+# Optional console sink: the dashboard registers a callback here so every
+# AIPL print() line is mirrored into the browser console window (like the
+# Xinu HDMI console).  None (default) = stdout only, no behaviour change.
+_console_sink = None
+
+def set_console_sink(fn):
+    global _console_sink
+    _console_sink = fn
+
 def _b_print(args, frame, interp):
-    print(*[_to_str(a) for a in args], sep="", flush=True)
+    line = "".join(_to_str(a) for a in args)
+    print(line, flush=True)
+    if _console_sink is not None:
+        try:
+            _console_sink(line)
+        except Exception:
+            pass
+    return None
+
+def _b_suicide(args, frame, interp):
+    """suicide() — the calling actor terminates itself.  Sets the actor's
+    stop flag so its worker thread exits after the current method returns
+    (the mailbox is drained, no further messages are processed)."""
+    a = getattr(frame, "actor", None)
+    if a is not None:
+        try:
+            a._stopped = True
+        except Exception:
+            pass
     return None
 
 def _b_reply(args, frame, interp):
@@ -3145,6 +3173,7 @@ def _b_tcp_close(args, frame, interp):
 _BUILTINS = {
     "print":   _b_print,
     "println": _b_print,
+    "suicide": _b_suicide,
     "reply":   _b_reply,
     "wait":    _b_wait,
     # Dynamic class registration + actor instantiation by string name.

@@ -125,23 +125,24 @@ def main():
     if do_typeck:                           # --type-check alone: exit here
         return
 
-    interp = Interpreter(program, transient_checks=args.transient)
     if args.dashboard:
-        # Wire the running interpreter into the dashboard so /actors can
-        # show the live program + actors + their state (JS-I-style view).
+        # Dashboard mode: hand the program lifecycle to the dashboard so it
+        # can switch between programs at runtime (it shows live actors +
+        # state + a console).  Run the initial program in a dashboard-managed
+        # thread and keep the process alive so switching stays possible.
+        import aipl_dashboard, time
+        aipl_dashboard.configure_programs(args.source)
+        print(f"[dashboard] actors view: "
+              f"http://127.0.0.1:{args.dashboard}/actors")
+        print("[dashboard] program is NOT started — press Start in the browser")
         try:
-            import aipl_dashboard
-            src_text = ""
-            try:
-                with open(args.source) as _f:
-                    src_text = _f.read()
-            except Exception:
-                pass
-            aipl_dashboard.set_program(interp, src_text, args.source)
-            print(f"[dashboard] actors view: "
-                  f"http://127.0.0.1:{args.dashboard}/actors")
-        except Exception:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
             pass
+        return
+
+    interp = Interpreter(program, transient_checks=args.transient)
     try:
         interp.run(idle_ms=args.idle_ms, timeout_s=args.timeout)
     except KeyboardInterrupt:

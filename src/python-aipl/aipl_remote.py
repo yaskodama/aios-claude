@@ -555,6 +555,8 @@ def _uart1_remote_call_sync(hostport: str, to_actor: str, method: str,
         return _uart1_call(hostport, f"COMPILE {args[0]}")
     if method == "run":
         return _uart1_call(hostport, f"RUN {args[0]}")
+    if method == "reset":
+        return _uart1_call(hostport, "RESET")
     # Fallback: SEND-style as a sync call returning the dispatcher's
     # ack line ("OK method=... id=..." or "ERR ...").
     parts = ["SEND", str(to_actor), method] + [str(a) for a in args]

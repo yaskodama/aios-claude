@@ -63,14 +63,134 @@ _interp_ref = None
 _program_source = ""
 _program_path = ""
 
+# Console ring — every AIPL print() line, mirrored here for the browser
+# console window (the Mac-side analog of the Xinu HDMI console).
+_console_lock = threading.Lock()
+_console_lines: list = []
+_console_head = 0               # total lines ever appended (monotonic)
+_CONSOLE_MAX = 500
+
+
+def _console_append(line: str) -> None:
+    global _console_head
+    with _console_lock:
+        _console_lines.append(str(line))
+        _console_head += 1
+        if len(_console_lines) > _CONSOLE_MAX:
+            del _console_lines[:len(_console_lines) - _CONSOLE_MAX]
+
 
 def set_program(interp, source_text: str = "", source_path: str = "") -> None:
-    """Register the running interpreter so /actors can introspect it."""
+    """Register the running interpreter so /actors can introspect it, and
+    route AIPL print() output into the browser console window."""
     global _interp_ref, _program_source, _program_path
     with _introspect_lock:
         _interp_ref = interp
         _program_source = source_text or ""
         _program_path = source_path or ""
+    try:
+        import aipl_interp
+        aipl_interp.set_console_sink(_console_append)
+    except Exception:
+        pass
+
+
+# ── Program switcher ─────────────────────────────────────────────────
+# The dashboard can stop the running program and load another, so the
+# user can flip between e.g. the local dining demo and the Mac+Xinu one.
+_PROGRAMS: list = []           # [{key,label,path}]
+_run_lock = threading.Lock()
+_run_thread = None
+_program_stopped = False       # True after Stop (中止) until next Start/Switch
+_selected_key = ""             # program chosen in the dropdown / initial pick
+_PROGRAM_LABELS = {
+    "local_diners.abcl": "Dining Philosophers (local, 5)",
+    "dine_dynamic.abcl": "Dining Philosophers (3 local + 2 remote / Xinu)",
+    "mac_diners.abcl":   "Dining Philosophers (3 Mac + 2 Xinu, static)",
+    "ring_demo.abcl":    "Token ring (local, 4)",
+}
+
+
+def configure_programs(initial_path: str) -> None:
+    """Build the switchable-program list from the .abcl files next to the
+    initial program."""
+    global _PROGRAMS, _selected_key
+    import os, glob
+    d = os.path.dirname(os.path.abspath(initial_path))
+    progs = []
+    for p in sorted(glob.glob(os.path.join(d, "*.abcl"))):
+        base = os.path.basename(p)
+        progs.append({"key": base,
+                      "label": _PROGRAM_LABELS.get(base, base),
+                      "path": p})
+    _PROGRAMS = progs
+    _selected_key = os.path.basename(initial_path)   # default dropdown pick
+
+
+def _run_program_thread(path: str) -> None:
+    try:
+        from aipl_parser import parse_file
+        from aipl_interp import Interpreter
+        program = parse_file(path)
+        interp = Interpreter(program)
+        src = ""
+        try:
+            with open(path) as f:
+                src = f.read()
+        except Exception:
+            pass
+        set_program(interp, src, path)
+        # run effectively until the program is switched out (shutdown).
+        interp.run(idle_ms=120, timeout_s=86400)
+    except Exception as e:
+        _console_append(f"[program ended: {e}]")
+
+
+def load_program(key: str) -> bool:
+    """Stop the current program's actors and start the selected one."""
+    global _run_thread, _program_stopped, _selected_key
+    import aipl_runtime
+    with _run_lock:
+        prog = next((p for p in _PROGRAMS if p["key"] == key), None)
+        if prog is None:
+            return False
+        _selected_key = key
+        # resume first so parked actor threads can see the stop message.
+        aipl_runtime.resume_all()
+        with _introspect_lock:
+            cur = _interp_ref
+        if cur is not None:
+            try:
+                cur.scheduler.shutdown()
+            except Exception:
+                pass
+        if _run_thread is not None and _run_thread.is_alive():
+            _run_thread.join(timeout=2.0)
+        _program_stopped = False
+        _console_append(f"=== loaded: {prog['label']} ===")
+        t = threading.Thread(target=_run_program_thread, args=(prog["path"],),
+                             name=f"abcl-prog-{key}", daemon=True)
+        _run_thread = t
+        t.start()
+        return True
+
+
+def stop_program() -> None:
+    """中止 — halt the current program by shutting down all its actors.
+    Start (or Switch) brings a program back."""
+    global _program_stopped
+    import aipl_runtime
+    with _run_lock:
+        aipl_runtime.resume_all()        # unstick parked actors so stop lands
+        with _introspect_lock:
+            cur = _interp_ref
+        if cur is not None:
+            try:
+                cur.scheduler.shutdown()
+            except Exception:
+                pass
+        _program_stopped = True
+        _console_append("=== program stopped ===")
 
 
 def _json_safe(v):
@@ -341,8 +461,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_actors_html()
         elif self.path.startswith("/api/actors"):
             self._serve_actors_json()
+        elif self.path.startswith("/api/programs"):
+            self._serve_programs_json()
         elif self.path.startswith("/api/program"):
             self._serve_program_json()
+        elif self.path.startswith("/api/console"):
+            self._serve_console_json()
         elif self.path == "/" or self.path.startswith("/?"):
             self._serve_html()
         else:
@@ -399,8 +523,31 @@ class _Handler(BaseHTTPRequestHandler):
             self._handle_chat_send()
         elif self.path.startswith("/api/control"):
             self._handle_control()
+        elif self.path.startswith("/api/load"):
+            self._handle_load()
         else:
             self.send_error(404, "Not Found")
+
+    def _serve_programs_json(self):
+        cur_key = _selected_key
+        if not cur_key:
+            with _introspect_lock:
+                cur = _program_path
+            cur_key = os.path.basename(cur) if cur else ""
+        progs = [{"key": p["key"], "label": p["label"]} for p in _PROGRAMS]
+        self._send_bytes(200, "application/json",
+                         json.dumps({"programs": progs, "current": cur_key}).encode("utf-8"))
+
+    def _handle_load(self):
+        data = self._read_json_body() or {}
+        key = str(data.get("program", ""))
+        ok = False
+        try:
+            ok = load_program(key)
+        except Exception:
+            ok = False
+        self._send_bytes(200, "application/json",
+                         json.dumps({"ok": ok, "program": key}).encode("utf-8"))
 
     def _handle_control(self):
         """Start / pause / resume the actor scheduler from the dashboard.
@@ -409,15 +556,29 @@ class _Handler(BaseHTTPRequestHandler):
         action = str(data.get("action", "")).lower()
         try:
             import aipl_runtime
-            if action in ("pause", "suspend", "中断"):
+            if action in ("pause", "suspend"):
                 aipl_runtime.pause_all()
-            elif action in ("start", "resume", "run", "開始", "再開"):
+            elif action in ("resume", "run"):
                 aipl_runtime.resume_all()
+            elif action in ("start", "restart"):
+                # run the program selected in the dropdown (or the current one)
+                key = str(data.get("program", "")) or _selected_key
+                if not key:
+                    with _introspect_lock:
+                        cp = _program_path
+                    key = os.path.basename(cp) if cp else ""
+                if key:
+                    load_program(key)
+            elif action in ("stop", "abort"):
+                stop_program()
             paused = aipl_runtime.is_paused()
         except Exception:
             paused = False
+        with _introspect_lock:
+            started = _interp_ref is not None
         self._send_bytes(200, "application/json",
-                         json.dumps({"paused": paused}).encode("utf-8"))
+                         json.dumps({"paused": paused, "stopped": _program_stopped,
+                                     "started": started}).encode("utf-8"))
 
     def _handle_chat_send(self):
         data = self._read_json_body()
@@ -629,7 +790,8 @@ class _Handler(BaseHTTPRequestHandler):
             _paused = aipl_runtime.is_paused()
         except Exception:
             _paused = False
-        out = {"paused": _paused, "actors": []}
+        out = {"paused": _paused, "stopped": _program_stopped,
+               "started": interp is not None, "actors": []}
         for a in actors:
             try:
                 cls = getattr(getattr(a, "cls", None), "name", "?")
@@ -642,17 +804,45 @@ class _Handler(BaseHTTPRequestHandler):
                     mbox = 0
                 stopped = bool(getattr(a, "_stopped", False))
                 state = "stopped" if stopped else ("busy" if mbox > 0 else "idle")
+                th = getattr(a, "_thread", None)
+                tid = getattr(th, "ident", None) if th is not None else None
+                alive = bool(th.is_alive()) if th is not None else False
                 out["actors"].append({
                     "name":    str(getattr(a, "name", "?")),
                     "class":   str(cls),
                     "state":   state,
                     "mailbox": mbox,
+                    "thread":  tid,
+                    "alive":   alive,
                     "fields":  fields,
                 })
             except Exception:
                 continue
         self._send_bytes(200, "application/json",
                          json.dumps(out).encode("utf-8"))
+
+    def _serve_console_json(self):
+        """Return console lines newer than ?since=<head>.  The client tracks
+        the returned head and only appends the new tail each poll."""
+        since = 0
+        q = self.path.split("?", 1)
+        if len(q) == 2:
+            for kv in q[1].split("&"):
+                if kv.startswith("since="):
+                    try:
+                        since = int(kv[6:])
+                    except ValueError:
+                        since = 0
+        with _console_lock:
+            head = _console_head
+            buffered = len(_console_lines)
+            first = head - buffered          # head index of _console_lines[0]
+            if since < first:
+                since = first                # client fell behind the ring
+            tail = _console_lines[since - first:] if since <= head else []
+            lines = list(tail)
+        self._send_bytes(200, "application/json",
+                         json.dumps({"head": head, "lines": lines}).encode("utf-8"))
 
     def _serve_program_json(self):
         with _introspect_lock:
@@ -1012,21 +1202,30 @@ _ACTORS_HTML = """<!doctype html>
  .bar{margin:8px 0 4px} button{font-family:inherit;font-size:13px;padding:6px 14px;margin-right:8px;
    border:1px solid #3b4757;border-radius:5px;background:#1a2430;color:#d8dee9;cursor:pointer}
  button:hover{background:#243042} #b_start{border-color:#a3be8c} #b_pause{border-color:#ebcb8b}
- #b_resume{border-color:#88c0d0}
+ #b_resume{border-color:#88c0d0} #b_stop{border-color:#bf616a}
  #runstate{font-weight:bold;margin-left:8px} .running{color:#a3be8c} .paused{color:#ebcb8b}
+ .stopped{color:#bf616a} .notstarted{color:#7a8a99}
 </style></head><body>
 <h1>Py-I &mdash; AIPL interpreter (live)</h1>
 <div class="bar">
- <button id="b_start" onclick="ctl('start')">&#9654; 開始 Start</button>
- <button id="b_pause" onclick="ctl('pause')">&#10073;&#10073; 中断 Suspend</button>
- <button id="b_resume" onclick="ctl('resume')">&#8635; 再開 Resume</button>
- <span id="runstate" class="running">running</span>
+ <label for="progsel">Program:</label>
+ <select id="progsel" style="font-family:inherit;font-size:13px;padding:5px;background:#11161d;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;min-width:340px"></select>
+ <button id="b_switch" onclick="switchProgram()" style="border-color:#b48ead">Switch / Load</button>
+</div>
+<div class="bar">
+ <button id="b_start" onclick="ctl('start')">&#9654; Start</button>
+ <button id="b_pause" onclick="ctl('pause')">&#10073;&#10073; Suspend</button>
+ <button id="b_resume" onclick="ctl('resume')">&#8635; Resume</button>
+ <button id="b_stop" onclick="ctl('stop')">&#9632; End</button>
+ <span id="runstate" class="notstarted">not started</span>
 </div>
 <div class="meta">program: <span id="path">(loading)</span> &nbsp;|&nbsp; actors: <b id="count">0</b>
  &nbsp;|&nbsp; classes: <span id="classes" class="cls"></span> &nbsp;|&nbsp; updated <span id="ts"></span></div>
 <h2>Running actors</h2>
-<table><thead><tr><th>name</th><th>class</th><th>state</th><th>mailbox</th><th>fields (state)</th></tr></thead>
+<table><thead><tr><th>name</th><th>class</th><th>state</th><th>mailbox</th><th>thread</th><th>fields (state)</th></tr></thead>
 <tbody id="abody"><tr><td colspan="5">(loading)</td></tr></tbody></table>
+<h2>Console &mdash; print() output</h2>
+<pre id="console" style="max-height:300px;color:#40ff80">(waiting for output...)</pre>
 <h2>Current program</h2>
 <pre id="src">(loading)</pre>
 <script>
@@ -1038,32 +1237,76 @@ async function loadProg(){
   document.getElementById('src').textContent=p.source||'(source unavailable)';
  }catch(e){}
 }
-function setState(paused){
+function setState(paused,stopped,started){
  const el=document.getElementById('runstate');
- el.textContent=paused?'paused':'running';
- el.className=paused?'paused':'running';
+ let s,cls;
+ if(started===false){s='not started';cls='notstarted';}
+ else if(stopped){s='ended';cls='stopped';}
+ else if(paused){s='paused';cls='paused';}
+ else {s='running';cls='running';}
+ el.textContent=s; el.className=cls;
 }
 async function ctl(action){
+ const body={action};
+ if(action==='start'){ const sel=document.getElementById('progsel');
+   if(sel&&sel.value) body.program=sel.value;
+   conSince=0; document.getElementById('console').textContent=''; }
  try{ const r=await fetch('/api/control',{method:'POST',
-       headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
-  const d=await r.json(); setState(d.paused);
+       headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json(); setState(d.paused,d.stopped,d.started);
+  if(action==='start'){ setTimeout(tick,400); setTimeout(loadProg,500); }
  }catch(e){}
 }
 async function tick(){
  try{ const a=await (await fetch('/api/actors')).json();
   document.getElementById('count').textContent=a.actors.length;
   document.getElementById('ts').textContent=new Date().toLocaleTimeString();
-  setState(a.paused);
+  setState(a.paused,a.stopped,a.started);
   const rows=a.actors.map(x=>{
    const f=Object.entries(x.fields||{}).map(([k,v])=>k+'='+esc(JSON.stringify(v))).join('   ');
+   const th=(x.alive!==false&&x.thread!=null)?('#'+x.thread):'(dead)';
    return '<tr><td>'+esc(x.name)+'</td><td class="cls">'+esc(x['class'])+'</td>'+
           '<td class="'+x.state+'">'+x.state+'</td><td>'+x.mailbox+'</td>'+
+          '<td>'+esc(th)+'</td>'+
           '<td class="fields">'+f+'</td></tr>';
   }).join('');
   document.getElementById('abody').innerHTML=rows||'<tr><td colspan="5">(no actors)</td></tr>';
  }catch(e){}
 }
-loadProg(); tick(); setInterval(tick,1000); setInterval(loadProg,5000);
+let conSince=0;
+async function conTick(){
+ try{ const c=await (await fetch('/api/console?since='+conSince)).json();
+  conSince=c.head;
+  if(c.lines && c.lines.length){
+   const el=document.getElementById('console');
+   if(el.textContent==='(waiting for output...)') el.textContent='';
+   const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
+   el.textContent += c.lines.join('\\n')+'\\n';
+   if(el.textContent.length>40000) el.textContent=el.textContent.slice(-40000);
+   if(atBottom) el.scrollTop=el.scrollHeight;
+  }
+ }catch(e){}
+}
+async function loadPrograms(){
+ try{ const p=await (await fetch('/api/programs')).json();
+  const sel=document.getElementById('progsel');
+  if(document.activeElement===sel) return;        // don't fight the user
+  sel.innerHTML=(p.programs||[]).map(x=>
+    '<option value="'+esc(x.key)+'"'+(x.key===p.current?' selected':'')+'>'+esc(x.label)+'</option>').join('');
+ }catch(e){}
+}
+async function switchProgram(){
+ const sel=document.getElementById('progsel');
+ const key=sel.value; if(!key) return;
+ const b=document.getElementById('b_switch'); b.disabled=true; b.textContent='Loading...';
+ try{ await fetch('/api/load',{method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({program:key})});
+  conSince=0; document.getElementById('console').textContent='';
+ }catch(e){}
+ setTimeout(()=>{b.disabled=false;b.textContent='Switch / Load';loadProg();},800);
+}
+loadPrograms(); loadProg(); tick(); conTick();
+setInterval(tick,1000); setInterval(loadProg,5000); setInterval(conTick,500); setInterval(loadPrograms,5000);
 </script></body></html>
 """
 
