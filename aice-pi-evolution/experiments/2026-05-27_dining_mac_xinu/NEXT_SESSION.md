@@ -12,7 +12,7 @@
 - **Xinu (実機 Pi3)**: `/Users/kodamay/projects/xinu-raz/xinu`, branch `arm-rpi3-port`,
   HEAD `62b13d9` (suicide + reset + 50-meal)。remote `yaskodama/xinu-rpi`。
 - **Mac (Py-I 等)**: `/Users/kodamay/ocaml-app/abclcp-project`, branch `main`,
-  HEAD `bd85966` (ring 可視化)。remote `yaskodama/aios-claude`。
+  HEAD `ef3caff` (有限バッファデモ + 速度スライダー)。remote `yaskodama/aios-claude`。
 - ★`src/python-aipl/aipl_ai.py` は**未コミットのまま温存**(ユーザ指示)。モデル default の
   env override。触らない・コミットしない。
 
@@ -52,10 +52,14 @@ python3 src/python-aipl/aipl_main.py --dashboard 8899 \
 ```
 - ダッシュボードがプログラムのライフサイクルを管理 (main は常駐)。**未開始で起動**。
 - UI: Program セレクタ + **Switch/Load** / **Start** / **Suspend** / **Resume** / **End**、
-  状態 (not started/running/paused/stopped/ended)、**リング可視化** (哲学者を色分け +
-  フォークを使用 2 名の中点に配置 + 保持フォーク→保持者へ緑矢印)、**Console** (print 出力)、
+  状態 (not started/running/paused/stopped/ended)、**可視化** (canvas 760×360)、**Console** (print 出力)、
   アクター表 (thread id 付き = 各アクターは別 threading.Thread)、Current program ソース。
-- API: `GET /api/programs|actors|program|console` , `POST /api/load|control`。
+  - 可視化は実行中のクラスで自動切替 (`aipl_dashboard.py` の `drawViz`): Philosopher/Node/Fork →
+    **リング** (哲学者を色分け + フォークを使用 2 名の中点に配置 + 保持フォーク→保持者へ緑矢印)、
+    Buffer → **有限バッファ** (`drawBuffer`: 20 スロットを横一列 1 段で表示, 満=値表示,
+    head=水色枠/tail=橙枠, producer 上→帯→consumer 下のフロー矢印)。
+  - ★`_json_safe` は list/tuple を再帰して JSON 配列にする (Buffer の `slots` 配列を図に出すため)。
+- API: `GET /api/programs|actors|program|console` , `POST /api/load|control|speed`。
 - 切替対象 (実験ディレクトリ内の *.abcl を自動列挙):
   - `local_diners.abcl` — **local 5** (Pi 不要, 全 5 哲学者+5 fork 可視化, 50 食, suicide)
   - `dine_dynamic.abcl` — **3 Mac + 2 Xinu, 動的** (要 Pi)。冒頭で RESET → ソース送付(LOAD)→
@@ -63,6 +67,13 @@ python3 src/python-aipl/aipl_main.py --dashboard 8899 \
   - `mac_diners.abcl` — **3 Mac + 2 Xinu, 静的** (要 Pi)。RESET → SPAWN (事前リンク済クラス, 動的
     コンパイルなし) → 50 食 + suicide。**何度でも再ラン可**。
   - `ring_demo.abcl` — local token ring 4 (Pi 不要, 切替テスト用)。
+  - `bounded_buffer.abcl` — **有限バッファ (producer/consumer)** local (Pi 不要)。
+    1 個の Buffer アクターが容量 **20** のリングを所有 (mailbox 順序 = 相互排他, 追加ロック無し)。
+    Producer ×2 (各 80 個) / Consumer ×2。満杯なら `refused`→バックオフ (back-pressure)、
+    空なら `empty`→待機。全 producer 完了 + drain 後に consumer へ `closed`→suicide で終了。
+    ★**速度スライダー**: 可視化下に Producer/Consumer interval の 2 本のレンジバー (50–2000ms,
+    左=速い)。ドラッグで `POST /api/speed {produce_ms,consume_ms}` → 実行中アクターの `delay`
+    フィールドを直接書換 (再起動不要、次の 1 個目から反映)。`Buffer` アクターがいる時のみ表示。
 - AIPL ビルトイン: `suicide()` (自アクター終了), `remote_call/remote_now(hub,"_",op,...)` で
   `reset/spawn/load/compile/run/ping/list` + `field`/メソッド送信。hub=`uart1://192.168.3.50:5555`。
 

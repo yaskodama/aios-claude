@@ -13,6 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
       <li><a href="/bounded_buffer.html">Bounded Buffer</a> &mdash; producer / consumer with capacity 4</li>
       <li><a href="/drone_simulator.html">Drone Return-Route Simulator</a> &mdash; MANET-style obstacle diffusion</li>
     </ul>
+    <h3>Local Generative AI</h3>
+    <ul>
+      <li><a href="http://127.0.0.1:7861/" target="_blank">Local Generative AI</a> &mdash; local LLM chat (Ollama: gemma3 / llama3.2 / gemma2), runs entirely on this machine</li>
+    </ul>
     <h3>Console</h3>
     <button id="openBrowserConsole">Open Browser Console</button>
   </div>
