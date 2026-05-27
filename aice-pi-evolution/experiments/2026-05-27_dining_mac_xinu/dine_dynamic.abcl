@@ -52,7 +52,7 @@ class Philosopher {
   var my_id        = 0;
   var lo_fork      = "0";
   var hi_fork      = "0";
-  var meals_target = 25;
+  var meals_target = 200;
   var meals_done   = 0;
   var attempts     = 0;
   var hub          = "uart1://192.168.3.50:5555";
@@ -99,6 +99,6 @@ class Philosopher {
 }
 
 print("--- launching 3 Mac philosophers ---");
-var p1 = new Philosopher(1, "0", "4", 25);
-var p2 = new Philosopher(2, "0", "1", 25);
-var p3 = new Philosopher(3, "1", "2", 25);
+var p1 = new Philosopher(1, "0", "4", 200);
+var p2 = new Philosopher(2, "0", "1", 200);
+var p3 = new Philosopher(3, "1", "2", 200);
