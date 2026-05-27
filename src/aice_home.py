@@ -1,43 +1,212 @@
 """AICE home — a portal page (kodama-lab.com style) linking to every AIPL
 runtime dashboard / server built in this project.
 
+Each card now has Start / Stop / Open buttons and a live status LED.  The
+portal launches the documented dashboard commands itself (server-side
+allowlist in TARGETS — no arbitrary commands), polls each port for liveness,
+and can stop the processes it started.
+
 Run:
     python3 src/aice_home.py            # serves http://127.0.0.1:8888/
 """
 
 from __future__ import annotations
 
+import json
 import os
+import signal
+import socket
+import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
+
+# repo root, derived from this file's location (src/aice_home.py)
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Server-side allowlist. Only these ids can be started; the launch command and
+# working directory are fixed here, never taken from the request.
+TARGETS = [
+    {
+        "id": "pyi",
+        "glyph": "Py&middot;I",
+        "portlabel": ":8899/actors",
+        "title": "Py-I &mdash; Python runtime",
+        "desc": "Actor dashboard: dining philosophers, bounded buffer (capacity 20 + live speed sliders), token ring. Live actor table, console, ring/buffer visualization.",
+        "addr": "127.0.0.1:8899/actors",
+        "href": "http://127.0.0.1:8899/actors",
+        "port": 8899,
+        "cwd": REPO,
+        "cmd": "python3 src/python-aipl/aipl_main.py --dashboard 8899 "
+               "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl",
+    },
+    {
+        "id": "ocaml",
+        "glyph": "OCaml",
+        "portlabel": ":8080/dashboard",
+        "title": "OCaml &mdash; web gateway",
+        "desc": "Reference runtime. Program selector (philosophers / bounded buffer + speed sliders / ping-pong / counter / hello), actor table, console, buffer viz, and source view.",
+        "addr": "localhost:8080/dashboard",
+        "href": "http://localhost:8080/dashboard",
+        "port": 8080,
+        "cwd": REPO,
+        "cmd": "dune build && { printf 'load src/gateway_launch.abcl\\ncompile\\n'; "
+               "sleep 1000000; } | _build/default/src/repl_thread.exe",
+    },
+    {
+        "id": "evo",
+        "glyph": "Evolve",
+        "portlabel": ":8700",
+        "title": "Evolution pipeline",
+        "desc": "Type a goal, then convert step by step: <b>goal &rarr; .aice &rarr; .ga.json &rarr; .aipl</b>. LLM-assisted, with a dropdown of past experiments.",
+        "addr": "127.0.0.1:8700",
+        "href": "http://127.0.0.1:8700/",
+        "port": 8700,
+        "cwd": os.path.join(REPO, "aice-evolution-v2"),
+        "cmd": "python3 evolution_dashboard.py",
+    },
+    {
+        "id": "node",
+        "glyph": "JS&middot;Node",
+        "portlabel": ":8090",
+        "title": "JavaScript &mdash; Node server",
+        "desc": "AIPL parsed &amp; run inside a Node process (<code>/api/run</code>). Editor + examples (incl. dining philosophers), type-check, console.",
+        "addr": "localhost:8090",
+        "href": "http://localhost:8090/",
+        "port": 8090,
+        "cwd": os.path.join(REPO, "src", "node-aipl-server"),
+        "cmd": "node server.mjs",
+    },
+    {
+        "id": "web",
+        "glyph": "JS&middot;Web",
+        "portlabel": ":8765",
+        "title": "JavaScript &mdash; in-browser",
+        "desc": "No backend interpreter: AIPL runs entirely in the browser. Demos &mdash; philosophers, bounded buffer (visual), rotating threads, cooperative AI chat, drone simulator.",
+        "addr": "127.0.0.1:8765",
+        "href": "http://127.0.0.1:8765/",
+        "port": 8765,
+        "cwd": os.path.join(REPO, "src", "browser-abcl"),
+        "cmd": "python3 -m http.server 8765 --bind 127.0.0.1",
+    },
+    {
+        "id": "c",
+        "glyph": "C",
+        "portlabel": ":8095",
+        "title": "C &mdash; native + multi-target",
+        "desc": "AIPL &rarr; C &rarr; compiled native binary, showing generated source and stdout. Target selector: C / Erlang / Prolog / Go / Pony / Python / LLVM / OpenMP / Xinu.",
+        "addr": "127.0.0.1:8095",
+        "href": "http://127.0.0.1:8095/",
+        "port": 8095,
+        "cwd": REPO,
+        "cmd": "dune build && python3 src/c_dashboard.py",
+    },
+]
+TARGET_BY_ID = {t["id"]: t for t in TARGETS}
+
+# id -> Popen for processes this portal launched (so we can stop them)
+_PROCS: dict[str, subprocess.Popen] = {}
+
+
+def _is_up(port: int, host: str = "127.0.0.1") -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.25)
+        return s.connect_ex((host, port)) == 0
+
+
+def _status() -> dict:
+    out = {}
+    for t in TARGETS:
+        proc = _PROCS.get(t["id"])
+        ours = proc is not None and proc.poll() is None
+        out[t["id"]] = {"up": _is_up(t["port"]), "ours": ours}
+    return out
+
+
+def _start(tid: str) -> dict:
+    t = TARGET_BY_ID.get(tid)
+    if t is None:
+        return {"ok": False, "error": "unknown target"}
+    if _is_up(t["port"]):
+        return {"ok": True, "already": True}
+    logpath = f"/tmp/aice_{tid}.log"
+    log = open(logpath, "ab")
+    proc = subprocess.Popen(
+        t["cmd"], shell=True, cwd=t["cwd"],
+        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    _PROCS[tid] = proc
+    return {"ok": True, "pid": proc.pid, "log": logpath}
+
+
+def _stop(tid: str) -> dict:
+    proc = _PROCS.get(tid)
+    if proc is None or proc.poll() is not None:
+        return {"ok": False, "error": "not started by this portal — stop it manually"}
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    return {"ok": True}
 
 
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def _send(self, body: bytes, ctype: str, code: int = 200):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json(self, obj, code: int = 200):
+        self._send(json.dumps(obj).encode("utf-8"), "application/json", code)
+
     def do_GET(self):
-        if self.path == "/" or self.path.startswith("/?"):
-            body = _PAGE.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
+        path = urlparse(self.path).path
+        if path == "/":
+            self._send(_PAGE.encode("utf-8"), "text/html; charset=utf-8")
+        elif path == "/api/status":
+            self._json(_status())
+        else:
+            self.send_response(404)
             self.end_headers()
-            self.wfile.write(body)
+
+    def do_POST(self):
+        u = urlparse(self.path)
+        tid = (parse_qs(u.query).get("target") or [""])[0]
+        if u.path == "/api/start":
+            self._json(_start(tid))
+        elif u.path == "/api/stop":
+            self._json(_stop(tid))
         else:
             self.send_response(404)
             self.end_headers()
 
 
-def start(port: int = 8888):
-    srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
-    print(f"[aice-home] http://127.0.0.1:{port}/")
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
+def _render_cards() -> str:
+    out = []
+    for t in TARGETS:
+        out.append(f"""
+  <div class="card" data-id="{t['id']}">
+   <div class="thumb"><span class="glyph">{t['glyph']}</span><span class="port">{t['portlabel']}</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>{t['title']}</h3>
+    <p>{t['desc']}</p>
+    <span class="addr">{t['addr']}</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="{t['href']}">Open &#8599;</button>
+    </div></div>
+  </div>""")
+    return "".join(out)
 
 
-_PAGE = r"""<!doctype html>
+_PAGE_TMPL = r"""<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -106,13 +275,18 @@ _PAGE = r"""<!doctype html>
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .35s;pointer-events:none}
  .card:hover{transform:translateY(-4px);border-color:transparent;box-shadow:0 18px 40px rgba(0,63,140,.18),0 0 0 1px rgba(240,131,0,.22)}
  .card:hover::before{opacity:1}
- .card .cover{position:absolute;inset:0;z-index:3}
  .thumb{aspect-ratio:16/7;display:flex;align-items:center;justify-content:center;position:relative;
   background:var(--grad-soft);border-bottom:1px solid var(--border)}
  .thumb .glyph{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;letter-spacing:.02em;
   background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
  .thumb .port{position:absolute;left:12px;bottom:10px;font-family:'Space Grotesk',monospace;font-size:12px;
   color:var(--primary-strong);background:rgba(255,255,255,.7);border:1px solid var(--border);padding:2px 8px;border-radius:7px}
+ .thumb .status{position:absolute;right:12px;bottom:10px;display:flex;align-items:center;gap:6px;
+  font-family:'Space Grotesk',monospace;font-size:11px;color:var(--text-mute);
+  background:rgba(255,255,255,.7);border:1px solid var(--border);padding:2px 8px;border-radius:7px}
+ .status .led{width:8px;height:8px;border-radius:50%;background:#c2ccdb;transition:all .3s}
+ .status.up{color:#1c9c55}
+ .status.up .led{background:#1faa59;box-shadow:0 0 0 3px rgba(31,170,89,.18)}
  .arrow{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;background:var(--accent);
   border:1px solid var(--accent-strong);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;
   opacity:0;transform:scale(.8);transition:all .3s;z-index:2}
@@ -121,6 +295,16 @@ _PAGE = r"""<!doctype html>
  .body h3{margin:0;font-size:16px;font-weight:600;color:var(--text)}
  .body p{margin:0;font-size:13px;color:var(--text-dim)}
  .body .addr{margin-top:4px;font-family:'Space Grotesk',monospace;font-size:12px;color:var(--accent-strong)}
+ .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+ .btn{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;
+  padding:7px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text);transition:all .2s}
+ .btn:hover{border-color:var(--accent);color:var(--accent-strong)}
+ .btn:disabled{opacity:.45;cursor:not-allowed}
+ .btn-start{background:var(--primary);color:#fff;border-color:var(--primary-strong)}
+ .btn-start:hover:not(:disabled){background:var(--primary-strong);color:#fff}
+ .btn-open{margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent-strong)}
+ .btn-open:hover:not(:disabled){background:var(--accent-strong);color:#fff}
  .note{background:var(--surface-soft);border:1px solid var(--border);border-radius:var(--radius);
   padding:14px 18px;color:var(--text-dim);font-size:13px}
  .note code{background:var(--primary-soft);color:var(--primary-strong);padding:1px 6px;border-radius:6px;font-size:12px}
@@ -156,63 +340,9 @@ _PAGE = r"""<!doctype html>
 </div>
 
 <section class="container" id="dashboards">
- <div class="sec-head"><h2>Dashboards</h2><span class="ribbon"></span><span class="num">RUNNING SERVERS</span></div>
+ <div class="sec-head"><h2>Dashboards</h2><span class="ribbon"></span><span class="num">START &middot; STOP &middot; OPEN</span></div>
  <div class="grid">
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://127.0.0.1:8899/actors" aria-label="Py-I dashboard"></a>
-   <div class="thumb"><span class="glyph">Py&middot;I</span><span class="port">:8899/actors</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>Py-I &mdash; Python runtime</h3>
-    <p>Actor dashboard: dining philosophers, bounded buffer (capacity 20 + live speed sliders), token ring. Live actor table, console, ring/buffer visualization.</p>
-    <span class="addr">127.0.0.1:8899/actors</span></div>
-  </div>
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://localhost:8080/dashboard" aria-label="OCaml gateway dashboard"></a>
-   <div class="thumb"><span class="glyph">OCaml</span><span class="port">:8080/dashboard</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>OCaml &mdash; web gateway</h3>
-    <p>Reference runtime. Program selector (philosophers / bounded buffer + speed sliders / ping-pong / counter / hello), actor table, console, buffer viz, and source view.</p>
-    <span class="addr">localhost:8080/dashboard</span></div>
-  </div>
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://127.0.0.1:8700/" aria-label="Evolution pipeline"></a>
-   <div class="thumb"><span class="glyph">Evolve</span><span class="port">:8700</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>Evolution pipeline</h3>
-    <p>Type a goal, then convert step by step: <b>goal &rarr; .aice &rarr; .ga.json &rarr; .aipl</b>. LLM-assisted, with a dropdown of past experiments.</p>
-    <span class="addr">127.0.0.1:8700</span></div>
-  </div>
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://localhost:8090/" aria-label="JS Node server"></a>
-   <div class="thumb"><span class="glyph">JS&middot;Node</span><span class="port">:8090</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>JavaScript &mdash; Node server</h3>
-    <p>AIPL parsed &amp; run inside a Node process (<code>/api/run</code>). Editor + examples (incl. dining philosophers), type-check, console.</p>
-    <span class="addr">localhost:8090</span></div>
-  </div>
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://127.0.0.1:8765/" aria-label="JS browser runtime"></a>
-   <div class="thumb"><span class="glyph">JS&middot;Web</span><span class="port">:8765</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>JavaScript &mdash; in-browser</h3>
-    <p>No backend interpreter: AIPL runs entirely in the browser. Demos &mdash; philosophers, bounded buffer (visual), rotating threads, cooperative AI chat, drone simulator.</p>
-    <span class="addr">127.0.0.1:8765</span></div>
-  </div>
-
-  <div class="card">
-   <a class="cover" target="_blank" href="http://127.0.0.1:8095/" aria-label="C runtime dashboard"></a>
-   <div class="thumb"><span class="glyph">C</span><span class="port">:8095</span></div>
-   <span class="arrow">&#8599;</span>
-   <div class="body"><h3>C &mdash; native + multi-target</h3>
-    <p>AIPL &rarr; C &rarr; compiled native binary, showing generated source and stdout. Target selector: C / Erlang / Prolog / Go / Pony / Python / LLVM / OpenMP / Xinu.</p>
-    <span class="addr">127.0.0.1:8095</span></div>
-  </div>
-
+<!--CARDS-->
  </div>
 </section>
 
@@ -227,8 +357,10 @@ _PAGE = r"""<!doctype html>
   <div class="rt"><h4>Transpile</h4><p>Erlang / Prolog / Go / Pony / Python / LLVM / OpenMP / Xinu source.</p></div>
  </div>
  <div class="note" style="margin-top:18px">
-  これらはローカル開発サーバです。リンクが開かない場合は、対象のダッシュボードを起動してください
-  &mdash; 起動コマンド・ポート一覧は <code>docs/DASHBOARDS_NEXT_SESSION.md</code> を参照。
+  各カードの <b>Start</b> ボタンでローカル開発サーバを起動できます（このポータルが起動コマンドを実行します）。
+  緑の LED は稼働中、灰色は停止中。<b>Stop</b> はこのポータルが起動したプロセスのみ停止できます。
+  OCaml / C は初回に <code>dune build</code> が走るため起動までに少し時間がかかります。
+  手動の起動コマンド・ポート一覧は <code>docs/DASHBOARDS_NEXT_SESSION.md</code> を参照。
  </div>
 </section>
 
@@ -238,9 +370,55 @@ _PAGE = r"""<!doctype html>
   <span>Copyright &copy; 2000&ndash;2026 &middot; styled after kodama-lab.com</span>
  </div>
 </footer>
+
+<script>
+async function refresh(){
+  let s={};
+  try{ s = await (await fetch('/api/status')).json(); }catch(e){ return; }
+  document.querySelectorAll('.card').forEach(card=>{
+    const st = s[card.dataset.id] || {};
+    const badge = card.querySelector('[data-status]');
+    badge.classList.toggle('up', !!st.up);
+    badge.querySelector('.txt').textContent = st.up ? 'running' : 'stopped';
+    const start = card.querySelector('[data-start]');
+    const stop  = card.querySelector('[data-stop]');
+    if(start.dataset.busy!=='1'){ start.disabled = !!st.up; start.textContent = 'Start'; }
+    stop.disabled = !st.ours;
+  });
+}
+document.addEventListener('click', async (e)=>{
+  const card = e.target.closest('.card'); if(!card) return;
+  const id = card.dataset.id;
+  if(e.target.matches('[data-href]')){ window.open(e.target.dataset.href,'_blank'); return; }
+  if(e.target.matches('[data-start]')){
+    const b=e.target; b.dataset.busy='1'; b.disabled=true; b.textContent='Starting…';
+    try{ await fetch('/api/start?target='+encodeURIComponent(id),{method:'POST'}); }catch(err){}
+    let n=0; const iv=setInterval(()=>{ refresh(); if(++n>=10){ clearInterval(iv); b.dataset.busy='0'; refresh(); } }, 1200);
+    return;
+  }
+  if(e.target.matches('[data-stop]')){
+    e.target.disabled=true;
+    try{ await fetch('/api/stop?target='+encodeURIComponent(id),{method:'POST'}); }catch(err){}
+    setTimeout(refresh, 700);
+  }
+});
+refresh(); setInterval(refresh, 4000);
+</script>
 </body>
 </html>
 """
+
+_PAGE = _PAGE_TMPL.replace("<!--CARDS-->", _render_cards())
+
+
+def start(port: int = 8888):
+    srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    print(f"[aice-home] http://127.0.0.1:{port}/")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
 
 if __name__ == "__main__":
     start(int(os.environ.get("AICE_HOME_PORT", "8888")))
