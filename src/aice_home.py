@@ -89,6 +89,18 @@ TARGETS = [
         "cmd": "python3 -m http.server 8765 --bind 127.0.0.1",
     },
     {
+        "id": "genai",
+        "glyph": "GenAI",
+        "portlabel": ":7861",
+        "title": "Local Generative AI",
+        "desc": "Local LLM chat (Ollama: gemma3 / llama3.2 / gemma2), linked from the JS&middot;Web in-browser page. Runs entirely on this machine via the local Ollama API &mdash; no external network call.",
+        "addr": "127.0.0.1:7861",
+        "href": "http://127.0.0.1:7861/",
+        "port": 7861,
+        "cwd": REPO,
+        "cmd": "local-genai/.venv/bin/python local-genai/ollama_chat.py",
+    },
+    {
         "id": "c",
         "glyph": "C",
         "portlabel": ":8095",
@@ -303,6 +315,7 @@ _PAGE_TMPL = r"""<!doctype html>
  .btn:disabled{opacity:.45;cursor:not-allowed}
  .btn-start{background:var(--primary);color:#fff;border-color:var(--primary-strong)}
  .btn-start:hover:not(:disabled){background:var(--primary-strong);color:#fff}
+ .linkcard .body{flex:1;justify-content:center}
  .btn-open{margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent-strong)}
  .btn-open:hover:not(:disabled){background:var(--accent-strong);color:#fff}
  .note{background:var(--surface-soft);border:1px solid var(--border);border-radius:var(--radius);
@@ -324,7 +337,7 @@ _PAGE_TMPL = r"""<!doctype html>
  <div class="barwrap">
   <div class="brand"><span class="dot"></span><span class="grad-text">AICE</span>
    <small>AI&middot;Coevolution &mdash; AIPL Runtime Portal</small></div>
-  <div class="navlink"><a href="#dashboards">Dashboards</a></div>
+  <div class="navlink"><a href="#robot">Robot</a> <a href="#dashboards">Dashboards</a></div>
  </div>
 </header>
 
@@ -338,6 +351,19 @@ _PAGE_TMPL = r"""<!doctype html>
   <span class="pill">MAP-Elites evolution</span><span class="pill">AIPL &rarr; C / Erlang / Prolog / Go &hellip;</span>
  </div>
 </div>
+
+<section class="container" id="robot">
+ <div class="sec-head"><h2>Robot</h2><span class="ribbon"></span><span class="num">VIDEO &middot; EDITOR</span></div>
+ <div class="grid">
+  <a class="card linkcard" target="_blank" rel="noopener" href="https://lecture.site44.com/index-ro03-editor2.html">
+   <div class="thumb"><span class="glyph">&#129302;</span><span class="port">site44.com</span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>ロボット動画 &mdash; Robot editor</h3>
+    <p>Block-based robot programming &amp; video lecture, hosted at lecture.site44.com. Opens in a new tab.</p>
+    <span class="addr">lecture.site44.com/index-ro03-editor2.html</span></div>
+  </a>
+ </div>
+</section>
 
 <section class="container" id="dashboards">
  <div class="sec-head"><h2>Dashboards</h2><span class="ribbon"></span><span class="num">START &middot; STOP &middot; OPEN</span></div>
