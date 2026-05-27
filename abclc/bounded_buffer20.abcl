@@ -1,0 +1,130 @@
+// bounded_buffer20.abcl — capacity-20 bounded buffer for the browser dashboard.
+//
+// Same async-message bounded-buffer logic as bounded_buffer.abcl, but the
+// 20 slots live in an array and the Producer / Consumer each carry an
+// adjustable `speed` (ms between items) that the dashboard's speed sliders
+// retune live via `send p0.set_speed(ms)` / `send c0.set_speed(ms)`.
+//
+// The console prints ([BUF] put=/get/FULL/EMPTY, [P0]/[C0]) drive the
+// browser visualization, which reconstructs the FIFO from these lines.
+
+class Buffer {
+  var cap   = 20;
+  var slots = array_empty();   // filled with 20 zero slots in init()
+  var head  = 0;               // next slot to read
+  var tail  = 0;               // next slot to write
+  var count = 0;               // items currently buffered
+
+  var pwaiter = "";            // at most one queued producer
+  var pitem   = 0;
+  var cwaiter = "";            // at most one queued consumer
+
+  method init() {
+    var i = 0;
+    while (i < 20) do {
+      slots = array_push(slots, 0);
+      i = i + 1;
+    }
+  }
+
+  method put(item) {
+    if (cwaiter != "") {
+      // a consumer was waiting on an empty buffer — hand it over directly
+      send sender.put_ok();
+      send cwaiter.got(item);
+      print("[BUF] passthrough put=" + item);
+      cwaiter = "";
+    } else {
+      if (count == cap) {
+        pwaiter = sender;
+        pitem   = item;
+        print("[BUF] FULL  -- queued put=" + item);
+      } else {
+        slots = array_set(slots, tail, item);
+        tail = tail + 1;
+        if (tail == cap) { tail = 0; }
+        count = count + 1;
+        print("[BUF] put=" + item + "   count=" + count);
+        send sender.put_ok();
+      }
+    }
+  }
+
+  method get() {
+    if (count == 0) {
+      cwaiter = sender;
+      print("[BUF] EMPTY -- queued get");
+    } else {
+      send sender.got(array_get(slots, head));
+      head = head + 1;
+      if (head == cap) { head = 0; }
+      count = count - 1;
+      print("[BUF] get   count=" + count);
+      if (pwaiter != "") {
+        slots = array_set(slots, tail, pitem);
+        tail = tail + 1;
+        if (tail == cap) { tail = 0; }
+        count = count + 1;
+        print("[BUF] accepted queued put=" + pitem);
+        send pwaiter.put_ok();
+        pwaiter = "";
+      }
+    }
+  }
+}
+
+class Producer {
+  var id    = 0;
+  var buf   = "";
+  var n     = 0;
+  var max   = 0;
+  var speed = 250;        // ms between items — set live via set_speed
+
+  method init(myId, b, limit) {
+    id = myId; buf = b; max = limit;
+    send self.produce();
+  }
+  method set_speed(s) { speed = s; }
+  method produce() {
+    if (n == max) {
+      print("[P" + id + "] DONE");
+    } else {
+      n = n + 1;
+      print("[P" + id + "] -> put " + n);
+      send buf.put(n);
+    }
+  }
+  method put_ok() {
+    call wait(speed);
+    send self.produce();
+  }
+}
+
+class Consumer {
+  var id    = 0;
+  var buf   = "";
+  var taken = 0;
+  var max   = 0;
+  var speed = 500;        // ms to consume each item — set live via set_speed
+
+  method init(myId, b, limit) {
+    id = myId; buf = b; max = limit;
+    send buf.get();
+  }
+  method set_speed(s) { speed = s; }
+  method got(item) {
+    taken = taken + 1;
+    print("[C" + id + "] got " + item + "   (total=" + taken + ")");
+    if (taken == max) {
+      print("[C" + id + "] DONE");
+    } else {
+      call wait(speed);
+      send self.do_get();
+    }
+  }
+  method do_get() { send buf.get(); }
+}
+
+var buf = new Buffer();
+var p0  = new Producer(0, buf, 100);
+var c0  = new Consumer(0, buf, 100);

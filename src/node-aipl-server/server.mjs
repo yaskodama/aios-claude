@@ -198,25 +198,98 @@ function handleRun(source, opts = {}) {
 // HTTP server
 
 const STATUS_HTML = `<!doctype html>
-<html><head><meta charset="utf-8"><title>AIPL Node Server</title></head>
-<body style="font-family:sans-serif;max-width:60em;margin:2em auto;">
-<h1>AIPL Node.js server</h1>
-<p>The Node sibling of the OCaml <code>web_gateway</code>.
-Hosts the AIPL parser, flow-sensitive type checker, and interpreter
-inside a single Node process.</p>
-<h2>Endpoints</h2>
-<ul>
-<li><code>POST /api/typecheck</code> — body <code>{source}</code> returns
- inferred classes + errors</li>
-<li><code>POST /api/run</code> — body <code>{source, timeoutMs?, typecheck?}</code>
- executes and returns stdout</li>
-</ul>
-<p>Try:
-<pre>
-curl -X POST -H 'Content-Type: application/json' \\
-  -d '{"source":"class C{var x=0;method tick(){x=x+1;}}"}' \\
-  http://localhost:${PORT}/api/typecheck
-</pre></p>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AIPL Node.js Dashboard</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px;max-width:920px}
+ h2{margin:0 0 4px} h3{margin:14px 0 6px;color:#8fbcbb;font-size:14px}
+ .note{color:#7a8a99;font-size:12px}
+ .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+ select{font-family:inherit;font-size:13px;padding:5px;background:#11161d;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;min-width:300px}
+ button{font-family:inherit;font-size:13px;padding:7px 14px;background:#1c2530;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;cursor:pointer}
+ button:hover{background:#26313e} button.primary{background:#2e4b6e;border-color:#3b6ea5}
+ button:disabled{opacity:.5;cursor:default}
+ textarea{width:100%;box-sizing:border-box;background:#0b0f14;color:#d8dee9;border:1px solid #2a3340;border-radius:6px;font-family:inherit;font-size:13px;padding:8px;resize:vertical}
+ pre{background:#0b0f14;border:1px solid #2a3340;border-radius:6px;padding:8px;max-height:340px;overflow:auto;white-space:pre-wrap}
+ #console{color:#40ff80} #status{font-size:12px}
+ .ok{color:#a3be8c} .err{color:#bf616a}
+</style>
+</head>
+<body>
+<h2>AIPL Node.js &mdash; Dashboard</h2>
+<div class="note">The Node sibling of the OCaml <code>web_gateway</code>: the AIPL parser, type checker, and
+ interpreter run inside this Node process. Pick or edit a program, then Run (POST <code>/api/run</code>)
+ or Type-check (POST <code>/api/typecheck</code>).</div>
+
+<div class="bar">
+ <select id="exsel" onchange="loadExample()"></select>
+ <button id="b_run" class="primary" onclick="run()">&#9654; Run</button>
+ <button id="b_tc" onclick="typecheck()">Type-check</button>
+ <span id="status"></span>
+</div>
+
+<h3>AIPL source</h3>
+<textarea id="src" rows="16" spellcheck="false"></textarea>
+
+<h3>Console &mdash; stdout / errors</h3>
+<pre id="console">(run a program)</pre>
+
+<script>
+var EXAMPLES = {
+  "Dining Philosophers (5, deadlock-free, 3 meals each)":
+    "class Fork {\\n  var holder = 0;\\n  method acquire(pid) {\\n    if (holder == 0) { holder = pid; send sender.granted(pid); }\\n    else { send sender.denied(pid); }\\n  }\\n  method release(pid) { if (holder == pid) { holder = 0; } }\\n}\\nclass Philosopher {\\n  var id = 0;\\n  var lo = 0;\\n  var hi = 0;\\n  var state = 0;\\n  var meals = 0;\\n  var target = 3;\\n  method init(i, l, h) { id = i; lo = l; hi = h; send self.think(); }\\n  method think() { send lo.acquire(id); }\\n  method granted(pid) {\\n    if (state == 0) {\\n      state = 1;\\n      send hi.acquire(id);\\n    } else {\\n      meals = meals + 1;\\n      print(\\"P\\" + id + \\" eats (meal \\" + meals + \\")\\");\\n      send hi.release(id);\\n      send lo.release(id);\\n      state = 0;\\n      if (meals < target) { send self.think(); }\\n      else { print(\\"P\\" + id + \\" done after \\" + meals + \\" meals\\"); }\\n    }\\n  }\\n  method denied(pid) {\\n    if (state == 1) { send lo.release(id); state = 0; }\\n    send self.think();\\n  }\\n}\\nvar f0 = new Fork();\\nvar f1 = new Fork();\\nvar f2 = new Fork();\\nvar f3 = new Fork();\\nvar f4 = new Fork();\\nvar p0 = new Philosopher(1, f0, f1);\\nvar p1 = new Philosopher(2, f1, f2);\\nvar p2 = new Philosopher(3, f2, f3);\\nvar p3 = new Philosopher(4, f3, f4);\\nvar p4 = new Philosopher(5, f0, f4);",
+  "Counter (self-send, prints 1..5)":
+    "class Counter {\\n  var n = 0;\\n  method go() {\\n    n = n + 1;\\n    print(\\"n=\\" + n);\\n    if (n < 5) { send self.go(); }\\n  }\\n}\\nvar c = new Counter();\\nsend c.go();",
+  "Ping-Pong (2 actors, bounded)":
+    "class Pinger {\\n  var left = 4;\\n  var p = 0;\\n  method bind(x) { p = x; send p.ping(left); }\\n  method pong(k) {\\n    print(\\"pong \\" + k);\\n    left = left - 1;\\n    if (left > 0) { send p.ping(left); }\\n  }\\n}\\nclass Ponger {\\n  method ping(k) { print(\\"ping \\" + k); send sender.pong(k); }\\n}\\nvar pi = new Pinger();\\nvar po = new Ponger();\\nsend pi.bind(po);",
+  "Hello (init + greet)":
+    "class Hello {\\n  var n = 0;\\n  method init(x) { n = x; print(\\"init \\" + n); }\\n  method greet() { print(\\"hello, count=\\" + n); }\\n}\\nvar h = new Hello(5);\\nsend h.greet();",
+  "Empty class + tick":
+    "class C {\\n  var x = 0;\\n  method tick() { x = x + 1; }\\n}\\nvar c = new C();\\nsend c.tick();"
+};
+var $ = function(id){ return document.getElementById(id); };
+function setStatus(t, cls){ var e=$("status"); e.textContent=t; e.className=cls||""; }
+function loadExample(){
+  var k = $("exsel").value;
+  if (EXAMPLES[k] !== undefined) $("src").value = EXAMPLES[k];
+}
+async function post(ep, payload){
+  var r = await fetch(ep, { method:"POST", headers:{"Content-Type":"application/json"},
+                            body: JSON.stringify(payload) });
+  return await r.json();
+}
+async function run(){
+  setStatus("running…"); $("b_run").disabled = true;
+  try {
+    var d = await post("/api/run", { source: $("src").value, timeoutMs: 8000 });
+    var out = "";
+    if (d.stdout) out += d.stdout;
+    if (d.errors && d.errors.length) out += "\\n[errors]\\n" + d.errors.join("\\n");
+    $("console").textContent = out || "(no output)";
+    setStatus(d.ok ? "✔ ran" : "✘ error", d.ok ? "ok" : "err");
+  } catch(e){ $("console").textContent = String(e); setStatus("✘ " + e, "err"); }
+  finally { $("b_run").disabled = false; }
+}
+async function typecheck(){
+  setStatus("type-checking…"); $("b_tc").disabled = true;
+  try {
+    var d = await post("/api/typecheck", { source: $("src").value });
+    $("console").textContent = JSON.stringify(d, null, 2);
+    var bad = (d.errors && d.errors.length);
+    setStatus(bad ? "✘ type errors" : "✔ type-checked", bad ? "err" : "ok");
+  } catch(e){ $("console").textContent = String(e); setStatus("✘ " + e, "err"); }
+  finally { $("b_tc").disabled = false; }
+}
+(function init(){
+  var sel = $("exsel"); var keys = Object.keys(EXAMPLES);
+  for (var i=0;i<keys.length;i++){
+    var o = document.createElement("option"); o.value=keys[i]; o.textContent=keys[i]; sel.appendChild(o);
+  }
+  loadExample();
+})();
+</script>
 </body></html>`;
 
 function send(res, code, ctype, body) {

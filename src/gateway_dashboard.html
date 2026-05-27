@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AIPL (OCaml) — Dashboard</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px}
+ h2{margin:0 0 4px} h3{margin:18px 0 6px;color:#8fbcbb}
+ a{color:#88c0d0}
+ .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+ select{font-family:inherit;font-size:13px;padding:5px;background:#11161d;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;min-width:340px}
+ button{font-family:inherit;font-size:13px;padding:6px 12px;background:#1c2530;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;cursor:pointer}
+ button:hover{background:#26313e}
+ button.primary{background:#2e4b6e;border-color:#3b6ea5}
+ #runstate{padding:3px 9px;border-radius:5px;font-size:12px}
+ .idle{background:#3b4757} .loaded{background:#5e81ac} .running{background:#2e7d46} .reset{background:#4c566a}
+ .note{color:#7a8a99;font-size:12px;margin:2px 0 0;max-width:760px}
+ table{border-collapse:collapse;width:100%;font-size:13px;max-width:900px}
+ th,td{border:1px solid #2a3340;padding:4px 8px;text-align:left}
+ th{background:#11161d;color:#8fbcbb}
+ td.cls{color:#a3be8c} .meth{color:#7a8a99;font-size:12px}
+ pre{background:#0b0f14;border:1px solid #2a3340;border-radius:6px;padding:8px;max-height:340px;overflow:auto}
+ #console{color:#40ff80;max-width:900px}
+</style>
+</head>
+<body>
+<h2>AIPL Web Gateway &mdash; OCaml runtime dashboard</h2>
+<div class="note">Pick an example, press <b>Load &amp; Run</b>. The actors run inside the OCaml
+ <code>repl_thread.exe</code> process; this page drives it through <code>/api/repl</code>
+ (reset &rarr; load &rarr; compile) and polls <code>/api/actors</code> and <code>/api/log</code>.</div>
+
+<div class="bar">
+ <select id="progsel"></select>
+ <button id="b_run" class="primary" onclick="loadRun()">&#9654; Load &amp; Run</button>
+ <button id="b_start" onclick="ctl('start')">Start</button>
+ <button id="b_stop" onclick="ctl('stop')">Stop</button>
+ <button id="b_reset" onclick="doReset()">Reset</button>
+ <span id="runstate" class="idle">idle</span>
+ <a id="vizlink" href="#" target="_blank" style="display:none">Open visualization &#8599;</a>
+</div>
+<div id="note" class="note"></div>
+
+<div id="vizwrap" style="display:none;margin-top:12px">
+ <canvas id="viz" width="760" height="240"
+  style="background:#0b0f14;border:1px solid #2a3340;border-radius:6px;display:block;max-width:100%"></canvas>
+ <div id="speedctl" style="display:none;margin:8px 0 0;padding:8px 10px;background:#11161d;border:1px solid #2a3340;border-radius:6px;max-width:760px">
+  <div style="color:#cdd6e0;font-size:12px;margin-bottom:6px">Speed &mdash; drag to retune the running actors (left = faster, right = slower)</div>
+  <label style="display:flex;align-items:center;gap:8px;color:#81a1c1;font-size:12px;margin:3px 0">
+   <span style="width:120px">Producer interval</span>
+   <input id="pspeed" type="range" min="50" max="2000" step="10" value="250" oninput="pushSpeed()" style="flex:1">
+   <span id="pspeedv" style="width:58px;text-align:right">250 ms</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;color:#a3be8c;font-size:12px;margin:3px 0">
+   <span style="width:120px">Consumer interval</span>
+   <input id="cspeed" type="range" min="50" max="2000" step="10" value="500" oninput="pushSpeed()" style="flex:1">
+   <span id="cspeedv" style="width:58px;text-align:right">500 ms</span>
+  </label>
+ </div>
+ <div class="note">Reconstructed live from the console: the buffer's FIFO slots
+  (green = occupied, with the item value), the producer feeding in from the left
+  and the consumer draining on the right (blue = active, amber = blocked/waiting,
+  grey = done).</div>
+</div>
+
+<h3>Running actors &nbsp;<span id="acount" class="note" style="display:inline"></span></h3>
+<table><thead><tr><th>name</th><th>class</th><th>mailbox</th><th>methods</th></tr></thead>
+<tbody id="abody"><tr><td colspan="4">(none — Load &amp; Run a program)</td></tr></tbody></table>
+
+<h3>Console &mdash; print() output</h3>
+<pre id="console">(waiting for output...)</pre>
+
+<h3>Source &mdash; <span id="srcpath" class="note" style="display:inline"></span></h3>
+<pre id="source">(pick a program)</pre>
+
+<script src="/gateway_dashboard.js"></script>
+</body>
+</html>

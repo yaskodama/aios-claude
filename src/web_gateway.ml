@@ -1403,6 +1403,27 @@ let handle_api_browse (query:(string,string) Hashtbl.t) : int * string * string 
       in
       (500, "application/json; charset=utf-8", body)
 
+(* Return the raw text of a project-relative source file.  Used by the
+   dashboard to show the selected program's source.  Path-guarded: no "..",
+   no leading "/", so it can only read files under the runtime's cwd. *)
+let handle_api_source (query:(string,string) Hashtbl.t) : int * string * string =
+  let file =
+    match Hashtbl.find_opt query "file" with Some s -> trim s | None -> ""
+  in
+  let has_dotdot s =
+    let n = String.length s in
+    let rec go i = if i + 1 >= n then false
+                   else if s.[i] = '.' && s.[i+1] = '.' then true
+                   else go (i + 1)
+    in go 0
+  in
+  if file = "" then (400, "text/plain; charset=utf-8", "missing file")
+  else if has_dotdot file || (String.length file > 0 && file.[0] = '/') then
+    (403, "text/plain; charset=utf-8", "forbidden path")
+  else
+    (try (200, "text/plain; charset=utf-8", read_file file)
+     with _ -> (404, "text/plain; charset=utf-8", "not found: " ^ file))
+
 (* List project files matching an extension. Used by the IDE's File menu to
    populate the list of available .bat / .abcl scripts. We only look at a
    small fixed set of project-relative directories so that this cannot be
@@ -1682,6 +1703,9 @@ let handle_client (client: file_descr) : unit =
 	 let code, ctype, resp_body =
            match meth, path with
 	   | "GET", "/" -> (200, "text/html; charset=utf-8", html_index ())
+	   | "GET", "/dashboard" -> serve_asset "gateway_dashboard.html" "text/html; charset=utf-8"
+	   | "GET", "/dashboard.html" -> serve_asset "gateway_dashboard.html" "text/html; charset=utf-8"
+	   | "GET", "/gateway_dashboard.js" -> serve_asset "gateway_dashboard.js" "application/javascript; charset=utf-8"
 	   | "GET", "/ide" -> serve_asset "ide.html" "text/html; charset=utf-8"
 	   | "GET", "/ide.html" -> serve_asset "ide.html" "text/html; charset=utf-8"
 	   | "GET", "/ide.js" -> serve_asset "ide.js" "application/javascript; charset=utf-8"
@@ -1704,6 +1728,7 @@ let handle_client (client: file_descr) : unit =
 	   | "GET", "/api/files" -> handle_api_files q
 	   | "GET", "/api/actors" -> handle_api_actors ()
 	   | "GET", "/api/browse" -> handle_api_browse q
+	   | "GET", "/api/source" -> handle_api_source q
 	   | "POST", "/api/send" -> let params = parse_form_urlencoded body in handle_send_direct params
            | "POST", "/api/json/send" ->
                (match verify_hmac_or_reject ~headers ~body with

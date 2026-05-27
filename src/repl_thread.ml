@@ -456,6 +456,15 @@ let rec process_command line =
     repl_logln "  script <file>         - run REPL commands from file";
     repl_logln "  exit / quit           - exit REPL";
   end
+  else if String.trim line = "reset" || String.trim line = "clear" then (
+    (* Fresh slate for the dashboard's program switcher: empty the loaded
+       program, forget existing actors, and clear the console buffer. *)
+    program_buffer := [];
+    compiled := false;
+    Eval_thread.clear_actor_table ();
+    Eval_thread.clear_web_logs ();
+    repl_logln "[reset] cleared program buffer, actors, and console"
+  )
   else if line = "compile" then (
     compiled := true;
     List.iter (function

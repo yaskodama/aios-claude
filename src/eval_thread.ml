@@ -202,6 +202,14 @@ let push_web_log (s:string) =
     web_logs := take web_log_limit !web_logs;
   Mutex.unlock web_log_mutex
 
+(* Drop all buffered console lines (used by the REPL `reset` command so the
+   dashboard starts a fresh program with a clean console).  next_id stays
+   monotonic so any client polling with an old cursor re-syncs cleanly. *)
+let clear_web_logs () =
+  Mutex.lock web_log_mutex;
+  web_logs := [];
+  Mutex.unlock web_log_mutex
+
 let get_web_logs_since (after:int) : (int * string list) =
   Mutex.lock web_log_mutex;
   let newer =
@@ -277,6 +285,13 @@ let debug_print_actor_table () =
 (* actor_table を走査する汎用イテレータ *)
 let iter_actor_table (k : string -> actor -> unit) : unit =
   Hashtbl.iter (fun aname a -> k aname a) actor_table
+
+(* Forget every live actor (REPL `reset`).  Already-running actor threads
+   keep their own record captured in their closure, so they are not killed;
+   they simply become unreachable by name.  Curated dashboard demos are
+   finite (or have an explicit stop), so this is clean enough in practice. *)
+let clear_actor_table () =
+  Hashtbl.reset actor_table
 
 (* メールボックス長（非同期メッセージキューの長さ） *)
 let mailbox_len (a:actor) : int =
