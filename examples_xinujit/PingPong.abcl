@@ -1,0 +1,13 @@
+class Player {
+  var peer = 0;
+  method setup(p) { peer = p; }
+  method hit(n) {
+    print("hit " + n);
+    if (n > 0) send peer.hit(n - 1);
+  }
+}
+var a = new Player();
+var b = new Player();
+send a.setup(b);
+send b.setup(a);
+send a.hit(4);

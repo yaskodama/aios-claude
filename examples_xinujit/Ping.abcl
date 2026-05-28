@@ -1,0 +1,9 @@
+class Pinger {
+  var n = 0;
+  method ping(k) {
+    print("ping " + k);
+    if (k > 1) send self.ping(k - 1);
+  }
+}
+var p = new Pinger();
+send p.ping(3);

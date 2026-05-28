@@ -2245,7 +2245,8 @@ let gen_program_xinujit (p : program) : string =
     | CallStmt ("print", [a]) -> emitf "%sv_print(%s);\n" pad (gexpr ~cls ~fields a)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
-      emitf "%sdispatch(%s, %d, %s);\n" pad (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
+      (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)
+      emitf "%senqueue(%s, %d, %s);\n" pad (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | If (e, s1, s2) ->
       emitf "%sif (v_truthy(%s)) {\n" pad (gexpr ~cls ~fields e);
       gstmt ~cls ~fields ~ind:(ind + 2) s1;
