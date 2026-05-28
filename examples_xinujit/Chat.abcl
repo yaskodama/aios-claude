@@ -1,0 +1,19 @@
+// Chat.abcl — an actor you converse with.  Each message you send is appended
+// to the running story; the actor calls the on-device LLM (llm()) to continue
+// it and returns the continuation.  State (the story) persists across messages,
+// so the model has memory of the conversation.
+//
+// Load it resident (/actor/load), then message it (/chat); stories260K is a
+// tiny TinyStories model, so "conversation" = collaborative story-continuation.
+
+class Chat {
+  var story = "";
+  method say(msg) {
+    story = story + " " + msg;
+    var reply = llm(story);
+    story = story + reply;
+    return reply;
+  }
+}
+
+var c = new Chat();
