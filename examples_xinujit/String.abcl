@@ -1,0 +1,10 @@
+class Counter {
+  var count = 0;
+  method bump(by) { count = count + by; return count; }
+}
+var c = new Counter();
+var a = now c.bump(5);
+print("count = " + a);
+var b = now c.bump(37);
+print("count = " + b);
+print("done");

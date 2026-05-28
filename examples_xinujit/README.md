@@ -22,3 +22,8 @@ examples_xinujit/run.sh examples_xinujit/Counter.abcl
 - Counter.abcl  → `5 / 42 / 42`   (fields, params, return, now)
 - Summer.abcl   → `5050`          (while loop)
 - Multi.abcl    → `123`           (two actors, cross-actor now, new)
+
+## value_t update (2026-05-28)
+Values are now tagged (int | string), so AIPL strings and concatenation work:
+- String.abcl → `count = 5` / `count = 42` / `done`  (string literals + `"..." + int`)
+Integer programs (Counter/Summer/Multi) still pass. Float is still truncated to int.

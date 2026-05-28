@@ -2176,40 +2176,53 @@ let gen_program_xinujit (p : program) : string =
   let max_fields =
     List.fold_left (fun acc (c : class_decl) -> max acc (List.length (fields_of c))) 1 classes in
 
+  (* Every expression evaluates to a value_t (a tagged 64-bit word, held
+     in an `int` C variable).  Ints/strings/comparisons all go through the
+     v_* runtime; only object ids are untagged (via v_int_of) where a raw
+     index into g_obj[] / dispatch() is needed. *)
   let rec gexpr ~cls ~fields (e : expr) : string =
     match e.desc with
-    | Int n   -> string_of_int n
-    | Float f -> string_of_int (int_of_float f)
-    | String _ -> "0"
+    | Int n   -> Printf.sprintf "v_int(%d)" n
+    | Float f -> Printf.sprintf "v_int(%d)" (int_of_float f)
+    | String s -> Printf.sprintf "v_str(\"%s\")" (String.escaped s)
     | Var x ->
       if List.mem x fields then
         (match find_class cls with
          | Some c -> Printf.sprintf "g_obj[self].f[%d]" (field_index c x)
-         | None -> "0")
+         | None -> "v_int(0)")
       else Printf.sprintf "v_%s" x
     | Binop (op, a, b) ->
-      let op' = match op with "and" -> "&&" | "or" -> "||" | o -> o in
-      Printf.sprintf "(%s %s %s)" (gexpr ~cls ~fields a) op' (gexpr ~cls ~fields b)
-    | New (cn, _) -> Printf.sprintf "g_spawn(%d)" (class_id cn)
+      let ga = gexpr ~cls ~fields a and gb = gexpr ~cls ~fields b in
+      (match op with
+       | ">"  -> Printf.sprintf "v_lt(%s, %s)" gb ga      (* a>b  == b<a  *)
+       | ">=" -> Printf.sprintf "v_le(%s, %s)" gb ga      (* a>=b == b<=a *)
+       | _ ->
+         let f = match op with
+           | "and" -> "v_and" | "or" -> "v_or"
+           | "+" -> "v_add" | "-" -> "v_sub" | "*" -> "v_mul" | "/" -> "v_div"
+           | "==" -> "v_eq" | "!=" -> "v_ne" | "<" -> "v_lt" | "<=" -> "v_le"
+           | _ -> "v_add"
+         in Printf.sprintf "%s(%s, %s)" f ga gb)
+    | New (cn, _) -> Printf.sprintf "v_int(g_spawn(%d))" (class_id cn)
     | Now (tgt, m, args) | Future (tgt, m, args) ->
       Printf.sprintf "dispatch(%s, %d, %s)"
         (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | Await e1 -> gexpr ~cls ~fields e1
-    | _ -> "0"
-  and gtarget ~cls ~fields = function
+    | _ -> "v_int(0)"
+  and gtarget ~cls ~fields = function          (* -> a RAW object id *)
     | LocalTarget "self" -> "self"
     | LocalTarget name ->
       if List.mem name fields then
         (match find_class cls with
-         | Some c -> Printf.sprintf "g_obj[self].f[%d]" (field_index c name)
+         | Some c -> Printf.sprintf "v_int_of(g_obj[self].f[%d])" (field_index c name)
          | None -> "0")
-      else Printf.sprintf "v_%s" name
+      else Printf.sprintf "v_int_of(v_%s)" name
     | RemoteTarget _ -> "0"
   and gargs ~cls ~fields args =
     let a = List.map (gexpr ~cls ~fields) args in
     let rec pad n l =
       if n = 0 then []
-      else match l with x :: r -> x :: pad (n - 1) r | [] -> "0" :: pad (n - 1) []
+      else match l with x :: r -> x :: pad (n - 1) r | [] -> "v_int(0)" :: pad (n - 1) []
     in
     String.concat ", " (pad 4 a)
   in
@@ -2225,24 +2238,21 @@ let gen_program_xinujit (p : program) : string =
          | Some c -> emitf "%sg_obj[self].f[%d] = %s;\n" pad (field_index c x) (gexpr ~cls ~fields e)
          | None -> ())
       else emitf "%sv_%s = %s;\n" pad x (gexpr ~cls ~fields e)
-    | CallStmt ("print", [a]) ->
-      (match a.desc with
-       | String s -> emitf "%sputs(\"%s\");\n" pad (String.escaped s)
-       | _ -> emitf "%sprint(%s);\n" pad (gexpr ~cls ~fields a))
+    | CallStmt ("print", [a]) -> emitf "%sv_print(%s);\n" pad (gexpr ~cls ~fields a)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       emitf "%sdispatch(%s, %d, %s);\n" pad (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | If (e, s1, s2) ->
-      emitf "%sif (%s) {\n" pad (gexpr ~cls ~fields e);
+      emitf "%sif (v_truthy(%s)) {\n" pad (gexpr ~cls ~fields e);
       gstmt ~cls ~fields ~ind:(ind + 2) s1;
       emitf "%s} else {\n" pad;
       gstmt ~cls ~fields ~ind:(ind + 2) s2;
       emitf "%s}\n" pad
     | While (e, b) ->
-      emitf "%swhile (%s) {\n" pad (gexpr ~cls ~fields e);
+      emitf "%swhile (v_truthy(%s)) {\n" pad (gexpr ~cls ~fields e);
       gstmt ~cls ~fields ~ind:(ind + 2) b;
       emitf "%s}\n" pad
-    | Return None -> emitf "%sreturn 0;\n" pad
+    | Return None -> emitf "%sreturn v_int(0);\n" pad
     | Return (Some e) -> emitf "%sreturn %s;\n" pad (gexpr ~cls ~fields e)
     | _ -> emitf "%s/* unsupported stmt */\n" pad
   in
