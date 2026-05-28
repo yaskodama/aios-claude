@@ -6,13 +6,15 @@
 // Load it resident (/actor/load), then message it (/chat); stories260K is a
 // tiny TinyStories model, so "conversation" = collaborative story-continuation.
 
+// chat(msg) keeps a KV-cache session in the model, so each turn only
+// processes the new message + its continuation (cost is ~constant per turn,
+// instead of growing as the story does).  The conversation memory lives in
+// the model's cache; /actor/load starts a fresh session.
 class Chat {
-  var story = "";
+  var turns = 0;
   method say(msg) {
-    story = story + " " + msg;
-    var reply = llm(story);
-    story = story + reply;
-    return reply;
+    turns = turns + 1;
+    return chat(msg);
   }
 }
 

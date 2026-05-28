@@ -2259,8 +2259,9 @@ let gen_program_xinujit (p : program) : string =
     | Call ("get", [l; i]) ->
       Printf.sprintf "v_list_get(%s, %s)" (gexpr ~cls ~fields l) (gexpr ~cls ~fields i)
     | Call ("len", [l]) -> Printf.sprintf "v_list_len(%s)" (gexpr ~cls ~fields l)
-    (* on-device LLM: llm(prompt) -> generated text (string) *)
-    | Call ("llm", [p]) -> Printf.sprintf "cc_llm(%s)" (gexpr ~cls ~fields p)
+    (* on-device LLM: llm(prompt) one-shot; chat(msg) continues a KV-cache session *)
+    | Call ("llm", [p])  -> Printf.sprintf "cc_llm(%s)"  (gexpr ~cls ~fields p)
+    | Call ("chat", [m]) -> Printf.sprintf "cc_chat(%s)" (gexpr ~cls ~fields m)
     (* higher-order: the 2nd arg names a top-level function, passed as its id *)
     | Call ("map", [l; { desc = Var fn; _ }]) ->
       Printf.sprintf "v_list_map(%s, v_int(%d))" (gexpr ~cls ~fields l) (fn_id fn)
