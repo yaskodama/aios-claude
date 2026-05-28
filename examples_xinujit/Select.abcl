@@ -1,0 +1,16 @@
+class Worker {
+  var done = 0;
+  method run() {
+    while (done == 0) do {
+      select {
+        case add(x) -> { print("add " + x); }
+        case stop() -> { print("stopping"); done = 1; }
+      }
+    }
+  }
+}
+var w = new Worker();
+send w.run();
+send w.add(10);
+send w.add(20);
+send w.stop();

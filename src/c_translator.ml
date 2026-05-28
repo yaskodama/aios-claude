@@ -2168,13 +2168,37 @@ let gen_program_xinujit (p : program) : string =
   let mtbl = Hashtbl.create 32 in
   let mctr = ref 0 in
   let methods_ordered = ref [] in            (* (name, id) in assignment order *)
+  let add_meth name =
+    if not (Hashtbl.mem mtbl name) then begin
+      Hashtbl.add mtbl name !mctr;
+      methods_ordered := (name, !mctr) :: !methods_ordered;
+      incr mctr
+    end
+  in
   List.iter (fun (c : class_decl) ->
-    List.iter (fun (m : method_decl) ->
-      if not (Hashtbl.mem mtbl m.mname) then begin
-        Hashtbl.add mtbl m.mname !mctr;
-        methods_ordered := (m.mname, !mctr) :: !methods_ordered;
-        incr mctr
-      end) c.methods) classes;
+    List.iter (fun (m : method_decl) -> add_meth m.mname) c.methods) classes;
+  (* Also assign ids to message names that appear only in send/now/select
+     (a `select { case add(x): }` names a message with no method body). *)
+  let rec cm_e (e : expr) = match e.desc with
+    | Now (_, m, a) | Future (_, m, a) -> add_meth m; List.iter cm_e a
+    | Binop (_, a, b) -> cm_e a; cm_e b
+    | New (_, a) -> List.iter cm_e a
+    | Await e1 -> cm_e e1
+    | _ -> ()
+  and cm_s (s : stmt) = match s.sdesc with
+    | Seq ss -> List.iter cm_s ss
+    | Send (_, m, a) | UnsafeSend (_, m, a) -> add_meth m; List.iter cm_e a
+    | Select (cs, _) -> List.iter (fun (c : select_case) -> add_meth c.pat.meth; cm_s c.body) cs
+    | If (e, x, y) -> cm_e e; cm_s x; cm_s y
+    | While (e, b) -> cm_e e; cm_s b
+    | Assign (_, e) | VarDecl (_, e) -> cm_e e
+    | CallStmt (_, a) -> List.iter cm_e a
+    | Return (Some e) -> cm_e e
+    | _ -> ()
+  in
+  List.iter (fun (c : class_decl) ->
+    List.iter (fun (m : method_decl) -> cm_s m.body) c.methods) classes;
+  List.iter cm_s globals;
   let methods_ordered = List.rev !methods_ordered in
   let method_id mn = try Hashtbl.find mtbl mn with Not_found -> -1 in
   let max_fields =
@@ -2259,6 +2283,23 @@ let gen_program_xinujit (p : program) : string =
       emitf "%s}\n" pad
     | Return None -> emitf "%sreturn v_int(0);\n" pad
     | Return (Some e) -> emitf "%sreturn %s;\n" pad (gexpr ~cls ~fields e)
+    | Select (cases, _timeout) ->
+      (* Block on this actor's mailbox until one of the named methods
+         arrives; run the matching case (pattern vars bound to the
+         message args via cc_sel_arg).  Requires `self` (a method body). *)
+      let n = List.length cases in
+      let mids = List.map (fun (c : select_case) -> method_id c.pat.meth) cases in
+      let rec pad4 k l = if k = 0 then []
+        else (match l with x :: r -> x :: pad4 (k-1) r | [] -> (-1) :: pad4 (k-1) []) in
+      let m4 = pad4 4 mids in
+      emitf "%s{ int __sm = cc_select(self, %d, %s);\n"
+        pad n (String.concat ", " (List.map string_of_int m4));
+      List.iteri (fun i (c : select_case) ->
+        emitf "%s  %s (__sm == %d) {\n" pad (if i = 0 then "if" else "} else if") (method_id c.pat.meth);
+        List.iteri (fun j v -> emitf "%s    int v_%s = cc_sel_arg(%d);\n" pad v j) c.pat.vars;
+        gstmt ~cls ~fields ~ind:(ind + 4) c.body
+      ) cases;
+      emitf "%s  }\n%s}\n" pad pad
     | _ -> emitf "%s/* unsupported stmt */\n" pad
   in
 
@@ -2268,7 +2309,7 @@ let gen_program_xinujit (p : program) : string =
   emit "int g_nobj;\n\n";
 
   emit "int g_spawn(int cls) {\n";
-  emit "  int id; id = g_nobj; g_nobj = g_nobj + 1;\n";
+  emit "  int id; id = cc_actor_new(); g_nobj = g_nobj + 1;\n";
   emit "  g_obj[id].cls = cls;\n";
   List.iteri (fun ci (c : class_decl) ->
     emitf "  if (cls == %d) {\n" ci;
