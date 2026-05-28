@@ -1,0 +1,48 @@
+// Saga.abcl — AIPL `saga { step {} compensate {} }` on actors, via the
+// synchronous `now` RPC.  The coordinator runs each step in order (a step
+// is a synchronous call to a collaborator actor); a step signals failure
+// with fail().  On the first failure the already-committed steps are
+// compensated in REVERSE order (LIFO), leaving the system consistent.
+//
+// Here hotel + flight reserve OK but payment is DECLINED, so the saga
+// rolls back flight then hotel.  (Make Payment.charge return 1 and the
+// saga commits with no compensation.)
+
+class Hotel {
+  method reserve(n) { print("  hotel: reserved"); return 1; }
+  method cancel()   { print("  hotel: CANCELLED"); return 1; }
+}
+class Flight {
+  method reserve(n) { print("  flight: reserved"); return 1; }
+  method cancel()   { print("  flight: CANCELLED"); return 1; }
+}
+class Payment {
+  method charge(amt) { print("  payment: DECLINED"); return 0; }
+  method refund()    { print("  payment: refunded"); return 1; }
+}
+
+class Booking {
+  var hotel = 0;
+  var flight = 0;
+  var pay = 0;
+  method setup(h, f, p) { hotel = h; flight = f; pay = p; }
+  method run() {
+    print("saga: begin");
+    saga {
+      step { var r = now hotel.reserve(2);  if (r == 0) fail(); }
+      compensate { var c = now hotel.cancel(); }
+      step { var r = now flight.reserve(1); if (r == 0) fail(); }
+      compensate { var c = now flight.cancel(); }
+      step { var r = now pay.charge(500);   if (r == 0) fail(); }
+      compensate { var c = now pay.refund(); }
+    }
+    print("saga: done");
+  }
+}
+
+var h = new Hotel();
+var f = new Flight();
+var p = new Payment();
+var b = new Booking();
+send b.setup(h, f, p);
+send b.run();

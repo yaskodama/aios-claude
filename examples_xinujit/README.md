@@ -33,3 +33,20 @@ Integer programs (Counter/Summer/Multi) still pass. Float is still truncated to 
 spawns the actors and they stay alive.  `GET /actor/send?to=N&m=METHOD&arg=X`
 messages them; state persists across calls.  See actor_server.sh.
 Also on the serial shell: `aload <file.c>` / `amsg <actor> <method> [arg]`.
+
+## select + synchronous now (2026-05-28)
+- Select.abcl → `add 10 / add 20 / stopping`  (selective receive: each actor is
+  a Xinu process that blocks on its mailbox until a named message arrives)
+- Rpc.abcl    → `got 50`  (in-method `now` is a real synchronous call between
+  actor processes: the caller blocks for the callee's return value)
+
+## saga — compensating transactions (2026-05-28)
+AIPL's `saga { step {..} compensate {..} ... }` runs on the Pi.  Steps run in
+order (each a synchronous `now` to a collaborator); a step calls `fail()` to
+abort, and the already-committed steps are then compensated in reverse (LIFO).
+- Saga.abcl → `hotel/flight reserved`, `payment DECLINED`, then
+  `flight CANCELLED` / `hotel CANCELLED` (rollback in reverse; refund is skipped
+  because payment never committed).  Make Payment.charge return 1 to commit with
+  no compensation.
+(int-only backend has no exceptions, so failure is signalled by `fail()` rather
+than a raise; nested sagas are not supported.)

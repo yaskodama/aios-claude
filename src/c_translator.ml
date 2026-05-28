@@ -2194,6 +2194,8 @@ let gen_program_xinujit (p : program) : string =
     | Assign (_, e) | VarDecl (_, e) -> cm_e e
     | CallStmt (_, a) -> List.iter cm_e a
     | Return (Some e) -> cm_e e
+    | Saga steps ->
+      List.iter (fun (st : saga_step) -> cm_s st.saga_body; cm_s st.saga_compensate) steps
     | _ -> ()
   in
   List.iter (fun (c : class_decl) ->
@@ -2274,6 +2276,7 @@ let gen_program_xinujit (p : program) : string =
          | None -> ())
       else emitf "%sv_%s = %s;\n" pad x (gexpr ~cls ~fields e)
     | CallStmt ("print", [a]) -> emitf "%sv_print(%s);\n" pad (gexpr ~cls ~fields a)
+    | CallStmt ("fail", _) -> emitf "%scc_saga_fail();\n" pad   (* signal saga step failure *)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)
@@ -2307,6 +2310,28 @@ let gen_program_xinujit (p : program) : string =
         gstmt ~cls ~fields ~ind:(ind + 4) c.body
       ) cases;
       emitf "%s  }\n%s}\n" pad pad
+    | Saga steps ->
+      (* Run step bodies in order; a body calls fail() (-> cc_saga_fail) to
+         abort.  After the first failure, run the completed steps' compensate
+         blocks in reverse (LIFO).  No goto/do-while (the on-device compiler
+         lacks them): each step is guarded by !cc_saga_failed(), and __sc
+         counts completed steps so the reverse pass compensates only those. *)
+      let n = List.length steps in
+      emitf "%s{ cc_saga_reset(); int __sc = 0;\n" pad;
+      List.iteri (fun i (st : saga_step) ->
+        emitf "%s  if (!cc_saga_failed()) {\n" pad;
+        gstmt ~cls ~fields ~ind:(ind + 4) st.saga_body;
+        emitf "%s    if (!cc_saga_failed()) { __sc = %d; }\n" pad (i + 1);
+        emitf "%s  }\n" pad
+      ) steps;
+      emitf "%s  if (cc_saga_failed()) {\n" pad;
+      List.iter (fun (i, (st : saga_step)) ->
+        emitf "%s    if (__sc > %d) {\n" pad i;
+        gstmt ~cls ~fields ~ind:(ind + 6) st.saga_compensate;
+        emitf "%s    }\n" pad
+      ) (List.rev (List.mapi (fun i st -> (i, st)) steps));
+      emitf "%s  }\n%s}\n" pad pad;
+      ignore n
     | _ -> emitf "%s/* unsupported stmt */\n" pad
   in
 
