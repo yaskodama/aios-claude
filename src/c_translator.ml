@@ -2245,6 +2245,7 @@ let gen_program_xinujit (p : program) : string =
         Printf.sprintf "cc_call(self, %s, %d, %s)"
           (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | Await e1 -> gexpr ~cls ~fields e1
+    | Call ("crashed", _) -> "cc_crashed_value()"   (* supervisor: did the callee crash? *)
     | _ -> "v_int(0)"
   and gtarget ~cls ~fields = function          (* -> a RAW object id *)
     | LocalTarget "self" -> "self"
@@ -2277,6 +2278,7 @@ let gen_program_xinujit (p : program) : string =
       else emitf "%sv_%s = %s;\n" pad x (gexpr ~cls ~fields e)
     | CallStmt ("print", [a]) -> emitf "%sv_print(%s);\n" pad (gexpr ~cls ~fields a)
     | CallStmt ("fail", _) -> emitf "%scc_saga_fail();\n" pad   (* signal saga step failure *)
+    | CallStmt ("crash", _) -> emitf "%scc_crash();\n" pad      (* let-it-crash: abandon handler *)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)

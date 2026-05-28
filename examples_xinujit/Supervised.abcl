@@ -1,0 +1,42 @@
+// Supervised.abcl — let-it-crash + supervision over actor processes.
+//
+// A worker handler that hits a transient fault calls crash(): the kernel
+// abandons that handler and returns the worker to its receive loop (the
+// process stays ALIVE — the crash is isolated, it does not take down the
+// system).  The synchronous caller's `now` returns the crash sentinel, which
+// crashed() yields, so the supervisor can detect the failure and retry.
+//
+// Here the worker crashes on its first call (tries==1) but succeeds on the
+// retry (tries==2): the actor's state survived the crash, so the supervisor
+// recovers without the whole program dying.
+
+class Worker {
+  var tries = 0;
+  method work() {
+    tries = tries + 1;
+    if (tries == 1) { print("worker: transient fault -> crash()"); crash(); }
+    print("worker: ok on try " + tries);
+    return tries;
+  }
+}
+
+class Supervisor {
+  var child = 0;
+  method setup(c) { child = c; }
+  method run() {
+    var r = now child.work();              // attempt 1 -> worker crashes
+    if (r == crashed()) {
+      print("supervisor: child crashed; restarting + retrying");
+      var r2 = now child.work();           // attempt 2 -> worker recovers
+      if (r2 == crashed()) { print("supervisor: gave up (crashed again)"); }
+      else { print("supervisor: recovered, result = " + r2); }
+    } else {
+      print("supervisor: ok first try, result = " + r);
+    }
+  }
+}
+
+var w = new Worker();
+var s = new Supervisor();
+send s.setup(w);
+send s.run();

@@ -50,3 +50,17 @@ abort, and the already-committed steps are then compensated in reverse (LIFO).
   no compensation.
 (int-only backend has no exceptions, so failure is signalled by `fail()` rather
 than a raise; nested sagas are not supported.)
+
+## let-it-crash + supervision (2026-05-28)
+An actor handler that hits a transient fault calls `crash()`: the kernel
+abandons just that handler and returns the actor to its receive loop (the
+process stays ALIVE — the crash is isolated, it does not halt the system).
+A synchronous `now` caller is then unblocked with a crash sentinel, which
+`crashed()` yields, so a supervisor can `if (r == crashed())` detect it and
+retry / restart.
+- Supervised.abcl → worker crashes on try 1, supervisor retries, worker
+  recovers on try 2 (`recovered, result = 2`).  If the worker keeps crashing
+  the supervisor reports `gave up` — no infinite loop, no wedge.
+Implementation: per-actor `__builtin_setjmp` frame in actorproc.c (no
+exception-handler or scheduler changes); `crash()`/`crashed()` are ordinary
+calls (no new syntax).
