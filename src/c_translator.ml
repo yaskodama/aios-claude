@@ -2221,6 +2221,7 @@ let gen_program_xinujit (p : program) : string =
     | Int n   -> Printf.sprintf "v_int(%d)" n
     | Float f -> Printf.sprintf "v_floatlit(%Lu)" (Int64.bits_of_float f)
     | String s -> Printf.sprintf "v_str(\"%s\")" (String.escaped s)
+    | Var "self" -> "v_int(self)"      (* the actor's own id, as a value_t *)
     | Var x ->
       if List.mem x fields then
         (match find_class cls with

@@ -1,0 +1,33 @@
+// MultiAgent.abcl — multiple LLM-driven actors coordinated with `select`.
+//
+// A Director spawns two Agents and asks each (with its own prompt) to produce
+// a story fragment.  Each Agent calls the on-device LLM independently (llm()
+// is one-shot / stateless, so concurrent agents don't share session state) and
+// sends its fragment back.  The Director uses `select` to collect both replies
+// as they arrive, regardless of order.
+
+class Agent {
+  method ask(director, topic) {
+    var fragment = llm(topic);          // independent one-shot generation
+    send director.reply(fragment);      // hand the result to the coordinator
+  }
+}
+
+class Director {
+  method run() {
+    var a1 = new Agent();
+    var a2 = new Agent();
+    send a1.ask(self, "The brave knight");
+    send a2.ask(self, "The sleepy dragon");
+    var got = 0;
+    while (got < 2) do {
+      select {
+        case reply(x) -> { print("agent: " + x); got = got + 1; }
+      }
+    }
+    print("director: collected 2 fragments");
+  }
+}
+
+var d = new Director();
+send d.run();
