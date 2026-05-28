@@ -2316,7 +2316,9 @@ let gen_program_xinujit (p : program) : string =
   emit "int g_nobj;\n\n";
 
   emit "int g_spawn(int cls) {\n";
-  emit "  int id; id = cc_actor_new(); g_nobj = g_nobj + 1;\n";
+  emit "  int id; id = cc_actor_new();\n";
+  emit "  if (id < 0) { return -1; }\n";   (* out of process slots: do not index g_obj[-1] *)
+  emit "  g_nobj = g_nobj + 1;\n";
   emit "  g_obj[id].cls = cls;\n";
   List.iteri (fun ci (c : class_decl) ->
     emitf "  if (cls == %d) {\n" ci;
