@@ -1,7 +1,7 @@
 (* aipl2c.ml — AIPL ソースを C に変換 *)
 
 let usage () =
-  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --python | --pony | --erlang | --go | --prolog | --llvm | --openmp] [--no-typecheck] [--dump-types] [--dump-effects] [--check]";
+  prerr_endline "usage: aipl2c <input.abcl> [-o <output>] [--max-msgs N] [--xinu | --xinu-jit | --python | --pony | --erlang | --go | --prolog | --llvm | --openmp] [--no-typecheck] [--dump-types] [--dump-effects] [--check]";
   exit 1
 
 let () =
@@ -9,6 +9,7 @@ let () =
   let output = ref None in
   let max_msgs = ref 12 in
   let xinu = ref false in
+  let xinujit = ref false in
   let py = ref false in
   let pony = ref false in
   let erl = ref false in
@@ -26,6 +27,7 @@ let () =
     | "-o" :: f :: rest -> output := Some f; loop rest
     | "--max-msgs" :: n :: rest -> max_msgs := int_of_string n; loop rest
     | "--xinu" :: rest -> xinu := true; loop rest
+    | "--xinu-jit" :: rest -> xinujit := true; loop rest
     | "--python" :: rest -> py := true; loop rest
     | "--pony" :: rest -> pony := true; loop rest
     | "--erlang" :: rest -> erl := true; loop rest
@@ -111,6 +113,7 @@ let () =
     else if !go   then C_translator.gen_program_go                         prog
     else if !pl   then C_translator.gen_program_prolog                     prog
     else if !py   then C_translator.gen_program_python ~max_messages:!max_msgs prog
+    else if !xinujit then C_translator.gen_program_xinujit                 prog
     else if !xinu then C_translator.gen_program_xinu   ~max_messages:!max_msgs prog
     else if !openmp then C_translator.gen_program_openmp ~max_messages:!max_msgs prog
     else if !llvm   then C_translator.gen_program_llvm   ~max_messages:!max_msgs prog

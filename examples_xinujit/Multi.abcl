@@ -1,0 +1,15 @@
+class Adder {
+  var base = 100;
+  method addTo(x) { return base + x; }
+}
+class Driver {
+  var helper = 0;
+  method run() {
+    helper = new Adder();
+    var r = now helper.addTo(23);
+    return r;
+  }
+}
+var d = new Driver();
+var ans = now d.run();
+print(ans);

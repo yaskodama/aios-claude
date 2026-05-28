@@ -1,0 +1,14 @@
+class Summer {
+  var total = 0;
+  method addUpTo(n) {
+    var i = 1;
+    while (i <= n) do {
+      total = total + i;
+      i = i + 1;
+    }
+    return total;
+  }
+}
+var s = new Summer();
+var r = now s.addUpTo(100);
+print(r);

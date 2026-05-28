@@ -2137,6 +2137,156 @@ let gen_class_py (c : class_decl) =
   end;
   emit "\n"
 
+(* ============================================================
+   --xinu-jit target.  Emits a SELF-CONTAINED, integer-only C program
+   that the on-device /compile compiler (xinu-rpi5/cc/) accepts — no
+   value_t, no threads/semaphores/mailboxes, no libc beyond the
+   print/puts builtins.  Model:
+     - objects live in a global  struct Obj { int cls; int f[N]; }  array
+     - fields are array slots (field name -> index, per class)
+     - a message send is a `dispatch(to, methodId, a0..a3)` switch on cls
+     - each method becomes  int m_<Class>_<method>(int self,int a0..a3)
+     - top-level globals (var x = new C(); now/print ...) become main()
+   Scope: int values only (floats are truncated to int, strings only as a
+   literal `print` argument).  Good for integer actor programs. *)
+let gen_program_xinujit (p : program) : string =
+  Buffer.clear buf;
+  let classes = classes_of p in
+  let globals = globals_of p in
+
+  let class_id cn =
+    let rec go i = function
+      | [] -> -1
+      | (c : class_decl) :: r -> if c.cname = cn then i else go (i + 1) r
+    in go 0 classes
+  in
+  let find_class cn = List.find_opt (fun (c : class_decl) -> c.cname = cn) classes in
+  let field_index (c : class_decl) fn =
+    let rec go i = function [] -> -1 | x :: r -> if x = fn then i else go (i + 1) r in
+    go 0 (fields_of c)
+  in
+  let mtbl = Hashtbl.create 32 in
+  let mctr = ref 0 in
+  List.iter (fun (c : class_decl) ->
+    List.iter (fun (m : method_decl) ->
+      if not (Hashtbl.mem mtbl m.mname) then begin
+        Hashtbl.add mtbl m.mname !mctr; incr mctr
+      end) c.methods) classes;
+  let method_id mn = try Hashtbl.find mtbl mn with Not_found -> -1 in
+  let max_fields =
+    List.fold_left (fun acc (c : class_decl) -> max acc (List.length (fields_of c))) 1 classes in
+
+  let rec gexpr ~cls ~fields (e : expr) : string =
+    match e.desc with
+    | Int n   -> string_of_int n
+    | Float f -> string_of_int (int_of_float f)
+    | String _ -> "0"
+    | Var x ->
+      if List.mem x fields then
+        (match find_class cls with
+         | Some c -> Printf.sprintf "g_obj[self].f[%d]" (field_index c x)
+         | None -> "0")
+      else Printf.sprintf "v_%s" x
+    | Binop (op, a, b) ->
+      let op' = match op with "and" -> "&&" | "or" -> "||" | o -> o in
+      Printf.sprintf "(%s %s %s)" (gexpr ~cls ~fields a) op' (gexpr ~cls ~fields b)
+    | New (cn, _) -> Printf.sprintf "g_spawn(%d)" (class_id cn)
+    | Now (tgt, m, args) | Future (tgt, m, args) ->
+      Printf.sprintf "dispatch(%s, %d, %s)"
+        (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
+    | Await e1 -> gexpr ~cls ~fields e1
+    | _ -> "0"
+  and gtarget ~cls ~fields = function
+    | LocalTarget "self" -> "self"
+    | LocalTarget name ->
+      if List.mem name fields then
+        (match find_class cls with
+         | Some c -> Printf.sprintf "g_obj[self].f[%d]" (field_index c name)
+         | None -> "0")
+      else Printf.sprintf "v_%s" name
+    | RemoteTarget _ -> "0"
+  and gargs ~cls ~fields args =
+    let a = List.map (gexpr ~cls ~fields) args in
+    let rec pad n l =
+      if n = 0 then []
+      else match l with x :: r -> x :: pad (n - 1) r | [] -> "0" :: pad (n - 1) []
+    in
+    String.concat ", " (pad 4 a)
+  in
+
+  let rec gstmt ~cls ~fields ~ind (s : stmt) : unit =
+    let pad = String.make ind ' ' in
+    match s.sdesc with
+    | Seq ss -> List.iter (gstmt ~cls ~fields ~ind) ss
+    | VarDecl (x, e) -> emitf "%sint v_%s = %s;\n" pad x (gexpr ~cls ~fields e)
+    | Assign (x, e) ->
+      if List.mem x fields then
+        (match find_class cls with
+         | Some c -> emitf "%sg_obj[self].f[%d] = %s;\n" pad (field_index c x) (gexpr ~cls ~fields e)
+         | None -> ())
+      else emitf "%sv_%s = %s;\n" pad x (gexpr ~cls ~fields e)
+    | CallStmt ("print", [a]) ->
+      (match a.desc with
+       | String s -> emitf "%sputs(\"%s\");\n" pad (String.escaped s)
+       | _ -> emitf "%sprint(%s);\n" pad (gexpr ~cls ~fields a))
+    | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
+    | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
+      emitf "%sdispatch(%s, %d, %s);\n" pad (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
+    | If (e, s1, s2) ->
+      emitf "%sif (%s) {\n" pad (gexpr ~cls ~fields e);
+      gstmt ~cls ~fields ~ind:(ind + 2) s1;
+      emitf "%s} else {\n" pad;
+      gstmt ~cls ~fields ~ind:(ind + 2) s2;
+      emitf "%s}\n" pad
+    | While (e, b) ->
+      emitf "%swhile (%s) {\n" pad (gexpr ~cls ~fields e);
+      gstmt ~cls ~fields ~ind:(ind + 2) b;
+      emitf "%s}\n" pad
+    | Return None -> emitf "%sreturn 0;\n" pad
+    | Return (Some e) -> emitf "%sreturn %s;\n" pad (gexpr ~cls ~fields e)
+    | _ -> emitf "%s/* unsupported stmt */\n" pad
+  in
+
+  emit "/* AIPL -> C  (--xinu-jit: self-contained integer subset for /compile) */\n";
+  emitf "struct Obj { int cls; int f[%d]; };\n" (if max_fields < 1 then 1 else max_fields);
+  emit "struct Obj g_obj[64];\n";
+  emit "int g_nobj;\n\n";
+
+  emit "int g_spawn(int cls) {\n";
+  emit "  int id; id = g_nobj; g_nobj = g_nobj + 1;\n";
+  emit "  g_obj[id].cls = cls;\n";
+  List.iteri (fun ci (c : class_decl) ->
+    emitf "  if (cls == %d) {\n" ci;
+    List.iteri (fun fi (st : stmt) ->
+      match st.sdesc with
+      | VarDecl (_, e) -> emitf "    g_obj[id].f[%d] = %s;\n" fi (gexpr ~cls:"" ~fields:[] e)
+      | _ -> ()) c.fields;
+    emit "  }\n") classes;
+  emit "  return id;\n}\n\n";
+
+  List.iter (fun (c : class_decl) ->
+    let fields = fields_of c in
+    List.iter (fun (m : method_decl) ->
+      emitf "int m_%s_%s(int self, int a0, int a1, int a2, int a3) {\n" c.cname m.mname;
+      List.iteri (fun i p -> if i < 4 then emitf "  int v_%s = a%d;\n" p i) m.params;
+      gstmt ~cls:c.cname ~fields ~ind:2 m.body;
+      emit "  return 0;\n}\n\n") c.methods) classes;
+
+  emit "int dispatch(int self, int meth, int a0, int a1, int a2, int a3) {\n";
+  emit "  int c; c = g_obj[self].cls;\n";
+  List.iteri (fun ci (c : class_decl) ->
+    emitf "  if (c == %d) {\n" ci;
+    List.iter (fun (m : method_decl) ->
+      emitf "    if (meth == %d) return m_%s_%s(self, a0, a1, a2, a3);\n"
+        (method_id m.mname) c.cname m.mname) c.methods;
+    emit "  }\n") classes;
+  emit "  return 0;\n}\n\n";
+
+  emit "int main() {\n";
+  List.iter (gstmt ~cls:"" ~fields:[] ~ind:2) globals;
+  emit "  return 0;\n}\n";
+  Buffer.contents buf
+
 let gen_program_python ?(max_messages = 12) (p : program) : string =
   Buffer.clear buf;
   let cs = classes_of p in
