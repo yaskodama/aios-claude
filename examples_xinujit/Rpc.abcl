@@ -1,0 +1,10 @@
+class Server { method query(x) { return x * 10; } }
+class Client {
+  var srv = 0;
+  method setup(s) { srv = s; }
+  method go() { var r = now srv.query(5); print("got " + r); }
+}
+var srv = new Server();
+var cli = new Client();
+send cli.setup(srv);
+send cli.go();

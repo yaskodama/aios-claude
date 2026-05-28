@@ -2233,8 +2233,15 @@ let gen_program_xinujit (p : program) : string =
          in Printf.sprintf "%s(%s, %s)" f ga gb)
     | New (cn, _) -> Printf.sprintf "v_int(g_spawn(%d))" (class_id cn)
     | Now (tgt, m, args) | Future (tgt, m, args) ->
-      Printf.sprintf "dispatch(%s, %d, %s)"
-        (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
+      (* Inside a method, `now` is a synchronous call between actor
+         processes (the caller blocks for the reply); at top level there
+         is no actor process, so dispatch inline. *)
+      if cls = "" then
+        Printf.sprintf "dispatch(%s, %d, %s)"
+          (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
+      else
+        Printf.sprintf "cc_call(self, %s, %d, %s)"
+          (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | Await e1 -> gexpr ~cls ~fields e1
     | _ -> "v_int(0)"
   and gtarget ~cls ~fields = function          (* -> a RAW object id *)
