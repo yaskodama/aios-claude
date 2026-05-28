@@ -2246,6 +2246,13 @@ let gen_program_xinujit (p : program) : string =
           (gtarget ~cls ~fields tgt) (method_id m) (gargs ~cls ~fields args)
     | Await e1 -> gexpr ~cls ~fields e1
     | Call ("crashed", _) -> "cc_crashed_value()"   (* supervisor: did the callee crash? *)
+    (* lists / collections (immutable, value_t): list() / push(l,x) / get(l,i) / len(l) *)
+    | Call ("list", []) -> "v_list_new()"
+    | Call ("push", [l; x]) ->
+      Printf.sprintf "v_list_push(%s, %s)" (gexpr ~cls ~fields l) (gexpr ~cls ~fields x)
+    | Call ("get", [l; i]) ->
+      Printf.sprintf "v_list_get(%s, %s)" (gexpr ~cls ~fields l) (gexpr ~cls ~fields i)
+    | Call ("len", [l]) -> Printf.sprintf "v_list_len(%s)" (gexpr ~cls ~fields l)
     | _ -> "v_int(0)"
   and gtarget ~cls ~fields = function          (* -> a RAW object id *)
     | LocalTarget "self" -> "self"

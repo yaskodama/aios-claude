@@ -64,3 +64,12 @@ retry / restart.
 Implementation: per-actor `__builtin_setjmp` frame in actorproc.c (no
 exception-handler or scheduler changes); `crash()`/`crashed()` are ordinary
 calls (no new syntax).
+
+## lists / collections (2026-05-28)
+A list is a value_t (a pointer tagged into a per-run list heap, alongside the
+int/string/float tags).  Exposed as ordinary builtin calls (no new syntax):
+`list()` (empty), `push(l, x)` (immutable append -> new list), `get(l, i)`,
+`len(l)`.  Lists print as `[a, b, c]` and concatenate with strings.
+- Lists.abcl → `[10, 20, 30, 40]`, `len 4`, `l[2]=30`, `sum 100`,
+  `filtered(>20) = [30, 40]` (build via loop, index, sum, filter into a new
+  list).

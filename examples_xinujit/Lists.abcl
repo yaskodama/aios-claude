@@ -1,0 +1,37 @@
+// Lists.abcl — lists / collections as value_t, via runtime builtins:
+//   list()        -> a new empty list
+//   push(l, x)    -> a new list = l with x appended (immutable)
+//   get(l, i)     -> element i (0-based)
+//   len(l)        -> number of elements
+// Lists print as [a, b, c] and concatenate with strings.
+
+class Demo {
+  method run() {
+    // build [10, 20, 30, 40]
+    var l = list();
+    var i = 1;
+    while (i <= 4) do { l = push(l, i * 10); i = i + 1; }
+    print("list = " + l);
+    print("len  = " + len(l));
+    print("l[2] = " + get(l, 2));
+
+    // sum by indexed iteration
+    var s = 0;
+    var k = 0;
+    while (k < len(l)) do { s = s + get(l, k); k = k + 1; }
+    print("sum  = " + s);
+
+    // filter (> 20) into a fresh list
+    var big = list();
+    var j = 0;
+    while (j < len(l)) do {
+      var e = get(l, j);
+      if (e > 20) big = push(big, e);
+      j = j + 1;
+    }
+    print("filtered(>20) = " + big);
+  }
+}
+
+var d = new Demo();
+send d.run();
