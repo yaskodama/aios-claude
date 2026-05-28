@@ -1,0 +1,28 @@
+class Worker {
+  var agg = 0;
+  method setup(a) { agg = a; }
+  method square(n) { send agg.collect(n * n); }
+}
+class Aggregator {
+  var sum = 0;
+  var count = 0;
+  var expected = 0;
+  method init(e) { expected = e; }
+  method collect(v) {
+    sum = sum + v;
+    count = count + 1;
+    print("collected " + v + "  (running sum " + sum + ")");
+    if (count == expected) print("sum of squares = " + sum);
+  }
+}
+var agg = new Aggregator();
+var w0 = new Worker();
+var w1 = new Worker();
+var w2 = new Worker();
+send agg.init(3);
+send w0.setup(agg);
+send w1.setup(agg);
+send w2.setup(agg);
+send w0.square(1);
+send w1.square(2);
+send w2.square(3);
