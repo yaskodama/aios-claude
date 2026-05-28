@@ -2183,7 +2183,7 @@ let gen_program_xinujit (p : program) : string =
   let rec gexpr ~cls ~fields (e : expr) : string =
     match e.desc with
     | Int n   -> Printf.sprintf "v_int(%d)" n
-    | Float f -> Printf.sprintf "v_int(%d)" (int_of_float f)
+    | Float f -> Printf.sprintf "v_floatlit(%Lu)" (Int64.bits_of_float f)
     | String s -> Printf.sprintf "v_str(\"%s\")" (String.escaped s)
     | Var x ->
       if List.mem x fields then
