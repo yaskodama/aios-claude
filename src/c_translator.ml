@@ -2167,11 +2167,15 @@ let gen_program_xinujit (p : program) : string =
   in
   let mtbl = Hashtbl.create 32 in
   let mctr = ref 0 in
+  let methods_ordered = ref [] in            (* (name, id) in assignment order *)
   List.iter (fun (c : class_decl) ->
     List.iter (fun (m : method_decl) ->
       if not (Hashtbl.mem mtbl m.mname) then begin
-        Hashtbl.add mtbl m.mname !mctr; incr mctr
+        Hashtbl.add mtbl m.mname !mctr;
+        methods_ordered := (m.mname, !mctr) :: !methods_ordered;
+        incr mctr
       end) c.methods) classes;
+  let methods_ordered = List.rev !methods_ordered in
   let method_id mn = try Hashtbl.find mtbl mn with Not_found -> -1 in
   let max_fields =
     List.fold_left (fun acc (c : class_decl) -> max acc (List.length (fields_of c))) 1 classes in
@@ -2291,6 +2295,17 @@ let gen_program_xinujit (p : program) : string =
         (method_id m.mname) c.cname m.mname) c.methods;
     emit "  }\n") classes;
   emit "  return 0;\n}\n\n";
+
+  (* Resident-actor introspection used by the /actor/* HTTP endpoints:
+     map a method name (value_t string) to its id, and report how many
+     actors were spawned by main(). *)
+  emit "int __method_id(int name) {\n";
+  List.iter (fun (nm, id) ->
+    emitf "  if (v_truthy(v_eq(name, v_str(\"%s\")))) return v_int(%d);\n" (String.escaped nm) id)
+    methods_ordered;
+  emit "  return v_int(-1);\n}\n\n";
+
+  emit "int __nobj() { return v_int(g_nobj); }\n\n";
 
   emit "int main() {\n";
   List.iter (gstmt ~cls:"" ~fields:[] ~ind:2) globals;
