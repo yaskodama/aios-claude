@@ -2153,6 +2153,11 @@ let gen_program_xinujit (p : program) : string =
   Buffer.clear buf;
   let classes = classes_of p in
   let globals = globals_of p in
+  let functions = List.filter_map (function Function f -> Some f | _ -> None) p in
+  (* function values are int ids; map/filter call back through apply(id, x) *)
+  let fn_tbl = Hashtbl.create 16 in
+  List.iteri (fun i (f : function_decl) -> Hashtbl.replace fn_tbl f.fn_name i) functions;
+  let fn_id name = try Hashtbl.find fn_tbl name with Not_found -> -1 in
 
   let class_id cn =
     let rec go i = function
@@ -2201,6 +2206,7 @@ let gen_program_xinujit (p : program) : string =
   List.iter (fun (c : class_decl) ->
     List.iter (fun (m : method_decl) -> cm_s m.body) c.methods) classes;
   List.iter cm_s globals;
+  List.iter (fun (f : function_decl) -> cm_s f.fn_body) functions;
   let methods_ordered = List.rev !methods_ordered in
   let method_id mn = try Hashtbl.find mtbl mn with Not_found -> -1 in
   let max_fields =
@@ -2253,6 +2259,14 @@ let gen_program_xinujit (p : program) : string =
     | Call ("get", [l; i]) ->
       Printf.sprintf "v_list_get(%s, %s)" (gexpr ~cls ~fields l) (gexpr ~cls ~fields i)
     | Call ("len", [l]) -> Printf.sprintf "v_list_len(%s)" (gexpr ~cls ~fields l)
+    (* higher-order: the 2nd arg names a top-level function, passed as its id *)
+    | Call ("map", [l; { desc = Var fn; _ }]) ->
+      Printf.sprintf "v_list_map(%s, v_int(%d))" (gexpr ~cls ~fields l) (fn_id fn)
+    | Call ("filter", [l; { desc = Var fn; _ }]) ->
+      Printf.sprintf "v_list_filter(%s, v_int(%d))" (gexpr ~cls ~fields l) (fn_id fn)
+    (* direct call of a top-level function *)
+    | Call (fn, args) when Hashtbl.mem fn_tbl fn ->
+      Printf.sprintf "fn_%s(%s)" fn (gargs ~cls ~fields args)
     | _ -> "v_int(0)"
   and gtarget ~cls ~fields = function          (* -> a RAW object id *)
     | LocalTarget "self" -> "self"
@@ -2362,6 +2376,21 @@ let gen_program_xinujit (p : program) : string =
       | _ -> ()) c.fields;
     emit "  }\n") classes;
   emit "  return id;\n}\n\n";
+
+  (* top-level functions (usable as values via map/filter, or called directly) *)
+  List.iter (fun (f : function_decl) ->
+    emitf "int fn_%s(int a0, int a1, int a2, int a3) {\n" f.fn_name;
+    List.iteri (fun i p -> if i < 4 then emitf "  int v_%s = a%d;\n" p i) f.fn_params;
+    gstmt ~cls:"" ~fields:[] ~ind:2 f.fn_body;
+    emit "  return v_int(0);\n}\n\n") functions;
+
+  if functions <> [] then begin
+    emit "int apply(int id, int x) {\n";
+    List.iteri (fun i (f : function_decl) ->
+      emitf "  if (id == %d) return fn_%s(x, v_int(0), v_int(0), v_int(0));\n" i f.fn_name)
+      functions;
+    emit "  return v_int(0);\n}\n\n"
+  end;
 
   List.iter (fun (c : class_decl) ->
     let fields = fields_of c in

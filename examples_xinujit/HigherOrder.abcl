@@ -1,0 +1,23 @@
+// HigherOrder.abcl — map / filter with top-level functions as values.
+//
+// A function value is a top-level `function`; map(list, f) / filter(list, p)
+// apply it to each element (the JIT emits an apply(id, x) dispatcher and the
+// runtime calls back into it).  Functions can also be called directly.
+
+function dbl(x)   { return x * 2; }
+function isBig(x) { return x > 20; }
+
+class Demo {
+  method run() {
+    var l = list();
+    var i = 1;
+    while (i <= 4) do { l = push(l, i * 10); i = i + 1; }   // [10, 20, 30, 40]
+    print("src        = " + l);
+    print("map dbl    = " + map(l, dbl));        // [20, 40, 60, 80]
+    print("filter >20 = " + filter(l, isBig));   // [30, 40]
+    print("dbl(7)     = " + dbl(7));             // 14  (direct call)
+  }
+}
+
+var demo = new Demo();
+send demo.run();

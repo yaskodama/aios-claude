@@ -73,3 +73,12 @@ int/string/float tags).  Exposed as ordinary builtin calls (no new syntax):
 - Lists.abcl → `[10, 20, 30, 40]`, `len 4`, `l[2]=30`, `sum 100`,
   `filtered(>20) = [30, 40]` (build via loop, index, sum, filter into a new
   list).
+
+## higher-order map / filter (2026-05-28)
+A top-level `function` is a value: `map(list, f)` / `filter(list, pred)` apply
+it to each element.  A function value is an int id; the translator emits an
+`apply(id, x)` dispatcher (like the actor `dispatch`) and the runtime calls
+back into it — no on-device function pointers needed.  Top-level functions can
+also be called directly.
+- HigherOrder.abcl → `map dbl = [20, 40, 60, 80]`, `filter >20 = [30, 40]`,
+  `dbl(7) = 14`.
