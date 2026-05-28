@@ -27,3 +27,9 @@ examples_xinujit/run.sh examples_xinujit/Counter.abcl
 Values are now tagged (int | string), so AIPL strings and concatenation work:
 - String.abcl → `count = 5` / `count = 42` / `done`  (string literals + `"..." + int`)
 Integer programs (Counter/Summer/Multi) still pass. Float is still truncated to int.
+
+## Resident actors (2026-05-28)
+`POST /actor/load` (body = --xinu-jit C) keeps the program resident: main()
+spawns the actors and they stay alive.  `GET /actor/send?to=N&m=METHOD&arg=X`
+messages them; state persists across calls.  See actor_server.sh.
+Also on the serial shell: `aload <file.c>` / `amsg <actor> <method> [arg]`.
