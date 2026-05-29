@@ -1,0 +1,97 @@
+// mac_diners_rpi4.abcl — distributed dining philosophers, written ENTIRELY in
+// AIPL and run from the Py-I browser dashboard.  3 philosophers + all 5 forks
+// are local Py-I actors on the Mac; 2 philosophers (P3, P4) are mirrored onto
+// the bare-metal xinu-rpi4 Pi (192.168.3.100): when they eat, the meal is
+// recorded by an AIPL philosopher actor that the Pi JIT-compiled on-device.
+//
+// DYNAMIC: on Start this program first ships the Pi philosophers' AIPL->C
+// source to /actor/load over "xinujit://", where the in-kernel cc JIT compiles
+// it and main() spawns the 2 resident actors.  (The launcher translates
+// xinu_phil.abcl -> /tmp/xinu_phil.c first.)  Deadlock-free: every philosopher
+// takes its lower-numbered fork first.
+
+var pi = "xinujit://192.168.3.100";
+print("Xinu JIT load -> " + remote_now(pi, "_", "loadfile", "/tmp/xinu_phil.c"));
+
+class Fork {
+  var holder = 0;
+  method acquire(pid) {
+    if (holder == 0) { holder = pid; send sender.granted(pid); }
+    else { send sender.denied(pid); }
+  }
+  method release(pid) { if (holder == pid) { holder = 0; } }
+}
+
+class Philosopher {
+  var id     = 0;
+  var lo     = 0;
+  var hi     = 0;
+  var state  = 0;          // 0 = no forks, 1 = holds low fork
+  var meals  = 0;
+  var target = 8;
+  var remote = 0;          // 1 = also recorded on the Pi
+  var rid    = "0";        // Xinu resident actor id (string) when remote==1
+  var hub    = "xinujit://192.168.3.100";
+  var status = "thinking";
+
+  method init(i, l, h, isx, xid) {
+    id = i; lo = l; hi = h; state = 0; meals = 0;
+    remote = isx; rid = xid; status = "thinking";
+    send self.think();
+  }
+  method think() {
+    status = "thinking";
+    print("P" + id + " thinking");
+    sleep(0.15);
+    send lo.acquire(id);
+  }
+  method granted(pid) {
+    if (state == 0) {
+      state = 1; status = "took low fork";
+      send hi.acquire(id);
+    } else {
+      meals = meals + 1;
+      status = "eating";
+      if (remote == 1) {
+        // the Pi's AIPL/JIT philosopher actually performs the meal
+        var pn = remote_now(hub, rid, "eat");
+        print("P" + id + " eating (meal " + meals + ") [Xinu actor " + rid + " count=" + pn + "]");
+      } else {
+        print("P" + id + " eating (meal " + meals + ") [Mac]");
+      }
+      sleep(0.2);
+      send hi.release(id);
+      send lo.release(id);
+      state = 0;
+      status = "put down forks";
+      if (meals >= target) {
+        status = "done";
+        print("P" + id + " finished after " + meals + " meals");
+        suicide();
+      } else {
+        send self.think();
+      }
+    }
+  }
+  method denied(pid) {
+    if (state == 1) { send lo.release(id); state = 0; }
+    status = "waiting (fork busy)";
+    sleep(0.1);
+    send self.think();
+  }
+}
+
+var f0 = new Fork();
+var f1 = new Fork();
+var f2 = new Fork();
+var f3 = new Fork();
+var f4 = new Fork();
+
+// philosopher i shares fork i with i-1 and fork i+1 with i+1; pass (lower,
+// higher) so the lower fork is always acquired first (deadlock-free).
+// seats 0,1,2 = Mac-only; seats 3,4 = mirrored to Xinu actors 0,1.
+var p0 = new Philosopher(0, f0, f1, 0, "0");
+var p1 = new Philosopher(1, f1, f2, 0, "0");
+var p2 = new Philosopher(2, f2, f3, 0, "0");
+var p3 = new Philosopher(3, f3, f4, 1, "0");
+var p4 = new Philosopher(4, f0, f4, 1, "1");

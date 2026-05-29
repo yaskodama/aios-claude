@@ -2425,6 +2425,17 @@ let gen_program_xinujit (p : program) : string =
 
   emit "int __nobj() { return v_int(g_nobj); }\n\n";
 
+  (* Per-actor introspection for the Xinu "Actors (live)" window: the class
+     name (as a value_t string) for a class index, and the class index of a
+     spawned object (g_obj is indexed by the actor id). *)
+  emit "int __cls_name(int cls) {\n";
+  List.iteri (fun ci (c : class_decl) ->
+    emitf "  if (cls == %d) return v_str(\"%s\");\n" ci (String.escaped c.cname))
+    classes;
+  emit "  return v_str(\"?\");\n}\n\n";
+
+  emit "int __obj_cls(int id) { return v_int(g_obj[id].cls); }\n\n";
+
   emit "int main() {\n";
   List.iter (gstmt ~cls:"" ~fields:[] ~ind:2) globals;
   emit "  return 0;\n}\n";

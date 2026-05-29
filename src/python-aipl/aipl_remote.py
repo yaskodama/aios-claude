@@ -415,6 +415,50 @@ def _xinu_http_send(hostport: str, to_actor: str, method: str, args: list):
     except json.JSONDecodeError:
         return {"ok": 0, "raw": raw}
 
+# ─── xinujit:// scheme — Xinu cc-JIT *resident* actor gateway ─────────────
+#
+# Unlike http:// (native actor.c demo actors via /send, JSON), the resident
+# actors loaded via /actor/load are driven by /actor/send (plain-text result),
+# and fresh AIPL->C source is shipped + JIT-compiled + spawned on-device via
+# /actor/load.  This lets a Mac AIPL program host philosophers on a bare
+# xinu-rpi4 Pi and drive them, all from the browser dashboard:
+#     now remote("xinujit://192.168.3.100", "_", "loadfile", "/tmp/x.c")  // ship+JIT
+#     now remote("xinujit://192.168.3.100", "0", "eat")     -> meal count (int)
+def _is_xinu_jit(hostport: str) -> bool:
+    return isinstance(hostport, str) and hostport.startswith("xinujit://")
+
+def _xinujit_base(hostport: str) -> str:
+    return "http://" + hostport[len("xinujit://"):].rstrip("/")
+
+def _xinujit_load(hostport: str, source: str) -> str:
+    req = urllib.request.Request(_xinujit_base(hostport) + "/actor/load",
+                                 data=source.encode("utf-8"), method="POST")
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        return resp.read().decode("utf-8", "replace").strip()
+
+def _xinujit_send_raw(hostport: str, to_actor: str, method: str, args: list) -> str:
+    arg = 0
+    if args:
+        try:    arg = int(args[0])
+        except (ValueError, TypeError): arg = 0
+    url = f"{_xinujit_base(hostport)}/actor/send?to={to_actor}&m={method}&arg={arg}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        return resp.read().decode("utf-8", "replace").strip()
+
+def _xinujit_dispatch(hostport: str, to_actor: str, method: str, args: list):
+    """Async + sync both route here.  Meta-actor "_" maps control ops
+    (load = ship a source string; loadfile = ship a file) to /actor/load;
+    any other (actor, method) is an /actor/send returning the leading int."""
+    if to_actor == "_":
+        if method == "load":
+            return _xinujit_load(hostport, str(args[-1]) if args else "")
+        if method == "loadfile":
+            with open(str(args[0]), "r") as fh:
+                return _xinujit_load(hostport, fh.read())
+    body = _xinujit_send_raw(hostport, to_actor, method, args)
+    try:    return int(body.split()[0])
+    except (ValueError, IndexError): return body
+
 def _uart1_target(hostport: str) -> tuple:
     raw = hostport[len("uart1://"):]
     if ":" in raw:
@@ -616,6 +660,13 @@ def remote_send(hostport: str, to_actor: str, method: str,
         except (urllib.error.URLError, OSError) as e:
             print(f"[remote_send http] {hostport}/{to_actor}.{method} failed: {e}")
         return
+    if _is_xinu_jit(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=False)
+        try:
+            _xinujit_dispatch(hostport, to_actor, method, args)
+        except (urllib.error.URLError, OSError) as e:
+            print(f"[remote_send xinujit] {hostport}/{to_actor}.{method} failed: {e}")
+        return
     url = f"http://{hostport}/api/json/send"
     payload = json.dumps({
         "to":     to_actor,
@@ -653,6 +704,12 @@ def remote_call_sync(hostport: str, to_actor: str, method: str,
         except (urllib.error.URLError, OSError) as e:
             raise RuntimeError(f"remote_call http {hostport}/{to_actor}.{method} failed: {e}")
         return d.get("result")
+    if _is_xinu_jit(hostport):
+        _publish_remote_out(hostport, to_actor, method, sync=True)
+        try:
+            return _xinujit_dispatch(hostport, to_actor, method, args)
+        except (urllib.error.URLError, OSError) as e:
+            raise RuntimeError(f"remote_call xinujit {hostport}/{to_actor}.{method} failed: {e}")
     url = f"http://{hostport}/api/json/call?timeout_ms={int(timeout_s * 1000)}"
     payload = json.dumps({
         "to":     to_actor,

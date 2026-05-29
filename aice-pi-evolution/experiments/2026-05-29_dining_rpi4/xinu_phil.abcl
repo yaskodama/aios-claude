@@ -1,0 +1,17 @@
+// xinu_phil.abcl — the 2 Xinu-resident philosophers (P4, P5) for the
+// distributed dinner.  Fork arbitration lives on the Mac coordinator, which
+// drives these via HTTP /actor/send: it calls eat() when it has granted both
+// forks, think() between meals.  Pure stateful actors — no forks/select/sleep
+// here, so the xinu-rpi4 JIT + actor runtime stay on the proven path.
+class Philosopher {
+  var id    = 0;
+  var meals = 0;
+  method seat(i)  { id = i; meals = 0; return id; }
+  method think()  { print("P" + id + " thinking"); return meals; }
+  method eat()    { meals = meals + 1; print("P" + id + " eating (meal " + meals + ")"); return meals; }
+  method count()  { return meals; }
+}
+var p4 = new Philosopher();
+var p5 = new Philosopher();
+send p4.seat(4);
+send p5.seat(5);
