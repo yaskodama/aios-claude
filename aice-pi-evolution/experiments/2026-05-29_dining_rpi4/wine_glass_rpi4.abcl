@@ -1,0 +1,71 @@
+// wine_glass_rpi4.abcl — a rotating wine glass drawn on the bare-metal
+// xinu-rpi4 Pi's HDMI "Graphics" window, written ENTIRELY in AIPL and run from
+// the Py-I browser dashboard.
+//
+// On Start the Animator actor FIRST ships a drawing actor (pi/wine_canvas.abcl
+// -> /tmp/wine_canvas.c) to the Pi over "xinujit://": the in-kernel cc JIT
+// compiles it and main() spawns the Canvas actor (id 0).  Then it animates by
+// re-sending frame() to itself: each frame rotates the whole wine-glass outline
+// in the plane by an ever-growing angle (the trig runs here on the Mac via
+// sin/cos, which the bare-metal JIT lacks) and streams the rotated segments to
+// the Pi with moveto/lineto, so the glass appears to spin in the Graphics
+// window.  Rotation maps each offset (dx,dy) from the centre to
+// (dx*cos a - dy*sin a, dx*sin a + dy*cos a).
+//
+// (AIPL keeps control flow inside actors, so the animation loop is the
+// self-send recursion in frame(), exactly like the philosophers' think().)
+
+class Animator {
+  var pi  = "xinujit://192.168.3.100";
+  var f   = 0;
+  var cx  = 185;          // centre, in Graphics-window content coords (~368x734)
+  var cy  = 350;
+  var col = 4;            // glass colour: 4 = yellow
+
+  method start() {
+    print("Xinu JIT load -> " + remote_now(pi, "_", "loadfile", "/tmp/wine_canvas.c"));
+    send self.frame();
+  }
+
+  method frame() {
+    if (f < 1200) {
+      var a  = f * 0.12;            // rotation angle (radians), grows each frame
+      var co = cos(a);
+      var si = sin(a);
+
+      // wine-glass outline points, as offsets from the centre (before rotation)
+      var rlx = 0 - 60;  var rly = 0 - 150;    // bowl rim, left
+      var bbx = 0;       var bby = 0 - 50;     // bowl bottom (stem top)
+      var rrx = 60;      var rry = 0 - 150;    // bowl rim, right
+      var bcx = 0;       var bcy = 140;        // base centre (stem bottom)
+      var blx = 0 - 50;  var bly = 140;        // base, left
+      var brx = 50;      var bry = 140;        // base, right
+
+      // (coords are float here; the xinujit bridge int()-truncates each arg)
+      remote_now(pi, "0", "clear", 0, 0, 0);
+
+      // bowl outline polyline: rim-left -> bowl-bottom -> rim-right -> rim-left
+      remote_now(pi, "0", "moveto", cx + rlx*co - rly*si, cy + rlx*si + rly*co, 0);
+      remote_now(pi, "0", "lineto", cx + bbx*co - bby*si, cy + bbx*si + bby*co, col);
+      remote_now(pi, "0", "lineto", cx + rrx*co - rry*si, cy + rrx*si + rry*co, col);
+      remote_now(pi, "0", "lineto", cx + rlx*co - rly*si, cy + rlx*si + rly*co, col);
+
+      // stem: bowl-bottom -> base-centre
+      remote_now(pi, "0", "moveto", cx + bbx*co - bby*si, cy + bbx*si + bby*co, 0);
+      remote_now(pi, "0", "lineto", cx + bcx*co - bcy*si, cy + bcx*si + bcy*co, col);
+
+      // base: base-left -> base-right
+      remote_now(pi, "0", "moveto", cx + blx*co - bly*si, cy + blx*si + bly*co, 0);
+      remote_now(pi, "0", "lineto", cx + brx*co - bry*si, cy + brx*si + bry*co, col);
+
+      f = f + 1;
+      sleep(0.03);
+      send self.frame();           // next frame (mailbox-driven, not stack recursion)
+    } else {
+      print("wine glass: done");
+    }
+  }
+}
+
+var anim = new Animator();
+send anim.start();

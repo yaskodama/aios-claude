@@ -16,7 +16,7 @@ import sys, time, subprocess, urllib.request, urllib.parse, os
 
 HOST   = "192.168.3.100"
 PROJ   = "/Users/kodamay/ocaml-app/abclcp-project"
-ABCL   = os.path.join(PROJ, "aice-pi-evolution/experiments/2026-05-29_dining_rpi4/xinu_phil.abcl")
+ABCL   = os.path.join(PROJ, "aice-pi-evolution/experiments/2026-05-29_dining_rpi4/pi/xinu_phil.abcl")
 CSRC   = "/tmp/xinu_phil.c"
 MEALS  = int(sys.argv[1]) if len(sys.argv) > 1 else 5
 

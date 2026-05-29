@@ -109,6 +109,12 @@ _PROGRAM_LABELS = {
     "mac_diners.abcl":   "Dining Philosophers (3 Mac + 2 Xinu, static)",
     "ring_demo.abcl":    "Token ring (local, 4)",
     "bounded_buffer.abcl": "Bounded buffer (local, 2 producers + 2 consumers)",
+    # rpi4 (xinu-rpi4 @ .100, HTTP /actor gateway, on-device cc JIT):
+    "mac_diners_rpi4.abcl": "Dining Philosophers (3 Mac + 2 Xinu rpi4, dynamic JIT)",
+    "mac_only_diners.abcl": "Dining Philosophers (Mac only, 5 local)",
+    "xinu_phil.abcl":       "Xinu rpi4 philosophers (P4, P5 — resident)",
+    "wine_glass_rpi4.abcl":   "Rotating wine glass 2D (Xinu rpi4 Graphics window, JIT)",
+    "wine_glass3d_rpi4.abcl": "Rotating wine glass 3D solid of revolution (Xinu rpi4, JIT)",
 }
 
 
@@ -464,6 +470,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_chat_html()
         elif self.path == "/actors" or self.path.startswith("/actors?"):
             self._serve_actors_html()
+        elif self.path == "/layout" or self.path.startswith("/layout?"):
+            self._serve_layout_html()
+        elif self.path.startswith("/api/layout/windows"):
+            self._serve_layout_windows()
         elif self.path.startswith("/api/actors"):
             self._serve_actors_json()
         elif self.path.startswith("/api/programs"):
@@ -528,6 +538,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._handle_chat_send()
         elif self.path.startswith("/api/control"):
             self._handle_control()
+        elif self.path.startswith("/api/layout/send"):
+            self._handle_layout_send()
         elif self.path.startswith("/api/load"):
             self._handle_load()
         elif self.path.startswith("/api/speed"):
@@ -821,6 +833,75 @@ class _Handler(BaseHTTPRequestHandler):
     def _serve_actors_html(self):
         self._send_bytes(200, "text/html; charset=utf-8",
                          _ACTORS_HTML.encode("utf-8"))
+
+    # ---- Xinu window-layout designer (all comms in AIPL) ----
+    def _serve_layout_html(self):
+        html = _LAYOUT_HTML.replace("XINUHOST", _LAYOUT_XINU_HOST)
+        self._send_bytes(200, "text/html; charset=utf-8", html.encode("utf-8"))
+
+    def _serve_layout_windows(self):
+        """Proxy the bare-metal Xinu /windows inventory (server-side fetch so
+        the browser isn't blocked by cross-origin to the Pi)."""
+        host = _LAYOUT_XINU_HOST
+        try:
+            with urllib.request.urlopen("http://%s/windows" % host, timeout=6) as r:
+                raw = r.read()
+            self._send_bytes(200, "application/json", raw)
+        except Exception as e:
+            self._send_bytes(200, "application/json",
+                             json.dumps({"error": str(e), "windows": []}).encode("utf-8"))
+
+    def _handle_layout_send(self):
+        """Apply a designed layout to Xinu.  The 'やり取り' is all AIPL: we
+        GENERATE an AIPL program of remote_now(...) move/resize calls and run
+        it through the Py-I interpreter, which ships them to the resident
+        Layout actor over xinujit:// (the actor calls the wm window builtins)."""
+        data = self._read_json_body() or {}
+        wins = data.get("windows", [])
+        host = str(data.get("host") or _LAYOUT_XINU_HOST)
+        proj = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        layout_abcl = os.path.join(
+            proj, "aice-pi-evolution/experiments/2026-05-29_dining_rpi4/pi/xinu_layout.abcl")
+        layout_c = "/tmp/xinu_layout.c"
+        if not os.path.exists(layout_c):
+            subprocess.run(["dune", "exec", "src/aipl2c.exe", "--", layout_abcl,
+                            "--xinu-jit", "--no-typecheck", "-o", layout_c],
+                           cwd=proj, check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        lines = ['var pi = "xinujit://%s";' % host,
+                 'print(remote_now(pi, "_", "loadfile", "%s"));' % layout_c]
+        for w in wins:
+            try:
+                i = int(w["id"]); x = int(w["x"]); y = int(w["y"])
+                ww = int(w["w"]); hh = int(w["h"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            lines.append('remote_now(pi, "0", "resize", %d, %d, %d);' % (i, ww, hh))
+            lines.append('remote_now(pi, "0", "move", %d, %d, %d);' % (i, x, y))
+            try:
+                fs = int(w.get("fs", 1))
+                if fs < 1: fs = 1
+                if fs > 4: fs = 4
+                lines.append('remote_now(pi, "0", "font", %d, %d);' % (i, fs))
+            except (ValueError, TypeError):
+                pass
+        lines.append('print("layout sent");')
+        prog = "\n".join(lines) + "\n"
+        sendf = "/tmp/layout_send.abcl"
+        with open(sendf, "w") as fh:
+            fh.write(prog)
+        ok = False
+        out = ""
+        try:
+            r = subprocess.run([sys.executable,
+                                os.path.join(proj, "src/python-aipl/aipl_main.py"), sendf],
+                               cwd=proj, capture_output=True, text=True, timeout=60)
+            ok = (r.returncode == 0)
+            out = (r.stdout or "") + (r.stderr or "")
+        except Exception as e:
+            out = "run failed: %s" % e
+        self._send_bytes(200, "application/json",
+                         json.dumps({"ok": ok, "log": out[-2000:], "program": prog}).encode("utf-8"))
 
     def _serve_actors_json(self):
         with _introspect_lock:
@@ -1230,6 +1311,114 @@ msgEl.focus();
 </body></html>
 """
 
+
+_LAYOUT_XINU_HOST = "192.168.3.100"
+
+# Xinu window-layout designer.  Drag/resize the window rectangles over a scaled
+# view of the Xinu virtual desktop, then 送信 (Send) — the dashboard generates
+# an AIPL program of remote_now(...) move/resize calls and runs it, so the
+# whole exchange to the bare-metal Pi is in AIPL.
+_LAYOUT_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><title>Py-I — Xinu screen layout designer</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px}
+ h2{margin:0 0 8px}
+ #bar{margin:8px 0}
+ button{font:inherit;background:#243; color:#d8ffd8; border:1px solid #4a6; border-radius:6px; padding:6px 14px; cursor:pointer}
+ button.send{background:#354a7a;color:#dde8ff;border-color:#6a8}
+ #desk{position:relative;background:#003366;border:1px solid #355;margin-top:10px}
+ #screen{position:absolute;border:1px dashed #7aa;pointer-events:none;color:#9bd;font-size:10px}
+ .win{position:absolute;background:rgba(40,30,60,0.85);border:1px solid #b8e;border-radius:3px;
+      box-sizing:border-box;overflow:hidden;cursor:move;font-size:11px}
+ .win .t{background:#503070;color:#fff;padding:1px 4px;white-space:nowrap;overflow:hidden}
+ .win .t button.fb{font:inherit;font-size:10px;line-height:1;padding:0 5px;margin-left:2px;
+      background:#71539a;color:#fff;border:1px solid #a8e;border-radius:3px;cursor:pointer}
+ .win .sz{padding:2px 4px;color:#bcd;font-size:10px;pointer-events:none}
+ .win .h{position:absolute;right:0;bottom:0;width:12px;height:12px;background:#b8e;cursor:nwse-resize}
+ #log{white-space:pre-wrap;background:#0d1117;border:1px solid #333;border-radius:6px;
+      padding:8px;margin-top:10px;max-height:160px;overflow:auto;font-size:12px}
+ .muted{color:#8aa}
+</style></head><body>
+<h2>Xinu screen layout designer <span class=muted style="font-size:13px">(host XINUHOST)</span></h2>
+<div class=muted>Drag a window to move it; drag the corner handle to resize; +/- changes its font size. The frame is the Xinu 1024×768 screen.</div>
+<div id=bar>
+  <button onclick="reload()">↻ Xinuから取得 (Reload)</button>
+  <button class=send onclick="send()">送信 (Send) →</button>
+  <span id=status class=muted></span>
+</div>
+<div id=desk></div>
+<div id=log class=muted>ready.</div>
+<script>
+const DW=1024, DH=768, SCALE=0.55;          // the 1024x768 visible Xinu screen
+const SW=1024, SH=768;
+let wins=[];                                 // [{id,name,x,y,w,h}]
+const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
+desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
+
+function log(s){ logEl.textContent = s; }
+function render(){
+  desk.innerHTML='';
+  wins.forEach((w,idx)=>{
+    const d=document.createElement('div'); d.className='win'; d.dataset.i=idx;
+    d.style.left=(w.x*SCALE)+'px'; d.style.top=(w.y*SCALE)+'px';
+    d.style.width=(w.w*SCALE)+'px'; d.style.height=(w.h*SCALE)+'px';
+    if(!w.fs){ w.fs=1; }
+    const t=document.createElement('div'); t.className='t';
+    const nm=document.createElement('span'); nm.textContent=w.id+': '+w.name+'  A'+w.fs; t.appendChild(nm);
+    const bm=document.createElement('button'); bm.className='fb'; bm.textContent='-';
+    const bp=document.createElement('button'); bp.className='fb'; bp.textContent='+';
+    bm.onmousedown=e=>e.stopPropagation(); bp.onmousedown=e=>e.stopPropagation();
+    bm.onclick=e=>{ e.stopPropagation(); w.fs=Math.max(1,w.fs-1); render(); };
+    bp.onclick=e=>{ e.stopPropagation(); w.fs=Math.min(4,w.fs+1); render(); };
+    t.appendChild(bm); t.appendChild(bp); d.appendChild(t);
+    // hint: scale the title font so the size is visible in the designer too
+    t.style.fontSize=(11+(w.fs-1)*4)+'px';
+    // live size + position readout (updates as you drag / resize)
+    const sz=document.createElement('div'); sz.className='sz';
+    sz.textContent=w.w+'x'+w.h+'  ('+w.x+','+w.y+')';
+    d.appendChild(sz);
+    const h=document.createElement('div'); h.className='h'; d.appendChild(h);
+    desk.appendChild(d);
+    d.addEventListener('mousedown', e=>{ if(e.target===h) startResize(e,idx); else startMove(e,idx); });
+  });
+}
+function startMove(e,idx){
+  e.preventDefault();
+  const w=wins[idx], sx=e.clientX, sy=e.clientY, ox=w.x, oy=w.y;
+  function mv(ev){ w.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); w.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function startResize(e,idx){
+  e.preventDefault(); e.stopPropagation();
+  const w=wins[idx], sx=e.clientX, sy=e.clientY, ow=w.w, oh=w.h;
+  function mv(ev){ w.w=Math.max(40,Math.round(ow+(ev.clientX-sx)/SCALE)); w.h=Math.max(24,Math.round(oh+(ev.clientY-sy)/SCALE)); render(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+async function reload(){
+  status.textContent='loading from Xinu...';
+  try{
+    const r=await fetch('/api/layout/windows'); const j=await r.json();
+    if(Array.isArray(j)){ wins=j; } else if(j.windows){ wins=j.windows; } else { wins=[]; }
+    if(j.error){ log('Xinu /windows error: '+j.error+' (load a program on Xinu? Pi reachable?)'); }
+    else { log('loaded '+wins.length+' windows from Xinu.'); }
+    status.textContent=wins.length+' windows';
+    render();
+  }catch(e){ log('reload failed: '+e); status.textContent='error'; }
+}
+async function send(){
+  status.textContent='sending (AIPL)...';
+  const payload={host:'XINUHOST', windows:wins.map(w=>({id:w.id,x:w.x,y:w.y,w:w.w,h:w.h,fs:w.fs||1}))};
+  try{
+    const r=await fetch('/api/layout/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json();
+    status.textContent = j.ok ? 'sent ✓' : 'send error';
+    log('--- generated AIPL ---\\n'+(j.program||'')+'\\n--- run log ---\\n'+(j.log||''));
+  }catch(e){ log('send failed: '+e); status.textContent='error'; }
+}
+reload();
+</script></body></html>"""
 
 _ACTORS_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>Py-I — AIPL actors</title>

@@ -1,0 +1,16 @@
+// wine_canvas.abcl — a resident drawing actor on the bare-metal xinu-rpi4 Pi.
+// The Mac wine-glass animator ships this over "xinujit://" (the in-kernel cc
+// JIT compiles it and main() spawns the Canvas actor), then drives it via HTTP
+// /actor/send.  Because /actor/send carries only 3 int args, drawing uses a
+// pen/turtle API instead of a 5-arg gfx_line: moveto(x,y) sets the pen, then
+// lineto(x,y,color) draws from the pen to (x,y) (color = palette 0..7) and
+// advances the pen.  The Graphics window replays the whole gfx command list
+// every frame, so the figure persists until the next clear().
+class Canvas {
+  var lx = 0;       // pen position
+  var ly = 0;
+  method clear()           { gfx_clear(); return 0; }
+  method moveto(x, y)      { lx = x; ly = y; return 0; }
+  method lineto(x, y, col) { gfx_line(lx, ly, x, y, col); lx = x; ly = y; return 0; }
+}
+var c = new Canvas();

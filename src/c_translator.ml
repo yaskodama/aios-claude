@@ -2268,6 +2268,29 @@ let gen_program_xinujit (p : program) : string =
       Printf.sprintf "v_list_map(%s, v_int(%d))" (gexpr ~cls ~fields l) (fn_id fn)
     | Call ("filter", [l; { desc = Var fn; _ }]) ->
       Printf.sprintf "v_list_filter(%s, v_int(%d))" (gexpr ~cls ~fields l) (fn_id fn)
+    (* Xinu wm window layout: move/resize a window by index, count windows.
+       Drives the on-device wm from the AIPL screen-layout designer. *)
+    | Call ("win_move", [a; b; c]) ->
+      Printf.sprintf "cc_win_move(%s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | Call ("win_resize", [a; b; c]) ->
+      Printf.sprintf "cc_win_resize(%s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | Call ("win_font", [a; b]) ->
+      Printf.sprintf "cc_win_font(%s, %s)" (gexpr ~cls ~fields a) (gexpr ~cls ~fields b)
+    | Call ("win_count", []) -> "cc_win_count()"
+    (* actor graphics: draw line segments / circles into the Graphics window *)
+    | Call ("gfx_clear", []) -> "cc_gfx_clear()"
+    | Call ("gfx_glass", [a; b; c]) ->
+      Printf.sprintf "cc_gfx_glass(%s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | Call ("gfx_line", [a; b; c; d; e]) ->
+      Printf.sprintf "cc_gfx_line(%s, %s, %s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+        (gexpr ~cls ~fields d) (gexpr ~cls ~fields e)
+    | Call ("gfx_circle", [a; b; c; d]) ->
+      Printf.sprintf "cc_gfx_circle(%s, %s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c) (gexpr ~cls ~fields d)
     (* direct call of a top-level function *)
     | Call (fn, args) when Hashtbl.mem fn_tbl fn ->
       Printf.sprintf "fn_%s(%s)" fn (gargs ~cls ~fields args)
@@ -2304,6 +2327,25 @@ let gen_program_xinujit (p : program) : string =
     | CallStmt ("print", [a]) -> emitf "%sv_print(%s);\n" pad (gexpr ~cls ~fields a)
     | CallStmt ("fail", _) -> emitf "%scc_saga_fail();\n" pad   (* signal saga step failure *)
     | CallStmt ("crash", _) -> emitf "%scc_crash();\n" pad      (* let-it-crash: abandon handler *)
+    | CallStmt ("win_move", [a; b; c]) ->
+      emitf "%scc_win_move(%s, %s, %s);\n" pad
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | CallStmt ("win_resize", [a; b; c]) ->
+      emitf "%scc_win_resize(%s, %s, %s);\n" pad
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | CallStmt ("win_font", [a; b]) ->
+      emitf "%scc_win_font(%s, %s);\n" pad (gexpr ~cls ~fields a) (gexpr ~cls ~fields b)
+    | CallStmt ("gfx_clear", []) -> emitf "%scc_gfx_clear();\n" pad
+    | CallStmt ("gfx_glass", [a; b; c]) ->
+      emitf "%scc_gfx_glass(%s, %s, %s);\n" pad
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+    | CallStmt ("gfx_line", [a; b; c; d; e]) ->
+      emitf "%scc_gfx_line(%s, %s, %s, %s, %s);\n" pad
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c)
+        (gexpr ~cls ~fields d) (gexpr ~cls ~fields e)
+    | CallStmt ("gfx_circle", [a; b; c; d]) ->
+      emitf "%scc_gfx_circle(%s, %s, %s, %s);\n" pad
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c) (gexpr ~cls ~fields d)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)
@@ -2435,6 +2477,11 @@ let gen_program_xinujit (p : program) : string =
   emit "  return v_str(\"?\");\n}\n\n";
 
   emit "int __obj_cls(int id) { return v_int(g_obj[id].cls); }\n\n";
+
+  (* Field value (value_t) of a spawned object — lets the Xinu Actors window
+     show e.g. a philosopher's meal count.  Field indices follow declaration
+     order within the class. *)
+  emit "int __obj_field(int id, int fidx) { return g_obj[id].f[fidx]; }\n\n";
 
   emit "int main() {\n";
   List.iter (gstmt ~cls:"" ~fields:[] ~ind:2) globals;

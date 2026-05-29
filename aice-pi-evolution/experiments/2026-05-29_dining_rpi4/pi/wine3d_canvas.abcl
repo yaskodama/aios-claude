@@ -1,0 +1,12 @@
+// wine3d_canvas.abcl — a resident actor on the bare-metal xinu-rpi4 Pi that
+// draws a 3D wireframe wine glass (a solid of revolution) on the HDMI Graphics
+// window.  The Mac ships this over "xinujit://" (the in-kernel cc JIT compiles
+// it; main() spawns the actor as id 0), then drives the rotation by sending
+// spin(deg): the gfx_glass builtin rebuilds the whole revolved-and-rotated
+// wireframe in C on-device, so one /actor/send draws an entire frame and the
+// glass spins smoothly.
+class Glass3D {
+  method spin(ax, ay, az) { gfx_glass(ax, ay, az); return 0; }  // tumble: degrees about X/Y/Z
+  method clear()          { gfx_clear(); return 0; }
+}
+var g = new Glass3D();

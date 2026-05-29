@@ -2,11 +2,30 @@
 
 2026-05-27 のセッション成果。再開時はこの文書を最初に読む。
 AIPL の各ランタイム（Py-I / OCaml / JS-server / JS-browser / C）に「ブラウザ・ダッシュボード」を用意した。
-加えて進化計算パイプライン（goal→.aice→.ga.json→.aipl）の専用ダッシュボードを新設。
+加えて進化計算パイプライン（goal→.aice→.ga.json→.aipl）、全体の入口となる **AICE ポータル(8888)**、
+ローカル LLM チャット 2 種（自前学習モデル 7860 / Ollama 7861）も用意。
+
+**入口は AICE ポータル http://127.0.0.1:8888/**（全ダッシュボードへのカードリンク）。
+
+## ★最短の再起動（推奨）— ポータルから起動する
+ポータルは各カードに **Start / Stop / Open ボタン + 稼働 LED** を持つ（commit `d554489`）。
+個別のコマンドを覚えなくても、ポータルを 1 つ起動してブラウザで Start を押すだけでよい。
+```sh
+cd /Users/kodamay/ocaml-app/abclcp-project
+python3 src/aice_home.py
+# → http://127.0.0.1:8888/ を開き、各カードの Start を押す
+```
+- 起動コマンドはポータル内 `TARGETS` allowlist に固定（任意コマンドは実行不可）。緑 LED = 稼働中、灰 = 停止。
+- **Stop はポータルが起動したプロセスのみ**停止できる（別プロセスで上げたものは手動停止）。
+- OCaml / C は初回に `dune build` が走るため起動まで時間がかかる。
+- 個別コマンドで手動起動したい場合のみ、以下の各節を参照。
 
 ## リポジトリ / ブランチ / HEAD
-- `/Users/kodamay/ocaml-app/abclcp-project`, branch `main`, HEAD `817cb65`
-  （= 本セッションの全ダッシュボード成果を commit & push 済み。Py-I bounded-buffer は手前の `ef3caff`）。
+- `/Users/kodamay/ocaml-app/abclcp-project`, branch `main`, HEAD `dd975a8`（**push 済み**）。
+  - `817cb65` ダッシュボード一式 / `fa80a9b` ハンドオフ / `c1d6c4d` AICE ポータル+JS·Web リンク。
+  - `d554489` ポータルに per-card **Start/Stop/Open ボタン + 稼働 LED**（`/api/status` `/api/start` `/api/stop`）。
+  - `dd975a8` ポータルに **Robot 動画セクション**（lecture.site44.com/index-ro03-editor2.html）+ **Local Generative AI カード**（Ollama 7861 を Start/Open）。
+  - Py-I bounded-buffer は `ef3caff`。
 - remote `yaskodama/aios-claude`。
 - ★`src/python-aipl/aipl_ai.py` は**未コミットのまま温存**（ユーザ指示・モデル env override）。**触らない・コミットしない**。
 - 言語ルール: チャットは日本語、プログラムの予約語・UI/コンソール文字列は英語。
@@ -14,6 +33,18 @@ AIPL の各ランタイム（Py-I / OCaml / JS-server / JS-browser / C）に「�
 ## 6 つのダッシュボード（起動コマンドと URL）
 
 すべて 127.0.0.1。OCaml/C は先に `cd /Users/kodamay/ocaml-app/abclcp-project && dune build` が必要。
+
+### 0. AICE ポータル（入口） — port 8888
+```sh
+cd /Users/kodamay/ocaml-app/abclcp-project
+python3 src/aice_home.py
+# → http://127.0.0.1:8888/
+```
+- kodama-lab.com 風デザイン。**各カードに Start / Stop / Open + 稼働 LED**（`d554489`）。サーバ側 `TARGETS` allowlist の固定コマンドのみ起動可。
+- カード一覧: Py-I 8899 / OCaml 8080 / Evolution 8700 / JS-Node 8090 / JS-Web 8765 / **Local Generative AI 7861** / C 8095。
+- **Robot セクション**（`dd975a8`）: lecture.site44.com/index-ro03-editor2.html（ロボット動画/エディタ）への外部リンクカード。新規タブで開く。ヘッダーに `Robot` ナビリンクも追加。
+- **Local Generative AI カード**（`dd975a8`）: JS·Web ページからリンクされている Ollama チャット（:7861）。Start で `local-genai/.venv/bin/python local-genai/ollama_chat.py` を起動、Open で http://127.0.0.1:7861/ 。Ollama(11434) がローカルで動いている前提。
+- ファイル `src/aice_home.py`（HTML/JS 埋め込み、commit 済み `dd975a8`）。`_PAGE` は import 時に生成されるため、編集後はサーバ再起動が必要。
 
 ### 1. Py-I (Python) — port 8899
 ```sh
@@ -86,9 +117,19 @@ python3 src/c_dashboard.py
 - ファイル（**未コミット**）: `src/c_dashboard.py`。生成物 `out/c_dashboard/`（コミット不要）。
 
 ## 全部まとめて再起動（コピペ用）
+
+### A. 推奨: ポータルだけ起動して UI から Start
+```sh
+cd /Users/kodamay/ocaml-app/abclcp-project
+python3 src/aice_home.py        # → http://127.0.0.1:8888/ で各カードの Start を押す
+```
+
+### B. CLI で全部一括起動
 ```sh
 cd /Users/kodamay/ocaml-app/abclcp-project
 dune build
+# 0) ポータル
+python3 src/aice_home.py >/tmp/d_portal.log 2>&1 &
 # 1) Py-I
 python3 src/python-aipl/aipl_main.py --dashboard 8899 \
   aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl >/tmp/d_pyi.log 2>&1 &
@@ -100,16 +141,19 @@ python3 src/python-aipl/aipl_main.py --dashboard 8899 \
 ( cd src/node-aipl-server && node server.mjs >/tmp/d_node.log 2>&1 & )
 # 5) JS browser (static)
 ( cd src/browser-abcl && python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/d_browser.log 2>&1 & )
-# 6) C
+# 6) Local Generative AI (Ollama chat, 要 Ollama 11434)
+local-genai/.venv/bin/python local-genai/ollama_chat.py >/tmp/d_genai.log 2>&1 &
+# 7) C
 python3 src/c_dashboard.py >/tmp/d_c.log 2>&1 &
 ```
-URL: 8899/actors · 8080/dashboard · 8700/ · 8090/ · 8765/ · 8095/
-停止: `pkill -f aipl_main.py; pkill -f repl_thread.exe; pkill -f 'sleep 1000000'; pkill -f evolution_dashboard.py; pkill -f 'node server.mjs'; pkill -f 'http.server 8765'; pkill -f c_dashboard.py`
+URL: 8888/（ポータル）· 8899/actors · 8080/dashboard · 8700/ · 8090/ · 8765/ · 7861/（GenAI）· 8095/
+停止: `pkill -f aice_home.py; pkill -f aipl_main.py; pkill -f repl_thread.exe; pkill -f 'sleep 1000000'; pkill -f evolution_dashboard.py; pkill -f 'node server.mjs'; pkill -f 'http.server 8765'; pkill -f ollama_chat.py; pkill -f c_dashboard.py`
 
 ## コミット状況
 - 本セッションのダッシュボード一式は `817cb65` で **commit & push 済み**
   （web_gateway/repl_thread/eval_thread.ml、gateway_dashboard.{html,js}、gateway_launch.abcl、
   c_dashboard.py、node-aipl-server/server.mjs、evolution_dashboard.py、
   bounded_buffer20.abcl、PingPongDemo.abcl、本ハンドオフ）。
-- **未コミットのまま**: `src/python-aipl/aipl_ai.py`（温存・触らない）。`out/c_dashboard/` は生成物（無視）。
+- ポータル機能追加は **push 済み**: `d554489`（Start/Stop/Open + LED）/ `dd975a8`（Robot + Local Generative AI カード）。
+- **未コミットのまま**: `src/python-aipl/aipl_ai.py`（温存・触らない）。本ハンドオフ `docs/DASHBOARDS_NEXT_SESSION.md` の今回更新は未コミット。`out/c_dashboard/` は生成物（無視）。
 - 未確認事項: OCaml バッファ可視化の C/P 矢印向き（反転済みだが視覚未確認。違えば `gateway_dashboard.js` の `flowArrow` 引数順を戻す）。

@@ -1,0 +1,48 @@
+// wine_glass3d_rpi4.abcl — a 3D wireframe wine glass (a solid of revolution)
+// spinning on the bare-metal xinu-rpi4 Pi's HDMI "Graphics" window, written
+// ENTIRELY in AIPL and run from the Py-I browser dashboard.
+//
+// On Start the Spinner actor FIRST ships a drawing actor (pi/wine3d_canvas.abcl
+// -> /tmp/wine3d_canvas.c) to the Pi over "xinujit://": the in-kernel cc JIT
+// compiles it and main() spawns the Glass3D actor (id 0).  Then it animates by
+// re-sending frame() to itself; each frame just sends one spin(deg) message and
+// the Pi rebuilds the whole revolved-and-rotated 3D wireframe in C (the trig is
+// a fixed-point sine table in the kernel, since the JIT has no libm).  Because a
+// frame is a single /actor/send, the glass spins smoothly.
+//
+// It turns a little each frame and STOPS after 20 full rotations.
+
+class Spinner {
+  var pi   = "xinujit://192.168.3.100";
+  var ax   = 0;       // rotation about X (degrees)
+  var ay   = 0;       // rotation about Y (degrees) — the primary spin
+  var az   = 0;       // rotation about Z (degrees)
+  var rots = 0;       // completed full rotations of the Y axis
+
+  method start() {
+    print("Xinu JIT load -> " + remote_now(pi, "_", "loadfile", "/tmp/wine3d_canvas.c"));
+    send self.frame();
+  }
+
+  method frame() {
+    if (rots < 20) {
+      remote_now(pi, "0", "spin", ax, ay, az);    // tumble the glass to this pose
+      ax = ax + 3;  if (ax >= 360) { ax = ax - 360; }   // a little about each axis,
+      az = az + 2;  if (az >= 360) { az = az - 360; }   // at different rates
+      ay = ay + 5;
+      if (ay >= 360) {
+        ay   = ay - 360;
+        rots = rots + 1;
+        print("rotation " + rots + " / 20");
+      }
+      sleep(0.04);
+      send self.frame();
+    } else {
+      remote_now(pi, "0", "clear", 0, 0, 0);
+      print("wine glass 3D: 20 rotations done");
+    }
+  }
+}
+
+var s = new Spinner();
+send s.start();

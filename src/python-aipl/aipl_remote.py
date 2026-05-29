@@ -437,11 +437,12 @@ def _xinujit_load(hostport: str, source: str) -> str:
         return resp.read().decode("utf-8", "replace").strip()
 
 def _xinujit_send_raw(hostport: str, to_actor: str, method: str, args: list) -> str:
-    arg = 0
-    if args:
-        try:    arg = int(args[0])
-        except (ValueError, TypeError): arg = 0
-    url = f"{_xinujit_base(hostport)}/actor/send?to={to_actor}&m={method}&arg={arg}"
+    def _i(v):
+        try:    return int(v)
+        except (ValueError, TypeError): return 0
+    a = [ _i(args[k]) if k < len(args) else 0 for k in range(3) ]  # up to 3 int args
+    url = (f"{_xinujit_base(hostport)}/actor/send?to={to_actor}&m={method}"
+           f"&arg={a[0]}&a1={a[1]}&a2={a[2]}")
     with urllib.request.urlopen(url, timeout=10) as resp:
         return resp.read().decode("utf-8", "replace").strip()
 

@@ -1,0 +1,10 @@
+// xinu_layout.abcl — resident "Layout" actor on the Pi.  The Mac screen
+// designer ships this (JIT-compiled on-device), then sends it move/resize
+// messages; the methods call the wm window builtins to reposition the
+// on-screen windows.  Windows are addressed by their add order (0-based).
+class Layout {
+  method move(id, x, y)   { win_move(id, x, y); }
+  method resize(id, w, h) { win_resize(id, w, h); }
+  method font(id, s)      { win_font(id, s); }
+}
+var lay = new Layout();

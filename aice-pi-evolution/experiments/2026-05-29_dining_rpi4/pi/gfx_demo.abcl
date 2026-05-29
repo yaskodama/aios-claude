@@ -1,0 +1,20 @@
+// gfx_demo.abcl — a Painter actor that draws line segments and circles into
+// the Xinu "Graphics" window via the gfx_* builtins.  Load with /actor/load,
+// then send it "draw" (and "spin" to redraw).  color = palette 0..7
+// (1=red 2=green 3=blue 4=yellow 5=cyan 6=magenta 7=white).
+class Painter {
+  method draw() {
+    gfx_clear();
+    gfx_line(20, 20, 320, 20, 7);
+    gfx_line(320, 20, 320, 320, 7);
+    gfx_line(320, 320, 20, 320, 7);
+    gfx_line(20, 320, 20, 20, 7);
+    gfx_line(20, 20, 320, 320, 1);
+    gfx_line(320, 20, 20, 320, 3);
+    gfx_circle(170, 170, 150, 2);
+    gfx_circle(170, 170, 90, 4);
+    gfx_circle(170, 170, 40, 6);
+    return 0;
+  }
+}
+var p = new Painter();

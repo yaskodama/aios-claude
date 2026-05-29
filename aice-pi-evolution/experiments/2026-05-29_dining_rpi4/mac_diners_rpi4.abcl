@@ -28,7 +28,7 @@ class Philosopher {
   var hi     = 0;
   var state  = 0;          // 0 = no forks, 1 = holds low fork
   var meals  = 0;
-  var target = 8;
+  var target = 50;
   var remote = 0;          // 1 = also recorded on the Pi
   var rid    = "0";        // Xinu resident actor id (string) when remote==1
   var hub    = "xinujit://192.168.3.100";
