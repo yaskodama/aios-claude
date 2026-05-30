@@ -58,6 +58,14 @@
  ul.runtimes { list-style:none; padding:0; columns:2; column-gap:30px; }
  ul.runtimes li { margin:.25em 0; }
  ul.runtimes li::before { content:"› "; color:#5ad; }
+ /* Paper / manual list inside their cards */
+ .paper-list, .manual-list { list-style:none; padding:0; margin:.6rem 0 0; }
+ .paper-list li, .manual-list li { margin:.35em 0; line-height:1.4; }
+ .paper-list li::before, .manual-list li::before { content:"› "; color:#fa6; }
+ .paper-list a, .manual-list a { color:#aef; text-decoration:none; }
+ .paper-list a:hover, .manual-list a:hover { color:#fff; text-decoration:underline; }
+ .card.papers, .card.manual { background:linear-gradient(135deg,#1b2333,#13202c); border-color:#444f7a; }
+ .card.manual { background:linear-gradient(135deg,#1a2c1f,#13202c); border-color:#4a6b4a; }
  footer { color:#556; font-size:.8rem; margin-top:2rem; border-top:1px solid #1c2530; padding-top:1rem; }
 </style></head>
 <body>
@@ -98,6 +106,28 @@
        <code>src/python-aipl/</code>, <code>src/browser-abcl/</code>, etc., and the design papers in <code>docs/</code>.</p>
     <span class="url">github.com/yaskodama/aios-claude</span>
   </a>
+
+  <div class="card papers" id="papers-card">
+    <h2>&#128218; 論文 / Papers</h2>
+    <p>これまでに書いた設計・解析・メタ研究類。クリックで PDF を開きます。</p>
+    <ul class="paper-list">
+      <li><a href="docs/AIPL_Overview.pdf" target="_blank">AIPL Overview &mdash; プロジェクトの全体像</a></li>
+      <li><a href="docs/AIPL_Design_and_Implementation.pdf" target="_blank">AIPL Design and Implementation &mdash; 設計と実装</a></li>
+      <li><a href="docs/AIPL_Runtime_Feature_Matrix.pdf" target="_blank">AIPL Runtime Feature Matrix &mdash; 5 ランタイムの機能比較表</a></li>
+      <li><a href="docs/AIPL_Type_Soundness_Report.pdf" target="_blank">AIPL Type Soundness Report &mdash; 型安全性</a></li>
+      <li><a href="docs/AICE_Meta_Research.pdf" target="_blank">AICE Meta Research &mdash; メタ研究 (言語進化)</a></li>
+      <li><a href="docs/SESSION_RESUME.pdf" target="_blank">Session Resume &mdash; 開発セッション記録</a></li>
+    </ul>
+  </div>
+
+  <div class="card manual" id="manual-card">
+    <h2>&#128214; ユーザーズマニュアル / User's Manual</h2>
+    <p>言語仕様・組込みライブラリ・各ランタイム共通の使い方。</p>
+    <ul class="manual-list">
+      <li><a href="docs/AIPL_User_Manual.pdf" target="_blank">AIPL User Manual (PDF) &mdash; 言語仕様 &amp; ライブラリリファレンス</a></li>
+      <li><a href="USER_MANUAL.md" target="_blank">USER_MANUAL.md &mdash; ソース版 (GitHub render)</a></li>
+    </ul>
+  </div>
 
 </div>
 
