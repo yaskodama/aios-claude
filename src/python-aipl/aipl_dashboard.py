@@ -289,7 +289,9 @@ _HTML = """<!doctype html>
 </style></head><body>
 <h1>AIPL AI-OS Dashboard
   <small style="color:#667"><a style="color:#6af" href="/ide">→ Web IDE</a>
-  &nbsp;<a style="color:#6af" href="/chat">→ Chat</a></small></h1>
+  &nbsp;<a style="color:#6af" href="/chat">→ Chat</a>
+  &nbsp;<a style="color:#fa6" href="/layout">→ Xinu 設定画面</a>
+  &nbsp;<a style="color:#fa6" href="/shell">→ Xinu Shell</a></small></h1>
 <table id="t"></table>
 <small id="ts"></small>
 <h2>Cluster (this node + peers)</h2>
@@ -472,6 +474,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_actors_html()
         elif self.path == "/layout" or self.path.startswith("/layout?"):
             self._serve_layout_html()
+        elif self.path == "/shell" or self.path.startswith("/shell?"):
+            self._serve_shell_html()
+        elif self.path.startswith("/api/xinu/type"):
+            self._serve_xinu_type()
+        elif self.path.startswith("/api/xinu/click"):
+            self._serve_xinu_click()
         elif self.path.startswith("/api/layout/windows"):
             self._serve_layout_windows()
         elif self.path.startswith("/api/actors"):
@@ -850,6 +858,37 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as e:
             self._send_bytes(200, "application/json",
                              json.dumps({"error": str(e), "windows": []}).encode("utf-8"))
+
+    def _proxy_xinu(self, path_with_query: str) -> bytes:
+        """Forward a GET to the bare-metal Xinu's HTTP server.  Same server-side
+        fetch pattern as _serve_layout_windows — sidesteps browser CORS."""
+        host = _LAYOUT_XINU_HOST
+        url = "http://%s%s" % (host, path_with_query)
+        try:
+            with urllib.request.urlopen(url, timeout=8) as r:
+                return r.read()
+        except Exception as e:
+            return ("proxy error: %s" % e).encode("utf-8")
+
+    def _serve_xinu_type(self):
+        """Forward /api/xinu/type?... → http://XINUHOST/type?... ."""
+        from urllib.parse import urlsplit
+        q = urlsplit(self.path).query
+        suffix = ("?" + q) if q else ""
+        body = self._proxy_xinu("/type" + suffix)
+        self._send_bytes(200, "text/plain; charset=utf-8", body)
+
+    def _serve_xinu_click(self):
+        """Forward /api/xinu/click?... → http://XINUHOST/click?... ."""
+        from urllib.parse import urlsplit
+        q = urlsplit(self.path).query
+        suffix = ("?" + q) if q else ""
+        body = self._proxy_xinu("/click" + suffix)
+        self._send_bytes(200, "text/plain; charset=utf-8", body)
+
+    def _serve_shell_html(self):
+        html = _SHELL_HTML.replace("XINUHOST", _LAYOUT_XINU_HOST)
+        self._send_bytes(200, "text/html; charset=utf-8", html.encode("utf-8"))
 
     def _handle_layout_send(self):
         """Apply a designed layout to Xinu.  The 'やり取り' is all AIPL: we
@@ -1313,6 +1352,114 @@ msgEl.focus();
 
 
 _LAYOUT_XINU_HOST = "192.168.3.100"
+
+# Xinu shell-input UI.  Type into the bare-metal Pi 4's `Shell (UART)` window
+# from the browser.  Hits /api/xinu/type (server-side proxy → Pi's /type) so
+# CORS isn't a problem.  Includes a button strip for the special keys the Pi
+# now handles (Enter, Esc, Backspace, arrows for history/clear, Ctrl-U,
+# Ctrl-C) plus a mouse-delta sender that forwards to /api/xinu/click.
+_SHELL_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><title>Xinu Shell Input (XINUHOST)</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px;max-width:880px}
+ h2{margin:0 0 8px;color:#8af}
+ small{color:#778}
+ #line{width:560px;font:inherit;background:#111722;color:#dde;border:1px solid #345;border-radius:4px;padding:6px 8px}
+ button{font:inherit;background:#243;color:#d8ffd8;border:1px solid #4a6;border-radius:4px;padding:4px 10px;cursor:pointer;margin:2px}
+ button.send{background:#354a7a;color:#dde8ff;border-color:#6a8}
+ button.key{background:#332;color:#fde;border-color:#864}
+ #log{background:#050810;color:#9ab;padding:8px;border:1px solid #223;height:240px;overflow-y:auto;white-space:pre-wrap;font-size:0.85rem;margin-top:10px}
+ .row{margin:10px 0}
+ .row label{color:#aaa;margin-right:8px}
+ input.num{width:60px;font:inherit;background:#111722;color:#dde;border:1px solid #345;border-radius:4px;padding:4px 6px}
+ a{color:#6af}
+</style></head><body>
+<h2>Xinu Shell Input — XINUHOST</h2>
+<small>Types into the bare-metal Pi 4's <code>Shell (UART)</code> wm-window (xhci_keyboard_event hook).
+&nbsp;<a href="/">← Dashboard</a>  &nbsp;<a href="/layout">→ Xinu 設定画面</a></small>
+
+<div class="row">
+  <input id="line" type="text" autofocus placeholder="type a shell command and press Enter…">
+  <button class="send" id="send">Send + Enter</button>
+</div>
+
+<div class="row">
+  <strong style="color:#aaa">Keys:</strong>
+  <button class="key" data-key="enter">Enter ↵</button>
+  <button class="key" data-key="bs">⌫ Backspace</button>
+  <button class="key" data-key="esc">Esc</button>
+  <button class="key" data-key="tab">Tab</button>
+  <button class="key" data-key="up">↑ (history)</button>
+  <button class="key" data-key="down">↓ (clear)</button>
+  <button class="key" data-key="left">←</button>
+  <button class="key" data-key="right">→</button>
+  <button class="key" data-key="home">Home</button>
+  <button class="key" data-key="end">End</button>
+  <button class="key" data-key="ctrl-c">Ctrl-C</button>
+  <button class="key" data-key="ctrl-u">Ctrl-U</button>
+  <button class="key" data-key="ctrl-l">Ctrl-L</button>
+</div>
+
+<div class="row">
+  <strong style="color:#aaa">Mouse:</strong>
+  <label>dx<input class="num" id="dx" type="number" value="0"></label>
+  <label>dy<input class="num" id="dy" type="number" value="0"></label>
+  <label>btn
+    <select id="btn" style="font:inherit;background:#111722;color:#dde;border:1px solid #345;border-radius:4px;padding:3px">
+      <option value="0">none</option>
+      <option value="1">Left</option>
+      <option value="2">Right</option>
+      <option value="4">Middle</option>
+    </select>
+  </label>
+  <button class="send" id="click">Send move/click</button>
+</div>
+
+<div id="log"></div>
+
+<script>
+const logEl = document.getElementById('log');
+function log(s) {
+  const ts = new Date().toLocaleTimeString();
+  logEl.textContent = '[' + ts + '] ' + s.trim() + '\\n' + logEl.textContent;
+}
+async function sendType(text, key) {
+  const p = new URLSearchParams();
+  if (text) p.set('t', text);
+  if (key)  p.set('key', key);
+  try {
+    const r = await fetch('/api/xinu/type?' + p.toString());
+    log((text ? ('t="'+text+'" ') : '') + (key ? ('key='+key+' ') : '') + '→ ' + await r.text());
+  } catch (e) {
+    log('ERR ' + e);
+  }
+}
+document.getElementById('send').onclick = async () => {
+  const t = document.getElementById('line').value;
+  document.getElementById('line').value = '';
+  await sendType(t, 'enter');
+};
+document.getElementById('line').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('send').click(); }
+});
+document.querySelectorAll('button.key').forEach(b => {
+  b.onclick = () => sendType('', b.dataset.key);
+});
+document.getElementById('click').onclick = async () => {
+  const dx = document.getElementById('dx').value || 0;
+  const dy = document.getElementById('dy').value || 0;
+  const btn = document.getElementById('btn').value || 0;
+  try {
+    const r = await fetch('/api/xinu/click?dx=' + dx + '&dy=' + dy + '&btn=' + btn);
+    log('mouse dx='+dx+' dy='+dy+' btn='+btn+' → ' + await r.text());
+  } catch (e) {
+    log('ERR ' + e);
+  }
+};
+log('ready — Xinu host: XINUHOST');
+</script>
+</body></html>
+"""
 
 # Xinu window-layout designer.  Drag/resize the window rectangles over a scaled
 # view of the Xinu virtual desktop, then 送信 (Send) — the dashboard generates

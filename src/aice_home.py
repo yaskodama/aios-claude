@@ -193,6 +193,17 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(_start(tid))
         elif u.path == "/api/stop":
             self._json(_stop(tid))
+        elif u.path == "/api/shutdown":
+            # Self-terminate the portal itself.  Used by the top-level
+            # aios-claude/index.html Stop button.  We answer the HTTP
+            # request first, then exit on a tiny background thread so
+            # the browser sees a 200 instead of a connection-reset.
+            import threading, time as _time, os as _os
+            self._json({"ok": True, "shutting_down": True})
+            def _bye():
+                _time.sleep(0.2)
+                _os._exit(0)
+            threading.Thread(target=_bye, daemon=True).start()
         else:
             self.send_response(404)
             self.end_headers()
@@ -337,7 +348,7 @@ _PAGE_TMPL = r"""<!doctype html>
  <div class="barwrap">
   <div class="brand"><span class="dot"></span><span class="grad-text">AICE</span>
    <small>AI&middot;Coevolution &mdash; AIPL Runtime Portal</small></div>
-  <div class="navlink"><a href="#robot">Robot</a> <a href="#dashboards">Dashboards</a></div>
+  <div class="navlink"><a href="#robot">Robot</a> <a href="#xinu">Xinu</a> <a href="#dashboards">Dashboards</a></div>
  </div>
 </header>
 
@@ -362,6 +373,41 @@ _PAGE_TMPL = r"""<!doctype html>
     <p>Block-based robot programming &amp; video lecture, hosted at lecture.site44.com. Opens in a new tab.</p>
     <span class="addr">lecture.site44.com/index-ro03-editor2.html</span></div>
   </a>
+ </div>
+</section>
+
+<section class="container" id="xinu">
+ <div class="sec-head"><h2>Xinu (bare-metal Pi 4)</h2><span class="ribbon"></span><span class="num">LAYOUT &middot; SHELL</span></div>
+ <!-- Both Xinu pages are sub-routes of the Py-I dashboard (port 8900),
+      so Start/Stop targets the same `pyi` process — clicking Stop on
+      either card stops the underlying Py-I, and Start launches it. -->
+ <div class="grid">
+  <div class="card" data-id="pyi">
+   <div class="thumb"><span class="glyph">&#128736;</span><span class="port">:8900/layout</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Xinu 設定画面 &mdash; Window layout designer</h3>
+    <p>Drag/resize the wm-window rectangles over a scaled view of the Pi 4 virtual desktop, then 送信 &mdash; the dashboard generates an AIPL program of <code>remote_now</code> move/resize calls and applies them. Needs Py&middot;I running.</p>
+    <span class="addr">127.0.0.1:8900/layout</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8900/layout">Open &#8599;</button>
+    </div></div>
+  </div>
+  <div class="card" data-id="pyi">
+   <div class="thumb"><span class="glyph">&#9000;</span><span class="port">:8900/shell</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Xinu Shell &mdash; type into the running kernel</h3>
+    <p>Send keyboard text and special keys (Enter / Esc / arrows for history / Ctrl-C / Ctrl-U &hellip;) plus mouse-delta clicks to the bare-metal Pi 4&rsquo;s <code>Shell (UART)</code> wm-window over HTTP. CORS sidestepped via the Py&middot;I server-side proxy.</p>
+    <span class="addr">127.0.0.1:8900/shell</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8900/shell">Open &#8599;</button>
+    </div></div>
+  </div>
  </div>
 </section>
 
