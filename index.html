@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8">
+<title>aios-claude — AIPL multi-runtime &middot; AICE portal</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ :root { color-scheme: dark; }
+ body {
+   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+   background:#0b0f14; color:#d8dee9; margin:0; padding:0;
+   line-height:1.55;
+ }
+ .wrap { max-width:880px; margin:0 auto; padding:48px 24px; }
+ h1 { margin:0 0 .3em; font-size:1.9rem; color:#cfe0ff; letter-spacing:.2px; }
+ .sub { color:#7a8fa6; font-size:.95rem; margin:0 0 2rem; }
+ .grad { background:linear-gradient(90deg,#8af,#fa6); -webkit-background-clip:text; color:transparent; }
+ a { color:#7aa9ff; }
+ .card-row { display:flex; gap:18px; flex-wrap:wrap; margin:1.5rem 0 2rem; }
+ .card {
+   flex:1 1 320px; background:#13202c; border:1px solid #2a3b4c;
+   border-radius:10px; padding:18px 20px; text-decoration:none; color:inherit;
+   transition:border-color .15s, transform .15s;
+ }
+ .card:hover { border-color:#5ad; transform:translateY(-2px); }
+ .card.primary { background:linear-gradient(135deg,#1c2c3e,#13202c); border-color:#3d6699; }
+ .card h2 { margin:0 0 .3em; font-size:1.15rem; color:#aef; display:flex; align-items:center; gap:.5em; }
+ .card p  { margin:0; color:#a8b8c8; font-size:.92rem; }
+ .card .url { display:block; margin-top:.6rem; font-size:.82rem; color:#7aa9ff; word-break:break-all; }
+ /* LED + buttons (interactive AICE Portal card) */
+ .led { display:inline-block; width:.7em; height:.7em; border-radius:50%; background:#3a4250;
+        box-shadow:inset 0 0 4px rgba(0,0,0,.4); transition:background .2s, box-shadow .2s; }
+ .led.up { background:#7fe0a0; box-shadow:0 0 6px #7fe0a0, inset 0 0 2px #5c9a73; }
+ .led-label { font-size:.75rem; color:#778; font-weight:400; margin-left:.25em; }
+ .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+ .btn {
+   font:inherit; font-size:.85rem; border-radius:5px; padding:5px 12px; cursor:pointer;
+   border:1px solid #4a6; background:#1d3026; color:#d8ffd8; transition:background .15s;
+ }
+ .btn:hover:not(:disabled) { background:#284937; }
+ .btn:disabled { opacity:.45; cursor:not-allowed; }
+ .btn.open { background:#1f3654; color:#dde8ff; border-color:#3d6699; }
+ .btn.open:hover:not(:disabled) { background:#2a487a; }
+ .btn.stop { background:#3a1d1d; color:#ffd8d8; border-color:#8a4a4a; }
+ .btn.stop:hover:not(:disabled) { background:#552828; }
+ .start-help {
+   display:none; margin-top:10px; padding:10px 12px; background:#0c161e; border:1px solid #2a3b4c;
+   border-radius:6px; font-size:.82rem; color:#bdc; line-height:1.45;
+ }
+ .start-help.on { display:block; }
+ .start-help code { display:block; background:#000; padding:6px 10px; border-radius:4px;
+   color:#aef; word-break:break-all; user-select:all; margin:.3em 0; }
+ .start-help .copy { font-size:.75rem; padding:3px 9px; border:1px solid #4a6; background:#1d3026;
+   color:#d8ffd8; border-radius:4px; cursor:pointer; }
+ .start-help .ok { color:#7fe0a0; font-weight:600; }
+ .note { font-size:.86rem; color:#7a8fa6; border-left:3px solid #345; padding:10px 14px;
+         background:#11161c; border-radius:0 6px 6px 0; margin:1.5rem 0; }
+ .note code { background:#1d2937; padding:1px 6px; border-radius:3px; color:#dde; }
+ ul.runtimes { list-style:none; padding:0; columns:2; column-gap:30px; }
+ ul.runtimes li { margin:.25em 0; }
+ ul.runtimes li::before { content:"› "; color:#5ad; }
+ footer { color:#556; font-size:.8rem; margin-top:2rem; border-top:1px solid #1c2530; padding-top:1rem; }
+</style></head>
+<body>
+<div class="wrap">
+
+<h1><span class="grad">aios-claude</span> &mdash; AIPL multi-runtime</h1>
+<p class="sub">AIPL is a small actor language (descended from ABCL/1) ported across five runtimes
+   &mdash; OCaml, Python (Py&middot;I), JavaScript (Node &amp; browser), C, and bare-metal Xinu/Raspberry&nbsp;Pi&nbsp;4 &mdash;
+   with a "goal &rarr; .aice &rarr; .ga.json &rarr; .aipl" evolution pipeline on top.</p>
+
+<div class="card-row">
+
+  <div class="card primary" id="aice-card">
+    <h2>&#127968; AICE Portal
+      <span class="led" id="aice-led" title="server status"></span>
+      <span class="led-label" id="aice-status">checking&hellip;</span></h2>
+    <p>One-stop launcher for every local dashboard: Py&middot;I, OCaml, Node, browser, C,
+       the evolution pipeline, the local LLM, and the bare-metal Xinu setup &amp; shell pages.
+       Start / Stop / Open each runtime with a click.</p>
+    <span class="url">http://127.0.0.1:8888/</span>
+    <div class="actions">
+      <button class="btn open" id="aice-open" disabled>Open</button>
+      <button class="btn" id="aice-start">Start&hellip;</button>
+      <button class="btn stop" id="aice-stop" disabled>Stop</button>
+    </div>
+    <div class="start-help" id="aice-start-help">
+      Browsers can&rsquo;t launch local processes themselves &mdash; run this command in a terminal
+      from the repo root, then click <em>Open</em>:
+      <code id="aice-cmd">python3 src/aice_home.py</code>
+      <button class="copy" id="aice-copy">Copy command</button>
+      <span id="aice-copy-ok" style="display:none" class="ok">&nbsp;copied!</span>
+    </div>
+  </div>
+
+  <a class="card" href="https://github.com/yaskodama/aios-claude" target="_blank" rel="noopener">
+    <h2>&#128279; GitHub Repository</h2>
+    <p>Source, docs, and the full <code>README.md</code>. Browse the per-runtime READMEs under
+       <code>src/python-aipl/</code>, <code>src/browser-abcl/</code>, etc., and the design papers in <code>docs/</code>.</p>
+    <span class="url">github.com/yaskodama/aios-claude</span>
+  </a>
+
+</div>
+
+<div class="note">
+  <strong>初めての方へ</strong> &mdash; AICE Portal は <code>python3 src/aice_home.py</code> をローカルで実行すると
+  http://127.0.0.1:8888/ で立ち上がります。Portal 内の各カードの <b>Start</b> ボタンで個別ダッシュボードを起動できます
+  （Py&middot;I が立ち上がっていれば、その配下の <em>Xinu 設定画面</em> と <em>Xinu Shell</em> も使えます）。
+</div>
+
+<h2 style="color:#aef;font-size:1.05rem">Runtimes</h2>
+<ul class="runtimes">
+  <li><b>OCaml</b> &mdash; canonical interpreter; <code>aipl2c</code> codegen (SDL / Xinu / Python)</li>
+  <li><b>Py&middot;I</b> &mdash; Python reference + live actor dashboard</li>
+  <li><b>JS (Node)</b> &mdash; AIPL parsed &amp; run in a Node server</li>
+  <li><b>JS (browser)</b> &mdash; same runtime, in-page, no backend</li>
+  <li><b>C</b> &mdash; AIPL &rarr; C via <code>aipl2c</code>, linked with <code>abcl_nextgen_runtime</code></li>
+  <li><b>Xinu / Pi 4</b> &mdash; bare-metal AArch64; HTTP-driven shell &amp; layout</li>
+</ul>
+
+<footer>
+  AICE &mdash; AIPL multi-runtime portal &middot; Kodama Lab, Hosei University &middot;
+  &copy; 2000&ndash;2026
+</footer>
+
+</div>
+
+<script>
+/* Live status probe for the AICE Portal (http://127.0.0.1:8888/).
+ *
+ * Cross-origin fetch from a file:// page to localhost can be blocked
+ * by CORS, but `mode:'no-cors'` lets us tell connectivity (the request
+ * resolves to an opaque response on success, throws on connection refused
+ * / DNS failure / timeout).  That's all we need: did the socket open? */
+const led    = document.getElementById('aice-led');
+const status = document.getElementById('aice-status');
+const openB  = document.getElementById('aice-open');
+const startB = document.getElementById('aice-start');
+const stopB  = document.getElementById('aice-stop');
+const help   = document.getElementById('aice-start-help');
+
+async function probe() {
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 1500);
+    await fetch('http://127.0.0.1:8888/', {
+      mode: 'no-cors', cache: 'no-store', signal: ctrl.signal,
+    });
+    clearTimeout(to);
+    return true;
+  } catch (_) { return false; }
+}
+async function refresh() {
+  const up = await probe();
+  led.classList.toggle('up', up);
+  status.textContent = up ? 'running' : 'stopped';
+  openB.disabled  = !up;
+  startB.disabled = up;
+  stopB.disabled  = !up;
+  if (up) help.classList.remove('on');
+}
+openB.addEventListener('click', () => window.open('http://127.0.0.1:8888/', '_blank'));
+startB.addEventListener('click', () => help.classList.toggle('on'));
+stopB.addEventListener('click', async () => {
+  if (!confirm('Stop the AICE Portal (port 8888)?')) return;
+  stopB.disabled = true;
+  stopB.textContent = 'Stopping…';
+  try {
+    /* no-cors POST: server processes the request even though we can't
+     * read its response.  The server schedules its own exit after 200ms,
+     * so the next probe (in ≤2s) will flip the LED to stopped. */
+    await fetch('http://127.0.0.1:8888/api/shutdown', { method: 'POST', mode: 'no-cors' });
+  } catch (_) { /* expected — connection drops as the server exits */ }
+  setTimeout(() => { stopB.textContent = 'Stop'; refresh(); }, 1500);
+});
+document.getElementById('aice-copy').addEventListener('click', async () => {
+  const cmd = document.getElementById('aice-cmd').textContent.trim();
+  try { await navigator.clipboard.writeText(cmd); }
+  catch (_) { /* clipboard API may be denied on file:// — user can select+copy by hand */ }
+  const ok = document.getElementById('aice-copy-ok');
+  ok.style.display = 'inline';
+  setTimeout(() => { ok.style.display = 'none'; }, 1500);
+});
+refresh();
+setInterval(refresh, 2000);
+</script>
+
+</body></html>
