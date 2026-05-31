@@ -446,16 +446,36 @@ def _xinujit_send_raw(hostport: str, to_actor: str, method: str, args: list) -> 
     with urllib.request.urlopen(url, timeout=10) as resp:
         return resp.read().decode("utf-8", "replace").strip()
 
+def _xinujit_compile(hostport: str, source: str) -> str:
+    """Send raw C source to Xinu's /compile endpoint.  Pi 4 JITs it and
+    returns 'output\\n=> <retval>'; we hand the full body back so the
+    caller can parse the => integer (or read program output)."""
+    req = urllib.request.Request(_xinujit_base(hostport) + "/compile",
+                                 data=source.encode("utf-8"), method="POST")
+    with urllib.request.urlopen(req, timeout=600) as resp:
+        return resp.read().decode("utf-8", "replace").strip()
+
 def _xinujit_dispatch(hostport: str, to_actor: str, method: str, args: list):
-    """Async + sync both route here.  Meta-actor "_" maps control ops
-    (load = ship a source string; loadfile = ship a file) to /actor/load;
-    any other (actor, method) is an /actor/send returning the leading int."""
+    """Async + sync both route here.  Meta-actor "_" maps control ops:
+       load     = ship a source string to /actor/load
+       loadfile = ship a file's contents to /actor/load
+       compile  = ship a source string to /compile (returns parsed int from
+                  '=> N' line so AIPL callers get a numeric result directly)
+    Any other (actor, method) is an /actor/send returning the leading int."""
     if to_actor == "_":
         if method == "load":
             return _xinujit_load(hostport, str(args[-1]) if args else "")
         if method == "loadfile":
             with open(str(args[0]), "r") as fh:
                 return _xinujit_load(hostport, fh.read())
+        if method == "compile":
+            body = _xinujit_compile(hostport, str(args[-1]) if args else "")
+            for line in body.split("\n"):
+                line = line.strip()
+                if line.startswith("=> "):
+                    try: return int(line[3:].strip())
+                    except ValueError: pass
+            return body
     body = _xinujit_send_raw(hostport, to_actor, method, args)
     try:    return int(body.split()[0])
     except (ValueError, IndexError): return body

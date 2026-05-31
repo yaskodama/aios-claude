@@ -114,9 +114,15 @@ type class_decl = {
   fields : stmt list;
   methods : method_decl list;
   cpriority : priority;
+  (* Class-local `function` declarations — synchronous helpers visible to
+     all methods of this class.  Calls to these functions do NOT go through
+     the actor scheduler (no actor-message dispatch); they execute in the
+     calling method's stack frame just like an ordinary function call.
+     Parallels Py-I's `function` inside class semantics. *)
+  cfunctions : function_decl list;
 }
 
-type function_decl = {
+and function_decl = {
   fn_name : string;
   fn_params : string list;
   fn_param_types : type_expr option list;
@@ -202,7 +208,8 @@ let normalize_decl = function
   | Class c ->
       Class { c with
         fields = List.map normalize_stmt c.fields;
-        methods = List.map normalize_method c.methods }
+        methods = List.map normalize_method c.methods;
+        cfunctions = List.map normalize_function c.cfunctions }
   | Function fd -> Function (normalize_function fd)
   | Global s -> Global (normalize_stmt s)
 

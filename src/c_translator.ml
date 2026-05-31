@@ -2153,7 +2153,14 @@ let gen_program_xinujit (p : program) : string =
   Buffer.clear buf;
   let classes = classes_of p in
   let globals = globals_of p in
-  let functions = List.filter_map (function Function f -> Some f | _ -> None) p in
+  let top_functions = List.filter_map (function Function f -> Some f | _ -> None) p in
+  (* Also gather class-local `function` declarations from every class body.
+     These are visible to methods of the same class — and in the AArch64
+     codegen we hoist them all into the global function table since name
+     collisions across classes are unusual in practice and easy to avoid. *)
+  let class_local_functions =
+    List.concat_map (fun (c : class_decl) -> c.cfunctions) classes in
+  let functions = top_functions @ class_local_functions in
   (* function values are int ids; map/filter call back through apply(id, x) *)
   let fn_tbl = Hashtbl.create 16 in
   List.iteri (fun i (f : function_decl) -> Hashtbl.replace fn_tbl f.fn_name i) functions;
@@ -2260,6 +2267,20 @@ let gen_program_xinujit (p : program) : string =
     | Call ("get", [l; i]) ->
       Printf.sprintf "v_list_get(%s, %s)" (gexpr ~cls ~fields l) (gexpr ~cls ~fields i)
     | Call ("len", [l]) -> Printf.sprintf "v_list_len(%s)" (gexpr ~cls ~fields l)
+    (* AIPL standard `array_*` primitives — Pi 4 maps them onto the
+       same immutable v_list_* runtime so semantics match OCaml AIPL
+       (each call returns a new list, no shared-state surprises). *)
+    | Call ("array_get", [a; i]) ->
+      Printf.sprintf "v_list_get(%s, %s)" (gexpr ~cls ~fields a) (gexpr ~cls ~fields i)
+    | Call ("array_set", [a; i; v]) ->
+      Printf.sprintf "v_list_set(%s, %s, %s)"
+        (gexpr ~cls ~fields a) (gexpr ~cls ~fields i) (gexpr ~cls ~fields v)
+    | Call ("array_len", [a]) ->
+      Printf.sprintf "v_list_len(%s)" (gexpr ~cls ~fields a)
+    | Call ("array_copy", [a]) ->
+      (* On the immutable runtime a "copy" is just the same reference —
+         every mutating op returns a new list anyway. *)
+      gexpr ~cls ~fields a
     (* on-device LLM: llm(prompt) one-shot; chat(msg) continues a KV-cache session *)
     | Call ("llm", [p])  -> Printf.sprintf "cc_llm(%s)"  (gexpr ~cls ~fields p)
     | Call ("chat", [m]) -> Printf.sprintf "cc_chat(%s)" (gexpr ~cls ~fields m)
@@ -2294,6 +2315,22 @@ let gen_program_xinujit (p : program) : string =
     (* direct call of a top-level function *)
     | Call (fn, args) when Hashtbl.mem fn_tbl fn ->
       Printf.sprintf "fn_%s(%s)" fn (gargs ~cls ~fields args)
+    (* Array literal `[e0; e1; ...]` — build a fresh v_list by repeated push. *)
+    | Array (es, _) ->
+      let rec build = function
+        | [] -> "v_list_new()"
+        | e :: rest ->
+            Printf.sprintf "v_list_push(%s, %s)" (build rest)
+              (gexpr ~cls ~fields e)
+      in build (List.rev es)
+    (* `var a[N];` declaration — n-element zeros list. *)
+    | ArraySized ([n], None) ->
+      Printf.sprintf "v_list_zeros(%s)" (gexpr ~cls ~fields n)
+    | ArraySized ([n], Some _) ->
+      (* `var a[N] = expr` — we ignore the initializer's shape and just
+         allocate zeros; AIPL code that uses this form initializes
+         element-by-element afterwards in our experience. *)
+      Printf.sprintf "v_list_zeros(%s)" (gexpr ~cls ~fields n)
     | _ -> "v_int(0)"
   and gtarget ~cls ~fields = function          (* -> a RAW object id *)
     | LocalTarget "self" -> "self"
@@ -2346,6 +2383,13 @@ let gen_program_xinujit (p : program) : string =
     | CallStmt ("gfx_circle", [a; b; c; d]) ->
       emitf "%scc_gfx_circle(%s, %s, %s, %s);\n" pad
         (gexpr ~cls ~fields a) (gexpr ~cls ~fields b) (gexpr ~cls ~fields c) (gexpr ~cls ~fields d)
+    | CallStmt ("suicide", []) ->
+      (* xinu-rpi4: cc_actor_suicide(self) marks our actor dead so the
+         dispatcher's receive loop frees the slot and proc_exits.  After
+         this we cannot validly do anything else, so emit a return
+         immediately. *)
+      emitf "%scc_actor_suicide(v_int(self));\n" pad;
+      emitf "%sreturn v_int(0);\n" pad
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)
@@ -2406,7 +2450,12 @@ let gen_program_xinujit (p : program) : string =
 
   emit "/* AIPL -> C  (--xinu-jit: self-contained integer subset for /compile) */\n";
   emitf "struct Obj { int cls; int f[%d]; };\n" (if max_fields < 1 then 1 else max_fields);
-  emit "struct Obj g_obj[64];\n";
+  (* 64 was too small for tree-search workloads (N-Queens N>=6, two-level
+     tree W*G > 56): xinu's ap_spawn returns slot ids up to NPROC-1 (512 in
+     current build), and g_spawn() writes g_obj[id].cls — id>=64 silently
+     corrupted memory, manifesting as exactly-one-message-lost downstream.
+     Bumped to 512 to match the kernel's NPROC ceiling. *)
+  emit "struct Obj g_obj[512];\n";
   emit "int g_nobj;\n\n";
 
   emit "int g_spawn(int cls) {\n";

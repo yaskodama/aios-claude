@@ -233,6 +233,7 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     "array_get":      "function(arr:array|tuple, i:int) -> any",
     "array_set":      "function(arr:array, i:int, v:any) -> any",
     "array_push":     "function(arr:array, v:any) -> unit",
+    "array_copy":     "function(arr:array) -> array",
     "array_concat":   "function(a:array, b:array) -> array",
     "array_join":     "function(arr:array[string], sep:string) -> string",
     # Actor / future
@@ -339,6 +340,19 @@ class AI {
 }
 
 var AI = new AI();
+
+// Auto-spawned global Clock actor.  Wraps the wall-clock builtins so
+// timing code can use the actor send / now / future protocols uniformly
+// instead of bare function calls:
+//   var t0 = now Clock.ms();
+//   ... compute ...
+//   var dt = (now Clock.ms()) - t0;
+class Clock {
+  method ms() { reply(now_ms()); }
+  method s()  { reply(now_s()); }
+}
+
+var Clock = new Clock();
 """
 
 
@@ -2670,6 +2684,17 @@ def _b_array_push(args, frame, interp):
         a.append(args[1])
     return None
 
+def _b_array_copy(args, frame, interp):
+    """array_copy(arr) -> a shallow copy of arr.  Needed when a Py-I actor
+    wants to pass cols/state to children without sharing mutation (e.g.,
+    tree search where each branch evolves independently)."""
+    if not args:
+        return []
+    a = args[0]
+    if isinstance(a, list):
+        return list(a)
+    return a
+
 def _b_array_concat(args, frame, interp):
     if len(args) < 2:
         return list(args[0]) if args and isinstance(args[0], list) else []
@@ -3347,6 +3372,7 @@ _BUILTINS = {
     "array_get":                     _b_array_get,
     "array_set":                     _b_array_set,
     "array_push":                    _b_array_push,
+    "array_copy":                    _b_array_copy,
     "array_concat":                  _b_array_concat,
     "array_join":                    _b_array_join,
     # ---- AIOS coordination ----

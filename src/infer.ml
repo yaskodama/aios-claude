@@ -524,10 +524,22 @@ let rec check_stmt (env:env) (s:stmt) : unit =
         ()
   | If (cond, tbr, fbr) ->
       let tc = infer_expr env cond in
-      ignore(unify_at s.sloc tc TBool);
+      (* Accept either TBool (boolean expressions) or TInt (C-style
+         truthy: 0 = false, non-zero = true) as the condition type.
+         Many AIPL programs come from C/Python culture where the
+         predicate returns 0/1 directly (e.g. our N-Queens `safe()`
+         returns int).  Try TBool first, fall back to TInt; only
+         report a mismatch if neither matches.  unify_try is
+         non-throwing so we can probe both. *)
+      if not (unify_try s.sloc tc TBool)
+      && not (unify_try s.sloc tc TInt) then
+        ignore (unify_at s.sloc tc TBool);  (* canonical message *)
       check_stmt env tbr; check_stmt env fbr
   | While (cond, body) ->
-      let tc = infer_expr env cond in ignore(unify_at s.sloc tc TBool);
+      let tc = infer_expr env cond in
+      if not (unify_try s.sloc tc TBool)
+      && not (unify_try s.sloc tc TInt) then
+        ignore (unify_at s.sloc tc TBool);
       check_stmt env body
   | Seq ss -> List.iter (check_stmt env) ss
   | CallStmt (fname, args) ->
@@ -709,6 +721,40 @@ let check_decl (env:env) = function
         set env_cls m.mname (Forall ([], ft))
       ) c.methods;
 
+      (* 2b) Class-local `function` declarations.  Pre-bind each one in
+         env_cls so methods (and sibling class-local functions) can call
+         them unqualified.  Then type-check each function's body in a
+         child env so its locals don't pollute the class env. *)
+      List.iter (fun (fd:Ast.function_decl) ->
+        let tvar_table_pre : (string, Types.tvar ref) Hashtbl.t = Hashtbl.create 4 in
+        let param_tys_pre = List.map (fun t_opt ->
+          match t_opt with
+          | Some te -> ty_of_type_expr ~tvar_table:tvar_table_pre te
+          | None    -> TAny) fd.fn_param_types in
+        let ret_ty_pre = match fd.fn_ret_ty with
+          | Some te -> ty_of_type_expr ~tvar_table:tvar_table_pre te
+          | None    -> Types.TVar (Types.fresh_tvar ()) in
+        set env_cls fd.fn_name (Forall ([], TFun (param_tys_pre, ret_ty_pre)))
+      ) c.cfunctions;
+      List.iter (fun (fd:Ast.function_decl) ->
+        let env_fn = clone env_cls in
+        let tvar_table : (string, Types.tvar ref) Hashtbl.t = Hashtbl.create 4 in
+        let param_tys = List.map (fun t_opt ->
+          match t_opt with
+          | Some te -> ty_of_type_expr ~tvar_table te
+          | None    -> Types.TVar (Types.fresh_tvar ())) fd.fn_param_types in
+        List.iter2 (fun p t -> set env_fn p (Forall ([], t)))
+          fd.fn_params param_tys;
+        let ret_ty = match fd.fn_ret_ty with
+          | Some te -> ty_of_type_expr ~tvar_table te
+          | None    -> Types.TVar (Types.fresh_tvar ()) in
+        let prev_ret = !current_return_ty in
+        current_return_ty := Some ret_ty;
+        (try check_stmt env_fn fd.fn_body
+         with e -> current_return_ty := prev_ret; raise e);
+        current_return_ty := prev_ret
+      ) c.cfunctions;
+
       (* 3) 本文は“ローカル環境”で検査：ローカル変数が外へ漏れない *)
       List.iter (fun m ->
         let env_m = clone env_cls in
@@ -755,10 +801,28 @@ let check_decl (env:env) = function
       in
       List.iter2 (fun p t -> set env_fn p (Forall ([], t)))
         fd.fn_params param_tys;
+      (* PRE-BIND the function so recursive calls inside the body
+         type-check.  Without this, `nq_count(...)` in its own body
+         looks up an unbound name and falls into pick_overload's
+         gradual fallback — a *fresh* tvar per call site.  That fresh
+         tvar then has to unify against whatever context the call
+         appears in (e.g. `total + nq_count(...)`), and if any
+         later call-site context disagrees with an earlier one,
+         a "type mismatch" is reported even though the function
+         is internally consistent.  Mirrors the Class branch (lines
+         703-710) which pre-registers all method names before
+         checking any method body.
+         For unannotated return type we use a SINGLE fresh tvar
+         (not TAny, not a fresh tvar per call), so every recursive
+         call site shares the same unknown return type and refines
+         it consistently.  After body checking, generalize. *)
       let ret_ty = match fd.fn_ret_ty with
         | Some te -> ty_of_type_expr ~tvar_table te
-        | None    -> TAny
+        | None    -> Types.TVar (Types.fresh_tvar ())
       in
+      let ftype_pre = TFun (param_tys, ret_ty) in
+      set_var_scheme env    fd.fn_name (Forall ([], ftype_pre));
+      set_var_scheme env_fn fd.fn_name (Forall ([], ftype_pre));
       let prev_ret = !current_return_ty in
       current_return_ty := Some ret_ty;
       (try check_stmt env_fn fd.fn_body

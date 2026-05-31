@@ -59,10 +59,10 @@ arg_list:
   | arg_list COMMA expr        { $1 @ [$3] }
 
 decl:
-  | CLASS ID priority_opt LBRACE fields methods RBRACE
-      { Class { cname = $2; cpriority = $3; fields = $5; methods = $6 } }
-  | CLASS ID priority_opt LBRACE methods RBRACE
-      { Class { cname = $2; cpriority = $3; fields = []; methods = $5 } }
+  | CLASS ID priority_opt LBRACE class_members RBRACE
+      { let (fs, ms, fns) = $5 in
+        Class { cname = $2; cpriority = $3; fields = fs;
+                methods = ms; cfunctions = fns } }
   | FUNCTION ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
       { let (names, tys) = List.split $4 in
         Function { fn_name = $2; fn_params = names; fn_param_types = tys;
@@ -90,6 +90,20 @@ priority_opt:
         | "low"    -> Ast.Low
         | s        -> raise (Syntax_error (loc_of_rhs 3,
                         "unknown priority `" ^ s ^ "` — expected high|normal|low")) }
+
+/* Class body: fields, methods, and (NEW) class-local function declarations,
+   in any order.  Empty body OK.  Builds a triple (fields, methods, functions). */
+class_members:
+  | /* empty */                       { ([], [], []) }
+  | field         class_members       { let (fs, ms, fns) = $2 in ($1 :: fs, ms, fns) }
+  | method_decl   class_members       { let (fs, ms, fns) = $2 in (fs, $1 :: ms, fns) }
+  | class_function_decl class_members { let (fs, ms, fns) = $2 in (fs, ms, $1 :: fns) }
+
+class_function_decl:
+  | FUNCTION ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
+      { let (names, tys) = List.split $4 in
+        { fn_name = $2; fn_params = names; fn_param_types = tys;
+          fn_ret_ty = $6; fn_body = mk_stmt1 2 (Seq $8) } }
 
 fields:
   | field { [$1] }
@@ -299,7 +313,11 @@ expr:
   | expr DOT ID                                   { mk_expr1 2 (FieldAccess ($1, $3)) }
   | expr LBRACK INTLIT RBRACK                     { mk_expr1 2 (IndexExpr ($1, $3)) }
   | NOW send_target DOT ID LPAREN args RPAREN     { mk_expr1 1 (Now ($2, $4, $6)) }
+  | NOW SELF DOT ID LPAREN args RPAREN            { mk_expr1 1 (Now (LocalTarget "self", $4, $6)) }
+  | NOW SENDER DOT ID LPAREN args RPAREN          { mk_expr1 1 (Now (LocalTarget "sender", $4, $6)) }
   | FUTURE send_target DOT ID LPAREN args RPAREN  { mk_expr1 1 (Future ($2, $4, $6)) }
+  | FUTURE SELF DOT ID LPAREN args RPAREN         { mk_expr1 1 (Future (LocalTarget "self", $4, $6)) }
+  | FUTURE SENDER DOT ID LPAREN args RPAREN       { mk_expr1 1 (Future (LocalTarget "sender", $4, $6)) }
   | AWAIT expr %prec UAWAIT                       { mk_expr1 1 (Await $2) }
 
 record_fields:

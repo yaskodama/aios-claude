@@ -389,6 +389,24 @@ let register_function (fd : function_decl) : unit =
 let find_function_opt (name:string) : function_decl option =
   Hashtbl.find_opt function_env name
 
+(* Look up a function by name, giving the actor's class-local
+   `function` declarations (cfunctions) priority over the global
+   top-level function_env.  This is how class-local helpers become
+   callable unqualified from inside methods of the same class —
+   parallels Py-I's `function`-inside-class semantics. *)
+let find_function_for_actor (actor:actor) (name:string) : function_decl option =
+  if actor.cls <> "" then begin
+    match Hashtbl.find_opt class_env actor.cls with
+    | Some c -> (
+        match List.find_opt
+                (fun (fd:function_decl) -> fd.fn_name = name)
+                c.cfunctions with
+        | Some _ as r -> r
+        | None        -> Hashtbl.find_opt function_env name)
+    | None -> Hashtbl.find_opt function_env name
+  end else
+    Hashtbl.find_opt function_env name
+
 (* Carries a return value up through nested eval_stmt calls. Caught by
    the function call wrapper; bare `return e;` outside a function turns
    into a top-level failure. *)
@@ -1111,6 +1129,57 @@ let prim_table : (string, value list -> value) Hashtbl.t =
             | VActor (c,_) -> "actor("^c^")"));
            VUnit
        | _ -> failwith "actor_dump(x): arity 1 expected"));
+    (* now_ms() — wall-clock milliseconds since epoch, as VInt. *)
+    ("now_ms",
+     (function
+       | [] -> VInt (int_of_float (Unix.gettimeofday () *. 1000.0))
+       | _  -> failwith "now_ms(): arity 0 expected"));
+    (* xinu_compile(host, src) — POST C source to the Xinu /compile endpoint
+       and parse the `=> <int>` line.  `host` is "host:port" (no scheme;
+       we always send to http://<host>/compile).  Returns VInt of the
+       parsed retval, or VString of the full body if no `=> N` line.
+       Lets AIPL OCaml orchestrators talk to Pi 4 without the xinujit://
+       remote_now machinery the Py·I runtime uses. *)
+    ("xinu_compile",
+     (function
+       | [VString host; VString src] ->
+           let url = "http://" ^ host ^ "/compile" in
+           (* Write the C source to a tempfile and let curl read from it.
+              Avoids Unix.open_process bidirectional-pipe deadlock seen
+              when stdout pre-buffer fills before stdin is fully drained. *)
+           let tmp = Filename.temp_file "aipl_xinu_" ".c" in
+           let oc_t = open_out tmp in
+           output_string oc_t src;
+           close_out oc_t;
+           let cmd = Printf.sprintf
+             "curl -s --max-time 600 -X POST --data-binary @%s %s"
+             (Filename.quote tmp) (Filename.quote url) in
+           let ic = Unix.open_process_in cmd in
+           let buf = Buffer.create 1024 in
+           let chunk = Bytes.create 4096 in
+           let rec drain () =
+             let n = input ic chunk 0 (Bytes.length chunk) in
+             if n > 0 then begin
+               Buffer.add_subbytes buf chunk 0 n;
+               drain ()
+             end
+           in
+           (try drain () with End_of_file -> ());
+           let _ = Unix.close_process_in ic in
+           (try Sys.remove tmp with _ -> ());
+           let body = Buffer.contents buf in
+           let lines = String.split_on_char '\n' body in
+           let rec find = function
+             | [] -> VString body
+             | l :: rest ->
+                 let l = String.trim l in
+                 if String.length l >= 3 && String.sub l 0 3 = "=> " then
+                   (try VInt (int_of_string (String.trim (String.sub l 3 (String.length l - 3))))
+                    with _ -> find rest)
+                 else find rest
+           in
+           find lines
+       | _ -> failwith "xinu_compile(host:string, src:string): arity 2 expected"));
   ];
   h
 
@@ -1139,8 +1208,9 @@ let rec eval_expr (actor:actor) (e : expr) =
       let v2 = eval_expr actor e2 in
       apply_binop op v1 v2
   | Call (fname, arg1) ->
-      (* User-defined top-level function takes priority over builtins. *)
-      (match find_function_opt fname with
+      (* Class-local `function` (cfunctions) takes priority, then top-level
+         user functions, then builtins. *)
+      (match find_function_for_actor actor fname with
        | Some fd ->
            let vs = List.map (eval_expr actor) arg1 in
            call_user_function actor fd vs
@@ -1425,8 +1495,9 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
               match ov with Some v -> Hashtbl.replace actor.env p v | None -> Hashtbl.remove actor.env p
           ) saved
     | None ->
-      (* Fall back to a user-defined top-level function before primitives. *)
-      (match find_function_opt mname with
+      (* Fall back to a user-defined function (class-local first, then
+         top-level) before primitives. *)
+      (match find_function_for_actor actor mname with
        | Some fd ->
            let vs = List.map (eval_expr actor) args in
            ignore (call_user_function actor fd vs)

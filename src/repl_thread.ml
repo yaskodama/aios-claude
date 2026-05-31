@@ -687,6 +687,11 @@ let rec process_command line =
                 | Quit ->
                     close_in_noerr ic;
                     restore_cwd ();
+                    (* Same drain-wait as End_of_file: an explicit `exit`
+                       in a script shouldn't truncate in-flight actor work
+                       (e.g. an init still processing). *)
+                    (try Eval_thread.wait_actors_quiesce ~max_wait_s:600.0 ()
+                     with _ -> ());
                     raise Quit
                 | Failure msg when String.length msg >= 0 ->
                   repl_logln (Printf.sprintf "[Error in script line] %s: %s" "?" msg)
@@ -701,9 +706,12 @@ let rec process_command line =
             (* Wait for any in-flight actor messages to drain before the
                REPL exits.  Without this, `send d.run(...)` at the top
                level races against process shutdown and the receiver
-               never gets to run.  Bounded by a 5s wall-clock cap so a
-               truly stuck system doesn't hang the script. *)
-            (try Eval_thread.wait_actors_quiesce () with _ -> ());
+               never gets to run.  Bounded by a 600 s wall-clock cap so
+               long-running actor benches (e.g. load-distribution
+               experiments) can finish, but a truly stuck system
+               doesn't hang the script forever. *)
+            (try Eval_thread.wait_actors_quiesce ~max_wait_s:600.0 ()
+             with _ -> ());
             repl_logln "[Script execution completed]"
       with Sys_error msg ->
         repl_logln (Printf.sprintf "[Error] Could not open script file: %s" msg)
