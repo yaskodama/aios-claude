@@ -2289,6 +2289,8 @@ let gen_program_xinujit (p : program) : string =
     | Call ("actor_kill",    [id]) -> Printf.sprintf "cc_actor_kill(%s)"    (gexpr ~cls ~fields id)
     | Call ("actor_protect", [id; on]) ->
         Printf.sprintf "cc_actor_protect(%s, %s)" (gexpr ~cls ~fields id) (gexpr ~cls ~fields on)
+    | Call ("actor_protected", [id]) ->
+        Printf.sprintf "cc_actor_protected(%s)" (gexpr ~cls ~fields id)
     | Call ("gc_sweep", [th; dry]) ->
         Printf.sprintf "cc_gc_sweep(%s, %s)" (gexpr ~cls ~fields th) (gexpr ~cls ~fields dry)
     | Call ("now_ms",        [])   -> "cc_now_ms()"
@@ -2401,6 +2403,18 @@ let gen_program_xinujit (p : program) : string =
          immediately. *)
       emitf "%scc_actor_suicide(v_int(self));\n" pad;
       emitf "%sreturn v_int(0);\n" pad
+    (* xinu-rpi4 GC-side primitives used for their side effect, no return.
+       Without these as CallStmt fallback, `actor_protect(my_id, 1);` was
+       dropped as "/* unsupported call */" — the GC actor failed to mark
+       itself protected and its own sweep killed it. *)
+    | CallStmt ("actor_protect", [id; on]) ->
+      emitf "%scc_actor_protect(%s, %s);\n" pad
+        (gexpr ~cls ~fields id) (gexpr ~cls ~fields on)
+    | CallStmt ("actor_kill", [id]) ->
+      emitf "%scc_actor_kill(%s);\n" pad (gexpr ~cls ~fields id)
+    | CallStmt ("gc_sweep", [th; dry]) ->
+      emitf "%scc_gc_sweep(%s, %s);\n" pad
+        (gexpr ~cls ~fields th) (gexpr ~cls ~fields dry)
     | CallStmt (_, _) -> emitf "%s/* unsupported call */\n" pad
     | Send (tgt, m, args) | UnsafeSend (tgt, m, args) ->
       (* fire-and-forget: enqueue (the cooperative pump dispatches it later) *)
