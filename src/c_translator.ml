@@ -2281,6 +2281,17 @@ let gen_program_xinujit (p : program) : string =
       (* On the immutable runtime a "copy" is just the same reference —
          every mutating op returns a new list anyway. *)
       gexpr ~cls ~fields a
+    (* xinu-rpi4 GC / introspection primitives — let an AIPL GC actor
+       sweep the local actor pool from inside the runtime itself. *)
+    | Call ("actor_count",   [])   -> "cc_actor_count()"
+    | Call ("actor_alive",   [id]) -> Printf.sprintf "cc_actor_alive(%s)"   (gexpr ~cls ~fields id)
+    | Call ("actor_age",     [id]) -> Printf.sprintf "cc_actor_age(%s)"     (gexpr ~cls ~fields id)
+    | Call ("actor_kill",    [id]) -> Printf.sprintf "cc_actor_kill(%s)"    (gexpr ~cls ~fields id)
+    | Call ("actor_protect", [id; on]) ->
+        Printf.sprintf "cc_actor_protect(%s, %s)" (gexpr ~cls ~fields id) (gexpr ~cls ~fields on)
+    | Call ("gc_sweep", [th; dry]) ->
+        Printf.sprintf "cc_gc_sweep(%s, %s)" (gexpr ~cls ~fields th) (gexpr ~cls ~fields dry)
+    | Call ("now_ms",        [])   -> "cc_now_ms()"
     (* on-device LLM: llm(prompt) one-shot; chat(msg) continues a KV-cache session *)
     | Call ("llm", [p])  -> Printf.sprintf "cc_llm(%s)"  (gexpr ~cls ~fields p)
     | Call ("chat", [m]) -> Printf.sprintf "cc_chat(%s)" (gexpr ~cls ~fields m)
