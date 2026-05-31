@@ -2450,12 +2450,14 @@ let gen_program_xinujit (p : program) : string =
 
   emit "/* AIPL -> C  (--xinu-jit: self-contained integer subset for /compile) */\n";
   emitf "struct Obj { int cls; int f[%d]; };\n" (if max_fields < 1 then 1 else max_fields);
-  (* 64 was too small for tree-search workloads (N-Queens N>=6, two-level
-     tree W*G > 56): xinu's ap_spawn returns slot ids up to NPROC-1 (512 in
-     current build), and g_spawn() writes g_obj[id].cls — id>=64 silently
-     corrupted memory, manifesting as exactly-one-message-lost downstream.
-     Bumped to 512 to match the kernel's NPROC ceiling. *)
-  emit "struct Obj g_obj[512];\n";
+  (* Must match xinu's NPROC ceiling: any slot id >= this bound makes
+     g_spawn()'s `g_obj[id].cls = cls` write past the array, silently
+     corrupting BSS — manifested as exactly-one-message-lost downstream
+     for any actor spawned into a slot >= the bound.  History: 64 (was)
+     -> 512 (2026-05-31 N=6 fix) -> 1024 -> 2048 (N=8 needed 1467 spawn
+     attempts, peak alive ~1300 with recycling — 1024 hit 444 spawn_fails
+     and hung).  Keep in sync with NPROC in xinu-rpi4/include/proc.h. *)
+  emit "struct Obj g_obj[2048];\n";
   emit "int g_nobj;\n\n";
 
   emit "int g_spawn(int cls) {\n";
