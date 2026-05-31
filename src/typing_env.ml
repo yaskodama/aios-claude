@@ -129,6 +129,19 @@ let prelude () : env =
   add_mono e "wait" (TFun ([TInt],   TUnit));
   add_mono e "wait" (TFun ([TFloat], TUnit));
 
+  (* ---- xinu-rpi4 actor-pool GC primitives ---- *)
+  add_mono e "actor_count"     (TFun ([],                TInt));
+  add_mono e "actor_alive"     (TFun ([TInt],            TInt));
+  add_mono e "actor_age"       (TFun ([TInt],            TInt));
+  add_mono e "actor_kill"      (TFun ([TInt],            TInt));
+  add_mono e "actor_protect"   (TFun ([TAny; TInt],      TUnit));
+  add_mono e "actor_protected" (TFun ([TInt],            TInt));
+  add_mono e "gc_sweep"        (TFun ([TInt; TInt],      TInt));
+  add_mono e "now_ms"          (TFun ([],                TInt));
+  add_mono e "suicide"         (TFun ([],                TUnit));
+  (* array_* は OCaml AIPL 側に既存定義あり; xinu-rpi4 aipl2c 側は
+     c_translator.ml で直接 v_list_* に emit するので type system 登録は不要 *)
+
   (* ---- SDL colour line (7 numeric args) ---- *)
   let any7 = TFun ([TAny; TAny; TAny; TAny; TAny; TAny; TAny], TUnit) in
   add_mono e "sdl_line_c" any7;
