@@ -1635,7 +1635,7 @@ _PI3_HTML = """<!doctype html>
       max-height:160px;overflow:auto;font-size:12px}
 </style></head><body>
 <h2>Pi3 Xinu screen design <span class=muted style="font-size:13px">(framebuffer browser &mdash; host PI3HOST)</span></h2>
-<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出す 5 つのウィンドウ
+<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1920&times;1080)に出す 5 つのウィンドウ
  (Browser / Soft keyboard / Shell / Window System / Actors) の配置をデザインします。各ウィンドウをドラッグで移動、
  右下ハンドルでリサイズ。URL を入れて 送信、または Live ON で Pi 3 が 5 窓を描画し、Browser はそのページを表示します。</div>
 <div id=bar>
@@ -1649,15 +1649,15 @@ _PI3_HTML = """<!doctype html>
 <div id=desk></div>
 <div id=log class=muted>ready. (Pi 3 must be WiFi-connected + DHCP'd first)</div>
 <script>
-const DW=1024, DH=768, SCALE=1.1;     // ~2x of the previous 0.6 preview
+const DW=1920, DH=1080, SCALE=0.62;   // 1920x1080 Xinu screen, fits the browser
 let LIVE=false, liveFetched=false, liveTimer=null;
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
 // Five windows like the Pi 4 desktop: Browser, Soft keyboard, Shell,
 // Window System, Actors.
-const DEF={ b:{x:40,y:40,w:520,h:300}, s:{x:580,y:40,w:400,h:200},
-            a:{x:580,y:260,w:400,h:250}, p:{x:40,y:360,w:520,h:150},
-            k:{x:40,y:530,w:940,h:210} };
+const DEF={ b:{x:40,y:40,w:1000,h:560}, s:{x:1060,y:40,w:820,h:360},
+            a:{x:1060,y:420,w:820,h:380}, p:{x:40,y:620,w:1000,h:180},
+            k:{x:40,y:820,w:1840,h:230} };
 let W={ b:{...DEF.b}, s:{...DEF.s}, a:{...DEF.a}, p:{...DEF.p}, k:{...DEF.k} };
 const ORDER=['s','a','p','k','b'];          // browser drawn on top
 const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)',
