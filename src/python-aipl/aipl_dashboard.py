@@ -1642,13 +1642,15 @@ _PI3_HTML = """<!doctype html>
   <label>URL host: <input id=host value="kodamay.org" size=18></label>
   <label>IP: <input id=ip value="160.251.151.122" size=15></label>
   <button class=send onclick="send()">送信 (Send to Pi3) &rarr;</button>
+  <button id=livebtn onclick="toggleLive()">&#9679; Live: OFF</button>
   <button onclick="reset_()">&#8635; reset</button>
   <span id=status class=muted></span>
 </div>
 <div id=desk></div>
 <div id=log class=muted>ready. (Pi 3 must be WiFi-connected + DHCP'd first)</div>
 <script>
-const DW=1024, DH=768, SCALE=0.6;
+const DW=1024, DH=768, SCALE=1.1;     // ~2x of the previous 0.6 preview
+let LIVE=false, liveFetched=false, liveTimer=null;
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
 // Three windows like the Pi 4 desktop: Browser, Soft keyboard, Shell.
@@ -1677,27 +1679,41 @@ function render(){
 function startMove(e,id){ e.preventDefault();
   const w=W[id], sx=e.clientX, sy=e.clientY, ox=w.x, oy=w.y;
   function mv(ev){ w.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); w.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
-  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); liveSync(); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
 function startResize(e,id){ e.preventDefault(); e.stopPropagation();
   const w=W[id], sx=e.clientX, sy=e.clientY, ow=w.w, oh=w.h;
   function mv(ev){ w.w=Math.max(80,Math.round(ow+(ev.clientX-sx)/SCALE)); w.h=Math.max(60,Math.round(oh+(ev.clientY-sy)/SCALE)); render(); }
-  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); liveSync(); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
-function reset_(){ W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} }; render(); }
-async function send(){
-  status.textContent='sending to Pi3...';
+function reset_(){ W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} }; render(); liveSync(); }
+function toggleLive(){
+  LIVE=!LIVE;
+  document.getElementById('livebtn').textContent=(LIVE?'\\u25CF Live: ON':'\\u25CF Live: OFF');
+  document.getElementById('livebtn').style.background=LIVE?'#3a7a4a':'';
+  if(LIVE){ liveFetched=false; doSend(true); }   // first live send fetches the page
+}
+function liveSync(){            // debounced auto-send while Live is ON
+  if(!LIVE) return;
+  if(liveTimer) clearTimeout(liveTimer);
+  liveTimer=setTimeout(()=>doSend(!liveFetched), 350);  // after first fetch, redraw from cache (fast)
+}
+function send(){ doSend(true); }    // manual 送信 always (re-)fetches the page
+async function doSend(fetchPage){
+  status.textContent = fetchPage ? 'sending (fetch)...' : 'live sync...';
   const host=encodeURIComponent(document.getElementById('host').value);
   const ip=encodeURIComponent(document.getElementById('ip').value);
-  const q='?host='+host+'&ip='+ip
+  const q='?host='+host+'&ip='+ip+'&fetch='+(fetchPage?1:0)
     +'&bx='+W.b.x+'&by='+W.b.y+'&bw='+W.b.w+'&bh='+W.b.h
     +'&kx='+W.k.x+'&ky='+W.k.y+'&kw='+W.k.w+'&kh='+W.k.h
     +'&sx='+W.s.x+'&sy='+W.s.y+'&sw='+W.s.w+'&sh='+W.s.h;
   try{
     const r=await fetch('/api/pi3/desktop'+q); const j=await r.json();
-    if(j.ok){ status.textContent='drawn on Pi3 ✓'; log('Pi3 drew the 3 windows (browser fetched '+j.bytes+' bytes).'); }
+    if(j.ok){ if(fetchPage) liveFetched=true;
+      status.textContent=(LIVE?'live ✓':'drawn on Pi3 ✓');
+      log('Pi3 drew the 3 windows'+(fetchPage?' (browser fetched '+j.bytes+' bytes)':' (live move, cached page)')+'.'); }
     else { status.textContent='error'; log('send failed: '+j.error+'\\n(Pi 3 connected to WiFi + DHCP done?)'); }
   }catch(e){ status.textContent='error'; log('send failed: '+e); }
 }
