@@ -1665,7 +1665,7 @@ _PI3_HTML = """<!doctype html>
 <div id=desk></div>
 <div id=log class=muted>ready. (Pi 3 must be WiFi-connected + DHCP'd first)</div>
 <script>
-const DW=1280, DH=800, SCALE=0.72;    // 1280x800 Xinu screen
+const DW=1280, DH=800, SCALE=1.44;    // 1280x800 Xinu screen, ~2x larger preview
 let LIVE=false, liveFetched=false, liveTimer=null;
 let FOCUS='s';                         // focused window id (keyboard target)
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
@@ -1705,6 +1705,8 @@ function render(){
 /* Keyboard: when the Shell window is focused, type into it — keys go to the Pi 3
  * (/api/pi3/key) and are echoed locally.  Click a window to focus it. */
 document.addEventListener('keydown', async e=>{
+  const tag=(e.target.tagName||'');       // don't steal keys from the URL/IP inputs
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
   if(FOCUS!=='s') return;                 // only the Shell takes input for now
   if(e.metaKey||e.ctrlKey||e.altKey) return;
   let code=-1;
