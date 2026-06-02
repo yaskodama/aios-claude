@@ -418,16 +418,16 @@ _PAGE_TMPL = r"""<!doctype html>
       connected + DHCP'd for 送信 to draw on its HDMI screen. -->
  <div class="grid">
   <div class="card" data-id="pyi">
-   <div class="thumb"><span class="glyph">&#128421;</span><span class="port">:8900/pi3</span>
+   <div class="thumb"><span class="glyph">&#128421;</span><span class="port">:8899/pi3</span>
     <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
    <span class="arrow">&#8599;</span>
    <div class="body"><h3>Pi3 Xinu 画面設計 &mdash; Framebuffer browser layout</h3>
     <p>Drag/resize the browser window over a scaled 1024&times;768 view of the Pi 3 HDMI screen, set a URL, then 送信 &mdash; the page forwards the geometry to the Pi 3&rsquo;s <code>/api/wifi/browse</code> so the bare-metal kernel fetches the page (plain HTTP, e.g. http://kodamay.org) over its self-built WiFi/TCP stack and draws it as a window. Needs Py&middot;I running + the Pi 3 connected.</p>
-    <span class="addr">127.0.0.1:8900/pi3</span>
+    <span class="addr">127.0.0.1:8899/pi3</span>
     <div class="controls">
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
-     <button class="btn btn-open" data-href="http://127.0.0.1:8900/pi3">Open &#8599;</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8899/pi3">Open &#8599;</button>
     </div></div>
   </div>
  </div>
