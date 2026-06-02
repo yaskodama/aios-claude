@@ -483,6 +483,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_pi3_browse()
         elif self.path.startswith("/api/pi3/desktop"):
             self._serve_pi3_desktop()
+        elif self.path.startswith("/api/pi3/key"):
+            self._serve_pi3_key()
         elif self.path.startswith("/api/xinu/type"):
             self._serve_xinu_type()
         elif self.path.startswith("/api/xinu/click"):
@@ -914,6 +916,19 @@ class _Handler(BaseHTTPRequestHandler):
                 bytes_hdr = r.headers.get("X-Wifi-BrowseBytes", "?")
                 body = r.read()
             out = {"ok": True, "bytes": bytes_hdr, "len": len(body)}
+        except Exception as e:
+            out = {"ok": False, "error": str(e)}
+        self._send_bytes(200, "application/json", json.dumps(out).encode("utf-8"))
+
+    def _serve_pi3_key(self):
+        """Proxy a keystroke to the Pi 3 Shell window (/api/wifi/key?c=)."""
+        from urllib.parse import urlsplit
+        q = urlsplit(self.path).query
+        url = "http://%s/api/wifi/key%s" % (_PI3_XINU_HOST, ("?" + q) if q else "")
+        try:
+            with urllib.request.urlopen(url, timeout=8) as r:
+                r.read()
+            out = {"ok": True}
         except Exception as e:
             out = {"ok": False, "error": str(e)}
         self._send_bytes(200, "application/json", json.dumps(out).encode("utf-8"))
@@ -1635,9 +1650,10 @@ _PI3_HTML = """<!doctype html>
       max-height:160px;overflow:auto;font-size:12px}
 </style></head><body>
 <h2>Pi3 Xinu screen design <span class=muted style="font-size:13px">(framebuffer browser &mdash; host PI3HOST)</span></h2>
-<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1920&times;1080)に出す 5 つのウィンドウ
+<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1280&times;800)に出す 5 つのウィンドウ
  (Browser / Soft keyboard / Shell / Window System / Actors) の配置をデザインします。各ウィンドウをドラッグで移動、
- 右下ハンドルでリサイズ。URL を入れて 送信、または Live ON で Pi 3 が 5 窓を描画し、Browser はそのページを表示します。</div>
+ 右下ハンドルでリサイズ。URL を入れて 送信、または Live ON で Pi 3 が 5 窓を描画。
+ <b>ウィンドウをクリックしてフォーカス(黄枠)し、Shell を選ぶとキーボード入力が Pi 3 の Shell 窓に届きます。</b></div>
 <div id=bar>
   <label>URL host: <input id=host value="kodamay.org" size=18></label>
   <label>IP: <input id=ip value="160.251.151.122" size=15></label>
@@ -1649,23 +1665,25 @@ _PI3_HTML = """<!doctype html>
 <div id=desk></div>
 <div id=log class=muted>ready. (Pi 3 must be WiFi-connected + DHCP'd first)</div>
 <script>
-const DW=1920, DH=1080, SCALE=0.62;   // 1920x1080 Xinu screen, fits the browser
+const DW=1280, DH=800, SCALE=0.72;    // 1280x800 Xinu screen
 let LIVE=false, liveFetched=false, liveTimer=null;
+let FOCUS='s';                         // focused window id (keyboard target)
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
 // Five windows like the Pi 4 desktop: Browser, Soft keyboard, Shell,
 // Window System, Actors.
-const DEF={ b:{x:40,y:40,w:1000,h:560}, s:{x:1060,y:40,w:820,h:360},
-            a:{x:1060,y:420,w:820,h:380}, p:{x:40,y:620,w:1000,h:180},
-            k:{x:40,y:820,w:1840,h:230} };
+const DEF={ b:{x:20,y:20,w:680,h:440}, s:{x:720,y:20,w:540,h:300},
+            a:{x:720,y:340,w:540,h:300}, p:{x:20,y:480,w:680,h:140},
+            k:{x:20,y:640,w:1240,h:150} };
 let W={ b:{...DEF.b}, s:{...DEF.s}, a:{...DEF.a}, p:{...DEF.p}, k:{...DEF.k} };
 const ORDER=['s','a','p','k','b'];          // browser drawn on top
 const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)',
                a:'Actors', p:'Xinu Pi3 Window System' };
 const TBAR ={ b:'#0050c0', k:'#504030', s:'#705030', a:'#603040', p:'#206040' };
 function log(s){ logEl.textContent=s; }
+let shellText='';                      // local echo of what was typed into Shell
 const BODYTXT={ b:'(page text)', k:'[1234567890] [QWERTY…] [SPACE Enter]',
-                s:'xsh $ _', a:'id cls state mbox …', p:'Build/IP/Screen/Actors …' };
+                a:'id cls state mbox …', p:'Build/IP/Screen/Actors …' };
 function render(){
   desk.innerHTML='';
   for(const id of ORDER){
@@ -1673,15 +1691,34 @@ function render(){
     const d=document.createElement('div'); d.className='win'; d.dataset.id=id;
     d.style.left=(w.x*SCALE)+'px'; d.style.top=(w.y*SCALE)+'px';
     d.style.width=(w.w*SCALE)+'px'; d.style.height=(w.h*SCALE)+'px';
+    if(id===FOCUS){ d.style.outline='2px solid #ffd24a'; d.style.zIndex=10; }
     const t=document.createElement('div'); t.className='t'; t.style.background=TBAR[id];
     t.textContent = id==='b' ? (TITLES.b+'   http://'+document.getElementById('host').value+'/') : TITLES[id];
-    const b=document.createElement('div'); b.className='b'; b.textContent=BODYTXT[id]||'';
+    const b=document.createElement('div'); b.className='b';
+    b.textContent = id==='s' ? ('xsh $ '+shellText+'_') : (BODYTXT[id]||'');
     const sz=document.createElement('div'); sz.className='sz'; sz.textContent=w.w+'x'+w.h+' ('+w.x+','+w.y+')';
     const h=document.createElement('div'); h.className='h';
     d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
-    d.addEventListener('mousedown', e=>{ if(e.target===h) startResize(e,id); else startMove(e,id); });
+    d.addEventListener('mousedown', e=>{ FOCUS=id; if(e.target===h) startResize(e,id); else startMove(e,id); render(); });
   }
 }
+/* Keyboard: when the Shell window is focused, type into it — keys go to the Pi 3
+ * (/api/pi3/key) and are echoed locally.  Click a window to focus it. */
+document.addEventListener('keydown', async e=>{
+  if(FOCUS!=='s') return;                 // only the Shell takes input for now
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  let code=-1;
+  if(e.key==='Backspace') code=8;
+  else if(e.key==='Enter') code=13;
+  else if(e.key.length===1) code=e.key.charCodeAt(0);
+  if(code<0) return;
+  e.preventDefault();
+  if(code===8) shellText=shellText.slice(0,-1);
+  else if(code===13) shellText+='\\n';
+  else shellText+=e.key;
+  render();
+  try{ await fetch('/api/pi3/key?c='+code); }catch(err){}
+});
 function startMove(e,id){ e.preventDefault();
   const w=W[id], sx=e.clientX, sy=e.clientY, ox=w.x, oy=w.y;
   function mv(ev){ w.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); w.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
