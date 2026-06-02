@@ -483,6 +483,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_pi3_browse()
         elif self.path.startswith("/api/pi3/desktop"):
             self._serve_pi3_desktop()
+        elif self.path.startswith("/api/pi3/wifiscan"):
+            self._serve_pi3_wifiscan()
+        elif self.path.startswith("/api/pi3/wifijoin"):
+            self._serve_pi3_wifijoin()
+        elif self.path.startswith("/api/pi3/wifistatus"):
+            self._serve_pi3_wifistatus()
+        elif self.path.startswith("/api/pi3/shellring"):
+            self._serve_pi3_shellring()
         elif self.path.startswith("/api/pi3/key"):
             self._serve_pi3_key()
         elif self.path.startswith("/api/xinu/type"):
@@ -932,6 +940,85 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as e:
             out = {"ok": False, "error": str(e)}
         self._send_bytes(200, "application/json", json.dumps(out).encode("utf-8"))
+
+    def _serve_pi3_wifiscan(self):
+        """Proxy the Pi 3 WiFi scan (/api/wifi/scan) — returns the AP list JSON
+        for the desktop's WiFi indicator popup."""
+        url = "http://%s/api/wifi/scan" % _PI3_XINU_HOST
+        try:
+            # The bare-metal scan retunes the radio across all channels and
+            # blocks the single-threaded webactor ~25-35s; wait it out.
+            with urllib.request.urlopen(url, timeout=45) as r:
+                body = r.read()
+        except Exception as e:
+            body = json.dumps({"aps": [], "count": 0,
+                               "error": str(e)}).encode("utf-8")
+        self._send_bytes(200, "application/json", body)
+
+    def _serve_pi3_wifijoin(self):
+        """Connect the Pi 3 to the chosen AP: proxy /api/wifi/join then
+        /api/wifi/dhcp, remember the leased WiFi IP for status polling."""
+        global _PI3_WIFI_IP
+        from urllib.parse import urlsplit, parse_qs
+        q = parse_qs(urlsplit(self.path).query)
+        ssid = (q.get("ssid", [""])[0])
+        pw = (q.get("pass", [""])[0])
+        out = {"ok": False, "ip": None, "connected": False}
+        try:
+            from urllib.parse import quote
+            jurl = "http://%s/api/wifi/join?ssid=%s&pass=%s" % (
+                _PI3_XINU_HOST, quote(ssid), quote(pw))
+            with urllib.request.urlopen(jurl, timeout=45) as r:
+                r.read()
+            durl = "http://%s/api/wifi/dhcp" % _PI3_XINU_HOST
+            with urllib.request.urlopen(durl, timeout=30) as r:
+                dtxt = r.read().decode("utf-8", "replace")
+            out["join"] = dtxt.strip()
+            import re as _re
+            m = _re.search(r"ip=(\d+\.\d+\.\d+\.\d+)", dtxt)
+            if m and "have_ip=1" in dtxt:
+                _PI3_WIFI_IP = m.group(1)
+                out["ip"] = _PI3_WIFI_IP
+                out["ok"] = True
+                out["connected"] = self._wifi_ping(_PI3_WIFI_IP)
+        except Exception as e:
+            out["error"] = str(e)
+        self._send_bytes(200, "application/json",
+                         json.dumps(out).encode("utf-8"))
+
+    @staticmethod
+    def _wifi_ping(ip: str) -> bool:
+        """True if the Pi 3 WiFi IP answers an ICMP echo (its responder)."""
+        try:
+            # 3 packets: the Pi 3 WiFi responder usually misses the first
+            # (ARP warm-up), so a single packet would falsely read "down".
+            r = subprocess.run(["ping", "-c", "3", "-t", "3", ip],
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=6)
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    def _serve_pi3_wifistatus(self):
+        """Report whether the Pi 3 WiFi is up, by pinging the last leased
+        WiFi IP server-side (avoids needing a bare-metal status endpoint)."""
+        ip = _PI3_WIFI_IP
+        connected = self._wifi_ping(ip) if ip else False
+        self._send_bytes(200, "application/json",
+                         json.dumps({"connected": connected,
+                                     "ip": ip}).encode("utf-8"))
+
+    def _serve_pi3_shellring(self):
+        """Proxy the bare-metal Pi 3 shell's text ring (/api/wifi/shellring)
+        so the Mac /pi3 Shell window can mirror the real xsh content
+        (prompt + echo + command output) instead of a local echo."""
+        url = "http://%s/api/wifi/shellring" % _PI3_XINU_HOST
+        try:
+            with urllib.request.urlopen(url, timeout=6) as r:
+                body = r.read()
+        except Exception as e:
+            body = ("(shellring proxy error: %s)" % e).encode("utf-8")
+        self._send_bytes(200, "text/plain; charset=utf-8", body)
 
     def _serve_pi3_desktop(self):
         """Proxy the multi-window layout to the Pi 3 /api/wifi/desktop."""
@@ -1411,6 +1498,9 @@ msgEl.focus();
 _LAYOUT_XINU_HOST = "192.168.3.100"
 # Pi 3 (arm-rpi3) Xinu WiFi/HTTP server — the framebuffer "browser" lives here.
 _PI3_XINU_HOST = "192.168.3.50:8080"
+# Pi 3 WiFi-side IP (DHCP-leased over BCM43455).  Updated by /api/pi3/wifijoin;
+# pinged by /api/pi3/wifistatus to drive the desktop WiFi indicator.
+_PI3_WIFI_IP = "192.168.3.52"
 
 # Xinu shell-input UI.  Type into the bare-metal Pi 4's `Shell (UART)` window
 # from the browser.  Hits /api/xinu/type (server-side proxy → Pi's /type) so
@@ -1670,20 +1760,22 @@ let LIVE=false, liveFetched=false, liveTimer=null;
 let FOCUS='s';                         // focused window id (keyboard target)
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
-// Five windows like the Pi 4 desktop: Browser, Soft keyboard, Shell,
-// Window System, Actors.
-const DEF={ b:{x:20,y:20,w:680,h:440}, s:{x:720,y:20,w:540,h:300},
-            a:{x:720,y:340,w:540,h:300}, p:{x:20,y:480,w:680,h:140},
-            k:{x:20,y:640,w:1240,h:150} };
+// Five windows matching the actual gwm window manager on the Pi 3 HDMI:
+//   p = Info "Xinu Pi3", b = "AIPL console (print)", k = "Soft keyboard",
+//   a = "AIPL actors (live)", s = "Shell".  Coords match apps/gwm.c exactly.
+const DEF={ p:{x:16,y:16,w:420,h:120}, b:{x:16,y:148,w:420,h:304},
+            k:{x:16,y:470,w:420,h:300}, a:{x:448,y:16,w:360,h:754},
+            s:{x:824,y:16,w:440,h:754} };
 let W={ b:{...DEF.b}, s:{...DEF.s}, a:{...DEF.a}, p:{...DEF.p}, k:{...DEF.k} };
-const ORDER=['s','a','p','k','b'];          // browser drawn on top
-const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)',
-               a:'Actors', p:'Xinu Pi3 Window System' };
-const TBAR ={ b:'#0050c0', k:'#504030', s:'#705030', a:'#603040', p:'#206040' };
+const ORDER=['p','b','k','a','s'];
+const TITLES={ p:'Xinu Pi3', b:'AIPL console (print)', k:'Soft keyboard',
+               s:'Shell', a:'AIPL actors (live)' };
+const TBAR ={ p:'#0040a0', b:'#205020', k:'#704020', s:'#0040a0', a:'#105030' };
 function log(s){ logEl.textContent=s; }
-let shellText='';                      // local echo of what was typed into Shell
-const BODYTXT={ b:'(page text)', k:'[1234567890] [QWERTY…] [SPACE Enter]',
-                a:'id cls state mbox …', p:'Build/IP/Screen/Actors …' };
+let shellText='';                      // (legacy) local echo
+let shellRing='(connecting to xsh…)';  // live mirror of the real Pi 3 shell ring
+const BODYTXT={ b:'(AIPL print console)', k:'[1234567890] [QWERTY…] [SPACE Enter]',
+                a:'id cls state mbox …', p:'BCM2837 Cortex-A53 -- arm-rpi3 / 1280x800x32' };
 function render(){
   desk.innerHTML='';
   for(const id of ORDER){
@@ -1693,15 +1785,99 @@ function render(){
     d.style.width=(w.w*SCALE)+'px'; d.style.height=(w.h*SCALE)+'px';
     if(id===FOCUS){ d.style.outline='2px solid #ffd24a'; d.style.zIndex=10; }
     const t=document.createElement('div'); t.className='t'; t.style.background=TBAR[id];
-    t.textContent = id==='b' ? (TITLES.b+'   http://'+document.getElementById('host').value+'/') : TITLES[id];
+    t.textContent = TITLES[id];
     const b=document.createElement('div'); b.className='b';
-    b.textContent = id==='s' ? ('xsh $ '+shellText+'_') : (BODYTXT[id]||'');
+    if(id==='s'){ b.textContent=shellRing; b.style.whiteSpace='pre-wrap';
+                  b.style.overflow='hidden'; b.style.fontSize='10px'; b.style.lineHeight='1.15'; }
+    else b.textContent = (BODYTXT[id]||'');
     const sz=document.createElement('div'); sz.className='sz'; sz.textContent=w.w+'x'+w.h+' ('+w.x+','+w.y+')';
     const h=document.createElement('div'); h.className='h';
     d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
     d.addEventListener('mousedown', e=>{ FOCUS=id; if(e.target===h) startResize(e,id); else startMove(e,id); render(); });
   }
+  desk.appendChild(buildWifiWidget());   // WiFi indicator, bottom-right
 }
+
+/* ---- WiFi indicator (bottom-right of the desktop) ----
+ * White icon = not connected.  Click → scan & pick an AP → connect.
+ * On connect the icon turns green; if the link drops it goes white again. */
+let wifiConnected=false, wifiIP='', wifiBusy=false;
+function wifiSvg(){
+  const col = wifiConnected ? '#36d35a' : '#ffffff';
+  return '<svg width="26" height="20" viewBox="0 0 26 20" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round">'
+    +'<path d="M3 7 A14 14 0 0 1 23 7"/>'
+    +'<path d="M6.5 10.5 A9 9 0 0 1 19.5 10.5"/>'
+    +'<path d="M10 14 A4 4 0 0 1 16 14"/>'
+    +'<circle cx="13" cy="17" r="1.3" fill="'+col+'" stroke="none"/></svg>';
+}
+function buildWifiWidget(){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;right:8px;bottom:8px;width:34px;height:26px;cursor:pointer;z-index:20;'
+    +'display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:5px';
+  wrap.title = wifiConnected ? ('WiFi connected: '+wifiIP+' — click to change') : 'WiFi not connected — click to scan & connect';
+  wrap.innerHTML=wifiSvg();
+  wrap.addEventListener('mousedown', e=>e.stopPropagation());
+  wrap.addEventListener('click', e=>{ e.stopPropagation(); openWifiPopup(); });
+  return wrap;
+}
+async function pollWifi(){
+  // Don't disturb the popup while the user is scanning/connecting.
+  if(wifiBusy || document.getElementById('wifipop')) return;
+  try{ const r=await fetch('/api/pi3/wifistatus'); const j=await r.json();
+       const was=wifiConnected; wifiConnected=!!j.connected; wifiIP=j.ip||'';
+       if(was!==wifiConnected) render(); }catch(e){}
+}
+setInterval(pollWifi, 4000); pollWifi();
+function parseSsid(line){ const m=line.match(/"([^"]*)"/); return m?m[1]:''; }
+async function openWifiPopup(){
+  if(wifiBusy) return;
+  let pop=document.getElementById('wifipop');
+  if(pop){ pop.remove(); return; }            // toggle
+  // Append to <body> (NOT #desk) so render() — which clears #desk — can't
+  // wipe the popup mid-scan.  Fixed to the viewport's bottom-right.
+  pop=document.createElement('div'); pop.id='wifipop';
+  pop.style.cssText='position:fixed;right:18px;bottom:54px;width:280px;max-height:320px;overflow:auto;'
+    +'background:#0b1422;border:1px solid #2a4a6a;border-radius:6px;z-index:9999;padding:6px;font-size:12px;color:#cde;'
+    +'box-shadow:0 4px 16px rgba(0,0,0,0.5)';
+  pop.innerHTML='<div style="color:#8cf;margin-bottom:4px;font-weight:700">WiFi APs'
+    +'<span id="wificlose" style="float:right;cursor:pointer;padding:0 4px">×</span></div>'
+    +'<div id="wifilist">scanning… (takes ~30s &amp; briefly drops the current WiFi — please wait)</div>';
+  document.body.appendChild(pop);
+  pop.addEventListener('mousedown', e=>e.stopPropagation());
+  document.getElementById('wificlose').onclick=()=>pop.remove();
+  try{
+    const r=await fetch('/api/pi3/wifiscan'); const j=await r.json();
+    const aps=(j.aps||[]); const seen={};
+    const list=document.getElementById('wifilist'); if(!list) return;  // popup closed
+    list.innerHTML='';
+    if(!aps.length){ list.textContent='(no APs found / scan error: '+(j.error||'?')+')'; return; }
+    aps.forEach(line=>{
+      const ssid=parseSsid(line); if(!ssid||seen[ssid]) return; seen[ssid]=1;
+      const rssi=(line.match(/rssi=(-?\\d+)/)||[])[1]||'';
+      const row=document.createElement('div');
+      row.style.cssText='padding:5px 6px;border-bottom:1px solid #1a2a3a;cursor:pointer';
+      row.textContent=ssid+'   '+rssi+'dBm';
+      row.onmouseover=()=>row.style.background='#16263a'; row.onmouseout=()=>row.style.background='';
+      row.onclick=()=>connectWifi(ssid);
+      list.appendChild(row);
+    });
+  }catch(e){ const l=document.getElementById('wifilist'); if(l) l.textContent='scan failed: '+e; }
+}
+async function connectWifi(ssid){
+  const pw=prompt('Password for "'+ssid+'" (blank = open network):','');
+  if(pw===null) return;
+  wifiBusy=true;
+  const pop=document.getElementById('wifipop');
+  if(pop) pop.innerHTML='<div style="color:#8cf">connecting to '+ssid+'… (up to ~40s)</div>';
+  try{
+    const r=await fetch('/api/pi3/wifijoin?ssid='+encodeURIComponent(ssid)+'&pass='+encodeURIComponent(pw));
+    const j=await r.json(); wifiConnected=!!j.connected; wifiIP=j.ip||'';
+  }catch(e){}
+  wifiBusy=false;
+  const p2=document.getElementById('wifipop'); if(p2) p2.remove();
+  render(); pollWifi();
+}
+
 /* Keyboard: when the Shell window is focused, type into it — keys go to the Pi 3
  * (/api/pi3/key) and are echoed locally.  Click a window to focus it. */
 document.addEventListener('keydown', async e=>{
@@ -1715,12 +1891,21 @@ document.addEventListener('keydown', async e=>{
   else if(e.key.length===1) code=e.key.charCodeAt(0);
   if(code<0) return;
   e.preventDefault();
-  if(code===8) shellText=shellText.slice(0,-1);
-  else if(code===13) shellText+='\\n';
-  else shellText+=e.key;
-  render();
   try{ await fetch('/api/pi3/key?c='+code); }catch(err){}
+  // pull the real shell ring right after the key so the window mirrors xsh
+  setTimeout(pollShell, 60); setTimeout(pollShell, 250);
 });
+/* Mirror the real bare-metal xsh shell ring (prompt + echo + command
+ * output) into the Shell window so the Mac view stays in sync. */
+async function pollShell(){
+  if(!liveShell) return;
+  try{ const r=await fetch('/api/pi3/shellring'); const txt=await r.text();
+       if(txt && txt!==shellRing){ shellRing=txt; render(); } }
+  catch(e){}
+}
+let liveShell=true;
+setInterval(pollShell, 1500);
+pollShell();
 function startMove(e,id){ e.preventDefault();
   const w=W[id], sx=e.clientX, sy=e.clientY, ox=w.x, oy=w.y;
   function mv(ev){ w.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); w.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
