@@ -1635,9 +1635,9 @@ _PI3_HTML = """<!doctype html>
       max-height:160px;overflow:auto;font-size:12px}
 </style></head><body>
 <h2>Pi3 Xinu screen design <span class=muted style="font-size:13px">(framebuffer browser &mdash; host PI3HOST)</span></h2>
-<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出す 3 つのウィンドウ
- (Browser / Soft keyboard / Shell) の配置をデザインします。各ウィンドウをドラッグで移動、右下ハンドルでリサイズ。
- URL を入れて 送信 すると Pi 3 が 3 窓を描画し、Browser はそのページを取得して表示します。</div>
+<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出す 5 つのウィンドウ
+ (Browser / Soft keyboard / Shell / Window System / Actors) の配置をデザインします。各ウィンドウをドラッグで移動、
+ 右下ハンドルでリサイズ。URL を入れて 送信、または Live ON で Pi 3 が 5 窓を描画し、Browser はそのページを表示します。</div>
 <div id=bar>
   <label>URL host: <input id=host value="kodamay.org" size=18></label>
   <label>IP: <input id=ip value="160.251.151.122" size=15></label>
@@ -1653,23 +1653,29 @@ const DW=1024, DH=768, SCALE=1.1;     // ~2x of the previous 0.6 preview
 let LIVE=false, liveFetched=false, liveTimer=null;
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
-// Three windows like the Pi 4 desktop: Browser, Soft keyboard, Shell.
-const DEF={ b:{x:40,y:40,w:560,h:360}, k:{x:40,y:440,w:720,h:260}, s:{x:620,y:40,w:380,h:260} };
-let W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} };
-const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)' };
-const TBAR ={ b:'#0050c0', k:'#504030', s:'#705030' };
+// Five windows like the Pi 4 desktop: Browser, Soft keyboard, Shell,
+// Window System, Actors.
+const DEF={ b:{x:40,y:40,w:520,h:300}, s:{x:580,y:40,w:400,h:200},
+            a:{x:580,y:260,w:400,h:250}, p:{x:40,y:360,w:520,h:150},
+            k:{x:40,y:530,w:940,h:210} };
+let W={ b:{...DEF.b}, s:{...DEF.s}, a:{...DEF.a}, p:{...DEF.p}, k:{...DEF.k} };
+const ORDER=['s','a','p','k','b'];          // browser drawn on top
+const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)',
+               a:'Actors', p:'Xinu Pi3 Window System' };
+const TBAR ={ b:'#0050c0', k:'#504030', s:'#705030', a:'#603040', p:'#206040' };
 function log(s){ logEl.textContent=s; }
+const BODYTXT={ b:'(page text)', k:'[1234567890] [QWERTY…] [SPACE Enter]',
+                s:'xsh $ _', a:'id cls state mbox …', p:'Build/IP/Screen/Actors …' };
 function render(){
   desk.innerHTML='';
-  for(const id of ['s','k','b']){            // shell/keyboard under, browser on top
+  for(const id of ORDER){
     const w=W[id];
     const d=document.createElement('div'); d.className='win'; d.dataset.id=id;
     d.style.left=(w.x*SCALE)+'px'; d.style.top=(w.y*SCALE)+'px';
     d.style.width=(w.w*SCALE)+'px'; d.style.height=(w.h*SCALE)+'px';
     const t=document.createElement('div'); t.className='t'; t.style.background=TBAR[id];
     t.textContent = id==='b' ? (TITLES.b+'   http://'+document.getElementById('host').value+'/') : TITLES[id];
-    const b=document.createElement('div'); b.className='b';
-    b.textContent = id==='b' ? '(page text)' : (id==='k' ? '[1234567890] [QWERTY…] [SPACE Enter]' : 'xsh $ _');
+    const b=document.createElement('div'); b.className='b'; b.textContent=BODYTXT[id]||'';
     const sz=document.createElement('div'); sz.className='sz'; sz.textContent=w.w+'x'+w.h+' ('+w.x+','+w.y+')';
     const h=document.createElement('div'); h.className='h';
     d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
@@ -1688,7 +1694,7 @@ function startResize(e,id){ e.preventDefault(); e.stopPropagation();
   function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); liveSync(); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
-function reset_(){ W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} }; render(); liveSync(); }
+function reset_(){ W={ b:{...DEF.b}, s:{...DEF.s}, a:{...DEF.a}, p:{...DEF.p}, k:{...DEF.k} }; render(); liveSync(); }
 function toggleLive(){
   LIVE=!LIVE;
   document.getElementById('livebtn').textContent=(LIVE?'\\u25CF Live: ON':'\\u25CF Live: OFF');
@@ -1708,7 +1714,9 @@ async function doSend(fetchPage){
   const q='?host='+host+'&ip='+ip+'&fetch='+(fetchPage?1:0)
     +'&bx='+W.b.x+'&by='+W.b.y+'&bw='+W.b.w+'&bh='+W.b.h
     +'&kx='+W.k.x+'&ky='+W.k.y+'&kw='+W.k.w+'&kh='+W.k.h
-    +'&sx='+W.s.x+'&sy='+W.s.y+'&sw='+W.s.w+'&sh='+W.s.h;
+    +'&sx='+W.s.x+'&sy='+W.s.y+'&sw='+W.s.w+'&sh='+W.s.h
+    +'&px='+W.p.x+'&py='+W.p.y+'&pw='+W.p.w+'&ph='+W.p.h
+    +'&ax='+W.a.x+'&ay='+W.a.y+'&aw='+W.a.w+'&ah='+W.a.h;
   try{
     const r=await fetch('/api/pi3/desktop'+q); const j=await r.json();
     if(j.ok){ if(fetchPage) liveFetched=true;
