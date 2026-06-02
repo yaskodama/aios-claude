@@ -291,7 +291,8 @@ _HTML = """<!doctype html>
   <small style="color:#667"><a style="color:#6af" href="/ide">→ Web IDE</a>
   &nbsp;<a style="color:#6af" href="/chat">→ Chat</a>
   &nbsp;<a style="color:#fa6" href="/layout">→ Xinu 設定画面</a>
-  &nbsp;<a style="color:#fa6" href="/shell">→ Xinu Shell</a></small></h1>
+  &nbsp;<a style="color:#fa6" href="/shell">→ Xinu Shell</a>
+  &nbsp;<a style="color:#6cf" href="/pi3">→ Pi3 Xinu 画面設計</a></small></h1>
 <table id="t"></table>
 <small id="ts"></small>
 <h2>Cluster (this node + peers)</h2>
@@ -476,6 +477,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_layout_html()
         elif self.path == "/shell" or self.path.startswith("/shell?"):
             self._serve_shell_html()
+        elif self.path == "/pi3" or self.path.startswith("/pi3?"):
+            self._serve_pi3_html()
+        elif self.path.startswith("/api/pi3/browse"):
+            self._serve_pi3_browse()
         elif self.path.startswith("/api/xinu/type"):
             self._serve_xinu_type()
         elif self.path.startswith("/api/xinu/click"):
@@ -889,6 +894,27 @@ class _Handler(BaseHTTPRequestHandler):
     def _serve_shell_html(self):
         html = _SHELL_HTML.replace("XINUHOST", _LAYOUT_XINU_HOST)
         self._send_bytes(200, "text/html; charset=utf-8", html.encode("utf-8"))
+
+    # ---- Pi 3 (arm-rpi3) Xinu framebuffer "browser" screen-design page ----
+    def _serve_pi3_html(self):
+        html = _PI3_HTML.replace("PI3HOST", _PI3_XINU_HOST)
+        self._send_bytes(200, "text/html; charset=utf-8", html.encode("utf-8"))
+
+    def _serve_pi3_browse(self):
+        """Proxy the designer's geometry to the Pi 3 Xinu /api/wifi/browse so the
+        framebuffer window is drawn at the designed position/size (server-side
+        fetch sidesteps browser CORS to the Pi)."""
+        from urllib.parse import urlsplit
+        q = urlsplit(self.path).query
+        url = "http://%s/api/wifi/browse%s" % (_PI3_XINU_HOST, ("?" + q) if q else "")
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                bytes_hdr = r.headers.get("X-Wifi-BrowseBytes", "?")
+                body = r.read()
+            out = {"ok": True, "bytes": bytes_hdr, "len": len(body)}
+        except Exception as e:
+            out = {"ok": False, "error": str(e)}
+        self._send_bytes(200, "application/json", json.dumps(out).encode("utf-8"))
 
     def _handle_layout_send(self):
         """Apply a designed layout to Xinu.  The 'やり取り' is all AIPL: we
@@ -1352,6 +1378,8 @@ msgEl.focus();
 
 
 _LAYOUT_XINU_HOST = "192.168.3.100"
+# Pi 3 (arm-rpi3) Xinu WiFi/HTTP server — the framebuffer "browser" lives here.
+_PI3_XINU_HOST = "192.168.3.50:8080"
 
 # Xinu shell-input UI.  Type into the bare-metal Pi 4's `Shell (UART)` window
 # from the browser.  Hits /api/xinu/type (server-side proxy → Pi's /type) so
@@ -1565,6 +1593,88 @@ async function send(){
   }catch(e){ log('send failed: '+e); status.textContent='error'; }
 }
 reload();
+</script></body></html>"""
+
+# Pi 3 (arm-rpi3) Xinu framebuffer "browser" screen-design page.  Drag/resize a
+# single window over a scaled 1024x768 view of the Pi 3 HDMI screen, set the URL,
+# then 送信 — we forward the geometry to the Pi 3's /api/wifi/browse so the
+# bare-metal kernel fetches the page and draws the window there.
+_PI3_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><title>Py-I — Pi3 Xinu screen design</title>
+<style>
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0f14;color:#d8dee9;margin:0;padding:16px}
+ h2{margin:0 0 8px} .muted{color:#8aa}
+ #bar{margin:8px 0} label{font-size:13px;color:#9bd}
+ input{font:inherit;background:#11161d;color:#d8dee9;border:1px solid #3b4757;border-radius:5px;padding:4px 8px}
+ button{font:inherit;background:#243;color:#d8ffd8;border:1px solid #4a6;border-radius:6px;padding:6px 14px;cursor:pointer}
+ button.send{background:#354a7a;color:#dde8ff;border-color:#6a8}
+ #desk{position:relative;background:#402000;border:1px solid #553;margin-top:10px}
+ .win{position:absolute;background:#fff;border:2px solid #000;border-radius:2px;box-sizing:border-box;
+      overflow:hidden;cursor:move}
+ .win .t{background:#0050c0;color:#fff;padding:1px 5px;white-space:nowrap;overflow:hidden;font-size:11px}
+ .win .b{color:#222;font-size:9px;padding:2px 4px;pointer-events:none}
+ .win .sz{position:absolute;left:4px;bottom:2px;color:#666;font-size:9px;pointer-events:none}
+ .win .h{position:absolute;right:0;bottom:0;width:12px;height:12px;background:#0050c0;cursor:nwse-resize}
+ #log{white-space:pre-wrap;background:#0d1117;border:1px solid #333;border-radius:6px;padding:8px;margin-top:10px;
+      max-height:160px;overflow:auto;font-size:12px}
+</style></head><body>
+<h2>Pi3 Xinu screen design <span class=muted style="font-size:13px">(framebuffer browser &mdash; host PI3HOST)</span></h2>
+<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出すブラウザ・ウィンドウの配置をデザインします。
+ ウィンドウをドラッグで移動、右下ハンドルでリサイズ。URL を入れて 送信 すると Pi 3 がページを取得してそこに描画します。</div>
+<div id=bar>
+  <label>URL host: <input id=host value="kodamay.org" size=18></label>
+  <label>IP: <input id=ip value="160.251.151.122" size=15></label>
+  <button class=send onclick="send()">送信 (Send to Pi3) &rarr;</button>
+  <button onclick="reset_()">&#8635; reset</button>
+  <span id=status class=muted></span>
+</div>
+<div id=desk></div>
+<div id=log class=muted>ready. (Pi 3 must be WiFi-connected + DHCP'd first)</div>
+<script>
+const DW=1024, DH=768, SCALE=0.6;
+const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
+desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
+let win={x:160,y:140,w:704,h:480};
+function log(s){ logEl.textContent=s; }
+function render(){
+  desk.innerHTML='';
+  const d=document.createElement('div'); d.className='win';
+  d.style.left=(win.x*SCALE)+'px'; d.style.top=(win.y*SCALE)+'px';
+  d.style.width=(win.w*SCALE)+'px'; d.style.height=(win.h*SCALE)+'px';
+  const t=document.createElement('div'); t.className='t';
+  t.textContent='Xinu Browser   http://'+document.getElementById('host').value+'/';
+  const b=document.createElement('div'); b.className='b'; b.textContent='(page text renders here on the Pi 3 HDMI)';
+  const sz=document.createElement('div'); sz.className='sz'; sz.textContent=win.w+'x'+win.h+' ('+win.x+','+win.y+')';
+  const h=document.createElement('div'); h.className='h';
+  d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
+  d.addEventListener('mousedown', e=>{ if(e.target===h) startResize(e); else startMove(e); });
+}
+function startMove(e){ e.preventDefault();
+  const sx=e.clientX, sy=e.clientY, ox=win.x, oy=win.y;
+  function mv(ev){ win.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); win.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function startResize(e){ e.preventDefault(); e.stopPropagation();
+  const sx=e.clientX, sy=e.clientY, ow=win.w, oh=win.h;
+  function mv(ev){ win.w=Math.max(80,Math.round(ow+(ev.clientX-sx)/SCALE)); win.h=Math.max(60,Math.round(oh+(ev.clientY-sy)/SCALE)); render(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function reset_(){ win={x:160,y:140,w:704,h:480}; render(); }
+async function send(){
+  status.textContent='sending to Pi3...';
+  const host=encodeURIComponent(document.getElementById('host').value);
+  const ip=encodeURIComponent(document.getElementById('ip').value);
+  const q='?host='+host+'&ip='+ip+'&wx='+win.x+'&wy='+win.y+'&ww='+win.w+'&wh='+win.h;
+  try{
+    const r=await fetch('/api/pi3/browse'+q); const j=await r.json();
+    if(j.ok){ status.textContent='drawn on Pi3 ✓'; log('Pi3 fetched '+j.bytes+' bytes and drew the window at '+win.x+','+win.y+' '+win.w+'x'+win.h+'.'); }
+    else { status.textContent='error'; log('send failed: '+j.error+'\\n(Pi 3 connected to WiFi + DHCP done?)'); }
+  }catch(e){ status.textContent='error'; log('send failed: '+e); }
+}
+document.getElementById('host').addEventListener('input',render);
+render();
 </script></body></html>"""
 
 _ACTORS_HTML = """<!doctype html>

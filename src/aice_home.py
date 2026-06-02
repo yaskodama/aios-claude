@@ -348,7 +348,7 @@ _PAGE_TMPL = r"""<!doctype html>
  <div class="barwrap">
   <div class="brand"><span class="dot"></span><span class="grad-text">AICE</span>
    <small>AI&middot;Coevolution &mdash; AIPL Runtime Portal</small></div>
-  <div class="navlink"><a href="#robot">Robot</a> <a href="#xinu">Xinu</a> <a href="#dashboards">Dashboards</a></div>
+  <div class="navlink"><a href="#robot">Robot</a> <a href="#xinu">Xinu&middot;Pi4</a> <a href="#xinu3">Xinu&middot;Pi3</a> <a href="#dashboards">Dashboards</a></div>
  </div>
 </header>
 
@@ -406,6 +406,28 @@ _PAGE_TMPL = r"""<!doctype html>
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
      <button class="btn btn-open" data-href="http://127.0.0.1:8900/shell">Open &#8599;</button>
+    </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="container" id="xinu3">
+ <div class="sec-head"><h2>Xinu (bare-metal Pi 3)</h2><span class="ribbon"></span><span class="num">WIFI &middot; FRAMEBUFFER</span></div>
+ <!-- Pi 3 page is a sub-route of the Py-I dashboard (port 8900), so Start/Stop
+      targets the same `pyi` process.  The Pi 3 (192.168.3.50) must be WiFi-
+      connected + DHCP'd for 送信 to draw on its HDMI screen. -->
+ <div class="grid">
+  <div class="card" data-id="pyi">
+   <div class="thumb"><span class="glyph">&#128421;</span><span class="port">:8900/pi3</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Pi3 Xinu 画面設計 &mdash; Framebuffer browser layout</h3>
+    <p>Drag/resize the browser window over a scaled 1024&times;768 view of the Pi 3 HDMI screen, set a URL, then 送信 &mdash; the page forwards the geometry to the Pi 3&rsquo;s <code>/api/wifi/browse</code> so the bare-metal kernel fetches the page (plain HTTP, e.g. http://kodamay.org) over its self-built WiFi/TCP stack and draws it as a window. Needs Py&middot;I running + the Pi 3 connected.</p>
+    <span class="addr">127.0.0.1:8900/pi3</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8900/pi3">Open &#8599;</button>
     </div></div>
   </div>
  </div>
