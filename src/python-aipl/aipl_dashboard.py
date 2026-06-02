@@ -481,6 +481,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_pi3_html()
         elif self.path.startswith("/api/pi3/browse"):
             self._serve_pi3_browse()
+        elif self.path.startswith("/api/pi3/desktop"):
+            self._serve_pi3_desktop()
         elif self.path.startswith("/api/xinu/type"):
             self._serve_xinu_type()
         elif self.path.startswith("/api/xinu/click"):
@@ -907,6 +909,20 @@ class _Handler(BaseHTTPRequestHandler):
         from urllib.parse import urlsplit
         q = urlsplit(self.path).query
         url = "http://%s/api/wifi/browse%s" % (_PI3_XINU_HOST, ("?" + q) if q else "")
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                bytes_hdr = r.headers.get("X-Wifi-BrowseBytes", "?")
+                body = r.read()
+            out = {"ok": True, "bytes": bytes_hdr, "len": len(body)}
+        except Exception as e:
+            out = {"ok": False, "error": str(e)}
+        self._send_bytes(200, "application/json", json.dumps(out).encode("utf-8"))
+
+    def _serve_pi3_desktop(self):
+        """Proxy the multi-window layout to the Pi 3 /api/wifi/desktop."""
+        from urllib.parse import urlsplit
+        q = urlsplit(self.path).query
+        url = "http://%s/api/wifi/desktop%s" % (_PI3_XINU_HOST, ("?" + q) if q else "")
         try:
             with urllib.request.urlopen(url, timeout=60) as r:
                 bytes_hdr = r.headers.get("X-Wifi-BrowseBytes", "?")
@@ -1619,8 +1635,9 @@ _PI3_HTML = """<!doctype html>
       max-height:160px;overflow:auto;font-size:12px}
 </style></head><body>
 <h2>Pi3 Xinu screen design <span class=muted style="font-size:13px">(framebuffer browser &mdash; host PI3HOST)</span></h2>
-<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出すブラウザ・ウィンドウの配置をデザインします。
- ウィンドウをドラッグで移動、右下ハンドルでリサイズ。URL を入れて 送信 すると Pi 3 がページを取得してそこに描画します。</div>
+<div class=muted>Pi 3 bare-metal Xinu の HDMI 画面(1024&times;768)に出す 3 つのウィンドウ
+ (Browser / Soft keyboard / Shell) の配置をデザインします。各ウィンドウをドラッグで移動、右下ハンドルでリサイズ。
+ URL を入れて 送信 すると Pi 3 が 3 窓を描画し、Browser はそのページを取得して表示します。</div>
 <div id=bar>
   <label>URL host: <input id=host value="kodamay.org" size=18></label>
   <label>IP: <input id=ip value="160.251.151.122" size=15></label>
@@ -1634,42 +1651,53 @@ _PI3_HTML = """<!doctype html>
 const DW=1024, DH=768, SCALE=0.6;
 const desk=document.getElementById('desk'), status=document.getElementById('status'), logEl=document.getElementById('log');
 desk.style.width=(DW*SCALE)+'px'; desk.style.height=(DH*SCALE)+'px';
-let win={x:160,y:140,w:704,h:480};
+// Three windows like the Pi 4 desktop: Browser, Soft keyboard, Shell.
+const DEF={ b:{x:40,y:40,w:560,h:360}, k:{x:40,y:440,w:720,h:260}, s:{x:620,y:40,w:380,h:260} };
+let W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} };
+const TITLES={ b:'Xinu Browser', k:'Soft keyboard', s:'Shell (UART)' };
+const TBAR ={ b:'#0050c0', k:'#504030', s:'#705030' };
 function log(s){ logEl.textContent=s; }
 function render(){
   desk.innerHTML='';
-  const d=document.createElement('div'); d.className='win';
-  d.style.left=(win.x*SCALE)+'px'; d.style.top=(win.y*SCALE)+'px';
-  d.style.width=(win.w*SCALE)+'px'; d.style.height=(win.h*SCALE)+'px';
-  const t=document.createElement('div'); t.className='t';
-  t.textContent='Xinu Browser   http://'+document.getElementById('host').value+'/';
-  const b=document.createElement('div'); b.className='b'; b.textContent='(page text renders here on the Pi 3 HDMI)';
-  const sz=document.createElement('div'); sz.className='sz'; sz.textContent=win.w+'x'+win.h+' ('+win.x+','+win.y+')';
-  const h=document.createElement('div'); h.className='h';
-  d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
-  d.addEventListener('mousedown', e=>{ if(e.target===h) startResize(e); else startMove(e); });
+  for(const id of ['s','k','b']){            // shell/keyboard under, browser on top
+    const w=W[id];
+    const d=document.createElement('div'); d.className='win'; d.dataset.id=id;
+    d.style.left=(w.x*SCALE)+'px'; d.style.top=(w.y*SCALE)+'px';
+    d.style.width=(w.w*SCALE)+'px'; d.style.height=(w.h*SCALE)+'px';
+    const t=document.createElement('div'); t.className='t'; t.style.background=TBAR[id];
+    t.textContent = id==='b' ? (TITLES.b+'   http://'+document.getElementById('host').value+'/') : TITLES[id];
+    const b=document.createElement('div'); b.className='b';
+    b.textContent = id==='b' ? '(page text)' : (id==='k' ? '[1234567890] [QWERTY…] [SPACE Enter]' : 'xsh $ _');
+    const sz=document.createElement('div'); sz.className='sz'; sz.textContent=w.w+'x'+w.h+' ('+w.x+','+w.y+')';
+    const h=document.createElement('div'); h.className='h';
+    d.appendChild(t); d.appendChild(b); d.appendChild(sz); d.appendChild(h); desk.appendChild(d);
+    d.addEventListener('mousedown', e=>{ if(e.target===h) startResize(e,id); else startMove(e,id); });
+  }
 }
-function startMove(e){ e.preventDefault();
-  const sx=e.clientX, sy=e.clientY, ox=win.x, oy=win.y;
-  function mv(ev){ win.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); win.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
+function startMove(e,id){ e.preventDefault();
+  const w=W[id], sx=e.clientX, sy=e.clientY, ox=w.x, oy=w.y;
+  function mv(ev){ w.x=Math.max(0,Math.round(ox+(ev.clientX-sx)/SCALE)); w.y=Math.max(0,Math.round(oy+(ev.clientY-sy)/SCALE)); render(); }
   function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
-function startResize(e){ e.preventDefault(); e.stopPropagation();
-  const sx=e.clientX, sy=e.clientY, ow=win.w, oh=win.h;
-  function mv(ev){ win.w=Math.max(80,Math.round(ow+(ev.clientX-sx)/SCALE)); win.h=Math.max(60,Math.round(oh+(ev.clientY-sy)/SCALE)); render(); }
+function startResize(e,id){ e.preventDefault(); e.stopPropagation();
+  const w=W[id], sx=e.clientX, sy=e.clientY, ow=w.w, oh=w.h;
+  function mv(ev){ w.w=Math.max(80,Math.round(ow+(ev.clientX-sx)/SCALE)); w.h=Math.max(60,Math.round(oh+(ev.clientY-sy)/SCALE)); render(); }
   function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
-function reset_(){ win={x:160,y:140,w:704,h:480}; render(); }
+function reset_(){ W={ b:{...DEF.b}, k:{...DEF.k}, s:{...DEF.s} }; render(); }
 async function send(){
   status.textContent='sending to Pi3...';
   const host=encodeURIComponent(document.getElementById('host').value);
   const ip=encodeURIComponent(document.getElementById('ip').value);
-  const q='?host='+host+'&ip='+ip+'&wx='+win.x+'&wy='+win.y+'&ww='+win.w+'&wh='+win.h;
+  const q='?host='+host+'&ip='+ip
+    +'&bx='+W.b.x+'&by='+W.b.y+'&bw='+W.b.w+'&bh='+W.b.h
+    +'&kx='+W.k.x+'&ky='+W.k.y+'&kw='+W.k.w+'&kh='+W.k.h
+    +'&sx='+W.s.x+'&sy='+W.s.y+'&sw='+W.s.w+'&sh='+W.s.h;
   try{
-    const r=await fetch('/api/pi3/browse'+q); const j=await r.json();
-    if(j.ok){ status.textContent='drawn on Pi3 ✓'; log('Pi3 fetched '+j.bytes+' bytes and drew the window at '+win.x+','+win.y+' '+win.w+'x'+win.h+'.'); }
+    const r=await fetch('/api/pi3/desktop'+q); const j=await r.json();
+    if(j.ok){ status.textContent='drawn on Pi3 ✓'; log('Pi3 drew the 3 windows (browser fetched '+j.bytes+' bytes).'); }
     else { status.textContent='error'; log('send failed: '+j.error+'\\n(Pi 3 connected to WiFi + DHCP done?)'); }
   }catch(e){ status.textContent='error'; log('send failed: '+e); }
 }
