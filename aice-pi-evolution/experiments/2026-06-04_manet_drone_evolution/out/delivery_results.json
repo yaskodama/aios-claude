@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "N_UAV": 3,
+    "STEPS": 1500,
+    "SEND_EVERY": 25,
+    "TTL": 120,
+    "UAV_SPEED": 0.006,
+    "SEEDS": 24,
+    "RANGES": [
+      0.22,
+      0.3,
+      0.4
+    ]
+  },
+  "byRange": {
+    "0.22": {
+      "AODV": {
+        "deliveryRate": 0.10004708097928437,
+        "meanLatency": 1.309263304437937,
+        "meanHops": 1.309263304437937,
+        "ctrlPerMsg": 7
+      },
+      "ZRP": {
+        "deliveryRate": 0.2751883239171374,
+        "meanLatency": 38.913599266346615,
+        "meanHops": 1.6178090366903983,
+        "ctrlPerMsg": 1.5576741996233519
+      },
+      "DTN": {
+        "deliveryRate": 0.3455743879472693,
+        "meanLatency": 45.796737391364836,
+        "meanHops": 1.5588253664760974,
+        "ctrlPerMsg": 3.4105461393596985
+      }
+    },
+    "0.3": {
+      "AODV": {
+        "deliveryRate": 0.8587570621468924,
+        "meanLatency": 2.520551420517059,
+        "meanHops": 2.520551420517059,
+        "ctrlPerMsg": 7
+      },
+      "ZRP": {
+        "deliveryRate": 0.9941148775894537,
+        "meanLatency": 7.065984856381817,
+        "meanHops": 2.9310928568297725,
+        "ctrlPerMsg": 2.2069209039548023
+      },
+      "DTN": {
+        "deliveryRate": 0.9941148775894537,
+        "meanLatency": 6.720527135393678,
+        "meanHops": 2.6138160010184106,
+        "ctrlPerMsg": 0.03177966101694916
+      }
+    },
+    "0.4": {
+      "AODV": {
+        "deliveryRate": 0.9745762711864404,
+        "meanLatency": 2.170062678301992,
+        "meanHops": 2.170062678301992,
+        "ctrlPerMsg": 7
+      },
+      "ZRP": {
+        "deliveryRate": 1,
+        "meanLatency": 3.064500941619585,
+        "meanHops": 2.5915725047080973,
+        "ctrlPerMsg": 3.324152542372882
+      },
+      "DTN": {
+        "deliveryRate": 1,
+        "meanLatency": 2.6692561205273075,
+        "meanHops": 2.196327683615819,
+        "ctrlPerMsg": 0.00423728813559322
+      }
+    }
+  }
+}
