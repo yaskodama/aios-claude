@@ -1,0 +1,90 @@
+{
+  "name": "manet_routing_r3",
+  "axes": {
+    "routing_protocol": [
+      "reactive_AODV",
+      "proactive_OLSR",
+      "hybrid_ZRP",
+      "geographic_GPSR",
+      "epidemic_DTN",
+      "spray_and_wait_DTN",
+      "gossip_flood",
+      "link_state_SR",
+      "bundle_forwarding"
+    ],
+    "buffering_strategy": [
+      "drop_on_partition",
+      "store_carry_forward",
+      "custody_transfer",
+      "replicate_n_copies"
+    ],
+    "link_metric": [
+      "hop_count",
+      "rtt_latency",
+      "rssi_signal",
+      "etx_quality",
+      "airtime_load",
+      "energy_aware"
+    ],
+    "topology_control": [
+      "none",
+      "range_pruning",
+      "power_control",
+      "clustering",
+      "backbone_cds"
+    ],
+    "mobility_handling": [
+      "none",
+      "link_break_detect",
+      "predictive_mobility",
+      "trajectory_aware"
+    ],
+    "neighbor_discovery": [
+      "on_demand",
+      "periodic_hello",
+      "adaptive_rate_hello",
+      "beaconless"
+    ],
+    "qos_priority": [
+      "none",
+      "sos_priority",
+      "deadline_aware",
+      "multi_class_dscp"
+    ],
+    "resource_awareness": [
+      "none",
+      "battery_aware",
+      "buffer_aware",
+      "full_resource_aware"
+    ],
+    "congestion_awareness": [
+      "none",
+      "queue_backpressure",
+      "ecn_marking",
+      "predictive_congestion"
+    ]
+  },
+  "ordinal_axes": {
+    "buffering_strategy": ["drop_on_partition", "store_carry_forward", "custody_transfer", "replicate_n_copies"],
+    "topology_control": ["none", "range_pruning", "power_control", "clustering", "backbone_cds"],
+    "mobility_handling": ["none", "link_break_detect", "predictive_mobility", "trajectory_aware"],
+    "link_metric": ["hop_count", "rtt_latency", "rssi_signal", "etx_quality", "airtime_load", "energy_aware"],
+    "qos_priority": ["none", "sos_priority", "deadline_aware", "multi_class_dscp"],
+    "resource_awareness": ["none", "battery_aware", "buffer_aware", "full_resource_aware"],
+    "congestion_awareness": ["none", "queue_backpressure", "ecn_marking", "predictive_congestion"]
+  },
+  "coherence": [
+    {"if": {"routing_protocol": "epidemic_DTN"},       "then_in":  {"buffering_strategy": ["store_carry_forward", "custody_transfer", "replicate_n_copies"]}},
+    {"if": {"routing_protocol": "spray_and_wait_DTN"}, "then_in":  {"buffering_strategy": ["store_carry_forward", "custody_transfer", "replicate_n_copies"]}},
+    {"if": {"routing_protocol": "bundle_forwarding"},  "then_in":  {"buffering_strategy": ["store_carry_forward", "custody_transfer", "replicate_n_copies"]}},
+    {"if": {"routing_protocol": "reactive_AODV"},      "then_not": {"mobility_handling": "none"}},
+    {"if": {"routing_protocol": "proactive_OLSR"},     "then_in":  {"neighbor_discovery": ["periodic_hello", "adaptive_rate_hello"]}},
+    {"if": {"routing_protocol": "link_state_SR"},      "then_in":  {"neighbor_discovery": ["periodic_hello", "adaptive_rate_hello"]}},
+    {"if": {"routing_protocol": "geographic_GPSR"},    "then_in":  {"mobility_handling": ["predictive_mobility", "trajectory_aware"]}},
+    {"if": {"topology_control": "backbone_cds"},       "then_not": {"routing_protocol": "gossip_flood"}},
+    {"if": {"buffering_strategy": "replicate_n_copies"}, "then_not": {"resource_awareness": "none"}},
+    {"if": {"routing_protocol": "gossip_flood"},       "then_not": {"congestion_awareness": "none"}}
+  ],
+  "open_axes": false,
+  "notes": "Round 3 = Round-1/2 MANET schema + bundle_forwarding (R2 discovery) + two axes the GA surfaced as missing: resource_awareness (fold remaining battery/CPU/buffer into routing decisions) and congestion_awareness (avoid congested links/queues). ordinal weak→strong. Added coherence: heavy replication must be resource-aware; pure flooding must be congestion-aware."
+}

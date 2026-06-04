@@ -1,0 +1,149 @@
+{
+  "cells": {
+    "routing_protocol=reactive_AODV": {
+      "id": "I0001",
+      "genome": {
+        "routing_protocol": "reactive_AODV",
+        "buffering_strategy": "drop_on_partition",
+        "link_metric": "hop_count",
+        "topology_control": "clustering",
+        "mobility_handling": "link_break_detect",
+        "neighbor_discovery": "on_demand",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "none"
+      },
+      "composite": 0.6908785714285715,
+      "generation": 0
+    },
+    "routing_protocol=proactive_OLSR": {
+      "id": "I0042",
+      "genome": {
+        "routing_protocol": "proactive_OLSR",
+        "buffering_strategy": "store_carry_forward",
+        "link_metric": "airtime_load",
+        "topology_control": "range_pruning",
+        "mobility_handling": "link_break_detect",
+        "neighbor_discovery": "adaptive_rate_hello",
+        "qos_priority": "none",
+        "resource_awareness": "battery_aware",
+        "congestion_awareness": "queue_backpressure"
+      },
+      "composite": 0.6803928571428571,
+      "generation": 29
+    },
+    "routing_protocol=hybrid_ZRP": {
+      "id": "I0017",
+      "genome": {
+        "routing_protocol": "hybrid_ZRP",
+        "buffering_strategy": "custody_transfer",
+        "link_metric": "etx_quality",
+        "topology_control": "none",
+        "mobility_handling": "link_break_detect",
+        "neighbor_discovery": "periodic_hello",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "none"
+      },
+      "composite": 0.6635714285714286,
+      "generation": 4
+    },
+    "routing_protocol=geographic_GPSR": {
+      "id": "I0004",
+      "genome": {
+        "routing_protocol": "geographic_GPSR",
+        "buffering_strategy": "store_carry_forward",
+        "link_metric": "energy_aware",
+        "topology_control": "clustering",
+        "mobility_handling": "trajectory_aware",
+        "neighbor_discovery": "adaptive_rate_hello",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "none"
+      },
+      "composite": 0.6506571428571429,
+      "generation": 0
+    },
+    "routing_protocol=epidemic_DTN": {
+      "id": "I0034",
+      "genome": {
+        "routing_protocol": "epidemic_DTN",
+        "buffering_strategy": "custody_transfer",
+        "link_metric": "energy_aware",
+        "topology_control": "power_control",
+        "mobility_handling": "trajectory_aware",
+        "neighbor_discovery": "beaconless",
+        "qos_priority": "none",
+        "resource_awareness": "battery_aware",
+        "congestion_awareness": "predictive_congestion"
+      },
+      "composite": 0.6688928571428572,
+      "generation": 21
+    },
+    "routing_protocol=spray_and_wait_DTN": {
+      "id": "I0006",
+      "genome": {
+        "routing_protocol": "spray_and_wait_DTN",
+        "buffering_strategy": "store_carry_forward",
+        "link_metric": "energy_aware",
+        "topology_control": "clustering",
+        "mobility_handling": "trajectory_aware",
+        "neighbor_discovery": "beaconless",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "none"
+      },
+      "composite": 0.6510428571428571,
+      "generation": 0
+    },
+    "routing_protocol=gossip_flood": {
+      "id": "I0045",
+      "genome": {
+        "routing_protocol": "gossip_flood",
+        "buffering_strategy": "store_carry_forward",
+        "link_metric": "airtime_load",
+        "topology_control": "range_pruning",
+        "mobility_handling": "link_break_detect",
+        "neighbor_discovery": "adaptive_rate_hello",
+        "qos_priority": "none",
+        "resource_awareness": "none",
+        "congestion_awareness": "queue_backpressure"
+      },
+      "composite": 0.6328857142857143,
+      "generation": 32
+    },
+    "routing_protocol=link_state_SR": {
+      "id": "I0044",
+      "genome": {
+        "routing_protocol": "link_state_SR",
+        "buffering_strategy": "drop_on_partition",
+        "link_metric": "energy_aware",
+        "topology_control": "power_control",
+        "mobility_handling": "link_break_detect",
+        "neighbor_discovery": "periodic_hello",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "none"
+      },
+      "composite": 0.6437214285714286,
+      "generation": 31
+    },
+    "routing_protocol=bundle_forwarding": {
+      "id": "I0030",
+      "genome": {
+        "routing_protocol": "bundle_forwarding",
+        "buffering_strategy": "store_carry_forward",
+        "link_metric": "energy_aware",
+        "topology_control": "clustering",
+        "mobility_handling": "trajectory_aware",
+        "neighbor_discovery": "beaconless",
+        "qos_priority": "sos_priority",
+        "resource_awareness": "none",
+        "congestion_awareness": "queue_backpressure"
+      },
+      "composite": 0.6892142857142858,
+      "generation": 17
+    }
+  },
+  "filled": 9
+}

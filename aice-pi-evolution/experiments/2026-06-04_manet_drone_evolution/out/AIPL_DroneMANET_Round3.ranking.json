@@ -1,0 +1,221 @@
+{
+  "trend": {
+    "deltas": {
+      "buffering_strategy": 0.0,
+      "topology_control": -0.5,
+      "mobility_handling": 0.0,
+      "link_metric": 0.6,
+      "qos_priority": -1.0,
+      "resource_awareness": 0.0,
+      "congestion_awareness": 0.0
+    },
+    "normalized": {
+      "buffering_strategy": 0.0,
+      "topology_control": -0.23809523809523808,
+      "mobility_handling": 0.0,
+      "link_metric": 0.2857142857142857,
+      "qos_priority": -0.47619047619047616,
+      "resource_awareness": 0.0,
+      "congestion_awareness": 0.0
+    },
+    "new_axis_values": [
+      [
+        "topology_control",
+        "range_pruning"
+      ],
+      [
+        "qos_priority",
+        "none"
+      ],
+      [
+        "congestion_awareness",
+        "predictive_congestion"
+      ],
+      [
+        "link_metric",
+        "airtime_load"
+      ]
+    ],
+    "path": [
+      "I0012",
+      "I0014",
+      "I0028",
+      "I0029",
+      "I0042"
+    ]
+  },
+  "gaps": [],
+  "meta_fitness": {
+    "I0001": {
+      "trend_alignment": 0.5,
+      "frontier_coverage": 0.20238095238095236,
+      "novelty": 1.0,
+      "evolvability": 0.06666666666666667,
+      "cross_task_generality": 0.5515714285714286,
+      "implementability": 0.6
+    },
+    "I0042": {
+      "trend_alignment": 0.5961422543701025,
+      "frontier_coverage": 0.3404761904761905,
+      "novelty": 1.0,
+      "evolvability": 0.06666666666666667,
+      "cross_task_generality": 0.5778571428571428,
+      "implementability": 0.6
+    },
+    "I0017": {
+      "trend_alignment": 0.5867768595041323,
+      "frontier_coverage": 0.2761904761904762,
+      "novelty": 1.0,
+      "evolvability": 0.2,
+      "cross_task_generality": 0.5464285714285715,
+      "implementability": 0.6
+    },
+    "I0004": {
+      "trend_alignment": 0.5714285714285714,
+      "frontier_coverage": 0.4880952380952381,
+      "novelty": 1.0,
+      "evolvability": 0.06666666666666667,
+      "cross_task_generality": 0.5141428571428571,
+      "implementability": 0.6
+    },
+    "I0034": {
+      "trend_alignment": 0.5592903828197946,
+      "frontier_coverage": 0.6428571428571429,
+      "novelty": 1.0,
+      "evolvability": 0.2,
+      "cross_task_generality": 0.5178571428571429,
+      "implementability": 0.6
+    },
+    "I0006": {
+      "trend_alignment": 0.5714285714285714,
+      "frontier_coverage": 0.4880952380952381,
+      "novelty": 1.0,
+      "evolvability": 0.5333333333333333,
+      "cross_task_generality": 0.49385714285714283,
+      "implementability": 0.6
+    },
+    "I0045": {
+      "trend_alignment": 0.6100759144237405,
+      "frontier_coverage": 0.2928571428571428,
+      "novelty": 1.0,
+      "evolvability": 0.0,
+      "cross_task_generality": 0.4697142857142857,
+      "implementability": 0.6
+    },
+    "I0044": {
+      "trend_alignment": 0.638095238095238,
+      "frontier_coverage": 0.3095238095238095,
+      "novelty": 1.0,
+      "evolvability": 0.0,
+      "cross_task_generality": 0.5174285714285715,
+      "implementability": 0.6
+    },
+    "I0030": {
+      "trend_alignment": 0.5612244897959183,
+      "frontier_coverage": 0.5357142857142857,
+      "novelty": 1.0,
+      "evolvability": 0.3333333333333333,
+      "cross_task_generality": 0.5892857142857143,
+      "implementability": 0.6
+    }
+  },
+  "rankings": [
+    {
+      "scenario": "conservative",
+      "weights": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0006",
+          "composite": 0.5736523809523809,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.75
+        },
+        {
+          "individual_id": "I0030",
+          "composite": 0.5705272108843538,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.5
+        },
+        {
+          "individual_id": "I0042",
+          "composite": 0.5475259192284508,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.375
+        }
+      ]
+    },
+    {
+      "scenario": "innovative",
+      "weights": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0006",
+          "composite": 0.6843857142857143,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.75
+        },
+        {
+          "individual_id": "I0034",
+          "composite": 0.6826073762838468,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.625
+        },
+        {
+          "individual_id": "I0030",
+          "composite": 0.677704081632653,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.5
+        }
+      ]
+    },
+    {
+      "scenario": "general_purpose",
+      "weights": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      },
+      "entries": [
+        {
+          "individual_id": "I0030",
+          "composite": 0.5768027210884354,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.875
+        },
+        {
+          "individual_id": "I0006",
+          "composite": 0.5554,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.625
+        },
+        {
+          "individual_id": "I0034",
+          "composite": 0.5453221288515406,
+          "pareto_rank": 1,
+          "pairwise_win_rate": 0.625
+        }
+      ]
+    }
+  ],
+  "discoveries": {
+    "axes": [],
+    "values": {}
+  }
+}
