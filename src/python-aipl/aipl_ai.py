@@ -101,9 +101,13 @@ def _get_openai_client():
     )
     return _openai_client
 
-DEFAULT_GEMINI_MODEL    = "gemini-2.5-flash"
-DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
-DEFAULT_OPENAI_MODEL    = "gpt-4o-mini"
+# Per-provider default model, overridable via env so the same framework
+# can be pointed at a local OpenAI-compatible endpoint (e.g. Ollama at
+# OPENAI_BASE_URL=http://127.0.0.1:11434/v1 with AIPL_OPENAI_MODEL=llama3.2:3b).
+# Empty/unset env keeps the cloud defaults unchanged.
+DEFAULT_GEMINI_MODEL    = os.environ.get("AIPL_GEMINI_MODEL",    "").strip() or "gemini-2.5-flash"
+DEFAULT_ANTHROPIC_MODEL = os.environ.get("AIPL_ANTHROPIC_MODEL", "").strip() or "claude-opus-4-7"
+DEFAULT_OPENAI_MODEL    = os.environ.get("AIPL_OPENAI_MODEL",    "").strip() or "gpt-4o-mini"
 # Enough headroom for visible output even when the model spends part of
 # its budget on internal thinking tokens (gemini-2.5 thinks by default,
 # Opus 4.7 thinks adaptively).

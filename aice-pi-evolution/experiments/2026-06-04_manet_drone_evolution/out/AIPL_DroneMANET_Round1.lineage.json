@@ -1,0 +1,1270 @@
+[
+  {
+    "id": "I0001",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.564,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.431,
+      "task::EmbeddedFeasibility": 0.564,
+      "task::SOSLatency": 0.53,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.734,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5602857142857143,
+      "paradigm_match": 0.734
+    },
+    "composite": 0.6776142857142857,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0002",
+    "genome": {
+      "routing_protocol": "proactive_OLSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=proactive_OLSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.6659999999999999,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.499,
+      "task::EmbeddedFeasibility": 0.497,
+      "task::SOSLatency": 0.564,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.166,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.49871428571428567,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6444857142857142,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0003",
+    "genome": {
+      "routing_protocol": "hybrid_ZRP",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=hybrid_ZRP",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.565,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.7,
+      "task::EmbeddedFeasibility": 0.598,
+      "task::SOSLatency": 0.602,
+      "task::EnergyEfficiency": 0.43300000000000005,
+      "task::AODVCompatibility": 0.431,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5755714285714285,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6752285714285714,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0004",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "power_control",
+      "mobility_handling": "predictive_mobility",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.634,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.46599999999999997,
+      "task::EmbeddedFeasibility": 0.397,
+      "task::SOSLatency": 0.432,
+      "task::EnergyEfficiency": 0.266,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.45142857142857146,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.6338214285714286,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0005",
+    "genome": {
+      "routing_protocol": "epidemic_DTN",
+      "buffering_strategy": "replicate_n_copies",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=epidemic_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.333,
+      "task::HighMobilityResilience": 0.598,
+      "task::SwarmScalability": 0.43100000000000005,
+      "task::EmbeddedFeasibility": 0.496,
+      "task::SOSLatency": 0.464,
+      "task::EnergyEfficiency": 0.2,
+      "task::AODVCompatibility": 0.166,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.384,
+      "paradigm_match": 0.598
+    },
+    "composite": 0.5731,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0006",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "predictive_mobility",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.232,
+      "task::HighMobilityResilience": 0.667,
+      "task::SwarmScalability": 0.432,
+      "task::EmbeddedFeasibility": 0.431,
+      "task::SOSLatency": 0.635,
+      "task::EnergyEfficiency": 0.334,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4185714285714286,
+      "paradigm_match": 0.667
+    },
+    "composite": 0.6041785714285715,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0007",
+    "genome": {
+      "routing_protocol": "gossip_flood",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=gossip_flood",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.432,
+      "task::HighMobilityResilience": 0.53,
+      "task::SwarmScalability": 0.53,
+      "task::EmbeddedFeasibility": 0.497,
+      "task::SOSLatency": 0.431,
+      "task::EnergyEfficiency": 0.233,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4074285714285714,
+      "paradigm_match": 0.53
+    },
+    "composite": 0.5654714285714286,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0008",
+    "genome": {
+      "routing_protocol": "link_state_SR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=link_state_SR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.7,
+      "task::HighMobilityResilience": 0.597,
+      "task::SwarmScalability": 0.564,
+      "task::EmbeddedFeasibility": 0.46299999999999997,
+      "task::SOSLatency": 0.365,
+      "task::EnergyEfficiency": 0.333,
+      "task::AODVCompatibility": 0.133,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4507142857142857,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6252857142857142,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed:explicit"
+  },
+  {
+    "id": "I0009",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.43300000000000005,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.499,
+      "task::EmbeddedFeasibility": 0.496,
+      "task::SOSLatency": 0.668,
+      "task::EnergyEfficiency": 0.734,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5374285714285715,
+      "paradigm_match": 0.734
+    },
+    "composite": 0.6684714285714286,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0010",
+    "genome": {
+      "routing_protocol": "epidemic_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "rtt_latency",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "predictive_mobility",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "multi_class_dscp"
+    },
+    "cell": "routing_protocol=epidemic_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.432,
+      "task::HighMobilityResilience": 0.6990000000000001,
+      "task::SwarmScalability": 0.564,
+      "task::EmbeddedFeasibility": 0.399,
+      "task::SOSLatency": 0.29800000000000004,
+      "task::EnergyEfficiency": 0.266,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.41285714285714287,
+      "paradigm_match": 0.6990000000000001
+    },
+    "composite": 0.6098928571428571,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0011",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "rtt_latency",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "none"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.398,
+      "task::HighMobilityResilience": 0.601,
+      "task::SwarmScalability": 0.432,
+      "task::EmbeddedFeasibility": 0.364,
+      "task::SOSLatency": 0.366,
+      "task::EnergyEfficiency": 0.367,
+      "task::AODVCompatibility": 0.166,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.38485714285714284,
+      "paradigm_match": 0.601
+    },
+    "composite": 0.5741928571428572,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0012",
+    "genome": {
+      "routing_protocol": "gossip_flood",
+      "buffering_strategy": "replicate_n_copies",
+      "link_metric": "airtime_load",
+      "topology_control": "power_control",
+      "mobility_handling": "none",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "deadline_aware"
+    },
+    "cell": "routing_protocol=gossip_flood",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.266,
+      "task::HighMobilityResilience": 0.266,
+      "task::SwarmScalability": 0.30000000000000004,
+      "task::EmbeddedFeasibility": 0.46499999999999997,
+      "task::SOSLatency": 0.29900000000000004,
+      "task::EnergyEfficiency": 0.233,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.29442857142857143,
+      "paradigm_match": 0.46499999999999997
+    },
+    "composite": 0.5040214285714286,
+    "generation": 0,
+    "parents": [],
+    "operator": "seed"
+  },
+  {
+    "id": "I0013",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.568,
+      "task::HighMobilityResilience": 0.5680000000000001,
+      "task::SwarmScalability": 0.501,
+      "task::EmbeddedFeasibility": 0.364,
+      "task::SOSLatency": 0.46499999999999997,
+      "task::EnergyEfficiency": 0.266,
+      "task::AODVCompatibility": 0.33099999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.43757142857142856,
+      "paradigm_match": 0.5680000000000001
+    },
+    "composite": 0.5870285714285715,
+    "generation": 1,
+    "parents": [
+      "I0009",
+      "I0004"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0014",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "deadline_aware"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.53,
+      "task::HighMobilityResilience": 0.6659999999999999,
+      "task::SwarmScalability": 0.399,
+      "task::EmbeddedFeasibility": 0.564,
+      "task::SOSLatency": 0.564,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.734,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5508571428571428,
+      "paradigm_match": 0.734
+    },
+    "composite": 0.6738428571428572,
+    "generation": 2,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0015",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.46599999999999997,
+      "task::HighMobilityResilience": 0.717,
+      "task::SwarmScalability": 0.46599999999999997,
+      "task::EmbeddedFeasibility": 0.46499999999999997,
+      "task::SOSLatency": 0.568,
+      "task::EnergyEfficiency": 0.567,
+      "task::AODVCompatibility": 0.397,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5208571428571428,
+      "paradigm_match": 0.717
+    },
+    "composite": 0.6575928571428572,
+    "generation": 3,
+    "parents": [
+      "I0004",
+      "I0009"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0016",
+    "genome": {
+      "routing_protocol": "link_state_SR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "none",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=link_state_SR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.364,
+      "task::HighMobilityResilience": 0.30000000000000004,
+      "task::SwarmScalability": 0.432,
+      "task::EmbeddedFeasibility": 0.497,
+      "task::SOSLatency": 0.29900000000000004,
+      "task::EnergyEfficiency": 0.30000000000000004,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.3415714285714286,
+      "paradigm_match": 0.497
+    },
+    "composite": 0.5308785714285714,
+    "generation": 4,
+    "parents": [
+      "I0008"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0017",
+    "genome": {
+      "routing_protocol": "hybrid_ZRP",
+      "buffering_strategy": "custody_transfer",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=hybrid_ZRP",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.733,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.7,
+      "task::EmbeddedFeasibility": 0.7,
+      "task::SOSLatency": 0.733,
+      "task::EnergyEfficiency": 0.432,
+      "task::AODVCompatibility": 0.432,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.6375714285714286,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.7082785714285714,
+    "generation": 5,
+    "parents": [
+      "I0003"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0018",
+    "genome": {
+      "routing_protocol": "gossip_flood",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "hop_count",
+      "topology_control": "range_pruning",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "multi_class_dscp"
+    },
+    "cell": "routing_protocol=gossip_flood",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.397,
+      "task::HighMobilityResilience": 0.531,
+      "task::SwarmScalability": 0.46499999999999997,
+      "task::EmbeddedFeasibility": 0.531,
+      "task::SOSLatency": 0.432,
+      "task::EnergyEfficiency": 0.333,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4172857142857143,
+      "paradigm_match": 0.531
+    },
+    "composite": 0.5696642857142857,
+    "generation": 6,
+    "parents": [
+      "I0007"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0019",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "adaptive_rate_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.499,
+      "task::HighMobilityResilience": 0.633,
+      "task::SwarmScalability": 0.568,
+      "task::EmbeddedFeasibility": 0.53,
+      "task::SOSLatency": 0.667,
+      "task::EnergyEfficiency": 0.7,
+      "task::AODVCompatibility": 0.33099999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5611428571428572,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6694571428571429,
+    "generation": 7,
+    "parents": [
+      "I0015"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0020",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.399,
+      "task::HighMobilityResilience": 0.634,
+      "task::SwarmScalability": 0.565,
+      "task::EmbeddedFeasibility": 0.398,
+      "task::SOSLatency": 0.534,
+      "task::EnergyEfficiency": 0.469,
+      "task::AODVCompatibility": 0.364,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4804285714285714,
+      "paradigm_match": 0.634
+    },
+    "composite": 0.6206714285714285,
+    "generation": 8,
+    "parents": [
+      "I0009"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0021",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.432,
+      "task::HighMobilityResilience": 0.585,
+      "task::SwarmScalability": 0.46499999999999997,
+      "task::EmbeddedFeasibility": 0.432,
+      "task::SOSLatency": 0.601,
+      "task::EnergyEfficiency": 0.601,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.47828571428571426,
+      "paradigm_match": 0.601
+    },
+    "composite": 0.6115642857142857,
+    "generation": 9,
+    "parents": [
+      "I0019"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0022",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.531,
+      "task::HighMobilityResilience": 0.6659999999999999,
+      "task::SwarmScalability": 0.564,
+      "task::EmbeddedFeasibility": 0.53,
+      "task::SOSLatency": 0.464,
+      "task::EnergyEfficiency": 0.366,
+      "task::AODVCompatibility": 0.733,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5505714285714286,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.6734785714285715,
+    "generation": 10,
+    "parents": [
+      "I0001",
+      "I0002"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0023",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "rtt_latency",
+      "topology_control": "clustering",
+      "mobility_handling": "predictive_mobility",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.432,
+      "task::HighMobilityResilience": 0.717,
+      "task::SwarmScalability": 0.53,
+      "task::EmbeddedFeasibility": 0.364,
+      "task::SOSLatency": 0.6659999999999999,
+      "task::EnergyEfficiency": 0.366,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4724285714285714,
+      "paradigm_match": 0.717
+    },
+    "composite": 0.6382214285714286,
+    "generation": 11,
+    "parents": [
+      "I0019",
+      "I0010"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0024",
+    "genome": {
+      "routing_protocol": "proactive_OLSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=proactive_OLSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.564,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.531,
+      "task::EmbeddedFeasibility": 0.597,
+      "task::SOSLatency": 0.531,
+      "task::EnergyEfficiency": 0.432,
+      "task::AODVCompatibility": 0.2,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5125714285714286,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.6582785714285715,
+    "generation": 12,
+    "parents": [
+      "I0002"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0025",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.733,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.531,
+      "task::EmbeddedFeasibility": 0.564,
+      "task::SOSLatency": 0.634,
+      "task::EnergyEfficiency": 0.367,
+      "task::AODVCompatibility": 0.768,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.6185714285714285,
+      "paradigm_match": 0.768
+    },
+    "composite": 0.7094285714285714,
+    "generation": 13,
+    "parents": [
+      "I0001"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0026",
+    "genome": {
+      "routing_protocol": "proactive_OLSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=proactive_OLSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.6659999999999999,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.597,
+      "task::EmbeddedFeasibility": 0.496,
+      "task::SOSLatency": 0.53,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5124285714285713,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6499714285714285,
+    "generation": 14,
+    "parents": [
+      "I0024",
+      "I0017"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0027",
+    "genome": {
+      "routing_protocol": "gossip_flood",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "range_pruning",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "multi_class_dscp"
+    },
+    "cell": "routing_protocol=gossip_flood",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.431,
+      "task::HighMobilityResilience": 0.567,
+      "task::SwarmScalability": 0.564,
+      "task::EmbeddedFeasibility": 0.43200000000000005,
+      "task::SOSLatency": 0.43300000000000005,
+      "task::EnergyEfficiency": 0.532,
+      "task::AODVCompatibility": 0.166,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.44642857142857145,
+      "paradigm_match": 0.567
+    },
+    "composite": 0.5903214285714286,
+    "generation": 15,
+    "parents": [
+      "I0018",
+      "I0019"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0028",
+    "genome": {
+      "routing_protocol": "link_state_SR",
+      "buffering_strategy": "custody_transfer",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=link_state_SR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.496,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.46499999999999997,
+      "task::EmbeddedFeasibility": 0.531,
+      "task::SOSLatency": 0.564,
+      "task::EnergyEfficiency": 0.365,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.479,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.64485,
+    "generation": 16,
+    "parents": [
+      "I0008",
+      "I0017"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0029",
+    "genome": {
+      "routing_protocol": "hybrid_ZRP",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=hybrid_ZRP",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.598,
+      "task::HighMobilityResilience": 0.667,
+      "task::SwarmScalability": 0.567,
+      "task::EmbeddedFeasibility": 0.565,
+      "task::SOSLatency": 0.635,
+      "task::EnergyEfficiency": 0.667,
+      "task::AODVCompatibility": 0.332,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5758571428571428,
+      "paradigm_match": 0.667
+    },
+    "composite": 0.6670928571428572,
+    "generation": 17,
+    "parents": [
+      "I0017",
+      "I0009"
+    ],
+    "operator": "crossover:axis_uniform_crossover"
+  },
+  {
+    "id": "I0030",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.46499999999999997,
+      "task::HighMobilityResilience": 0.667,
+      "task::SwarmScalability": 0.497,
+      "task::EmbeddedFeasibility": 0.53,
+      "task::SOSLatency": 0.43200000000000005,
+      "task::EnergyEfficiency": 0.266,
+      "task::AODVCompatibility": 0.633,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4985714285714286,
+      "paradigm_match": 0.667
+    },
+    "composite": 0.6361785714285715,
+    "generation": 18,
+    "parents": [
+      "I0025"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0031",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.432,
+      "task::HighMobilityResilience": 0.6659999999999999,
+      "task::SwarmScalability": 0.43200000000000005,
+      "task::EmbeddedFeasibility": 0.598,
+      "task::SOSLatency": 0.564,
+      "task::EnergyEfficiency": 0.635,
+      "task::AODVCompatibility": 0.331,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5225714285714286,
+      "paradigm_match": 0.6659999999999999
+    },
+    "composite": 0.6455285714285715,
+    "generation": 19,
+    "parents": [
+      "I0009"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0032",
+    "genome": {
+      "routing_protocol": "geographic_GPSR",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=geographic_GPSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.46499999999999997,
+      "task::HighMobilityResilience": 0.667,
+      "task::SwarmScalability": 0.498,
+      "task::EmbeddedFeasibility": 0.532,
+      "task::SOSLatency": 0.668,
+      "task::EnergyEfficiency": 0.6839999999999999,
+      "task::AODVCompatibility": 0.33099999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5492857142857143,
+      "paradigm_match": 0.6839999999999999
+    },
+    "composite": 0.6607142857142857,
+    "generation": 20,
+    "parents": [
+      "I0019",
+      "I0024"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0033",
+    "genome": {
+      "routing_protocol": "proactive_OLSR",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=proactive_OLSR",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.7,
+      "task::HighMobilityResilience": 0.6659999999999999,
+      "task::SwarmScalability": 0.598,
+      "task::EmbeddedFeasibility": 0.53,
+      "task::SOSLatency": 0.53,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.232,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5221428571428571,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6538571428571428,
+    "generation": 21,
+    "parents": [
+      "I0024",
+      "I0017"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0034",
+    "genome": {
+      "routing_protocol": "spray_and_wait_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "rssi_signal",
+      "topology_control": "clustering",
+      "mobility_handling": "trajectory_aware",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=spray_and_wait_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.498,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.398,
+      "task::EmbeddedFeasibility": 0.529,
+      "task::SOSLatency": 0.364,
+      "task::EnergyEfficiency": 0.502,
+      "task::AODVCompatibility": 0.33099999999999996,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.4745714285714286,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6348285714285714,
+    "generation": 22,
+    "parents": [
+      "I0009"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  },
+  {
+    "id": "I0035",
+    "genome": {
+      "routing_protocol": "hybrid_ZRP",
+      "buffering_strategy": "custody_transfer",
+      "link_metric": "energy_aware",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=hybrid_ZRP",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.46599999999999997,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.633,
+      "task::EmbeddedFeasibility": 0.496,
+      "task::SOSLatency": 0.564,
+      "task::EnergyEfficiency": 0.7,
+      "task::AODVCompatibility": 0.496,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5792857142857143,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6767142857142857,
+    "generation": 23,
+    "parents": [
+      "I0017"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0036",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.6659999999999999,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.564,
+      "task::EmbeddedFeasibility": 0.564,
+      "task::SOSLatency": 0.53,
+      "task::EnergyEfficiency": 0.366,
+      "task::AODVCompatibility": 0.733,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5889999999999999,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.68885,
+    "generation": 24,
+    "parents": [
+      "I0025"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0037",
+    "genome": {
+      "routing_protocol": "hybrid_ZRP",
+      "buffering_strategy": "custody_transfer",
+      "link_metric": "hop_count",
+      "topology_control": "clustering",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "on_demand",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=hybrid_ZRP",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.565,
+      "task::HighMobilityResilience": 0.7,
+      "task::SwarmScalability": 0.7,
+      "task::EmbeddedFeasibility": 0.598,
+      "task::SOSLatency": 0.598,
+      "task::EnergyEfficiency": 0.29900000000000004,
+      "task::AODVCompatibility": 0.30000000000000004,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5371428571428571,
+      "paradigm_match": 0.7
+    },
+    "composite": 0.6598571428571428,
+    "generation": 25,
+    "parents": [
+      "I0017",
+      "I0025"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0038",
+    "genome": {
+      "routing_protocol": "epidemic_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "etx_quality",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=epidemic_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.365,
+      "task::HighMobilityResilience": 0.601,
+      "task::SwarmScalability": 0.364,
+      "task::EmbeddedFeasibility": 0.398,
+      "task::SOSLatency": 0.397,
+      "task::EnergyEfficiency": 0.399,
+      "task::AODVCompatibility": 0.199,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.38899999999999996,
+      "paradigm_match": 0.601
+    },
+    "composite": 0.57585,
+    "generation": 26,
+    "parents": [
+      "I0010",
+      "I0024"
+    ],
+    "operator": "crossover:schema_partition_crossover"
+  },
+  {
+    "id": "I0039",
+    "genome": {
+      "routing_protocol": "epidemic_DTN",
+      "buffering_strategy": "store_carry_forward",
+      "link_metric": "rtt_latency",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "predictive_mobility",
+      "neighbor_discovery": "beaconless",
+      "qos_priority": "none"
+    },
+    "cell": "routing_protocol=epidemic_DTN",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.331,
+      "task::HighMobilityResilience": 0.499,
+      "task::SwarmScalability": 0.464,
+      "task::EmbeddedFeasibility": 0.33099999999999996,
+      "task::SOSLatency": 0.332,
+      "task::EnergyEfficiency": 0.233,
+      "task::AODVCompatibility": 0.166,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.3365714285714286,
+      "paradigm_match": 0.499
+    },
+    "composite": 0.5293785714285715,
+    "generation": 27,
+    "parents": [
+      "I0010"
+    ],
+    "operator": "mutation:axis_resample"
+  },
+  {
+    "id": "I0040",
+    "genome": {
+      "routing_protocol": "reactive_AODV",
+      "buffering_strategy": "drop_on_partition",
+      "link_metric": "etx_quality",
+      "topology_control": "backbone_cds",
+      "mobility_handling": "link_break_detect",
+      "neighbor_discovery": "periodic_hello",
+      "qos_priority": "sos_priority"
+    },
+    "cell": "routing_protocol=reactive_AODV",
+    "fitness_components": {
+      "task::PartitionTolerance": 0.564,
+      "task::HighMobilityResilience": 0.733,
+      "task::SwarmScalability": 0.531,
+      "task::EmbeddedFeasibility": 0.564,
+      "task::SOSLatency": 0.598,
+      "task::EnergyEfficiency": 0.365,
+      "task::AODVCompatibility": 0.7,
+      "implementability": 0.6,
+      "coherence": 1.0,
+      "cross_task_generality": 0.5792857142857143,
+      "paradigm_match": 0.733
+    },
+    "composite": 0.6849642857142858,
+    "generation": 28,
+    "parents": [
+      "I0024"
+    ],
+    "operator": "mutation:coherent_paradigm_shift"
+  }
+]

@@ -86,6 +86,28 @@ def run(
     tasks = spec["evaluation"]["tasks"]
 
     # 1) seed
+    # Optional explicit seeds (spec["search"]["seed_genomes"]): a list of
+    # partial/full genome dicts evaluated before the random seeds. Missing
+    # axes are filled randomly; supplied values override. A caller can thus
+    # guarantee coverage of every cell (e.g. one genome per routing_protocol)
+    # and pin a known baseline. Backward compatible — the key is absent for
+    # every legacy spec, so behaviour is unchanged.
+    for partial in spec["search"].get("seed_genomes", []):
+        g = random_genome(schema, rng)
+        g.update(dict(partial))
+        f = evaluate(g, schema, tasks)
+        ind = Individual(
+            id=fresh_id(),
+            genome=g,
+            cell=cell_id(g, cell_axes),
+            fitness_components=f,
+            composite=composite_fitness(f),
+            generation=0,
+            parents=[],
+            operator="seed:explicit",
+        )
+        consider(ind)
+
     for _ in range(seed_count):
         g = random_genome(schema, rng)
         f = evaluate(g, schema, tasks)

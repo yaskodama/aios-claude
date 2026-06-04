@@ -1,0 +1,72 @@
+{
+  "name": "manet_routing",
+  "axes": {
+    "routing_protocol": [
+      "reactive_AODV",
+      "proactive_OLSR",
+      "hybrid_ZRP",
+      "geographic_GPSR",
+      "epidemic_DTN",
+      "spray_and_wait_DTN",
+      "gossip_flood",
+      "link_state_SR"
+    ],
+    "buffering_strategy": [
+      "drop_on_partition",
+      "store_carry_forward",
+      "custody_transfer",
+      "replicate_n_copies"
+    ],
+    "link_metric": [
+      "hop_count",
+      "rtt_latency",
+      "rssi_signal",
+      "etx_quality",
+      "airtime_load",
+      "energy_aware"
+    ],
+    "topology_control": [
+      "none",
+      "range_pruning",
+      "power_control",
+      "clustering",
+      "backbone_cds"
+    ],
+    "mobility_handling": [
+      "none",
+      "link_break_detect",
+      "predictive_mobility",
+      "trajectory_aware"
+    ],
+    "neighbor_discovery": [
+      "on_demand",
+      "periodic_hello",
+      "adaptive_rate_hello",
+      "beaconless"
+    ],
+    "qos_priority": [
+      "none",
+      "sos_priority",
+      "deadline_aware",
+      "multi_class_dscp"
+    ]
+  },
+  "ordinal_axes": {
+    "buffering_strategy": ["drop_on_partition", "store_carry_forward", "custody_transfer", "replicate_n_copies"],
+    "topology_control": ["none", "range_pruning", "power_control", "clustering", "backbone_cds"],
+    "mobility_handling": ["none", "link_break_detect", "predictive_mobility", "trajectory_aware"],
+    "link_metric": ["hop_count", "rtt_latency", "rssi_signal", "etx_quality", "airtime_load", "energy_aware"],
+    "qos_priority": ["none", "sos_priority", "deadline_aware", "multi_class_dscp"]
+  },
+  "coherence": [
+    {"if": {"routing_protocol": "epidemic_DTN"},       "then_in":  {"buffering_strategy": ["store_carry_forward", "custody_transfer", "replicate_n_copies"]}},
+    {"if": {"routing_protocol": "spray_and_wait_DTN"}, "then_in":  {"buffering_strategy": ["store_carry_forward", "custody_transfer", "replicate_n_copies"]}},
+    {"if": {"routing_protocol": "reactive_AODV"},      "then_not": {"mobility_handling": "none"}},
+    {"if": {"routing_protocol": "proactive_OLSR"},     "then_in":  {"neighbor_discovery": ["periodic_hello", "adaptive_rate_hello"]}},
+    {"if": {"routing_protocol": "link_state_SR"},      "then_in":  {"neighbor_discovery": ["periodic_hello", "adaptive_rate_hello"]}},
+    {"if": {"routing_protocol": "geographic_GPSR"},    "then_in":  {"mobility_handling": ["predictive_mobility", "trajectory_aware"]}},
+    {"if": {"topology_control": "backbone_cds"},       "then_not": {"routing_protocol": "gossip_flood"}}
+  ],
+  "open_axes": false,
+  "notes": "MANET / DTN routing design space for the disaster-rescue UAV swarm (M-006) running over a real Xinu+Raspberry-Pi WiFi mesh. ordinal_axes give a partial order (increasing robustness/sophistication/cost) for trend-vector extraction; coherence rules keep protocol families self-consistent (DTN needs buffering, AODV needs link-break detection, proactive/link-state need periodic hellos, geographic needs position/mobility, CDS backbone is incompatible with pure flooding)."
+}

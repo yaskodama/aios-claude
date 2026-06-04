@@ -1,0 +1,121 @@
+{
+  "name": "AIPL_DroneMANET_Round1",
+  "task": "drone-hil の現行 MANET 層 (reactive_AODV + range_pruning + hop_count + link_break_detect + on_demand 近傍探索 + sos_priority + partition 時 drop) を seed に、山間部災害避難 UAV スウォーム (M-006) を実機 Xinu+Raspberry-Pi WiFi メッシュ上で運用するという固有条件 — 頻繁なネットワーク分断・UAV の高モビリティ・限られた RAM/CPU/WiFi・SOS フレームの低遅延要求・バッテリ制約 — の下で報われるルーティング設計を MAP-Elites で探索する。各個体は 7 軸の遺伝子 (routing_protocol/buffering_strategy/link_metric/topology_control/mobility_handling/neighbor_discovery/qos_priority) で、reviewer が各評価シナリオへの suitability を 0..1 で採点する。cell_axes=routing_protocol でプロトコル族ごとのベスト設計を archive する。",
+  "schema_ref": "../../../aice-evolution-v2/schemas/manet_routing.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "routing_protocol"
+    ],
+    "generations": 15,
+    "seed_count": 5,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "PartitionTolerance",
+      "HighMobilityResilience",
+      "SwarmScalability",
+      "EmbeddedFeasibility",
+      "SOSLatency",
+      "EnergyEfficiency",
+      "AODVCompatibility"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "manet_researcher",
+        "persona": "あなたは MANET/DTN ルーティングプロトコルの研究者です。AODV/OLSR/ZRP/GPSR/epidemic/spray-and-wait の理論的性質と既知の性能特性 (収束時間・オーバーヘッド・配送率・遅延) を踏まえ、与えられた遺伝子 (プロトコル設計の組合せ) が指定タスクにどれだけ適合するかを 0.0〜1.0 で厳密に採点します。説明は不要、数値1つだけ返します。",
+        "weight": 0.34
+      },
+      {
+        "name": "embedded_engineer",
+        "persona": "あなたは Xinu カーネルと Raspberry Pi (BCM43455 WiFi) で MANET を実装してきた組込みシステムエンジニアです。限られた RAM/CPU/フラッシュ・WiFi ドライバの制約・実装と保守のコストという現実の視点で、与えられた遺伝子が実機で動かせるか・実装が軽いかを重視して 0.0〜1.0 で採点します。数値1つだけ返します。",
+        "weight": 0.33
+      },
+      {
+        "name": "rescue_operator",
+        "persona": "あなたは山間部災害の避難支援を指揮する現場オペレータです。被災者の救助率・SOS の到達遅延・分断/高モビリティ下での運用堅牢性という実運用の視点で、与えられた遺伝子が現場で頼れるかを 0.0〜1.0 で採点します。数値1つだけ返します。",
+        "weight": 0.33
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}
