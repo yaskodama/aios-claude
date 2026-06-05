@@ -23,6 +23,7 @@
       ブラウザ内で実行。制御メッセージは <b style="color:#ffd66b">MANET(hybrid-ZRP)</b> 経路を流れる。Xinu 非連携。</div>
       <div class="row">
         <button id="restart">再実行</button>
+        <button id="bModel">Model: 論文準拠</button>
         <button id="bManet">MANET: ON</button>
         <button id="bTerrain">Terrain: abstract</button>
       </div>
@@ -38,9 +39,9 @@
       </div>
     </div>
     <div class="panel hud">
-      <h2>Mission HUD</h2>
-      <div>Phase: <b id="hPhase">—</b>　Trial: <b id="hTrial">0</b>/8</div>
-      <div>救助: <b id="hResc">0</b> 名　残存: <b id="hRem">349</b> 名</div>
+      <h2>Mission HUD <span id="hMode" style="color:#8fd6ff;font-size:11px">(論文準拠)</span></h2>
+      <div>Phase: <b id="hPhase">—</b>　誘導: <b id="hTrial">0</b> 点</div>
+      <div>救助: <b id="hResc">0</b> 名 (<b id="hPct">0</b>%)　残存: <b id="hRem">349</b> 名</div>
       <div>UAV1 scan: <b id="hScan">—</b></div>
       <div id="hManet" style="color:#ffd66b">MANET: —</div>
     </div>
@@ -81,47 +82,60 @@ function buildScenario(kind){
   return scenarioPS;
 }
 
-// ── generate the AIPL mission source for the chosen survivor distribution ──
-function buildSRC(ps){
+// ── generate the AIPL mission source ──
+//   paper=true: 原論文 M-006 準拠。優先度=α·dd+β·t+γ·dhc (式1, 人数重み無)、
+//     P8-P10 は未誘導、各点に約5%(最大2名)を残置、巡回は全誘導点 (8回=KO制限,非拘束)。
+//   paper=false: 簡約モデル (人数重み sqrt、1試行=1点全救助、8試行)。
+function buildSRC(ps, paper){
   let psA='', pxA='', pyA='';
   for (let i=0;i<20;i++){ psA+='ps['+i+']='+ps[i]+'; '; pxA+='px['+i+']='+PXY[i][0].toFixed(2)+'; '; pyA+='py['+i+']='+PXY[i][1].toFixed(2)+'; '; }
+  // not-guided exclusion (P8,P9,P10 = index 7,8,9) — 論文準拠時のみ
+  const exclude = paper ? 'if (i == 7) { reply(0.0 - 1.0); } if (i == 8) { reply(0.0 - 1.0); } if (i == 9) { reply(0.0 - 1.0); }' : '';
+  const prioExpr = paper ? 'base' : 'base * sqrt(1.0 + ps[i])';     // 論文式1は人数重み無し
+  const leaveCalc = paper ? 'lv = floor(s * 0.05 + 0.5); if (lv > 2) { lv = 2; }' : '';   // ストラグラー残置
+  const MAXN = paper ? 20 : 8;                                       // 論文=全誘導点 / 簡約=8試行
+  const startMsg = paper ? '=== M-006 ミッション開始 (論文準拠: 地理優先度+残置, P8-P10未誘導) ==='
+                         : '=== M-006 ミッション開始 (簡約: 上限 8 試行) ===';
   return `
-// UAV1: 情報収集ドローン。被災状況を保持し各点の M-006 優先度を返す。
+// UAV1: 情報収集ドローン。被災状況を保持し各点の優先度を返す。
 class UAV1 {
-  var ps[20] = 0;  var px[20] = 0.0;  var py[20] = 0.0;
+  var ps[20] = 0;  var px[20] = 0.0;  var py[20] = 0.0;  var served[20] = 0;
   var xb = 0.95;  var refx = 0.05;  var refy = 0.30;
   method init() { ${psA} ${pxA} ${pyA} }
   method prio(i) {
     if (ps[i] <= 0) { reply(0.0 - 1.0); }
+    if (served[i] == 1) { reply(0.0 - 1.0); }
+    ${exclude}
     var dd = 1.0 - py[i];
     var ex = refx - px[i];  var ey = refy - py[i];
     var t = sqrt(ex*ex + ey*ey) * 0.01;
     var ax = px[i] - xb;  if (ax < 0.0) { ax = 0.0 - ax; }
-    reply((1.2*dd + 0.05*t + 0.7*(dd*ax)) * sqrt(1.0 + ps[i]));
+    var base = 1.2*dd + 0.05*t + 0.7*(dd*ax);
+    reply(${prioExpr});
   }
   method surv(i) { reply(ps[i]); }
   method px_at(i) { reply(px[i]); }
   method py_at(i) { reply(py[i]); }
-  method clear(i) { ps[i] = 0; }
+  method set_resid(i, v) { ps[i] = v; served[i] = 1; }
   method set_ref(x, y) { refx = x; refy = y; }
 }
-// UAV2: 避難誘導ドローン。生存者を救助して累計する。
+// UAV2: 避難誘導ドローン。誘導できた人数を累計 (残置分は除く)。
 class UAV2 {
   var rescued = 0;  var trips = 0;
-  method dispatch(pid, surv) {
-    rescued = rescued + surv;  trips = trips + 1;
-    print("  UAV2: P" + pid + " の " + surv + " 名を最寄り避難所へ誘導 (累計 " + rescued + ")");
-    reply(surv);
+  method dispatch(pid, moved, resid) {
+    rescued = rescued + moved;  trips = trips + 1;
+    print("  UAV2: P" + pid + " で " + moved + " 名を誘導 (残置 " + resid + ", 累計 " + rescued + ")");
+    reply(moved);
   }
 }
-// GroundStation: UAV1 を scan→最高優先度点を UAV2 へ dispatch、8 試行で集計 (while 無=自己再帰)
+// GroundStation: UAV1 を scan→最高優先度点を UAV2 へ dispatch、巡回集計 (while 無=自己再帰)
 class GS {
   var phase = 0;  var scanIdx = 0;  var best = 0;  var bv = 0.0;
   var trial = 0;  var total = 0;  var curT = 0;
-  var tx = 0.0;  var ty = 0.0;  var u2x = 0.05;  var u2y = 0.30;  var MAX = 8;
+  var tx = 0.0;  var ty = 0.0;  var u2x = 0.05;  var u2y = 0.30;  var MAX = ${MAXN};
   method init() {
     best = 0 - 1;  bv = 0.0 - 1000.0;
-    print("=== M-006 ミッション開始 (上限 8 試行) ===");
+    print("${startMsg}");
     send self.step();
   }
   method step() {
@@ -129,29 +143,32 @@ class GS {
       if (scanIdx < 20) {
         var p = now uav1.prio(scanIdx);
         if (p > bv) { bv = p; best = scanIdx; }
-        scanIdx = scanIdx + 1;  call wait(35);  send self.step();
+        scanIdx = scanIdx + 1;  call wait(28);  send self.step();
       } else {
-        if (bv < 0.0) { phase = 3; print("=== 全救助完了。累計 " + total + " 名 ==="); }
-        else { curT = best + 1; tx = now uav1.px_at(best); ty = now uav1.py_at(best); phase = 1; call wait(35); send self.step(); }
+        if (bv < 0.0) { phase = 3; print("=== 誘導完了。累計救助 " + total + " 名 ==="); }
+        else { curT = best + 1; tx = now uav1.px_at(best); ty = now uav1.py_at(best); phase = 1; call wait(28); send self.step(); }
       }
     } else {
       if (phase == 1) {
-        u2x = u2x + (tx - u2x) * 0.20;  u2y = u2y + (ty - u2y) * 0.20;
+        u2x = u2x + (tx - u2x) * 0.22;  u2y = u2y + (ty - u2y) * 0.22;
         var dx = tx - u2x;  var dy = ty - u2y;
         if (sqrt(dx*dx + dy*dy) < 0.012) {
           u2x = tx;  u2y = ty;
           var s = now uav1.surv(best);
-          var moved = now uav2.dispatch(curT, s);
-          send uav1.clear(best);  send uav1.set_ref(tx, ty);
+          var lv = 0;
+          ${leaveCalc}
+          var moved = s - lv;
+          var z = now uav2.dispatch(curT, moved, lv);
+          send uav1.set_resid(best, lv);  send uav1.set_ref(tx, ty);
           total = total + moved;  trial = trial + 1;
-          print("GS: TRIAL " + trial + "/" + MAX + "  → P" + curT + " 救助 " + moved + "  累計 " + total);
-          phase = 2;  call wait(450);  send self.step();
-        } else { call wait(28); send self.step(); }
+          print("GS: 誘導 " + trial + "  → P" + curT + " 救助 " + moved + " 残置 " + lv + "  累計 " + total);
+          phase = 2;  call wait(350);  send self.step();
+        } else { call wait(24); send self.step(); }
       } else {
         if (phase == 2) {
           scanIdx = 0;  best = 0 - 1;  bv = 0.0 - 1000.0;
-          if (trial >= MAX) { phase = 3; print("=== 上限 8 試行到達。完了: 累計 " + total + " 名 ==="); }
-          else { phase = 0; call wait(35); send self.step(); }
+          if (trial >= MAX) { phase = 3; print("=== 上限到達。完了: 累計 " + total + " 名 ==="); }
+          else { phase = 0; call wait(28); send self.step(); }
         }
       }
     }
@@ -168,11 +185,12 @@ function appendLog(line){
   if (line.indexOf('[send]')===0 || line.indexOf('[actor created]')===0 || line.indexOf('[REPLY]')===0) return;
   logEl.textContent += line + "\n"; logEl.scrollTop = logEl.scrollHeight;
 }
+let paperMode = true;   // 既定: 原論文 M-006 準拠
 function boot(){
   killTimers();
   logEl.textContent = '';
   parser.yy = AST;
-  const ast = parser.parse(buildSRC(scenarioPS));
+  const ast = parser.parse(buildSRC(scenarioPS, paperMode));
   interp = new Interpreter(appendLog);
   interp.runProgram(ast);
 }
@@ -279,6 +297,7 @@ function render(){
   document.getElementById('hPhase').textContent=PHASES[g.phase]||'—';
   document.getElementById('hTrial').textContent=g.trial;
   document.getElementById('hResc').textContent=g.total;
+  document.getElementById('hPct').textContent=Math.round(100*g.total/Math.max(1,g.total+remaining));
   document.getElementById('hRem').textContent=remaining;
   document.getElementById('hScan').textContent=g.phase===0?('P'+(g.scanIdx+1)+' 評価中'):'—';
   document.getElementById('hManet').textContent='MANET(ZRP): '+manetTxt;
@@ -287,6 +306,8 @@ function render(){
 
 // ── controls ──
 document.getElementById('restart').onclick=boot;
+document.getElementById('bModel').onclick=e=>{ paperMode=!paperMode; e.target.textContent='Model: '+(paperMode?'論文準拠':'簡約');
+  document.getElementById('hMode').textContent='('+(paperMode?'論文準拠':'簡約')+')'; boot(); };
 document.getElementById('bManet').onclick=e=>{ manetOn=!manetOn; e.target.textContent='MANET: '+(manetOn?'ON':'off'); };
 document.getElementById('bTerrain').onclick=e=>{ GSI.on=!GSI.on; e.target.textContent='Terrain: '+(GSI.on?'GSI':'abstract'); };
 document.getElementById('apply').onclick=()=>{ scenarioPS=buildScenario(document.getElementById('scn').value); boot(); };
