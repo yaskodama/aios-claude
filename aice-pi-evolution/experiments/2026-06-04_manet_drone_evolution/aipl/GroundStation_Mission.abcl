@@ -1,0 +1,138 @@
+// GroundStation_Mission.abcl — M-006 災害避難支援ミッションの統合実行 (Py-I)
+//
+// 山間部災害避難支援システム (M-006, FIT2023 関口/加藤/神林) を AIPL アクターで実装。
+//   UAV1 (情報収集)  : 巡回し被災点の優先度を計算、最高優先度点を Ground Station に報告。
+//   UAV2 (避難誘導)  : GS の指示で被災点へ飛び、生存者を最寄り避難所へ誘導。
+//   GroundStation    : UAV1 から状況を pull、UAV2 へ dispatch、8 試行で総救助数を集計。
+//
+// このファイルは 3 アクターを 1 つの Py-I ランタイムで結線して走らせる統合版
+// (= 検証用)。実機 (UAV1=Xinu1 / UAV2=Xinu2) への配備は Deploy_Xinu.abcl を参照。
+//   実行: python3 src/python-aipl/aipl_main.py <thisfile> --timeout 20
+//
+// 優先度式は M-006 / drone-hil 準拠:
+//   priority = (α·dd + β·t + γ·dhc) · w(survivors),  α=1.2 β=0.05 γ=0.7
+//     dd  = 1 - y                (標高プロキシ: 高所ほど大)
+//     t   = UAV2 現在地からの距離 ×0.01   (移動時間プロキシ)
+//     dhc = dd · |x - x_B|        (標高 × 海岸距離)
+//     w   = sqrt(1 + survivors)   (劣線形の人数重み。AIPL に log が無いため sqrt で代替)
+
+function dist2(ax: float, ay: float, bx: float, by: float) -> float {
+  return sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+}
+function priority(s: int, x: float, y: float, refx: float, refy: float, xb: float) -> float {
+  if (s <= 0) { return -1.0; }
+  var dd  = 1.0 - y;
+  var t   = dist2(refx, refy, x, y) * 0.01;
+  var dhc = dd * abs(x - xb);
+  return (1.2 * dd + 0.05 * t + 0.7 * dhc) * sqrt(1.0 + s);
+}
+
+// ─── UAV1: 情報収集ドローン (Xinu1 搭載プログラム) ───────────────────
+class UAV1 {
+  // M-006 表1: 巡回点 P1..P20 の座標 (正規化) と「誘導前」生存者数 (計 349 名)
+  var px: array[float] = [0.13,0.20,0.16,0.24,0.27,0.32,0.34,0.40,0.42,0.45,0.48,0.54,0.56,0.60,0.66,0.70,0.72,0.80,0.83,0.85];
+  var py: array[float] = [0.18,0.34,0.52,0.66,0.22,0.42,0.78,0.18,0.34,0.58,0.78,0.22,0.46,0.66,0.30,0.50,0.74,0.20,0.42,0.62];
+  var ps: array[int]   = [15,30,0,0,25,30,0,10,25,5,40,35,0,0,0,12,20,25,32,45];
+  var xb: float = 0.95;          // 避難所 B の x (海岸側)
+  var refx: float = 0.05;        // 移動時間の基準点 = UAV2 現在地 (初期は避難所 A)
+  var refy: float = 0.30;
+
+  // 最高優先度の被災点 (id 1..20) を返す。対象なしなら -1。
+  method best_target() -> int {
+    var best = -1;
+    var bv   = -1.0;
+    var i = 0;
+    var n = array_len(ps);
+    while (i < n) do {
+      var p = priority(array_get(ps, i), array_get(px, i), array_get(py, i), refx, refy, xb);
+      if (p > bv) { bv = p; best = i; }
+      i = i + 1;
+    }
+    if (best < 0) { reply(-1); }
+    reply(best + 1);
+  }
+
+  method survivors_at(id: int) -> int { reply(array_get(ps, id - 1)); }
+  method px_at(id: int) -> float { reply(array_get(px, id - 1)); }
+  method py_at(id: int) -> float { reply(array_get(py, id - 1)); }
+  method clear(id: int) { array_set(ps, id - 1, 0); }
+  method set_ref(x: float, y: float) { refx = x; refy = y; }
+
+  // 残存被災者の合計 (HUD/報告用)
+  method remaining() -> int {
+    var sum = 0; var i = 0; var n = array_len(ps);
+    while (i < n) do { sum = sum + array_get(ps, i); i = i + 1; }
+    reply(sum);
+  }
+}
+
+// ─── UAV2: 避難誘導ドローン (Xinu2 搭載プログラム) ───────────────────
+class UAV2 {
+  var rescued: int = 0;          // 累計救助 (避難所到着) 数
+  var trips:   int = 0;          // 誘導回数
+  var posx: float = 0.05;        // 現在地 (初期 = 避難所 A)
+  var posy: float = 0.30;
+  var ax: float = 0.05;  var ay: float = 0.30;   // 避難所 A
+  var bx: float = 0.95;  var by: float = 0.50;   // 避難所 B
+
+  // 被災点 (x,y, 生存者 surv) へ誘導。最寄り避難所へ運び、救助数を返す。
+  method dispatch(pid: int, x: float, y: float, surv: int) -> int {
+    if (surv <= 0) { reply(0); }
+    // 最寄り避難所を選ぶ (A / B)
+    var da = dist2(x, y, ax, ay);
+    var db = dist2(x, y, bx, by);
+    var sx = bx; var sy = by; var sname = "B";
+    if (da <= db) { sx = ax; sy = ay; sname = "A"; }
+    // この試行で point の生存者を全員誘導 (1 試行 = 1 点を救出するモデル)
+    rescued = rescued + surv;
+    trips = trips + 1;
+    posx = sx; posy = sy;        // 避難所へ移動
+    print("  UAV2: P" + pid + " の " + surv + " 名を避難所 " + sname + " へ誘導 (累計 " + rescued + ")");
+    reply(surv);
+  }
+  method rescued_total() -> int { reply(rescued); }
+  method trips_done() -> int { reply(trips); }
+  method position_x() -> float { reply(posx); }
+  method position_y() -> float { reply(posy); }
+}
+
+// ─── Ground Station: 統括 (UAV1 から pull → UAV2 へ dispatch) ─────────
+class GroundStation {
+  var u1: any = 0;
+  var u2: any = 0;
+  var total: int = 0;
+  var MAX: int = 8;              // M-006 の 8 試行制限
+
+  method wire(a: any, b: any) { u1 = a; u2 = b; }
+
+  method run() {
+    print("=== M-006 避難支援ミッション開始 (UAV1 情報収集 + UAV2 避難誘導, 上限 " + MAX + " 試行) ===");
+    var trial = 0;
+    while (trial < MAX) do {
+      // UAV1 の探索結果を反映するため、UAV1 の移動基準を UAV2 現在地に更新
+      send u1.set_ref(now u2.position_x(), now u2.position_y());
+      var tgt = now u1.best_target();
+      if (tgt < 0) {
+        print("GS: 到達可能な被災者をすべて誘導完了。");
+        trial = MAX;                 // ループ脱出
+      } else {
+        var surv = now u1.survivors_at(tgt);
+        var tx   = now u1.px_at(tgt);
+        var ty   = now u1.py_at(tgt);
+        var moved = now u2.dispatch(tgt, tx, ty, surv);
+        send u1.clear(tgt);
+        total = total + moved;
+        trial = trial + 1;
+        print("GS: TRIAL " + trial + "/" + MAX + "  → P" + tgt + " (優先) 救助 " + moved + " 名  累計 " + total);
+      }
+    }
+    print("=== ミッション完了: 累計救助 " + total + " 名 / 残存 " + (now u1.remaining()) + " 名 (誘導 " + (now u2.trips_done()) + " 回) ===");
+  }
+}
+
+// ─── 結線して実行 (統合検証) ─────────────────────────────────────────
+var uav1 = new UAV1();
+var uav2 = new UAV2();
+var gs   = new GroundStation();
+send gs.wire(uav1, uav2);
+send gs.run();

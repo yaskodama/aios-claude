@@ -1,0 +1,59 @@
+// Deploy_Xinu.abcl — 実機 2-Xinu 配備ランチャ (Mac 側オーケストレータ)
+//
+// UAV1 を Xinu1 に、UAV2 を Xinu2 に SPAWN し、MANET (uart1:// = UART1/TCP RPC) 越しに
+// M-006 ミッションを駆動する。GroundStation の役割をこの Mac 側ランチャが担い、
+// UAV1 から状況を pull (remote_now) → UAV2 へ dispatch (remote_now) → UAV1 を clear
+// (remote_call) する。実機の AODV/ZRP ルーティングが UAV1↔GS↔UAV2 の経路を運ぶ。
+//
+// 前提 (dining_mac_xinu と同方式):
+//   * Xinu1/Xinu2 のカーネルに "UAV1"/"UAV2" クラスを pre-link 済み
+//     (UAV1_Xinu1.abcl / UAV2_Xinu2.abcl のロジックをカーネルクラス化)。
+//   * 各 Pi が apps/abcl_xinu_rpc.c の TCP RPC サーバを :5555 で公開。
+//   * Mac↔Xinu は ad-hoc MANET (Pi4=10.0.0.1=Xinu1, Pi3=10.0.0.2=Xinu2)。
+//
+// 実行: python3 src/python-aipl/aipl_main.py Deploy_Xinu.abcl --timeout 60
+//   (ハードウェア未接続では remote_* が接続失敗するため、配線確認は --ast / --type-check)
+
+class Launcher {
+  var hub1: string = "uart1://10.0.0.1:5555";    // Xinu1 = UAV1 (Pi4)
+  var hub2: string = "uart1://10.0.0.2:5555";    // Xinu2 = UAV2 (Pi3)
+  var total: int = 0;
+  var MAX: int = 8;
+
+  method run() {
+    // 1) 各ノードをリセットし、搭載アクターを SPAWN
+    remote_now(hub1, "_", "reset");
+    remote_now(hub2, "_", "reset");
+    var u1 = str(remote_now(hub1, "_", "spawn", "UAV1"));   // Xinu1 上の UAV1 actor id
+    var u2 = str(remote_now(hub2, "_", "spawn", "UAV2"));   // Xinu2 上の UAV2 actor id
+    print("SPAWN: UAV1@Xinu1 id=" + u1 + ", UAV2@Xinu2 id=" + u2);
+
+    // 2) 8 試行のミッションを MANET 越しに駆動
+    print("=== M-006 ミッション (実機 2-Xinu / MANET) 開始 ===");
+    var trial = 0;
+    while (trial < MAX) do {
+      // UAV1 の移動基準を UAV2 の現在地に更新 (Xinu2→Mac→Xinu1)
+      remote_call(hub1, u1, "set_ref",
+                  remote_now(hub2, u2, "position_x"),
+                  remote_now(hub2, u2, "position_y"));
+      var tgt = remote_now(hub1, u1, "best_target");
+      if (tgt < 0) {
+        print("GS: 全救助対象を誘導完了。");
+        trial = MAX;
+      } else {
+        var surv = remote_now(hub1, u1, "survivors_at", tgt);
+        var tx   = remote_now(hub1, u1, "px_at", tgt);
+        var ty   = remote_now(hub1, u1, "py_at", tgt);
+        var moved = remote_now(hub2, u2, "dispatch", tgt, tx, ty, surv);
+        remote_call(hub1, u1, "clear", tgt);
+        total = total + moved;
+        trial = trial + 1;
+        print("TRIAL " + trial + "/" + MAX + "  P" + tgt + "  救助 " + moved + "  累計 " + total);
+      }
+    }
+    print("=== ミッション完了: 累計救助 " + total + " 名 ===");
+  }
+}
+
+var L = new Launcher();
+send L.run();

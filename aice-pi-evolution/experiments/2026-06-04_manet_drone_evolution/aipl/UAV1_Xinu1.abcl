@@ -1,0 +1,83 @@
+// UAV1_Xinu1.abcl — 情報収集ドローン UAV1 (Xinu1 搭載 AIPL アクター)
+//
+// M-006 山間部災害避難支援システムの UAV1。巡回点 P1..P20 の被災状況を保持し、
+// M-006 優先度式で「次に救助すべき最高優先度の点」を計算して返す。Ground Station
+// (または実機ランチャ Deploy_Xinu.abcl) が best_target/survivors_at/px_at/py_at を
+// pull し、救助済みの点を clear する。
+//
+//   priority = (1.2·dd + 0.05·t + 0.7·dhc) · sqrt(1+survivors)
+//     dd  = 1 - y (標高), t = UAV2 現在地からの距離×0.01, dhc = dd·|x-x_B|
+//   (AIPL に log が無いため人数重みは sqrt(1+s) で代替)
+//
+// 単体テスト: python3 src/python-aipl/aipl_main.py UAV1_Xinu1.abcl --timeout 10
+// 実機配備  : Xinu1 にカーネルクラス "UAV1" として組込み、ランチャが SPAWN する。
+
+function dist2(ax: float, ay: float, bx: float, by: float) -> float {
+  return sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+}
+function priority(s: int, x: float, y: float, refx: float, refy: float, xb: float) -> float {
+  if (s <= 0) { return -1.0; }
+  var dd  = 1.0 - y;
+  var t   = dist2(refx, refy, x, y) * 0.01;
+  var dhc = dd * abs(x - xb);
+  return (1.2 * dd + 0.05 * t + 0.7 * dhc) * sqrt(1.0 + s);
+}
+
+class UAV1 {
+  // M-006 表1: P1..P20 の正規化座標 + 「誘導前」生存者数 (計 349 名)
+  var px: array[float] = [0.13,0.20,0.16,0.24,0.27,0.32,0.34,0.40,0.42,0.45,0.48,0.54,0.56,0.60,0.66,0.70,0.72,0.80,0.83,0.85];
+  var py: array[float] = [0.18,0.34,0.52,0.66,0.22,0.42,0.78,0.18,0.34,0.58,0.78,0.22,0.46,0.66,0.30,0.50,0.74,0.20,0.42,0.62];
+  var ps: array[int]   = [15,30,0,0,25,30,0,10,25,5,40,35,0,0,0,12,20,25,32,45];
+  var xb: float = 0.95;
+  var refx: float = 0.05;
+  var refy: float = 0.30;
+
+  method best_target() -> int {
+    var best = -1; var bv = -1.0; var i = 0; var n = array_len(ps);
+    while (i < n) do {
+      var p = priority(array_get(ps, i), array_get(px, i), array_get(py, i), refx, refy, xb);
+      if (p > bv) { bv = p; best = i; }
+      i = i + 1;
+    }
+    if (best < 0) { reply(-1); }
+    reply(best + 1);
+  }
+  method survivors_at(id: int) -> int { reply(array_get(ps, id - 1)); }
+  method px_at(id: int) -> float { reply(array_get(px, id - 1)); }
+  method py_at(id: int) -> float { reply(array_get(py, id - 1)); }
+  method clear(id: int) { array_set(ps, id - 1, 0); }
+  method set_ref(x: float, y: float) { refx = x; refy = y; }
+  method remaining() -> int {
+    var sum = 0; var i = 0; var n = array_len(ps);
+    while (i < n) do { sum = sum + array_get(ps, i); i = i + 1; }
+    reply(sum);
+  }
+  // 優先度順に被災点を読み上げる自己点検 (実機では呼ばれない)。
+  // ※ now self.X() は Py-I で自己デッドロックするため、ここでは self に
+  //   メッセージせず field を直接読んでインライン計算する。
+  method self_scan() {
+    var n = array_len(ps);
+    var rem = 0; var j = 0;
+    while (j < n) do { rem = rem + array_get(ps, j); j = j + 1; }
+    print("UAV1 自己点検: 優先度順の救助対象 (残存 " + rem + " 名)");
+    var k = 1;
+    while (k <= 8) do {
+      var best = -1; var bv = -1.0; var i = 0;
+      while (i < n) do {
+        var p = priority(array_get(ps, i), array_get(px, i), array_get(py, i), refx, refy, xb);
+        if (p > bv) { bv = p; best = i; }
+        i = i + 1;
+      }
+      if (best < 0) { k = 99; }
+      else {
+        print("  #" + k + "  P" + (best + 1) + "  (" + array_get(ps, best) + " 名)");
+        array_set(ps, best, 0);
+        k = k + 1;
+      }
+    }
+  }
+}
+
+// --- 単体自己点検 (Py-I) ---
+var uav1 = new UAV1();
+send uav1.self_scan();

@@ -1,0 +1,42 @@
+// UAV2_Xinu2.abcl — 避難誘導ドローン UAV2 (Xinu2 搭載 AIPL アクター)
+//
+// M-006 の UAV2。Ground Station (または実機ランチャ) から dispatch(pid,x,y,surv) を
+// 受け、被災点へ飛び、生存者を最寄り避難所 (A/B) へ誘導し、救助数を返す。累計救助数と
+// 誘導回数を保持。8 試行の上限管理は GS 側が行う。
+//
+// 単体テスト: python3 src/python-aipl/aipl_main.py UAV2_Xinu2.abcl --timeout 10
+// 実機配備  : Xinu2 にカーネルクラス "UAV2" として組込み、ランチャが SPAWN する。
+
+function dist2(ax: float, ay: float, bx: float, by: float) -> float {
+  return sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
+}
+
+class UAV2 {
+  var rescued: int = 0;
+  var trips:   int = 0;
+  var posx: float = 0.05;  var posy: float = 0.30;   // 現在地 (初期=避難所A)
+  var ax: float = 0.05;  var ay: float = 0.30;       // 避難所 A
+  var bx: float = 0.95;  var by: float = 0.50;       // 避難所 B
+
+  method dispatch(pid: int, x: float, y: float, surv: int) -> int {
+    if (surv <= 0) { reply(0); }
+    var da = dist2(x, y, ax, ay);
+    var db = dist2(x, y, bx, by);
+    var sx = bx; var sy = by; var sname = "B";
+    if (da <= db) { sx = ax; sy = ay; sname = "A"; }
+    rescued = rescued + surv;
+    trips = trips + 1;
+    posx = sx; posy = sy;
+    print("UAV2: P" + pid + " の " + surv + " 名を避難所 " + sname + " へ誘導 (累計 " + rescued + ")");
+    reply(surv);
+  }
+  method rescued_total() -> int { reply(rescued); }
+  method trips_done() -> int { reply(trips); }
+  method position_x() -> float { reply(posx); }
+  method position_y() -> float { reply(posy); }
+}
+
+// --- 単体自己点検 (Py-I): 2 点を誘導してみる ---
+var uav2 = new UAV2();
+send uav2.dispatch(12, 0.54, 0.22, 35);
+send uav2.dispatch(20, 0.85, 0.62, 45);
