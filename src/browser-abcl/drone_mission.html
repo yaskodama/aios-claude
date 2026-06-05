@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>M-006 災害避難ミッション — AIPL アクター (ブラウザ実行 / Xinu 非連携)</title>
+<title>M-006 災害避難ミッション — AIPL アクター × MANET(ZRP) × 実地形 (ブラウザ / Xinu 非連携)</title>
 <style>
   body{margin:0;background:#0b1020;color:#cfe;font:13px ui-monospace,Menlo,monospace}
   #wrap{display:flex;gap:12px;padding:12px}
@@ -8,9 +8,10 @@
   #side{width:340px;display:flex;flex-direction:column;gap:10px}
   .panel{background:#0d1430;border:1px solid #2a3a6a;border-radius:8px;padding:8px 10px}
   h1{font-size:15px;margin:0 0 2px} h2{font-size:12px;margin:0 0 6px;color:#8fd6ff}
-  #log{height:300px;overflow:auto;white-space:pre-wrap;line-height:1.45;font-size:11px;color:#bfe}
-  .hud b{color:#ffd66b} button{background:#13204a;color:#8fd6ff;border:1px solid #3a4a82;border-radius:6px;padding:5px 10px;cursor:pointer;font:12px ui-monospace}
-  .k{color:#9fb3ff}
+  #log{height:210px;overflow:auto;white-space:pre-wrap;line-height:1.45;font-size:11px;color:#bfe}
+  .hud b{color:#ffd66b} .k{color:#9fb3ff}
+  button,select{background:#13204a;color:#8fd6ff;border:1px solid #3a4a82;border-radius:6px;padding:5px 9px;cursor:pointer;font:12px ui-monospace}
+  .row{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
 </style></head>
 <body>
 <div id="wrap">
@@ -19,15 +20,29 @@
     <div class="panel">
       <h1>M-006 避難支援ミッション</h1>
       <div class="k">UAV1(情報収集)+UAV2(避難誘導)+GS を <b style="color:#8fd6ff">AIPL アクター</b>として
-      ブラウザ内ランタイムで実行（Xinu 非連携）。</div>
-      <div style="margin-top:6px"><button id="restart">再実行</button></div>
+      ブラウザ内で実行。制御メッセージは <b style="color:#ffd66b">MANET(hybrid-ZRP)</b> 経路を流れる。Xinu 非連携。</div>
+      <div class="row">
+        <button id="restart">再実行</button>
+        <button id="bManet">MANET: ON</button>
+        <button id="bTerrain">Terrain: abstract</button>
+      </div>
+      <div class="row">
+        <span class="k">Scenario</span>
+        <select id="scn">
+          <option value="table1">Table 1 (349名)</option>
+          <option value="empty">All Empty</option>
+          <option value="random">Random</option>
+          <option value="custom">Custom (JSON)</option>
+        </select>
+        <button id="apply">適用</button>
+      </div>
     </div>
     <div class="panel hud">
       <h2>Mission HUD</h2>
       <div>Phase: <b id="hPhase">—</b>　Trial: <b id="hTrial">0</b>/8</div>
-      <div>救助 (Rescued): <b id="hResc">0</b> 名</div>
-      <div>残存 (Remaining): <b id="hRem">349</b> 名</div>
-      <div>探索中 (UAV1 scan): <b id="hScan">—</b></div>
+      <div>救助: <b id="hResc">0</b> 名　残存: <b id="hRem">349</b> 名</div>
+      <div>UAV1 scan: <b id="hScan">—</b></div>
+      <div id="hManet" style="color:#ffd66b">MANET: —</div>
     </div>
     <div class="panel">
       <h2>イベントログ (AIPL print)</h2>
@@ -41,35 +56,48 @@
 import * as AST from "/src/ast.js";
 import { Interpreter } from "/src/interpreter.js";
 
-// ── M-006 mission as AIPL actors (browser dialect: no while/functions/array-literals/neg-literals) ──
-const SRC = `
-// UAV1: 情報収集ドローン。P1..P20 の被災状況を保持し、各点の優先度を返す。
-class UAV1 {
-  var ps[20] = 0;
-  var px[20] = 0.0;
-  var py[20] = 0.0;
-  var xb = 0.95;
-  var refx = 0.05;
-  var refy = 0.30;
-  method init() {
-    ps[0]=15;  ps[1]=30;  ps[2]=0;   ps[3]=0;   ps[4]=25;  ps[5]=30;  ps[6]=0;   ps[7]=10;  ps[8]=25;  ps[9]=5;
-    ps[10]=40; ps[11]=35; ps[12]=0;  ps[13]=0;  ps[14]=0;  ps[15]=12; ps[16]=20; ps[17]=25; ps[18]=32; ps[19]=45;
-    px[0]=0.13; px[1]=0.20; px[2]=0.16; px[3]=0.24; px[4]=0.27; px[5]=0.32; px[6]=0.34; px[7]=0.40; px[8]=0.42; px[9]=0.45;
-    px[10]=0.48; px[11]=0.54; px[12]=0.56; px[13]=0.60; px[14]=0.66; px[15]=0.70; px[16]=0.72; px[17]=0.80; px[18]=0.83; px[19]=0.85;
-    py[0]=0.18; py[1]=0.34; py[2]=0.52; py[3]=0.66; py[4]=0.22; py[5]=0.42; py[6]=0.78; py[7]=0.18; py[8]=0.34; py[9]=0.58;
-    py[10]=0.78; py[11]=0.22; py[12]=0.46; py[13]=0.66; py[14]=0.30; py[15]=0.50; py[16]=0.74; py[17]=0.20; py[18]=0.42; py[19]=0.62;
+// ── stop previous actor threads on restart (runtime self-drives via setTimeout) ──
+let timers = [];
+const _setTimeout = window.setTimeout.bind(window);
+window.setTimeout = (fn, ms, ...r) => { const id = _setTimeout(fn, ms, ...r); timers.push(id); return id; };
+function killTimers(){ for (const id of timers) clearTimeout(id); timers = []; }
+
+// ── M-006 point coordinates (fixed) + survivor scenarios ──
+const PXY = [
+  [0.13,0.18],[0.20,0.34],[0.16,0.52],[0.24,0.66],[0.27,0.22],[0.32,0.42],[0.34,0.78],[0.40,0.18],[0.42,0.34],[0.45,0.58],
+  [0.48,0.78],[0.54,0.22],[0.56,0.46],[0.60,0.66],[0.66,0.30],[0.70,0.50],[0.72,0.74],[0.80,0.20],[0.83,0.42],[0.85,0.62]];
+const TABLE1 = [15,30,0,0,25,30,0,10,25,5,40,35,0,0,0,12,20,25,32,45];
+let scenarioPS = TABLE1.slice();
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function buildScenario(kind){
+  if (kind==='table1') return TABLE1.slice();
+  if (kind==='empty')  return PXY.map(()=>0);
+  if (kind==='random'){ const r=mulberry32(7); return PXY.map(()=>r()<0.6?Math.floor(5+r()*45):0); }
+  if (kind==='custom'){
+    const s=prompt('被災者を JSON で（例 {"1":15,"5":25}）', '{"1":20,"11":40,"20":45}'); if(!s) return scenarioPS;
+    try{ const o=JSON.parse(s); return PXY.map((_,i)=>Math.max(0,Math.floor(+o[i+1]||0))); }catch(e){ alert('JSON 解析失敗'); return scenarioPS; }
   }
-  // M-006 優先度: (1.2*dd + 0.05*t + 0.7*dhc) * sqrt(1+survivors)。空点は負の番兵。
+  return scenarioPS;
+}
+
+// ── generate the AIPL mission source for the chosen survivor distribution ──
+function buildSRC(ps){
+  let psA='', pxA='', pyA='';
+  for (let i=0;i<20;i++){ psA+='ps['+i+']='+ps[i]+'; '; pxA+='px['+i+']='+PXY[i][0].toFixed(2)+'; '; pyA+='py['+i+']='+PXY[i][1].toFixed(2)+'; '; }
+  return `
+// UAV1: 情報収集ドローン。被災状況を保持し各点の M-006 優先度を返す。
+class UAV1 {
+  var ps[20] = 0;  var px[20] = 0.0;  var py[20] = 0.0;
+  var xb = 0.95;  var refx = 0.05;  var refy = 0.30;
+  method init() { ${psA} ${pxA} ${pyA} }
   method prio(i) {
     if (ps[i] <= 0) { reply(0.0 - 1.0); }
     var dd = 1.0 - py[i];
-    var ex = refx - px[i];
-    var ey = refy - py[i];
+    var ex = refx - px[i];  var ey = refy - py[i];
     var t = sqrt(ex*ex + ey*ey) * 0.01;
-    var ax = px[i] - xb;
-    if (ax < 0.0) { ax = 0.0 - ax; }
-    var dhc = dd * ax;
-    reply((1.2*dd + 0.05*t + 0.7*dhc) * sqrt(1.0 + ps[i]));
+    var ax = px[i] - xb;  if (ax < 0.0) { ax = 0.0 - ax; }
+    reply((1.2*dd + 0.05*t + 0.7*(dd*ax)) * sqrt(1.0 + ps[i]));
   }
   method surv(i) { reply(ps[i]); }
   method px_at(i) { reply(px[i]); }
@@ -77,35 +105,23 @@ class UAV1 {
   method clear(i) { ps[i] = 0; }
   method set_ref(x, y) { refx = x; refy = y; }
 }
-
-// UAV2: 避難誘導ドローン。被災点の生存者を救助して累計する。
+// UAV2: 避難誘導ドローン。生存者を救助して累計する。
 class UAV2 {
-  var rescued = 0;
-  var trips = 0;
+  var rescued = 0;  var trips = 0;
   method dispatch(pid, surv) {
-    rescued = rescued + surv;
-    trips = trips + 1;
+    rescued = rescued + surv;  trips = trips + 1;
     print("  UAV2: P" + pid + " の " + surv + " 名を最寄り避難所へ誘導 (累計 " + rescued + ")");
     reply(surv);
   }
 }
-
-// GroundStation: UAV1 を scan→最高優先度点を pull→UAV2 へ dispatch、8 試行で集計。
-// (while が無いため自己再帰でステップ駆動。phase 0=scan 1=fly 2=next 3=done)
+// GroundStation: UAV1 を scan→最高優先度点を UAV2 へ dispatch、8 試行で集計 (while 無=自己再帰)
 class GS {
-  var phase = 0;
-  var scanIdx = 0;
-  var best = 0;
-  var bv = 0.0;
-  var trial = 0;
-  var total = 0;
-  var curT = 0;
-  var tx = 0.0; var ty = 0.0;
-  var u2x = 0.05; var u2y = 0.30;
-  var MAX = 8;
+  var phase = 0;  var scanIdx = 0;  var best = 0;  var bv = 0.0;
+  var trial = 0;  var total = 0;  var curT = 0;
+  var tx = 0.0;  var ty = 0.0;  var u2x = 0.05;  var u2y = 0.30;  var MAX = 8;
   method init() {
-    best = 0 - 1; bv = 0.0 - 1000.0;
-    print("=== M-006 ミッション開始 (UAV1 情報収集 + UAV2 避難誘導, 上限 8 試行) ===");
+    best = 0 - 1;  bv = 0.0 - 1000.0;
+    print("=== M-006 ミッション開始 (上限 8 試行) ===");
     send self.step();
   }
   method step() {
@@ -113,66 +129,39 @@ class GS {
       if (scanIdx < 20) {
         var p = now uav1.prio(scanIdx);
         if (p > bv) { bv = p; best = scanIdx; }
-        scanIdx = scanIdx + 1;
-        call wait(35);
-        send self.step();
+        scanIdx = scanIdx + 1;  call wait(35);  send self.step();
       } else {
-        if (bv < 0.0) {
-          phase = 3;
-          print("=== 全救助対象を誘導完了。累計救助 " + total + " 名 ===");
-        } else {
-          curT = best + 1;
-          tx = now uav1.px_at(best);
-          ty = now uav1.py_at(best);
-          phase = 1;
-          call wait(35);
-          send self.step();
-        }
+        if (bv < 0.0) { phase = 3; print("=== 全救助完了。累計 " + total + " 名 ==="); }
+        else { curT = best + 1; tx = now uav1.px_at(best); ty = now uav1.py_at(best); phase = 1; call wait(35); send self.step(); }
       }
     } else {
       if (phase == 1) {
-        u2x = u2x + (tx - u2x) * 0.20;
-        u2y = u2y + (ty - u2y) * 0.20;
-        var dx = tx - u2x; var dy = ty - u2y;
+        u2x = u2x + (tx - u2x) * 0.20;  u2y = u2y + (ty - u2y) * 0.20;
+        var dx = tx - u2x;  var dy = ty - u2y;
         if (sqrt(dx*dx + dy*dy) < 0.012) {
-          u2x = tx; u2y = ty;
+          u2x = tx;  u2y = ty;
           var s = now uav1.surv(best);
           var moved = now uav2.dispatch(curT, s);
-          send uav1.clear(best);
-          send uav1.set_ref(tx, ty);
-          total = total + moved;
-          trial = trial + 1;
+          send uav1.clear(best);  send uav1.set_ref(tx, ty);
+          total = total + moved;  trial = trial + 1;
           print("GS: TRIAL " + trial + "/" + MAX + "  → P" + curT + " 救助 " + moved + "  累計 " + total);
-          phase = 2;
-          call wait(450);
-          send self.step();
-        } else {
-          call wait(28);
-          send self.step();
-        }
+          phase = 2;  call wait(450);  send self.step();
+        } else { call wait(28); send self.step(); }
       } else {
         if (phase == 2) {
-          scanIdx = 0; best = 0 - 1; bv = 0.0 - 1000.0;
-          if (trial >= MAX) {
-            phase = 3;
-            print("=== 上限 8 試行に到達。ミッション完了: 累計救助 " + total + " 名 ===");
-          } else {
-            phase = 0;
-            call wait(35);
-            send self.step();
-          }
+          scanIdx = 0;  best = 0 - 1;  bv = 0.0 - 1000.0;
+          if (trial >= MAX) { phase = 3; print("=== 上限 8 試行到達。完了: 累計 " + total + " 名 ==="); }
+          else { phase = 0; call wait(35); send self.step(); }
         }
       }
     }
   }
 }
-
-var uav1 = new UAV1();
-var uav2 = new UAV2();
-var gs = new GS();
+var uav1 = new UAV1();  var uav2 = new UAV2();  var gs = new GS();
 `;
+}
 
-// ── load + run the AIPL program in the browser runtime ──
+// ── boot / reboot the AIPL program ──
 const logEl = document.getElementById('log');
 let interp = null;
 function appendLog(line){
@@ -180,74 +169,128 @@ function appendLog(line){
   logEl.textContent += line + "\n"; logEl.scrollTop = logEl.scrollHeight;
 }
 function boot(){
+  killTimers();
   logEl.textContent = '';
   parser.yy = AST;
-  const ast = parser.parse(SRC);
+  const ast = parser.parse(buildSRC(scenarioPS));
   interp = new Interpreter(appendLog);
-  interp.runProgram(ast);   // actors self-run via setTimeout
+  interp.runProgram(ast);
 }
 
-// ── canvas rendering: read AIPL actor state each frame ──
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
-const W = cv.width, H = cv.height, MX = 40, MY = 40;
-const PX = x => MX + x*(W-2*MX), PY = y => MY + y*(H-2*MY);
-const SHELTERS = [{id:'A',x:0.05,y:0.30},{id:'B',x:0.95,y:0.50}];
-const PHASES = ['UAV1 探索中','UAV2 誘導中','次の対象へ','完了'];
+// ── MANET / hybrid-ZRP routing layer (ported from drone-hil) ──
+const R = 0.30, RHO = 1;
+const RELAYS = [{id:'R1',x:0.30,y:0.40},{id:'R2',x:0.52,y:0.58},{id:'R3',x:0.74,y:0.42}];
+const d2 = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function manetNodes(g, u1){
+  return [ {id:'GS',x:0.05,y:0.30}, {id:'UAV1',x:u1.x,y:u1.y}, {id:'UAV2',x:g.u2x,y:g.u2y},
+           RELAYS[0], RELAYS[1], RELAYS[2] ];
+}
+function adjOf(ns){ const a=ns.map(()=>[]); for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++) if(d2(ns[i],ns[j])<=R){a[i].push(j);a[j].push(i);} return a; }
+function etxPath(ns,adj,s,t){ const D=ns.map(()=>1e9),P=ns.map(()=>-1),done=ns.map(()=>false); D[s]=0;
+  for(;;){ let u=-1,bd=1e9; for(let k=0;k<ns.length;k++) if(!done[k]&&D[k]<bd){bd=D[k];u=k;} if(u<0)break; done[u]=true; if(u===t)break;
+    for(const v of adj[u]){ const w=1/Math.max(0.08,1-d2(ns[u],ns[v])/R); if(D[u]+w<D[v]){D[v]=D[u]+w;P[v]=u;} } }
+  if(D[t]>=1e9) return null; const p=[]; for(let u=t;u!==-1;u=P[u]) p.unshift(u); return p; }
+function zonePeri(adj,s){ const hop=adj.map(()=>1e9); hop[s]=0; const q=[s];
+  while(q.length){ const u=q.shift(); if(hop[u]>=RHO)continue; for(const v of adj[u]) if(hop[v]===1e9){hop[v]=hop[u]+1;q.push(v);} }
+  const inz=[],peri=[]; hop.forEach((h,i)=>{ if(h<=RHO){inz.push(i); if(h===RHO)peri.push(i);} }); return {inz,peri,hop}; }
+
+// ── GSI 実地形 (色別標高図タイル, 妙義山周辺) ──
+const GSI = { on:false, img:null };
+(function(){ const im=new Image(); im.crossOrigin='anonymous';
+  im.onload=()=>{ GSI.img=im; }; im.src='https://cyberjapandata.gsi.go.jp/xyz/relief/13/7252/3208.png'; })();
+
+// ── canvas + render ──
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const W=cv.width,H=cv.height,MX=40,MY=40;
+const PX=x=>MX+x*(W-2*MX), PY=y=>MY+y*(H-2*MY);
+const SHELTERS=[{id:'A',x:0.05,y:0.30},{id:'B',x:0.95,y:0.50}];
+const PHASES=['UAV1 探索中','UAV2 誘導中','次の対象へ','完了'];
+let manetOn=true, frameN=0;
 
 function render(){
+  frameN++;
   ctx.clearRect(0,0,W,H);
-  // frame
+  // terrain background
+  if (GSI.on && GSI.img){ ctx.globalAlpha=0.9; ctx.drawImage(GSI.img,0,0,W,H); ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(11,16,32,0.35)'; ctx.fillRect(0,0,W,H); }
   ctx.strokeStyle='rgba(159,179,255,0.18)'; ctx.strokeRect(MX-12,MY-12,W-2*MX+24,H-2*MY+24);
-  ctx.fillStyle='rgba(159,179,255,0.5)'; ctx.font='10px ui-monospace'; ctx.fillText('N ↑',MX-8,MY-2);
 
-  const u1 = interp && interp.runtime.actors.get('uav1');
-  const gs = interp && interp.runtime.actors.get('gs');
-  if (!u1 || !gs){ requestAnimationFrame(render); return; }
-  const ps = u1.state.ps, px = u1.state.px, py = u1.state.py;
-  const g = gs.state;
+  const u1A=interp&&interp.runtime.actors.get('uav1'), gsA=interp&&interp.runtime.actors.get('gs');
+  if(!u1A||!gsA){ requestAnimationFrame(render); return; }
+  const ps=u1A.state.ps, px=u1A.state.px, py=u1A.state.py, g=gsA.state;
+  const u1i = g.phase===0 ? Math.min(19,g.scanIdx) : (g.best>=0?g.best:0);
+  const u1pos = {x:px[u1i], y:py[u1i]};
+
+  // ── MANET layer ──
+  let manetTxt='off';
+  if (manetOn){
+    const ns=manetNodes(g,u1pos), adj=adjOf(ns);
+    // comm range + active links
+    for(const n of ns){ ctx.save(); ctx.strokeStyle='rgba(124,242,194,0.10)'; ctx.beginPath();
+      ctx.ellipse(PX(n.x),PY(n.y),R*(W-2*MX),R*(H-2*MY),0,0,7); ctx.stroke(); ctx.restore(); }
+    ctx.strokeStyle='rgba(124,242,194,0.28)'; ctx.lineWidth=1;
+    for(let i=0;i<ns.length;i++)for(const j of adj[i]) if(j>i){ ctx.beginPath(); ctx.moveTo(PX(ns[i].x),PY(ns[i].y)); ctx.lineTo(PX(ns[j].x),PY(ns[j].y)); ctx.stroke(); }
+    // source of control traffic depends on mission phase
+    const srcIdx = (g.phase===0)?1:2;             // scan→UAV1 reports, dispatch→GS↔UAV2
+    const z=zonePeri(adj,srcIdx);
+    // intra-zone gold links + peripheral rings
+    ctx.strokeStyle='rgba(255,214,107,0.55)'; ctx.lineWidth=2; ctx.setLineDash([3,4]);
+    for(const j of adj[srcIdx]){ if(z.inz.indexOf(j)>=0){ ctx.beginPath(); ctx.moveTo(PX(ns[srcIdx].x),PY(ns[srcIdx].y)); ctx.lineTo(PX(ns[j].x),PY(ns[j].y)); ctx.stroke(); } }
+    ctx.setLineDash([]); ctx.strokeStyle='rgba(255,214,107,0.8)';
+    for(const pi of z.peri){ ctx.beginPath(); ctx.arc(PX(ns[pi].x),PY(ns[pi].y),8,0,7); ctx.stroke(); }
+    // route src→GS + animated control packet
+    const route=etxPath(ns,adj,srcIdx,0);
+    if(route){ const pts=route.map(i=>[PX(ns[i].x),PY(ns[i].y)]);
+      ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2.4; ctx.setLineDash([8,6]); ctx.lineDashOffset=-(frameN*0.6);
+      ctx.beginPath(); pts.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke(); ctx.setLineDash([]);
+      const hops=pts.length-1, seg=(frameN*0.04)%hops, k=Math.floor(seg), f=seg-k;
+      const a=pts[k], b=pts[Math.min(hops,k+1)];
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,3.5,0,7); ctx.fill();
+      const flood=ns.length, saved=Math.max(0,flood-Math.max(1,z.peri.length));
+      manetTxt=`${ns[srcIdx].id}→GS ${hops}hop  ZRP flood-saved:${saved}`;
+    } else manetTxt=`${ns[srcIdx].id}→GS 分断中 (custody)`;
+    // relay markers
+    for(const r of RELAYS){ ctx.fillStyle='#9fb3ff'; ctx.beginPath(); ctx.arc(PX(r.x),PY(r.y),4,0,7); ctx.fill();
+      ctx.fillStyle='#9fb3ff'; ctx.font='9px ui-monospace'; ctx.fillText(r.id,PX(r.x)+6,PY(r.y)-5); }
+  }
 
   // shelters
-  for (const s of SHELTERS){ const x=PX(s.x), y=PY(s.y);
-    ctx.fillStyle='#7cf2c2'; ctx.fillRect(x-7,y-7,14,14);
+  for(const s of SHELTERS){ const x=PX(s.x),y=PY(s.y); ctx.fillStyle='#7cf2c2'; ctx.fillRect(x-7,y-7,14,14);
     ctx.fillStyle='#0b1020'; ctx.font='9px ui-monospace'; ctx.fillText(s.id,x-3,y+3);
-    ctx.fillStyle='#7cf2c2'; ctx.fillText('避難所'+s.id, x-12, y-11); }
+    ctx.fillStyle='#7cf2c2'; ctx.fillText('避難所'+s.id,x-12,y-11); }
 
   // points
-  let remaining = 0;
-  for (let i=0;i<20;i++){
-    const x=PX(px[i]), y=PY(py[i]), s=ps[i]; remaining += s;
-    const scanning = (g.phase===0 && g.scanIdx===i);
-    const isBest = (g.best===i && g.phase>=1 && (i+1)===g.curT);
-    const r = s>0 ? 6 + Math.sqrt(s) : 4;
-    ctx.beginPath(); ctx.arc(x,y,r,0,7);
-    ctx.fillStyle = s>0 ? `rgba(255,${120-Math.min(90,s)} ,120,0.85)` : 'rgba(90,100,130,0.5)';
-    ctx.fill();
-    if (scanning){ ctx.strokeStyle='#8fd6ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.stroke(); }
-    if (isBest){ ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,r+6,0,7); ctx.stroke(); }
-    ctx.fillStyle='rgba(220,230,255,0.85)'; ctx.font='9px ui-monospace';
-    ctx.fillText('P'+(i+1)+(s>0?(' '+s):''), x+r+2, y+3);
-  }
+  let remaining=0;
+  for(let i=0;i<20;i++){ const x=PX(px[i]),y=PY(py[i]),s=ps[i]; remaining+=s;
+    const scanning=(g.phase===0&&g.scanIdx===i), isBest=(g.best===i&&g.phase>=1&&(i+1)===g.curT);
+    const r=s>0?6+Math.sqrt(s):4; ctx.beginPath(); ctx.arc(x,y,r,0,7);
+    ctx.fillStyle=s>0?`rgba(255,${120-Math.min(90,s)},120,0.85)`:'rgba(90,100,130,0.5)'; ctx.fill();
+    if(scanning){ ctx.strokeStyle='#8fd6ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.stroke(); }
+    if(isBest){ ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,r+6,0,7); ctx.stroke(); }
+    ctx.fillStyle='rgba(220,230,255,0.85)'; ctx.font='9px ui-monospace'; ctx.fillText('P'+(i+1)+(s>0?(' '+s):''),x+r+2,y+3); }
 
-  // UAV2 marker + flight line to target
-  if (g.phase===1){
-    ctx.strokeStyle='rgba(255,214,107,0.6)'; ctx.setLineDash([6,5]); ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(PX(g.u2x),PY(g.u2y)); ctx.lineTo(PX(g.tx),PY(g.ty)); ctx.stroke(); ctx.setLineDash([]);
-  }
-  const ux=PX(g.u2x), uy=PY(g.u2y);
-  ctx.fillStyle='#ffd66b'; ctx.beginPath(); ctx.arc(ux,uy,6,0,7); ctx.fill();
-  ctx.fillStyle='#0b1020'; ctx.font='8px ui-monospace'; ctx.fillText('U2',ux-6,uy+3);
+  // UAV1 (scan) + UAV2 markers
+  const u1x=PX(u1pos.x),u1y=PY(u1pos.y); ctx.fillStyle='#7cf2c2'; ctx.beginPath(); ctx.arc(u1x,u1y,5,0,7); ctx.fill();
+  ctx.fillStyle='#0b1020'; ctx.font='8px ui-monospace'; ctx.fillText('U1',u1x-6,u1y+3);
+  const ux=PX(g.u2x),uy=PY(g.u2y); ctx.fillStyle='#ffd66b'; ctx.beginPath(); ctx.arc(ux,uy,6,0,7); ctx.fill();
+  ctx.fillStyle='#0b1020'; ctx.fillText('U2',ux-6,uy+3);
 
   // HUD
-  document.getElementById('hPhase').textContent = PHASES[g.phase]||'—';
-  document.getElementById('hTrial').textContent = g.trial;
-  document.getElementById('hResc').textContent  = g.total;
-  document.getElementById('hRem').textContent   = remaining;
-  document.getElementById('hScan').textContent  = g.phase===0 ? ('P'+(g.scanIdx+1)+' を評価中') : '—';
-
+  document.getElementById('hPhase').textContent=PHASES[g.phase]||'—';
+  document.getElementById('hTrial').textContent=g.trial;
+  document.getElementById('hResc').textContent=g.total;
+  document.getElementById('hRem').textContent=remaining;
+  document.getElementById('hScan').textContent=g.phase===0?('P'+(g.scanIdx+1)+' 評価中'):'—';
+  document.getElementById('hManet').textContent='MANET(ZRP): '+manetTxt;
   requestAnimationFrame(render);
 }
 
-document.getElementById('restart').onclick = boot;
+// ── controls ──
+document.getElementById('restart').onclick=boot;
+document.getElementById('bManet').onclick=e=>{ manetOn=!manetOn; e.target.textContent='MANET: '+(manetOn?'ON':'off'); };
+document.getElementById('bTerrain').onclick=e=>{ GSI.on=!GSI.on; e.target.textContent='Terrain: '+(GSI.on?'GSI':'abstract'); };
+document.getElementById('apply').onclick=()=>{ scenarioPS=buildScenario(document.getElementById('scn').value); boot(); };
+
 boot();
 requestAnimationFrame(render);
 </script>
