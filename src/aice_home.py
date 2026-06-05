@@ -112,6 +112,18 @@ TARGETS = [
         "cwd": REPO,
         "cmd": "dune build && python3 src/c_dashboard.py",
     },
+    {
+        "id": "pi5des",
+        "glyph": "Pi5",
+        "portlabel": ":8901",
+        "title": "Pi5 Xinu screen designer",
+        "desc": "Drag/resize the 6 wm-windows over a scaled 1920x1080 Pi 5 desktop, then 送信 — geometry is shipped to the bare-metal Pi 5 over its 3-pin debug UART (no network). Select Shell + type to send keystrokes.",
+        "addr": "127.0.0.1:8901",
+        "href": "http://127.0.0.1:8901/",
+        "port": 8901,
+        "cwd": REPO,
+        "cmd": "python3 src/pi5_screen_designer.py",
+    },
 ]
 TARGET_BY_ID = {t["id"]: t for t in TARGETS}
 
@@ -406,6 +418,29 @@ _PAGE_TMPL = r"""<!doctype html>
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
      <button class="btn btn-open" data-href="http://127.0.0.1:8900/shell">Open &#8599;</button>
+    </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="container" id="xinu5">
+ <div class="sec-head"><h2>Xinu (bare-metal Pi 5)</h2><span class="ribbon"></span><span class="num">SERIAL &middot; LAYOUT &middot; SHELL</span></div>
+ <!-- The Pi 5 has no working network (BCM2712 GENET/RP1 unbrought-up, GIC
+      unreachable with the MMU off), so this designer drives the kernel over
+      the 3-pin DEBUG UART via the Mac's USB-serial adapter — its own
+      server on :8901 (data-id "pi5des"), not a Py-I sub-route. -->
+ <div class="grid">
+  <div class="card" data-id="pi5des">
+   <div class="thumb"><span class="glyph">&#128421;</span><span class="port">:8901</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Pi5 Xinu 画面設計 &mdash; Window layout designer (serial)</h3>
+    <p>Drag/resize the 6 wm-windows (banner / System status / VFS tree / Memory / Shell / Soft keyboard) over a scaled 1920&times;1080 view of the Pi 5 HDMI desktop, then 送信 &mdash; the geometry is shipped to the bare-metal Pi 5 over its 3-pin <code>debug UART</code> (0x107D001000) via the Mac&rsquo;s USB-serial adapter, and <code>serial_io_tick</code> in the kernel repositions the live windows. <b>Select a window (yellow), pick Shell, then type to send keystrokes into that window.</b> Needs the debug-UART adapter plugged into the Mac.</p>
+    <span class="addr">127.0.0.1:8901</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8901/">Open &#8599;</button>
     </div></div>
   </div>
  </div>
