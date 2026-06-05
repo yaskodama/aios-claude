@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>M-006 災害避難ミッション — AIPL アクター (ブラウザ実行 / Xinu 非連携)</title>
+<style>
+  body{margin:0;background:#0b1020;color:#cfe;font:13px ui-monospace,Menlo,monospace}
+  #wrap{display:flex;gap:12px;padding:12px}
+  canvas{background:#0a0f1e;border:1px solid #2a3a6a;border-radius:8px}
+  #side{width:340px;display:flex;flex-direction:column;gap:10px}
+  .panel{background:#0d1430;border:1px solid #2a3a6a;border-radius:8px;padding:8px 10px}
+  h1{font-size:15px;margin:0 0 2px} h2{font-size:12px;margin:0 0 6px;color:#8fd6ff}
+  #log{height:300px;overflow:auto;white-space:pre-wrap;line-height:1.45;font-size:11px;color:#bfe}
+  .hud b{color:#ffd66b} button{background:#13204a;color:#8fd6ff;border:1px solid #3a4a82;border-radius:6px;padding:5px 10px;cursor:pointer;font:12px ui-monospace}
+  .k{color:#9fb3ff}
+</style></head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="760" height="520"></canvas>
+  <div id="side">
+    <div class="panel">
+      <h1>M-006 避難支援ミッション</h1>
+      <div class="k">UAV1(情報収集)+UAV2(避難誘導)+GS を <b style="color:#8fd6ff">AIPL アクター</b>として
+      ブラウザ内ランタイムで実行（Xinu 非連携）。</div>
+      <div style="margin-top:6px"><button id="restart">再実行</button></div>
+    </div>
+    <div class="panel hud">
+      <h2>Mission HUD</h2>
+      <div>Phase: <b id="hPhase">—</b>　Trial: <b id="hTrial">0</b>/8</div>
+      <div>救助 (Rescued): <b id="hResc">0</b> 名</div>
+      <div>残存 (Remaining): <b id="hRem">349</b> 名</div>
+      <div>探索中 (UAV1 scan): <b id="hScan">—</b></div>
+    </div>
+    <div class="panel">
+      <h2>イベントログ (AIPL print)</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/src/parser/parser.js"></script>
+<script type="module">
+import * as AST from "/src/ast.js";
+import { Interpreter } from "/src/interpreter.js";
+
+// ── M-006 mission as AIPL actors (browser dialect: no while/functions/array-literals/neg-literals) ──
+const SRC = `
+// UAV1: 情報収集ドローン。P1..P20 の被災状況を保持し、各点の優先度を返す。
+class UAV1 {
+  var ps[20] = 0;
+  var px[20] = 0.0;
+  var py[20] = 0.0;
+  var xb = 0.95;
+  var refx = 0.05;
+  var refy = 0.30;
+  method init() {
+    ps[0]=15;  ps[1]=30;  ps[2]=0;   ps[3]=0;   ps[4]=25;  ps[5]=30;  ps[6]=0;   ps[7]=10;  ps[8]=25;  ps[9]=5;
+    ps[10]=40; ps[11]=35; ps[12]=0;  ps[13]=0;  ps[14]=0;  ps[15]=12; ps[16]=20; ps[17]=25; ps[18]=32; ps[19]=45;
+    px[0]=0.13; px[1]=0.20; px[2]=0.16; px[3]=0.24; px[4]=0.27; px[5]=0.32; px[6]=0.34; px[7]=0.40; px[8]=0.42; px[9]=0.45;
+    px[10]=0.48; px[11]=0.54; px[12]=0.56; px[13]=0.60; px[14]=0.66; px[15]=0.70; px[16]=0.72; px[17]=0.80; px[18]=0.83; px[19]=0.85;
+    py[0]=0.18; py[1]=0.34; py[2]=0.52; py[3]=0.66; py[4]=0.22; py[5]=0.42; py[6]=0.78; py[7]=0.18; py[8]=0.34; py[9]=0.58;
+    py[10]=0.78; py[11]=0.22; py[12]=0.46; py[13]=0.66; py[14]=0.30; py[15]=0.50; py[16]=0.74; py[17]=0.20; py[18]=0.42; py[19]=0.62;
+  }
+  // M-006 優先度: (1.2*dd + 0.05*t + 0.7*dhc) * sqrt(1+survivors)。空点は負の番兵。
+  method prio(i) {
+    if (ps[i] <= 0) { reply(0.0 - 1.0); }
+    var dd = 1.0 - py[i];
+    var ex = refx - px[i];
+    var ey = refy - py[i];
+    var t = sqrt(ex*ex + ey*ey) * 0.01;
+    var ax = px[i] - xb;
+    if (ax < 0.0) { ax = 0.0 - ax; }
+    var dhc = dd * ax;
+    reply((1.2*dd + 0.05*t + 0.7*dhc) * sqrt(1.0 + ps[i]));
+  }
+  method surv(i) { reply(ps[i]); }
+  method px_at(i) { reply(px[i]); }
+  method py_at(i) { reply(py[i]); }
+  method clear(i) { ps[i] = 0; }
+  method set_ref(x, y) { refx = x; refy = y; }
+}
+
+// UAV2: 避難誘導ドローン。被災点の生存者を救助して累計する。
+class UAV2 {
+  var rescued = 0;
+  var trips = 0;
+  method dispatch(pid, surv) {
+    rescued = rescued + surv;
+    trips = trips + 1;
+    print("  UAV2: P" + pid + " の " + surv + " 名を最寄り避難所へ誘導 (累計 " + rescued + ")");
+    reply(surv);
+  }
+}
+
+// GroundStation: UAV1 を scan→最高優先度点を pull→UAV2 へ dispatch、8 試行で集計。
+// (while が無いため自己再帰でステップ駆動。phase 0=scan 1=fly 2=next 3=done)
+class GS {
+  var phase = 0;
+  var scanIdx = 0;
+  var best = 0;
+  var bv = 0.0;
+  var trial = 0;
+  var total = 0;
+  var curT = 0;
+  var tx = 0.0; var ty = 0.0;
+  var u2x = 0.05; var u2y = 0.30;
+  var MAX = 8;
+  method init() {
+    best = 0 - 1; bv = 0.0 - 1000.0;
+    print("=== M-006 ミッション開始 (UAV1 情報収集 + UAV2 避難誘導, 上限 8 試行) ===");
+    send self.step();
+  }
+  method step() {
+    if (phase == 0) {
+      if (scanIdx < 20) {
+        var p = now uav1.prio(scanIdx);
+        if (p > bv) { bv = p; best = scanIdx; }
+        scanIdx = scanIdx + 1;
+        call wait(35);
+        send self.step();
+      } else {
+        if (bv < 0.0) {
+          phase = 3;
+          print("=== 全救助対象を誘導完了。累計救助 " + total + " 名 ===");
+        } else {
+          curT = best + 1;
+          tx = now uav1.px_at(best);
+          ty = now uav1.py_at(best);
+          phase = 1;
+          call wait(35);
+          send self.step();
+        }
+      }
+    } else {
+      if (phase == 1) {
+        u2x = u2x + (tx - u2x) * 0.20;
+        u2y = u2y + (ty - u2y) * 0.20;
+        var dx = tx - u2x; var dy = ty - u2y;
+        if (sqrt(dx*dx + dy*dy) < 0.012) {
+          u2x = tx; u2y = ty;
+          var s = now uav1.surv(best);
+          var moved = now uav2.dispatch(curT, s);
+          send uav1.clear(best);
+          send uav1.set_ref(tx, ty);
+          total = total + moved;
+          trial = trial + 1;
+          print("GS: TRIAL " + trial + "/" + MAX + "  → P" + curT + " 救助 " + moved + "  累計 " + total);
+          phase = 2;
+          call wait(450);
+          send self.step();
+        } else {
+          call wait(28);
+          send self.step();
+        }
+      } else {
+        if (phase == 2) {
+          scanIdx = 0; best = 0 - 1; bv = 0.0 - 1000.0;
+          if (trial >= MAX) {
+            phase = 3;
+            print("=== 上限 8 試行に到達。ミッション完了: 累計救助 " + total + " 名 ===");
+          } else {
+            phase = 0;
+            call wait(35);
+            send self.step();
+          }
+        }
+      }
+    }
+  }
+}
+
+var uav1 = new UAV1();
+var uav2 = new UAV2();
+var gs = new GS();
+`;
+
+// ── load + run the AIPL program in the browser runtime ──
+const logEl = document.getElementById('log');
+let interp = null;
+function appendLog(line){
+  if (line.indexOf('[send]')===0 || line.indexOf('[actor created]')===0 || line.indexOf('[REPLY]')===0) return;
+  logEl.textContent += line + "\n"; logEl.scrollTop = logEl.scrollHeight;
+}
+function boot(){
+  logEl.textContent = '';
+  parser.yy = AST;
+  const ast = parser.parse(SRC);
+  interp = new Interpreter(appendLog);
+  interp.runProgram(ast);   // actors self-run via setTimeout
+}
+
+// ── canvas rendering: read AIPL actor state each frame ──
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height, MX = 40, MY = 40;
+const PX = x => MX + x*(W-2*MX), PY = y => MY + y*(H-2*MY);
+const SHELTERS = [{id:'A',x:0.05,y:0.30},{id:'B',x:0.95,y:0.50}];
+const PHASES = ['UAV1 探索中','UAV2 誘導中','次の対象へ','完了'];
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // frame
+  ctx.strokeStyle='rgba(159,179,255,0.18)'; ctx.strokeRect(MX-12,MY-12,W-2*MX+24,H-2*MY+24);
+  ctx.fillStyle='rgba(159,179,255,0.5)'; ctx.font='10px ui-monospace'; ctx.fillText('N ↑',MX-8,MY-2);
+
+  const u1 = interp && interp.runtime.actors.get('uav1');
+  const gs = interp && interp.runtime.actors.get('gs');
+  if (!u1 || !gs){ requestAnimationFrame(render); return; }
+  const ps = u1.state.ps, px = u1.state.px, py = u1.state.py;
+  const g = gs.state;
+
+  // shelters
+  for (const s of SHELTERS){ const x=PX(s.x), y=PY(s.y);
+    ctx.fillStyle='#7cf2c2'; ctx.fillRect(x-7,y-7,14,14);
+    ctx.fillStyle='#0b1020'; ctx.font='9px ui-monospace'; ctx.fillText(s.id,x-3,y+3);
+    ctx.fillStyle='#7cf2c2'; ctx.fillText('避難所'+s.id, x-12, y-11); }
+
+  // points
+  let remaining = 0;
+  for (let i=0;i<20;i++){
+    const x=PX(px[i]), y=PY(py[i]), s=ps[i]; remaining += s;
+    const scanning = (g.phase===0 && g.scanIdx===i);
+    const isBest = (g.best===i && g.phase>=1 && (i+1)===g.curT);
+    const r = s>0 ? 6 + Math.sqrt(s) : 4;
+    ctx.beginPath(); ctx.arc(x,y,r,0,7);
+    ctx.fillStyle = s>0 ? `rgba(255,${120-Math.min(90,s)} ,120,0.85)` : 'rgba(90,100,130,0.5)';
+    ctx.fill();
+    if (scanning){ ctx.strokeStyle='#8fd6ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.stroke(); }
+    if (isBest){ ctx.strokeStyle='#ffd66b'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,r+6,0,7); ctx.stroke(); }
+    ctx.fillStyle='rgba(220,230,255,0.85)'; ctx.font='9px ui-monospace';
+    ctx.fillText('P'+(i+1)+(s>0?(' '+s):''), x+r+2, y+3);
+  }
+
+  // UAV2 marker + flight line to target
+  if (g.phase===1){
+    ctx.strokeStyle='rgba(255,214,107,0.6)'; ctx.setLineDash([6,5]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(PX(g.u2x),PY(g.u2y)); ctx.lineTo(PX(g.tx),PY(g.ty)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const ux=PX(g.u2x), uy=PY(g.u2y);
+  ctx.fillStyle='#ffd66b'; ctx.beginPath(); ctx.arc(ux,uy,6,0,7); ctx.fill();
+  ctx.fillStyle='#0b1020'; ctx.font='8px ui-monospace'; ctx.fillText('U2',ux-6,uy+3);
+
+  // HUD
+  document.getElementById('hPhase').textContent = PHASES[g.phase]||'—';
+  document.getElementById('hTrial').textContent = g.trial;
+  document.getElementById('hResc').textContent  = g.total;
+  document.getElementById('hRem').textContent   = remaining;
+  document.getElementById('hScan').textContent  = g.phase===0 ? ('P'+(g.scanIdx+1)+' を評価中') : '—';
+
+  requestAnimationFrame(render);
+}
+
+document.getElementById('restart').onclick = boot;
+boot();
+requestAnimationFrame(render);
+</script>
+</body></html>
