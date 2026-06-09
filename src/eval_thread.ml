@@ -797,6 +797,54 @@ let wait_reply_slot (id:string) : value =
       Mutex.unlock reply_slots_mu;
       v
 
+(* ---------------- structured concurrency: scope { ... } ----------------
+   A `scope { ... }` block auto-joins every `future` spawned inside it: when
+   the closing brace is reached, all such futures are awaited before the
+   next statement runs.  We track this with a thread-local STACK of frames
+   (one frame per active scope).  Each frame collects the reply-slot ids of
+   futures created while it is on top.  The stack is keyed by Thread.id —
+   each actor runs the scope body on its own thread, so concurrent actors
+   never share a frame.  (_tid is defined above with the msgid tables.) *)
+let _scope_frames : (int, string list ref list ref) Hashtbl.t = Hashtbl.create 16
+let _scope_mu = Mutex.create ()
+
+let _scope_stack_for_tid () : string list ref list ref =
+  let tid = _tid () in
+  Mutex.lock _scope_mu;
+  let st =
+    match Hashtbl.find_opt _scope_frames tid with
+    | Some s -> s
+    | None   -> let s = ref [] in Hashtbl.replace _scope_frames tid s; s
+  in
+  Mutex.unlock _scope_mu;
+  st
+
+let scope_push () =
+  let st = _scope_stack_for_tid () in
+  st := (ref []) :: !st
+
+(* Register a future's reply-slot on the innermost active scope (if any). *)
+let scope_register (slot_id:string) =
+  let st = _scope_stack_for_tid () in
+  match !st with
+  | frame :: _ -> frame := slot_id :: !frame
+  | []         -> ()
+
+(* Pop the innermost frame and return its slot ids in spawn order. *)
+let scope_pop_ids () : string list =
+  let st = _scope_stack_for_tid () in
+  match !st with
+  | frame :: rest -> st := rest; List.rev !frame
+  | []            -> []
+
+(* Await a slot only if it is still pending (the body may have awaited it
+   explicitly, in which case wait_reply_slot already removed it). *)
+let scope_join_slot (id:string) : unit =
+  Mutex.lock reply_slots_mu;
+  let still = Hashtbl.mem reply_slots id in
+  Mutex.unlock reply_slots_mu;
+  if still then ignore (wait_reply_slot id)
+
 let send_message ?msg_id ~from (target_name:string) (stmt:Ast.stmt) : unit = (
 (*  let log_message () = (
     let oc = open_out_gen [Open_creat; Open_append; Open_text] 0o644 "message_log.txt" in
@@ -1180,6 +1228,70 @@ let prim_table : (string, value list -> value) Hashtbl.t =
            in
            find lines
        | _ -> failwith "xinu_compile(host:string, src:string): arity 2 expected"));
+
+    (* xinu_load(host) — GET http://<host>/api/load and return the node's live
+       actor count (parsed from "live_actors":N).  The mesh load-balancer polls
+       this to pick the least-loaded Xinu node.  Returns -1 if unreachable. *)
+    ("xinu_load",
+     (function
+       | [VString host] ->
+           let url = "http://" ^ host ^ "/api/load" in
+           let cmd = Printf.sprintf "curl -s --max-time 10 %s" (Filename.quote url) in
+           let ic = Unix.open_process_in cmd in
+           let buf = Buffer.create 256 in
+           let chunk = Bytes.create 4096 in
+           let rec drain () =
+             let n = input ic chunk 0 (Bytes.length chunk) in
+             if n > 0 then (Buffer.add_subbytes buf chunk 0 n; drain ()) in
+           (try drain () with End_of_file -> ());
+           let _ = Unix.close_process_in ic in
+           let body = Buffer.contents buf in
+           let key = "\"live_actors\":" in
+           let klen = String.length key and blen = String.length body in
+           let rec scan i =
+             if i + klen > blen then VInt (-1)
+             else if String.sub body i klen = key then begin
+               let j = ref (i + klen) in
+               let b = Buffer.create 8 in
+               while !j < blen && body.[!j] >= '0' && body.[!j] <= '9' do
+                 Buffer.add_char b body.[!j]; incr j done;
+               (try VInt (int_of_string (Buffer.contents b)) with _ -> VInt (-1))
+             end else scan (i + 1)
+           in
+           scan 0
+       | _ -> failwith "xinu_load(host:string): arity 1 expected"));
+
+    (* xinu_send(host, to, method, arg) — GET http://<host>/actor/send to invoke
+       a resident actor on a Xinu node and return its integer reply (parsed from
+       the "=> N" line), or -1.  The transport the Scheduler uses to dispatch a
+       task to the chosen Xinu worker. *)
+    ("xinu_send",
+     (function
+       | [VString host; VInt to_id; VString meth; VInt arg] ->
+           let url = Printf.sprintf "http://%s/actor/send?to=%d&m=%s&arg=%d"
+                       host to_id meth arg in
+           let cmd = Printf.sprintf "curl -s --max-time 30 %s" (Filename.quote url) in
+           let ic = Unix.open_process_in cmd in
+           let buf = Buffer.create 256 in
+           let chunk = Bytes.create 4096 in
+           let rec drain () =
+             let n = input ic chunk 0 (Bytes.length chunk) in
+             if n > 0 then (Buffer.add_subbytes buf chunk 0 n; drain ()) in
+           (try drain () with End_of_file -> ());
+           let _ = Unix.close_process_in ic in
+           let body = Buffer.contents buf in
+           let lines = String.split_on_char '\n' body in
+           let rec find = function
+             | [] -> VString body
+             | l :: rest ->
+                 let l = String.trim l in
+                 if String.length l >= 3 && String.sub l 0 3 = "=> " then
+                   (try VInt (int_of_string (String.trim (String.sub l 3 (String.length l - 3))))
+                    with _ -> find rest)
+                 else find rest
+           in
+           find lines
+       | _ -> failwith "xinu_send(host:string, to:int, method:string, arg:int): arity 4 expected"));
   ];
   h
 
@@ -1277,11 +1389,13 @@ let rec eval_expr (actor:actor) (e : expr) =
                 | _ -> tgt)
            in
            let (slot_id, _) = new_reply_slot () in
+           scope_register slot_id;  (* auto-join if inside a scope { } *)
            send_message ~msg_id:slot_id ~from:actor.name actual_target
              (mk_stmt (CallStmt (meth, arg_exprs)));
            VFuture slot_id
        | RemoteTarget (hostport, to_actor) ->
            let (slot_id, _) = new_reply_slot () in
+           scope_register slot_id;  (* auto-join if inside a scope { } *)
            let from_name = actor.name in
            ignore (Thread.create (fun () ->
              try
@@ -1445,6 +1559,16 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
         ();
   | Seq ss ->
       List.iter (eval_stmt actor) ss
+  | Scope body ->
+      (* Structured concurrency: run the block, then await every `future`
+         spawned inside it before continuing (auto-join).  On exception we
+         still pop the frame so the thread's scope stack stays balanced. *)
+      scope_push ();
+      let ids =
+        try eval_stmt actor body; scope_pop_ids ()
+        with e -> ignore (scope_pop_ids ()); raise e
+      in
+      List.iter scope_join_slot ids
   | CallStmt ("sdl_init", [w; h]) ->
       let w = int_of_float (as_float (eval_expr actor w))
       and h = int_of_float (as_float (eval_expr actor h)) in

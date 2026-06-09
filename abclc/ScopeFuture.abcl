@@ -1,0 +1,71 @@
+// =====================================================================
+// ScopeFuture.abcl  —  Scope inside an actor, exercised with futures
+// ---------------------------------------------------------------------
+// AIPL is actor-first: behaviour belongs to actors, not to free global
+// functions.  All logic lives inside actors here, and the future-type
+// (parallel) message sends are bounded by a `scope { ... }` block.
+//
+//   scope { ... }  — structured concurrency.  Every `future` spawned
+//   inside the block is auto-joined at the closing brace: control does
+//   not leave the scope until all those futures have completed.  No
+//   future can escape the scope.
+//
+// Scope rules shown here:
+//   (A) An actor FIELD (`radius`) is the actor's OWN private scope.
+//   (B) A method PARAMETER `radius` SHADOWS that field during the call.
+//   (C) A `var` declared inside a method is LOCAL to that method.
+//   (D) future-type sends inside scope { } run CONCURRENTLY, each with
+//       its own independent parameter scope, and the closing brace
+//       JOINS them all before execution continues.
+//
+// NOTE: the OCaml runtime predates the typed surface, so params/locals
+// carry no `: int` / `-> int` annotations, and integer fields use `var`.
+// =====================================================================
+
+class Geometry {
+  var radius = 100;                 // (A) actor field = actor-private scope
+
+  // (B) the parameter `radius` shadows the field `radius` while running.
+  method area(radius) {
+    var local = radius * radius * 3;        // (C) `local` is method-scoped
+    print("    [area] radius=" + radius + " -> " + local);
+    reply(local);
+  }
+
+  // reads the FIELD radius — proof it was never disturbed by (B).
+  method fieldRadius() {
+    reply(radius);
+  }
+}
+
+class Driver {
+  var geo = 0;                      // bound to the Geometry actor at init
+
+  method init(g) {
+    geo = g;
+  }
+
+  method run() {
+    print("--- before scope ---");
+
+    // (D) bound future-type message sends with scope { }.  Both calls
+    //     run in parallel, each with its own `radius` parameter scope,
+    //     and the closing brace auto-joins them (no explicit await).
+    scope {
+      var f1 = future geo.area(5);
+      var f2 = future geo.area(20);
+      print("    [scope] f1, f2 spawned — closing brace will join them");
+    }
+
+    print("--- after scope: all future sends joined ---");
+
+    // the actor's FIELD radius is still 100 — the parameter shadowing
+    // in area() was confined to each call's scope and then restored.
+    var r = now geo.fieldRadius();
+    print("[field]  geo.radius stays = " + r);   // 100
+  }
+}
+
+var geo = new Geometry();
+var driver = new Driver(geo);
+send driver.run();

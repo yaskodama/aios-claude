@@ -414,6 +414,7 @@ let rec string_of_stmt (st: Ast.stmt) =
   | Send (tgt, msg, args) -> "send " ^ (string_of_send_target tgt) ^
     " " ^ msg ^ "(" ^ String.concat ", " (List.map string_of_expr args) ^ ")"
   | Seq stmts -> String.concat "; " (List.map string_of_stmt stmts)
+  | Scope s -> "scope { " ^ string_of_stmt s ^ " }"
   | If (cond, t, f) -> "if " ^ string_of_expr cond ^ " then (" ^ string_of_stmt t ^ ") else (" ^ string_of_stmt f ^ ")"
   | While (cond, body) -> "while " ^ string_of_expr cond ^ " do (" ^ string_of_stmt body ^ ")"
   | VarDecl (vname, e) -> vname ^ " = " ^ string_of_expr e

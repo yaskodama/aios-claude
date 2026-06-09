@@ -1,0 +1,75 @@
+// =====================================================================
+// Scope.abcl  —  Variable scope in the AIPL OCaml runtime
+// ---------------------------------------------------------------------
+// Demonstrates the four scope rules of the OCaml runtime:
+//
+//   (1) A top-level `var` is a GLOBAL: visible everywhere below it.
+//   (2) A function parameter creates a FRESH scope that SHADOWS any
+//       same-named global for the duration of the call.
+//   (3) After the call returns, the shadowed global is RESTORED to its
+//       original value (the parameter scope does not leak out).
+//   (4) Top-level FUNCTIONS run in the caller's frame, so they can READ
+//       globals; but a `var` declared LOCALLY inside a function is NOT
+//       visible outside it.
+//   (5) An OBJECT (actor) method runs in its OWN scope: top-level globals
+//       are NOT shared into it, yet top-level functions remain callable.
+//
+// (Rule 4's "not visible outside" half is shown in the companion
+//  ScopeLeak.abcl, which is rejected by the type checker on purpose.)
+// =====================================================================
+
+// (1) global -----------------------------------------------------------
+var radius = 100;
+
+// (2)+(3) parameter `radius` shadows the global, then it is restored ----
+function area(radius) {
+  // here `radius` is the PARAMETER, not the global
+  return radius * radius * 3;
+}
+
+// (4) functions can READ the global -----------------------------------
+function readGlobalRadius() {
+  return radius;
+}
+
+// (4) a LOCAL var lives only inside the function ----------------------
+function withLocal() {
+  var scratch = 42;          // local to withLocal
+  return scratch + radius;   // mixes local + global
+}
+
+// nested calls: each parameter scope is independent and restored ------
+function outer(radius) {
+  print("    outer sees radius = " + radius);     // 7 (param)
+  var fromInner = area(radius);                    // inner shadows again
+  print("    outer still sees radius = " + radius);// 7 (restored)
+  return fromInner;
+}
+
+print("== global ==");
+print("global radius              = " + radius);          // 100
+
+print("== shadowing + restore ==");
+print("area(5)  [param shadows]   = " + area(5));         // 75
+print("global radius after call   = " + radius);          // 100 (restored)
+
+print("== reading the global ==");
+print("readGlobalRadius()         = " + readGlobalRadius());// 100
+print("withLocal() [local+global] = " + withLocal());     // 142
+
+print("== nested parameter scopes ==");
+print("outer(7) -> area(7)        = " + outer(7));         // 147
+print("global radius at the end   = " + radius);          // 100
+
+// (5) An object method runs in its OWN actor scope.  The top-level
+// global `radius` is NOT visible here (reading it would raise
+// "unbound variable: radius" — see the commented line), but the
+// top-level function `area` is still callable.
+class Circle {
+  method init(r) {
+    print("== method scope ==");
+    // print("[Circle] global radius = " + radius);  // would FAIL: not in actor scope
+    print("[Circle] area(r=" + r + ")    = " + area(r));  // top-level fn is reachable
+  }
+}
+var c = new Circle(10);                                    // area(10) = 300

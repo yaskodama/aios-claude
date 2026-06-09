@@ -1,0 +1,11 @@
+// ScopeLeak.abcl  —  the "does a local var leak out?" half of rule (4).
+// A `var` declared inside a function is local: it is NOT visible at the
+// top level.  The type checker proves this by REJECTING this program
+// with "unbound variable: scratch".  This file is expected to FAIL to
+// compile — that failure *is* the demonstration.
+function withLocal() {
+  var scratch = 42;     // local to withLocal
+  return scratch;
+}
+print("call = " + withLocal());
+print("leak? scratch = " + scratch);   // <-- unbound: scope does not leak

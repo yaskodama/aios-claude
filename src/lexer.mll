@@ -39,6 +39,7 @@ rule token = parse
 | "now"        { NOW }
 | "future"     { FUTURE }
 | "await"      { AWAIT }
+| "scope"      { SCOPE }
 | "if"         { IF }
 | "self"       { SELF }
 | "sender"     { SENDER }

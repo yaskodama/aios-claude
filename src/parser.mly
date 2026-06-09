@@ -17,6 +17,7 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token METHOD FLOAT CALL SEND UNSAFESEND REMOTE
 %token PRIORITY  /* P2: actor scheduling priority class — `priority(high|normal|low)` */
 %token NOW FUTURE AWAIT
+%token SCOPE   /* structured concurrency: scope { ... } joins futures spawned inside */
 %token IF THEN ELSE WHILE DO
 %token ASSIGN PLUS MINUS TIMES DIV LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK COLON SEMICOLON COMMA
 %token GE LE GT LT SELF SENDER CLASS
@@ -233,6 +234,7 @@ stmt:
   | IF LPAREN expr RPAREN stmt ELSE stmt           { mk_stmt1 3 (If($3, $5, $7)) }
   | WHILE expr DO stmt { mk_stmt1 2 (While ($2, $4)) }
   | LBRACE stmt_list RBRACE { mk_stmt1 2 (Seq $2) }
+  | SCOPE LBRACE stmt_list RBRACE { mk_stmt1 2 (Scope (mk_stmt1 2 (Seq $3))) }
   | VAR ID ASSIGN expr SEMICOLON { mk_stmt1 2 (VarDecl($2, $4)) }
   | VAR ID COLON type_expr ASSIGN expr SEMICOLON
       { mk_stmt1 2 (TypedVarDecl($2, $4, $6)) }

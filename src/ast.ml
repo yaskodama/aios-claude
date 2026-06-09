@@ -69,6 +69,9 @@ type stmt_desc =
   | UnsafeSend of send_target * string * expr list
   | Become of string * expr list
   | Seq of stmt list
+  | Scope of stmt            (* scope { ... } — structured concurrency: the
+                                closing brace awaits every `future` spawned
+                                inside the block (auto-join). *)
   | If of expr * stmt * stmt
   | While of expr * stmt
   | VarDecl of string * expr
@@ -176,6 +179,7 @@ let rec normalize_stmt (s : stmt) : stmt =
         Hashtbl.replace var_annotations s.sloc t;
         VarDecl (x, e)
     | Seq ss -> Seq (List.map normalize_stmt ss)
+    | Scope s -> Scope (normalize_stmt s)
     | If (c, a, b) -> If (c, normalize_stmt a, normalize_stmt b)
     | While (c, b) -> While (c, normalize_stmt b)
     | Select (cases, (to_ms, to_body)) ->
@@ -295,6 +299,7 @@ let rec string_of_stmt (s:stmt) : string =
       Printf.sprintf "Become(%s, [%s])" cls xs
   | Seq ss                -> let xs = ss |> List.map string_of_stmt |> String.concat "; " in
       Printf.sprintf "Seq([%s])" xs
+  | Scope s               -> Printf.sprintf "Scope(%s)" (string_of_stmt s)
   | If (e,s1,s2)          -> Printf.sprintf "If(%s, %s, %s)" (string_of_expr e) (string_of_stmt s1) (string_of_stmt s2)
   | While (e,body)        -> Printf.sprintf "While(%s, %s)" (string_of_expr e) (string_of_stmt body)
   | VarDecl (e1,e2)       -> Printf.sprintf "VarDecl(%s, %s)" e1 (string_of_expr e2)
@@ -390,6 +395,7 @@ let label_of_stmt (s:stmt) : string =
   | UnsafeSend (RemoteTarget (hp, a), m, _) -> "UnsafeSend remote(" ^ hp ^ "," ^ a ^ ")." ^ m
   | Become (cls,_)       -> "Become " ^ cls
   | Seq _                -> "Seq"
+  | Scope _              -> "Scope"
   | If _                 -> "If"
   | While _              -> "While"
   | VarDecl (x,_)        -> "VarDecl " ^ x
@@ -414,6 +420,8 @@ let rec dump_stmt ?(prefix="") ?(is_last=true) (s : stmt) =
       List.iteri (fun i e -> dump_expr ~prefix:child_pref ~is_last:(i = List.length args - 1) e) args
     | Seq ss ->
       List.iteri (fun i st -> dump_stmt ~prefix:child_pref ~is_last:(i = List.length ss - 1) st) ss
+    | Scope s ->
+      dump_stmt ~prefix:child_pref ~is_last:true s
     | Become (_cls, args) ->
       List.iteri (fun i e -> dump_expr ~prefix:child_pref ~is_last:(i = List.length args - 1) e) args
     | If (e, s1, s2) ->
@@ -587,6 +595,8 @@ let rec pprint_stmt ?(lvl=0) (s:stmt) : string =
         (String.concat ", " (List.map (pprint_expr ~lvl) args))
   | Seq ss ->
       String.concat "\n" (List.map (pprint_stmt ~lvl) ss)
+  | Scope s ->
+      Printf.sprintf "%sscope {\n%s\n%s}" indent (pprint_stmt ~lvl:(lvl+1) s) indent
   | If (e,s1,s2) ->
       Printf.sprintf "%sif (%s) {\n%s\n%s} else {\n%s\n%s}"
         indent (pprint_expr e)

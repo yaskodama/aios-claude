@@ -91,6 +91,7 @@ let rec collect_effects_stmt (s : Ast.stmt) (acc : SS.t) : SS.t =
   | Ast.Become (_, args) ->
       List.fold_left (fun a x -> collect_effects_expr x a) acc args
   | Ast.Seq xs -> List.fold_left (fun a x -> collect_effects_stmt x a) acc xs
+  | Ast.Scope s -> collect_effects_stmt s acc
   | Ast.If (c, t, e) ->
       let acc = collect_effects_expr c acc in
       let acc = collect_effects_stmt t acc in
@@ -542,6 +543,7 @@ let rec check_stmt (env:env) (s:stmt) : unit =
         ignore (unify_at s.sloc tc TBool);
       check_stmt env body
   | Seq ss -> List.iter (check_stmt env) ss
+  | Scope s -> check_stmt env s
   | CallStmt (fname, args) ->
       let arg_tys = List.map (infer_expr env) args in
       ignore (pick_overload s.sloc fname env arg_tys);
