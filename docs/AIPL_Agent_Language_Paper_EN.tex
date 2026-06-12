@@ -1,0 +1,886 @@
+% !TEX program = xelatex
+% On the Design, Implementation, and Execution Environment
+% of the Typed AI Agent Language AIPL
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{makecell}
+\usepackage{mathtools}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.82]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!60!black,
+  citecolor=blue!50!black,
+  pdftitle={On the Design, Implementation, and Execution Environment of the Typed AI Agent Language AIPL},
+  pdfauthor={Yasushi Kodama}
+}
+
+% ---- listings: AIPL language definition ----------------------------
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\definecolor{codestr}{RGB}{160,40,40}
+\definecolor{codetype}{RGB}{20,120,90}
+
+\lstdefinelanguage{aipl}{
+  keywords={class, method, function, return, var, new, send, now, future, await,
+            reply, become, select, case, scope, saga, step, compensate, channel,
+            if, else, while, do, self, sender, where, pub, linear, transient,
+            session_define, grant_cap, revoke_cap, true, false},
+  keywordstyle=\color{codekw}\bfseries,
+  morekeywords=[2]{int, float, string, bool, unit, actor, array, tuple, record,
+                   image, any},
+  keywordstyle=[2]\color{codetype},
+  comment=[l]{//},
+  commentstyle=\color{codecmt}\itshape,
+  string=[b]",
+  stringstyle=\color{codestr},
+  morestring=[b]',
+  sensitive=true,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+  literate={→}{{$\rightarrow$}}1 {⊢}{{$\vdash$}}1 {∀}{{$\forall$}}1,
+}
+\lstset{language=aipl}
+
+% ---- symbols -------------------------------------------------------
+\newcommand{\Yes}{\textcolor{green!50!black}{\textbf{\checkmark}}}
+\newcommand{\No}{\textcolor{red!70!black}{$\times$}}
+\newcommand{\Part}{\textcolor{orange!80!black}{$\triangle$}}
+\newcommand{\NA}{\textcolor{gray}{--}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+
+\title{\bfseries On the Design, Implementation, and Execution\\
+  Environment of the Typed AI Agent Language AIPL}
+\author{Yasushi Kodama\\[2pt]
+  {\small Hosei University\quad\texttt{yass@hosei.ac.jp}}}
+\date{2026-06-12}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+AI systems built around large language models (LLMs) are rapidly
+converging on architectures in which multiple autonomous
+agents---planners, solvers, reviewers, tool runners---cooperate
+asynchronously by exchanging messages.
+This paper presents, in a single coherent account, the design,
+implementation, and execution environment of \textbf{AIPL}
+(Actor-based Intelligent Parallel Language), a typed AI agent
+language that expresses this structure as a first-class language
+construct. AIPL inherits the lineage of Hewitt's actor model (1973)
+and ABCL/1 (1986), onto which it layers (i) \textbf{Hindley--Milner
+(HM) type inference} that demands no annotations, (ii) \textbf{gradual
+typing features} such as capability effects, linear types and session
+types, and (iii) \textbf{first-class AI integration} that embeds LLM
+calls as the language primitive \code{ai\_call}.
+On the implementation side, a single \code{.abcl} source is served by
+\textbf{seven runtimes} (annotated/inferred Python, the canonical
+OCaml, browser/Node JavaScript, and C) and \textbf{nine code-generation
+backends} (C+pthread, SDL2, Xinu, Python, Pony, Erlang, Go, Prolog,
+LLVM/OpenMP). We empirically verify that the three HM-equipped
+implementations (OCaml, inferred Python, and the C code generator)
+produce \emph{identical inferred types} for the same source.
+For execution, the same source can be deployed across three concurrency
+models---1:1 OS threads, M:N lightweight threads, and a cooperative
+event loop---and we add a distributed runtime layer (DR-1..13) providing
+token-budget governance, checkpointing, quarantine, CRDT state and saga
+compensation, together with on-device distributed execution that spans
+a Mac and the bare-metal OS Xinu running on a Raspberry Pi.
+As evaluation we report cross-validation of type inference, a locality
+analysis of type soundness, and more than 213 green smoke tests/demos.
+\end{abstract}
+
+\tableofcontents
+\vspace{1em}
+
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+
+\subsection{Background and Motivation}
+
+As LLM capabilities improve, practical AI systems increasingly rely not
+on a single model call but on multiple agents with distinct roles
+(planner, solver, reviewer, tool executor) that \emph{cooperate
+asynchronously through messages}. Strikingly, this is structurally
+isomorphic to the vision of \textbf{ABCL/1}~\cite{abcl1}, the
+object-oriented concurrent computation model proposed by Yonezawa et
+al.\ in 1986, in which independent stateful objects coordinate through
+three forms of message passing (past, now, future).
+However, the actor languages of that era lacked any facility for
+absorbing, at the language level, the \emph{token-budget management,
+timeouts, providers, fallbacks and cross-machine coordination} that
+modern AI agents require.
+
+This work designs and realizes \textbf{AIPL} (Actor-based Intelligent
+Parallel Language) as a language that fills this gap.
+Building on a direct re-implementation of ABCL, AIPL aims to:
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item realize an \textbf{annotation-free actor language} via
+        Hindley--Milner type inference;
+  \item make LLM invocation a first-class primitive,
+        \code{ai\_call(provider, prompt)}; and
+  \item drive, from one source, three concurrency models
+        (OS threads, lightweight threads, event loop) and beyond,
+        up to distributed and on-device execution.
+\end{enumerate}
+AIPL is therefore not merely a processor but a ``scripting layer for an
+AI-OS''---a language layer through which the runtime governs the
+concurrency, persistence, budgets and cross-machine coordination of
+many AI agents.
+
+\subsection{Contributions}
+
+This paper makes four contributions.
+
+\begin{description}[leftmargin=1.4em,style=nextline,itemsep=3pt]
+\item[(C1) An annotation-free actor language]
+  We design an actor language that requires no type annotations in its
+  surface syntax, inferring field types and method signatures from call
+  sites and initializers, and we empirically verify that three
+  independent HM implementations produce \emph{identical inference
+  results} for the same source (\S\ref{sec:eval}).
+\item[(C2) HM-driven code specialization]
+  Using inference results, we establish a code-generation technique that
+  \emph{specializes} regions outside actor message boundaries from a
+  \code{value\_t} tagged union to native C types (\S\ref{sec:codegen}).
+\item[(C3) First-class AI integration]
+  An LLM can be driven from any of ABCL/1's three send forms, and the
+  runtime governs token budgets, concurrency, fallback and usage
+  accounting (\S\ref{sec:llm}).
+\item[(C4) One source, many concurrency models, distributed execution]
+  The same \code{.abcl} source is deployed unmodified across three
+  concurrency models, and we further demonstrate on-device distributed
+  execution spanning a Mac and the bare-metal OS Xinu on a Raspberry Pi
+  over HTTP/JSON and UART/TCP (\S\ref{sec:runtime},\S\ref{sec:dist}).
+\end{description}
+
+\subsection{Organization}
+\S\ref{sec:related} reviews background and related work,
+\S\ref{sec:design} the language design, and
+\S\ref{sec:type} the type system and inference.
+\S\ref{sec:impl} covers the realization of seven runtimes and nine
+backends; \S\ref{sec:runtime}--\S\ref{sec:dist} cover the execution
+environment (concurrency models, LLM integration, distributed runtime,
+evolutionary pipeline); \S\ref{sec:case} gives case studies;
+\S\ref{sec:eval} evaluation, \S\ref{sec:discuss} discussion and
+limitations, and \S\ref{sec:concl} concludes.
+
+% =====================================================================
+\section{Background and Related Work}\label{sec:related}
+% =====================================================================
+
+\paragraph{The actor model and ABCL.}
+The actor model originates with Hewitt~\cite{hewitt}, treating each
+actor as a unit of computation that (i) receives a message,
+(ii) updates internal state, and (iii) creates new actors and sends.
+ABCL/1~\cite{abcl1} by Yonezawa et al.\ introduced three send forms---%
+\emph{past} (fire-and-forget), \emph{now} (synchronous) and
+\emph{future} (asynchronous handle)---and became a classic of
+object-oriented concurrent computing. AIPL inherits these three send
+forms directly (\S\ref{sec:design}).
+
+\paragraph{Hindley--Milner type inference.}
+The HM type system, beginning with Hindley~\cite{hindley} and
+Milner~\cite{milner}, is guaranteed by Damas--Milner's Algorithm
+\textsf{W}~\cite{damas} to infer principal types \emph{without
+annotations}. AIPL's inferencer adopts a textbook HM comprising
+\code{unify} / \code{generalize} / \code{instantiate} and let
+polymorphism (\S\ref{sec:infer}).
+
+\paragraph{Gradual typing, effects, linearity, sessions.}
+Siek--Taha's gradual typing~\cite{gradual} enables a continuous
+coexistence of static and dynamic typing. While AIPL is centered on its
+inferred dialect, the annotated dialect retains capability
+effects~\cite{capability}, linear types~\cite{linear} and session
+types~\cite{session} as a reference implementation, integrating the two
+as the inferred-HM axis and the annotated-gradual axis of one language
+(\S\ref{sec:gradual}).
+
+\paragraph{Structured concurrency and distribution.}
+Structured concurrency via \code{scope \{ \dots \}} shares its semantics
+with Java Project Loom's \textsf{StructuredTaskScope}~\cite{loom}.
+At the distributed layer, AIPL incorporates CRDT-based~\cite{crdt} actor
+state replication and saga-style compensating transactions.
+
+\paragraph{Evolutionary language design.}
+AIPL's next-generation feature set was determined through a unique loop
+(\S\ref{sec:evo}): an evolutionary search based on
+MAP-Elites~\cite{mapelites} empirically derives axes of language design,
+and the winners are implemented as features.
+
+\paragraph{Comparison with existing actor/agent platforms.}
+Erlang/OTP, Akka, Pony and Ray are mature actor/distributed platforms,
+but they pursue different design goals with respect to LLM integration,
+type inference and backend diversity (Table~\ref{tab:compare}).
+AIPL's distinctiveness lies in simultaneously achieving (i) annotation-
+free HM inference over an actor language, (ii) projection from one
+frontend to nine backends, and (iii) first-class governance of LLM calls
+and token budgets at the language/runtime level.
+
+\begin{table}[h]
+\centering\small
+\caption{Comparison of design goals with existing platforms}\label{tab:compare}
+\begin{tabularx}{\linewidth}{@{}l c c c c X@{}}
+\toprule
+ & 3 sends & inference & multi-backend & LLM first-class & main concurrency \\
+\midrule
+Erlang/OTP & \Part & \No & \No & \No & M:N (BEAM) \\
+Akka (Scala) & \Part & \Part & \No & \No & M:N (JVM) \\
+Pony & \No & \Part & \No & \No & M:N (ref.\ caps) \\
+Ray (Python) & \Part & \No & \No & \Part & 1:1 + cluster \\
+\textbf{AIPL} & \Yes & \Yes & \Yes & \Yes & 1:1 / M:N / event-loop \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{The Design of AIPL}\label{sec:design}
+% =====================================================================
+
+\subsection{Computation Model}
+An AIPL program is a set of \code{class} declarations. Each
+\code{class} defines one actor species, and \code{new C(args)} creates
+an instance (actor). Each actor owns an independent \textbf{mailbox},
+and its fields (state) are closed within the actor and cannot be read or
+written directly from outside. The sole interaction between actors is
+message passing.
+
+\subsection{The Three Send Forms}
+Inheriting ABCL/1, AIPL provides three send forms
+(Listing~\ref{lst:send}).
+
+\begin{lstlisting}[caption={Three send forms and reply},label={lst:send},float=h]
+class Counter {
+  var count = 0;
+  method tick() { count = count + 1; print("count = " + count); }
+  method get()  { reply(count); }     // respond to a synchronous send
+}
+var c = new Counter();
+send   c.tick();      // past   : fire-and-forget
+var v = now c.get();  // now    : blocks until reply arrives
+var f = future c.get();   // future : asynchronous handle
+var w = await(f);         // obtain the value from the handle
+\end{lstlisting}
+
+\code{reply(value)} fulfills the reply slot of a now/future send.
+\code{future\_done(f)} polls non-blockingly, and \code{await(f)} blocks
+to obtain the value. Within a method body, the special variables
+\code{self} (the actor) and \code{sender} (the sender) are available.
+
+\subsection{become and select}
+\code{become C(args)} replaces an actor's class and fields at runtime
+(a representation of state transition). \code{select \{ case \dots \}}
+performs selective reception from multiple channels/messages,
+corresponding to Erlang's \code{receive}.
+
+\subsection{Channels and Structured Concurrency}
+\code{channel[T]} / \code{channel[T,cap=N]} provide CSP-style typed
+channels (\code{channel\_send} / \code{channel\_recv} /
+\code{select\_recv}). A \code{scope \{ \dots \}} block is a structured-
+concurrency construct that automatically joins the futures created
+within it upon exit, guaranteeing that the parent scope owns the
+lifetimes of its child tasks.
+
+\subsection{The LLM Integration Primitive}
+LLM invocation is built into the language as
+\code{ai\_call([provider,] prompt)}. The provider id is
+\code{1}=Gemini (default) / \code{2}=Anthropic (Claude) /
+\code{3}=OpenAI / \code{0}=auto, and \code{AIPL\_AI\_PROVIDER=mock}
+takes all calls offline. An LLM can be driven from any of the three send
+forms (Listing~\ref{lst:ai}).
+
+\begin{lstlisting}[caption={Parallel queries via LLM $\times$ future},label={lst:ai},float=h]
+class Asker { method ask(q) { var r = ai_call(2, q); reply(r); } }
+var a = new Asker();
+var f1 = future a.ask("Translate hello to French.");
+var f2 = future a.ask("Translate hello to German.");
+print(await(f1));   // the two LLM calls run in parallel
+print(await(f2));
+\end{lstlisting}
+
+% =====================================================================
+\section{Type System and Type Inference}\label{sec:type}
+% =====================================================================
+
+\subsection{The World of Types}
+AIPL's types are as follows. Base types: \code{int} (64-bit),
+\code{float} (double precision; a trailing dot is allowed, e.g.\
+\code{100.}), \code{string} (UTF-8), \code{bool}, \code{unit};
+structured types: \code{actor(C)} (an instance of class C),
+\code{array}, \code{tuple(\dots)} (positional, immutable, fixed arity;
+the length and each slot type are part of the type),
+\code{record\{a:int,b:string\}} (structural, named fields),
+\code{channel[T]}, function types, and \code{future}; plus implicit
+polymorphism via single-letter type variables (\code{T U V \dots}).
+A generic function can be written \code{function id(x:T)->T}.
+
+\subsection{Hindley--Milner Type Inference}\label{sec:infer}
+The inferencer \code{infer.ml} of the canonical implementation (OCaml)
+realizes textbook HM: type variables via mutable union-find,
+\code{unify} / \code{generalize} / \code{instantiate}, and let
+polymorphism. The methods of a class are \textbf{pre-registered} with
+fresh type variables and concretized bottom-up during body checking---a
+\textbf{two-pass scheme}. As a result, information from call sites
+\emph{automatically monomorphizes} method signatures.
+
+\begin{lstlisting}[caption={No annotations = full inference; call sites fix the types},label={lst:infer},float=h]
+class Hello {
+  var count = 0.;        // count:float from the literal 0.
+  method init(n) {       // n is unannotated
+    count = n;           // count:float forces n:float
+    print("hi " + n);
+  }
+  method greet() { print("count = " + count); }
+}
+var h = new Hello(5);    // re-fixes init's argument type from the call site
+\end{lstlisting}
+
+For Listing~\ref{lst:infer}, the inferencer derives
+\code{count : float}, \code{init : (int) -> unit},
+\code{greet : () -> unit}. A method such as \code{Counter.dec(x)} is
+$\forall \alpha.\,\alpha \to \mathit{unit}$ at declaration, but is fixed
+to $\alpha = \mathit{float}$ by the body \code{count - x}
+(count:float), requiring no separate monomorphization pass
+(HM's \code{unify} does it automatically). Note that AIPL has no
+higher-rank polymorphism (rank-2 or higher); positions that take
+functions as arguments fall back to \code{any}.
+
+\subsubsection{The Two-Pass Inference Algorithm}
+The central challenge in applying HM to an actor language is the
+\emph{mutual reference among methods} and the \emph{sharing of fields}.
+When method \code{m} of class \code{C} calls another method \code{n} of
+the same class via \code{self.n(\dots)}, \code{m} must be checkable even
+if \code{n}'s type is undetermined. AIPL solves this in two passes.
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item \textbf{Pass 1 (pre-registration)}: assign a fresh type variable
+        to each field in the class, and a provisional signature
+        $\vec{\alpha}\to\beta$ (fresh variables for arguments and
+        result) to each method, registering them in the type
+        environment $\Gamma$.
+  \item \textbf{Pass 2 (body checking)}: check each method body
+        bottom-up and solve, via \code{unify}, the equality constraints
+        produced by assignments, calls and operations. Because fields
+        are shared across methods, a use in one method may fix the type
+        in another.
+\end{enumerate}
+
+Unification in Pass 2 is standard union-find with an occurs-check;
+\code{instantiate} freshens the generalized scheme of a \code{let}
+binding, and \code{generalize} closes, under $\forall$, the type
+variables not free in the environment. In Listing~\ref{lst:infer},
+Pass 1 gives \code{init} the type $(\alpha)\to\mathit{unit}$, and Pass 2
+derives $\alpha = \mathit{float}$ from the body \code{count = n}
+(with \code{count : float}). Furthermore, since the call site
+\code{new Hello(5)} supplies the integer literal \code{5}, \code{init}'s
+argument is finally re-fixed to \code{int}.
+
+\subsubsection{Principal Unification Rules}
+Unification $\mathsf{unify}(\tau_1,\tau_2)$ follows the rules below
+(excerpt). $\sigma$ is a substitution and $\doteq$ denotes a pair being
+unified.
+\begin{align*}
+\alpha \doteq \tau &\;\Rightarrow\; [\alpha \mapsto \tau]\quad
+  (\alpha \notin \mathrm{ftv}(\tau)\ \text{occurs-check}) \\
+(\tau_1 \to \tau_2) \doteq (\tau_1' \to \tau_2') &\;\Rightarrow\;
+  \mathsf{unify}(\tau_1,\tau_1');\ \mathsf{unify}(\tau_2,\tau_2') \\
+\mathsf{actor}(C) \doteq \mathsf{actor}(C') &\;\Rightarrow\;
+  C = C' \\
+\mathsf{record}(R_1) \doteq \mathsf{record}(R_2) &\;\Rightarrow\;
+  \text{unify common fields}\ (\text{width subtyping}) \\
+\mathsf{any} \doteq \tau &\;\Rightarrow\;
+  \text{succeed}\ (\text{gradual boundary; insert transient cast})
+\end{align*}
+The last \code{any} rule is the junction with gradual typing and is the
+locus of the soundness boundaries of \S\ref{sec:sound}.
+
+\subsection{The Second Axis: Gradual Typing}\label{sec:gradual}
+While centered on the inferred dialect, AIPL retains the annotated
+dialect as a \emph{reference implementation} and provides gradual-typing
+features.
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{Capability effects}:
+        \code{function read\_url(u:string)->string !\{net,fs\}\{\dots\}}
+        annotates method types with an effect row over
+        \code{\{ai,fs,net,mut\}}. Default effects \code{BUILTIN\_EFFECTS}
+        are assigned to 43 builtins and inferred.
+  \item \textbf{Linear types}: \code{var fh: linear int = open("x");}
+        statically guarantees single use of a resource.
+  \item \textbf{Ownership}: \code{pub var holder: string = "";}
+        distinguishes public fields.
+  \item \textbf{Session types}:
+        \code{session\_define("Solve", "solver.solve(string) ! string -> reviewer.review(\dots) -> \dots")}
+        dynamically defines an inter-actor protocol.
+  \item \textbf{Refinement}: predicate constraints over integers, reals
+        and rationals are delegated to the SMT solver Z3 (detecting
+        vacuously-false predicates at declaration time).
+\end{itemize}
+These exist in the inferred dialect only through the runtime, while the
+annotated dialect carries the static-checking reference implementation;
+this is the two-axis structure.
+
+\subsection{Type Soundness}\label{sec:sound}
+Type soundness is discussed via the two propositions of progress and
+preservation.
+\begin{definition}[Progress]
+Execution of a well-typed program does not get stuck due to a type
+mismatch (e.g.\ an arithmetic operation on a string).
+\end{definition}
+\begin{definition}[Preservation]
+After taking an evaluation step, a value's type remains compatible with
+its declared type (under a simple partial order that includes
+\code{any}).
+\end{definition}
+
+Being a gradually typed language, AIPL exhibits the typical property of
+being \emph{locally sound but globally unsound}. The boundaries at which
+soundness may break are four: (1) inflow of \code{any} from unannotated
+to annotated regions; (2) changes of class shape via dynamic reflection
+(\code{compile} / \code{become} / \code{add\_method}); (3) divergence of
+the recipient's signature under dynamic dispatch; and (4) rewriting an
+actor field via a record. For the highest-priority unsoundness gap,
+the \code{any}$\to$\code{T} boundary, we introduced a \textbf{transient
+cast} via the \code{--transient} flag, inserting at the three boundaries
+(variable declaration, method argument, function argument) a runtime
+check governed by the same compatibility rule as the static check.
+
+% =====================================================================
+\section{Realization: Seven Runtimes and Nine Backends}\label{sec:impl}
+% =====================================================================
+
+\subsection{The Multi-Implementation Architecture}
+AIPL has \textbf{seven runtime implementations} of a single source
+language (Table~\ref{tab:runtimes}). Of these, HM inference is adopted by
+three: OCaml, inferred Python, and the C code generator.
+
+\begin{table}[h]
+\centering\small
+\caption{AIPL's seven runtime implementations}\label{tab:runtimes}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Short name & Source & Type system \\
+\midrule
+Py-A (annotated) & \code{python-aipl/} & Gradual typing (Phase 11--17 reference, most complete) \\
+Py-I (inferred) & \code{python-aipl-inferred/} & \textbf{HM inference} (interp shared with Py-A, 899 lines) \\
+OCaml (canonical) & \code{src/*.ml} & \textbf{HM inference} (\code{infer.ml} 484 lines, WebSocket built in) \\
+JS-O (via OCaml) & \code{src/app.js} + gateway & = OCaml HM (\code{/api/typecheck}) \\
+JS-B (browser) & \code{browser-abcl/} & flow-sensitive light inference (\code{typecheck.js} 308 lines) \\
+JS-N (Node) & \code{node-aipl-server/} & flow-sensitive (inherited), HTTP wrap \\
+C (\code{aipl2c}) & \code{aipl2c.ml} + C runtimes & \textbf{HM + code specialization} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Parsing Mechanism}
+The canonical OCaml implementation performs lexing/parsing with
+\code{lexer.mll} (ocamllex) + \code{parser.mly} (Menhir), feeding
+\code{infer.ml} → \code{eval\_thread.ml}. The Python implementation uses
+a Lark grammar (\code{grammar.lark}) and passes the AST to
+\code{aipl\_typeck} / \code{aipl\_inference}. The browser/Node
+implementations share browser-abcl's hand-written parser.
+
+\subsection{HM-Driven Code Specialization}\label{sec:codegen}
+The core technique of the C backend (\code{aipl2c}) is \textbf{code
+specialization} using HM inference results. If \code{l\_a, l\_b} are
+inferred to be \code{int}, then instead of the \code{value\_t}
+tagged-union operation \code{v\_binop("+",l\_a,l\_b)} it emits the native
+\code{long l\_x = (l\_a + l\_b);}. \code{value\_t} is kept uniform only at
+actor message boundaries (\code{value\_t args[]}), while the actor
+interior is specialized. This reconciles \emph{mailbox uniformity} with
+\emph{static specialization of the interior}.
+
+\subsection{Nine Code-Generation Backends}\label{sec:backends}
+The OCaml \code{aipl2c} generates code from a single frontend to several
+backends (Table~\ref{tab:backends}). A send is projected onto each
+target's concurrency primitive: C+pthread emits \code{enqueue(\dots)},
+Pony \code{obj.method(args)}, Erlang \code{Pid ! \{method,Args\}}, Go
+\code{obj.mailbox <- msgT\{\dots\}}, and Prolog
+\code{thread\_send\_message(\dots)}. Pony/Go/Erlang use a two-stage
+initialization that separates construction from the init body.
+
+\begin{table}[h]
+\centering\small
+\caption{Nine backends from a single frontend}\label{tab:backends}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Flag & Target & Concurrency model \\
+\midrule
+(default) & C + pthread & 1:1 OS threads \\
+\code{-lSDL2} & C + SDL2 GUI & 1:1 (with rendering) \\
+\code{--xinu} & Xinu C & bare-metal cooperative \\
+\code{--python} & Python & 1:1 OS threads \\
+\code{--pony} & Pony & M:N lightweight \\
+\code{--erlang} & Erlang/BEAM & M:N lightweight \\
+\code{--go} & Go goroutine & M:N lightweight \\
+\code{--prolog} & SWI-Prolog & threads \\
+\code{--llvm / --openmp} & LLVM / OpenMP & hot/cold annotation, parallel for \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Execution Environment (1): Concurrency Models and LLM Integration}\label{sec:runtime}
+% =====================================================================
+
+\subsection{Unifying Three Concurrency Models}
+A key demonstration in AIPL is that the same \code{.abcl} source can be
+deployed, \emph{unmodified}, across three concurrency models.
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item \textbf{1:1 OS threads} (Python/OCaml/C):
+        on the order of 100--1000 actors.
+  \item \textbf{M:N lightweight threads} (Pony/Erlang/Go codegen):
+        on the order of $10^5$--$10^7$ actors.
+  \item \textbf{Cooperative event loop} (browser-abcl/node):
+        single-threaded \code{setTimeout(0)} scheduling.
+\end{enumerate}
+Because the actor abstraction is independent of the concurrency model,
+one can migrate from a prototype (event loop) to high throughput (M:N)
+without changing the source.
+
+\subsection{LLM Governance}\label{sec:llm}
+The \code{ai\_call} family (\code{ai\_call\_with\_system},
+\code{ai\_call\_retry}, \code{ai\_call\_image}, \code{ai\_call\_priority})
+is governed by the runtime through environment variables:
+\code{ABCL\_AI\_TOKEN\_BUDGET} (\code{BudgetExceeded} on overflow),
+\code{ABCL\_AI\_MAX\_CONCURRENT} (in-flight semaphore),
+\code{ABCL\_AI\_FALLBACK\_MODELS} (fallback chain),
+\code{ABCL\_AI\_USAGE\_FILE} (usage accounting), and
+\code{AIPL\_AI\_PROVIDER=mock} (offline smoke).
+Backends support Ollama (local), OpenAI, Gemini and Anthropic.
+
+\subsection{WebSocket and Dashboards}
+All seven runtimes provide WebSocket over a unified wire protocol:
+OCaml implements RFC 6455 by hand in \code{web\_gateway.ml} (40 lines),
+Python in \code{aipl\_websocket.py}, JS-B uses the browser native API,
+JS-N uses \code{ws}, and C uses libwebsockets. A client joins via
+\code{?sid=<group>} and receives
+\code{\{"kind":"welcome","sid":\dots,"peers":N\}}.
+\code{aipl\_main.py --dashboard 8800} provides live counters, an observed
+traffic table and an SSE event stream, and
+\code{ABCL\_PEER\_DASHBOARDS} aggregates multiple workers into a TOTAL
+row.
+
+% =====================================================================
+\section{Execution Environment (2): Distributed Runtime and On-Device Distribution}\label{sec:dist}
+% =====================================================================
+
+\subsection{Distributed Runtime DR-1..13}
+Enabled by \code{AIPL\_DIST\_ENABLE=1}, the distributed runtime layer
+(\code{aipl\_dist}) provides, opt-in, the governance features needed for
+operating AI agents (Table~\ref{tab:dr}).
+
+\begin{table}[h]
+\centering\small
+\caption{Distributed runtime features DR-1..13}\label{tab:dr}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+ID & Feature & Summary \\
+\midrule
+DR-1 & env-var routing & \code{AIPL\_ROUTE}, actor-name→tag table \\
+DR-2 & structured log & ND-JSON, one line per event \\
+DR-3 & token-budget coordination & 60-second sliding window (RPM/TPM) \\
+DR-4 & checkpoint/resume & atomic save/restore \\
+DR-5 & quarantine \& skip & automatic quarantine (TTL) \\
+DR-6 & quorum replication & parallel multi-provider \\
+DR-7 & subtree quarantine & OTP-style blast-radius limiting \\
+DR-8 & spawn-tree tracking & TLS-auto parent \\
+DR-9 & runtime hooks & interp/actor/call\_ai (opt-in) \\
+DR-10 & CRDT state & G-Counter/OR-Set/LWW-Register (15 prims) \\
+DR-11 & saga compensation & \code{saga\{step\{\}compensate\{\}\}} (LIFO) \\
+DR-12 & multi-region failover & per-region route + chain walk \\
+DR-13 & auto-scaling pool & hysteresis-driven (\code{pool\_create} etc.) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{HTTP/JSON Distribution and Remote Send}
+Remote send is realized over an HTTP/JSON wire protocol:
+\code{POST /api/json/send} (fire-and-forget) and
+\code{POST /api/json/call} (synchronous reply). Python provides
+\code{remote\_call} / \code{remote\_now} / \code{remote\_future} and
+\code{web\_listen(port)} / \code{web\_expose} / \code{serve\_forever}.
+Setting \code{ABCL\_REMOTE\_SECRET} makes an HMAC-SHA256 signature
+(\code{X-ABCL-Sig}) mandatory, wire-compatible across Python/OCaml/C
+(OCaml uses a pure \code{hmac\_sha256.ml}). This enables coordination
+across three nodes with different providers (coordinator / solver /
+verifier).
+
+\subsection{On-Device Distribution: Mac $\times$ Raspberry Pi (Xinu)}
+AIPL further demonstrates on-device distribution spanning host actors on
+a Mac and AIPL actors on the bare-metal OS \textbf{Xinu} running on a
+Raspberry Pi. The two are connected by a line-oriented RPC over UART/TCP
+(opcodes: PING/LIST/SEND/QUERY/LOAD/COMPILE/RUN/SPAWN), and the inferred
+Python translates this transparently into sends via the \code{uart1://}
+scheme. As a representative example, the ``distributed dining
+philosophers'' was composed of 3 Mac nodes + 2 Xinu nodes, with the 5
+forks turned into Xinu actors, achieving mutual-exclusion synchronization
+across the boundary on real hardware.
+
+\subsection{The Evolutionary Language-Design Pipeline}\label{sec:evo}
+AIPL's next-generation features (CE-1..13 for inference enhancement and
+DR-1..13 for distribution) were implemented as the result of a
+\textbf{MAP-Elites} genetic algorithm in \code{aice-evolution-v2} that,
+taking a language specification (\code{.aice}) as input, performs
+cross-task evaluation and LLM-directed mutation to empirically derive
+``universal axes of language design.'' For example, structured
+concurrency (\code{scope\{future\dots\}}) was turned into a language
+feature based on a prediction in which the search pinned
+\code{concurrency=structured}, \code{ownership=linear} and
+\code{type=dependent} as top axes. The pipeline consists of three stages,
+\code{.aice} → \code{.ga.json} → \code{.abcl}. Table~\ref{tab:evo} shows
+the predicted axes the search derived and reflected into the
+implementation.
+
+\begin{table}[h]
+\centering\small
+\caption{Language axes derived by the evolutionary search and their implementation}\label{tab:evo}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Prediction (axis) & Winning value & Implementation \\
+\midrule
+type\_safety & dependent & refinement + Z3 (CE-6/CE-9) \\
+effect & capability & capability effect rows (CE-10/CE-11) \\
+concurrency & csp\_channels & \code{channel[T]} (CE family / Phase 13) \\
+ownership & linear & linear types \code{linear} \\
+state & symbol\_owned & actor-closed fields \\
+concurrency (again) & structured & \code{scope\{future\dots\}} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The winning individuals (balanced / hang-resilience / Erlang-OTP-like)
+were selected from a MAP-Elites search of 8 seeds $\times$ 30 generations
+$\times$ 2 runs (about 24 minutes each, over 1400 LLM calls). These
+became the implementation basis for DR-1..13.
+
+% =====================================================================
+\section{Case Studies}\label{sec:case}
+% =====================================================================
+This section shows, through two case studies, how AIPL's design
+crystallizes in real applications.
+
+\subsection{An LLM Multi-Agent Pipeline}
+A configuration in which planner, solver and reviewer agents cooperate to
+solve a problem can be written concisely with the three send forms and
+\code{ai\_call} (Listing~\ref{lst:pipeline}). Future-form sends overlap
+the LLM calls of the solver and reviewer, and \code{scope} bundles the
+lifetimes of the child tasks.
+
+\begin{lstlisting}[caption={planner→solver→reviewer cooperation},label={lst:pipeline},float=h]
+class Solver   { method solve(q)      { reply(ai_call(2, "Solve: " + q)); } }
+class Reviewer { method review(q, a)  { reply(ai_call(2, "Grade:" + q + a)); } }
+class Planner {
+  var s = new Solver();
+  var r = new Reviewer();
+  method run(q) {
+    scope {
+      var fa = future s.solve(q);     // solver's LLM call
+      var a  = await(fa);
+      var fr = future r.review(q, a); // reviewer's LLM call
+      reply(await(fr));
+    }                                 // unfinished futures auto-joined on scope exit
+  }
+}
+var p = new Planner();
+print(now p.run("integral of x^2"));
+\end{lstlisting}
+
+The token budget (\code{ABCL\_AI\_TOKEN\_BUDGET}), concurrency
+(\code{ABCL\_AI\_MAX\_CONCURRENT}), quorum replication (DR-6) and
+fallback (\code{ABCL\_AI\_FALLBACK\_MODELS}) are all governed by
+environment variables and the runtime without changing this source.
+
+\subsection{Mac $\times$ Xinu On-Device Distribution: Dining Philosophers}
+We ran the classic dining-philosophers problem in a mixed topology that
+places the 5 forks as Xinu actors on a Raspberry Pi and the philosophers
+as actors on a Mac. The inferred Python on the Mac side translates sends
+to the fork actors transparently into line-oriented RPC (QUERY/SEND)
+under the \code{uart1://} scheme, achieving mutual-exclusion
+synchronization across the boundary on real hardware. The fact that the
+same philosopher logic can be deployed \emph{unmodified} into the three
+forms (a) single-process 1:1 threads, (b) M:N via Go-goroutine codegen,
+and (c) Mac+Xinu on-device distribution, concretely substantiates the
+concurrency-model independence of \S\ref{sec:runtime}.
+
+% =====================================================================
+\section{Evaluation}\label{sec:eval}
+% =====================================================================
+
+\subsection{Cross-Validation of Inference}
+AIPL's principal empirical claim is that the three HM-equipped
+implementations (OCaml / inferred Python / C code generator) produce
+\emph{identical inferred types} for the same \code{.abcl} source.
+A representative example follows (identical across all three):
+\begin{verbatim}
+Hello:   count : float;  init : (int) -> unit;
+         greet : () -> unit;  inc : () -> unit
+Counter: count : float;  inc : () -> unit;
+         dec : (float) -> unit   <- monomorphized via call site
+\end{verbatim}
+
+\subsection{Feature Parity and Testing}
+The next-generation features CE-1..13 + DR-1..13 are confirmed to have
+feature parity across the main runtimes. At the completion of Phase O,
+distributed DR-1..9 and inference CE-1..9 were each 9/9 across the Py-A /
+OCaml / JS-O implementations, totaling 18/18 (about 1305 LOC of
+implementation). JS-B / JS-N also closed out at 26/26, including
+CE-10/CE-12/CE-13/DR-11. Table~\ref{tab:smoke} summarizes the smoke
+tests.
+
+\begin{table}[h]
+\centering\small
+\caption{Smoke-test summary (representative figures)}\label{tab:smoke}
+\begin{tabularx}{\linewidth}{@{}X r@{}}
+\toprule
+Item & Result \\
+\midrule
+OCaml runtime & 52/52 \\
+Browser (syntax/parse) & 7/7 + 4/4 \\
+Python (\code{.abcl} / legacy \code{.aipl}) & 33/33 + 21/21 \\
+Distributed cross-language (3-node mock) & 8/8 \\
+Self-hosting tower (10 levels, 41 samples) & 47/47 \\
+\code{aipl\_dist} unit & 27/27 \\
+Distributed MVP demos (8 features $\times$ 3) & 24/24 \\
+next-gen / self-host assertions & 103 all PASS \\
+\midrule
+\textbf{Total} & \textbf{213+ tests/demos green} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Self-Hosting}
+The \code{aipl-self-host/} tower, which describes AIPL in AIPL itself,
+consists of 10 levels (Level A--C-3 plus the integrated Level Z), and all
+47/47 smoke tests are green. Level Z is an integrated full self-host
+using an 18-line Python bootstrap and a CE-11 capability-checked
+\code{io\_bridge.abcl}, applying each level's checker to itself to
+demonstrate phase monotonicity.
+
+\subsection{Implementation Size}
+The sizes of the principal components are: OCaml HM $\approx$985 lines
+(\code{infer.ml} 484 + \code{types.ml} + \code{typing\_env.ml}), inferred
+Python 899 lines, \code{aipl\_inference.py} $\sim$1255 lines,
+\code{aipl\_dist.py} 591 lines, \code{typecheck.js} 308 lines, WebSocket
+40 lines, the C+SDL2 runtime 1178 lines, and the self-host with 9 modules
+$\sim$1500 lines.
+
+% =====================================================================
+\section{Discussion and Limitations}\label{sec:discuss}
+% =====================================================================
+
+\paragraph{Limits of soundness.}
+As stated in \S\ref{sec:sound}, AIPL is a gradually typed language: it is
+locally sound for annotated regions, but global soundness does not hold
+at boundaries with unannotated regions or dynamic reflection. The
+transient cast plugs the highest-priority gap, but the runtime type cast
+is limited and constitutes a weak guarantee that falls short of full
+transient soundness. Soundness guarantees for programs containing dynamic
+reflection (\code{become} / \code{compile}) are future work.
+
+\paragraph{Expressiveness of inference.}
+The current HM lacks higher-rank polymorphism (rank-2 or higher), and
+positions taking functions as arguments fall back to \code{any}. Also,
+narrowing is limited to simple conditions; narrowing over \code{\&\&}
+chains and nested conditions is unsupported.
+
+\paragraph{Version drift.}
+The figures in this paper are integrated from several reports of
+different periods, with version drift in the number of runtimes (7 vs 6,
+depending on how Py-A is counted) and the number of self-hosting levels
+(9/37 vs 10/47). This paper adopts the latest feature matrix (10 levels,
+47/47, 7 runtimes).
+
+\paragraph{Future work.}
+(i) Strengthening soundness guarantees for programs with dynamic
+reflection; (ii) higher-rank polymorphism and full flow-sensitive
+narrowing; (iii) large-scale (>$10^6$ actors) on-device evaluation on the
+M:N backends; and (iv) quantitative validation of language-feature
+prediction via the evolutionary pipeline.
+
+% =====================================================================
+\section{Conclusion}\label{sec:concl}
+% =====================================================================
+This paper presented, in a single coherent account, the design,
+implementation and execution environment of AIPL, a typed AI agent
+language that gives a first-class linguistic expression to the
+``cooperating multiple agents'' that form the natural architecture of
+LLM-driven AI systems. AIPL layers HM type inference and gradual-typing
+features, together with first-class AI integration via \code{ai\_call},
+onto ABCL/1's three send forms; it drives seven runtimes, nine backends
+and three concurrency models from one source, and realizes on-device
+distribution spanning a Mac and a Raspberry Pi (Xinu) over HTTP/JSON and
+UART/TCP. We empirically showed that the three HM-equipped
+implementations produce identical inferred types for the same source, and
+that more than 213 tests/demos are green. AIPL offers one attainment of a
+``scripting layer for an AI-OS'' that bridges the classical ideal of
+actor languages and the modern operation of AI agents.
+
+% =====================================================================
+\begin{thebibliography}{99}
+\bibitem{hewitt} C. Hewitt, P. Bishop, R. Steiger.
+  A Universal Modular ACTOR Formalism for Artificial Intelligence.
+  \textit{IJCAI}, 1973.
+\bibitem{abcl1} A. Yonezawa, J.-P. Briot, E. Shibayama.
+  Object-Oriented Concurrent Programming in ABCL/1.
+  \textit{OOPSLA}, 1986.
+\bibitem{hindley} J. R. Hindley.
+  The Principal Type-Scheme of an Object in Combinatory Logic.
+  \textit{Trans. AMS}, 1969.
+\bibitem{milner} R. Milner.
+  A Theory of Type Polymorphism in Programming.
+  \textit{J. Computer and System Sciences}, 1978.
+\bibitem{damas} L. Damas, R. Milner.
+  Principal Type-Schemes for Functional Programs.
+  \textit{POPL}, 1982.
+\bibitem{gradual} J. G. Siek, W. Taha.
+  Gradual Typing for Functional Languages.
+  \textit{Scheme Workshop}, 2006.
+\bibitem{capability} A. Mettler, D. Wagner, T. Close.
+  Joe-E: A Security-Oriented Subset of Java.
+  \textit{NDSS}, 2010.
+\bibitem{linear} P. Wadler.
+  Linear Types Can Change the World!
+  \textit{Programming Concepts and Methods}, 1990.
+\bibitem{session} K. Honda, V. T. Vasconcelos, M. Kubo.
+  Language Primitives and Type Discipline for Structured
+  Communication-Based Programming. \textit{ESOP}, 1998.
+\bibitem{loom} R. Pressler et al.
+  JEP 453: Structured Concurrency (Java Project Loom). 2023.
+\bibitem{crdt} M. Shapiro, N. Pregui\c{c}a, C. Baquero, M. Zawirski.
+  Conflict-Free Replicated Data Types. \textit{SSS}, 2011.
+\bibitem{mapelites} J.-B. Mouret, J. Clune.
+  Illuminating Search Spaces by Mapping Elites. arXiv:1504.04909, 2015.
+\end{thebibliography}
+
+\end{document}

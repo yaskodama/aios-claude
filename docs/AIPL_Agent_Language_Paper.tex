@@ -1,0 +1,856 @@
+% !TEX program = xelatex
+% 型付きAIエージェント言語AIPLの設計と実現とその実行環境について
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{makecell}
+\usepackage{mathtools}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.82]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!60!black,
+  citecolor=blue!50!black,
+  pdftitle={型付きAIエージェント言語AIPLの設計と実現とその実行環境について},
+  pdfauthor={Yasushi Kodama (児玉靖司)}
+}
+
+% ---- listings: AIPL 言語定義 ----------------------------------------
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\definecolor{codestr}{RGB}{160,40,40}
+\definecolor{codetype}{RGB}{20,120,90}
+
+\lstdefinelanguage{aipl}{
+  keywords={class, method, function, return, var, new, send, now, future, await,
+            reply, become, select, case, scope, saga, step, compensate, channel,
+            if, else, while, do, self, sender, where, pub, linear, transient,
+            session_define, grant_cap, revoke_cap, true, false},
+  keywordstyle=\color{codekw}\bfseries,
+  morekeywords=[2]{int, float, string, bool, unit, actor, array, tuple, record,
+                   image, any},
+  keywordstyle=[2]\color{codetype},
+  comment=[l]{//},
+  commentstyle=\color{codecmt}\itshape,
+  string=[b]",
+  stringstyle=\color{codestr},
+  morestring=[b]',
+  sensitive=true,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  breaklines=true,
+  showstringspaces=false,
+  literate={→}{{$\rightarrow$}}1 {⊢}{{$\vdash$}}1 {∀}{{$\forall$}}1,
+}
+\lstset{language=aipl}
+
+% ---- 記号 -----------------------------------------------------------
+\newcommand{\Yes}{\textcolor{green!50!black}{\textbf{\checkmark}}}
+\newcommand{\No}{\textcolor{red!70!black}{$\times$}}
+\newcommand{\Part}{\textcolor{orange!80!black}{$\triangle$}}
+\newcommand{\NA}{\textcolor{gray}{--}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\newtheorem{theorem}{定理}
+\newtheorem{proposition}{命題}
+\newtheorem{definition}{定義}
+
+\title{\bfseries 型付き AI エージェント言語 AIPL の\\設計と実現とその実行環境について}
+\author{児玉 靖司\quad (Yasushi Kodama)\\[2pt]
+  {\small 法政大学\quad\texttt{yass@hosei.ac.jp}}}
+\date{2026-06-12}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+大規模言語モデル (LLM) を中核に据えた AI システムは,
+プランナ・ソルバ・レビュアといった複数の自律エージェントが
+非同期に協調するアーキテクチャへ急速に収束しつつある.
+本稿は,この構造を言語仕様として第一級に表現する
+\textbf{型付き AI エージェント言語 AIPL} (Actor-based Intelligent
+Parallel Language) の設計・実現・実行環境を一貫して記述する.
+AIPL は 1973 年 Hewitt のアクターモデルと 1986 年の ABCL/1 の系譜を継ぎ,
+そこへ (i) 注釈を一切要求しない \textbf{Hindley--Milner (HM) 型推論},
+(ii) capability 効果・線形・セッションといった \textbf{段階的型機能},
+(iii) LLM 呼び出しを言語プリミティブ \code{ai\_call} として埋め込む
+\textbf{第一級 AI 連携} の三層を重ねたものである.
+実現面では,同一の \code{.abcl} ソースに対して \textbf{7 種のランタイム}
+(注釈版/推論版 Python,OCaml 正典,ブラウザ/Node の JavaScript,C) と
+\textbf{9 種のコード生成バックエンド} (C+pthread, SDL2, Xinu, Python,
+Pony, Erlang, Go, Prolog, LLVM/OpenMP) を実装し,そのうち HM 推論を
+備える 3 実装 (OCaml,推論版 Python,C コード生成) が
+\textbf{同一ソースに対し完全一致する推論型}を産出することを経験的に検証した.
+実行環境としては,1:1 OS スレッド・M:N 軽量スレッド・協調イベントループの
+3 並行モデルを同一ソースから選択可能とし,さらにトークン予算管理・
+チェックポイント・隔離・CRDT 状態・saga 補償からなる分散ランタイム層
+(DR-1..13) と,Mac と Raspberry Pi 上のベアメタル OS Xinu を跨ぐ
+実機分散実行を実現した.型推論の cross-validation,型健全性の局所性解析,
+そして 213 超のスモークテスト/デモが全て green である点を評価として報告する.
+\end{abstract}
+
+\tableofcontents
+\vspace{1em}
+
+% =====================================================================
+\section{はじめに}
+% =====================================================================
+
+\subsection{背景と動機}
+
+LLM の能力向上にともない,実務的な AI システムは単一のモデル呼び出しでは
+なく,役割の異なる複数エージェント
+(プランナ,ソルバ,レビュア,ツール実行器など) が
+\emph{メッセージを介して非同期に協調}する構成に収束しつつある.
+これは奇しくも,1986 年に米澤明憲らが提唱したオブジェクト指向並行計算モデル
+\textbf{ABCL/1}~\cite{abcl1} が描いた未来像——
+独立した状態を持つオブジェクトが過去型・現在型・未来型の三種の
+メッセージ送信で協調する——と本質的に同型である.
+しかし当時のアクター言語には,現代の AI エージェントが必要とする
+\emph{トークン予算管理・タイムアウト・プロバイダ・フォールバック・
+クロスマシン協調}を言語仕様で吸収する仕組みが存在しなかった.
+
+本研究は,この欠落を埋める言語として \textbf{AIPL}
+(Actor-based Intelligent Parallel Language) を設計・実現した.
+AIPL は ABCL の直系再実装を基盤としつつ,
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item \textbf{型注釈フリーなアクター言語}を Hindley--Milner 型推論で実現し,
+  \item LLM 呼び出しを \code{ai\_call(provider, prompt)} という
+        言語プリミティブとして第一級化し,
+  \item 同一ソースから OS スレッド・軽量スレッド・イベントループの
+        3 並行モデル,そして分散・実機実行までを統一的に駆動する,
+\end{enumerate}
+ことを目指す.AIPL は単なる処理系ではなく,
+``AI-OS のスクリプト層'' ——
+すなわち多数の AI エージェントの並行性・永続性・予算・
+クロスマシン協調をランタイムが統治するための言語層——として位置づけられる.
+
+\subsection{本稿の貢献}
+
+本稿の貢献は次の四点である.
+
+\begin{description}[leftmargin=1.4em,style=nextline,itemsep=3pt]
+\item[(C1) 型注釈フリーなアクター言語の実現]
+  表面構文に型注釈を一切要求せず,フィールド型・メソッドシグネチャを
+  呼び出しサイトと初期化式から自動推論するアクター言語を設計し,
+  HM を備えた 3 つの独立実装が同一ソースに対し
+  \emph{同一の推論結果}を産出することを経験的に検証した
+  (\S\ref{sec:eval}).
+\item[(C2) HM 駆動のコード特殊化]
+  推論結果を活用し,アクター間メッセージ境界以外の領域を
+  \code{value\_t} タグ付き共用体からネイティブ C 型へ
+  \emph{特殊化}するコード生成手法を確立した (\S\ref{sec:codegen}).
+\item[(C3) AI 連携の第一級化]
+  ABCL/1 の三種送信のいずれからも LLM を駆動でき,
+  トークン予算・並行度・フォールバック・利用量記録を
+  環境変数とランタイムで統治する枠組みを構築した (\S\ref{sec:llm}).
+\item[(C4) 単一ソース・多並行モデル・分散実行]
+  同一の \code{.abcl} ソースを 3 並行モデルへ無改変配置し,
+  さらに HTTP/JSON および UART/TCP 経由で
+  Mac と Raspberry Pi 上のベアメタル OS Xinu を跨ぐ
+  実機分散実行を実証した (\S\ref{sec:runtime},\S\ref{sec:dist}).
+\end{description}
+
+\subsection{構成}
+\S\ref{sec:related} で背景と関連研究を整理し,
+\S\ref{sec:design} で言語設計を,
+\S\ref{sec:type} で型システムと型推論を述べる.
+\S\ref{sec:impl} で 7 ランタイムと 9 バックエンドの実現を,
+\S\ref{sec:runtime}--\S\ref{sec:dist} で実行環境
+(並行モデル・LLM 連携・分散ランタイム・進化的パイプライン) を述べ,
+\S\ref{sec:eval} で評価,\S\ref{sec:discuss} で議論と限界,
+\S\ref{sec:concl} で結論を述べる.
+
+% =====================================================================
+\section{背景と関連研究}\label{sec:related}
+% =====================================================================
+
+\paragraph{アクターモデルと ABCL.}
+アクターモデルは Hewitt~\cite{hewitt} に始まり,各アクターが
+(i) メッセージ受信,(ii) 内部状態の更新,(iii) 新たなアクター生成・送信
+を行う計算単位とする.米澤らの ABCL/1~\cite{abcl1} は,
+これに \emph{過去型 (past, fire-and-forget)},\emph{現在型 (now, 同期)},
+\emph{未来型 (future, 非同期ハンドル)} の三種送信を導入し,
+オブジェクト指向並行計算の古典となった.
+AIPL は ABCL/1 の三種送信をそのまま継承する (\S\ref{sec:design}).
+
+\paragraph{Hindley--Milner 型推論.}
+Hindley~\cite{hindley} と Milner~\cite{milner} に始まる HM 型システムは,
+Damas--Milner~\cite{damas} の Algorithm \textsf{W} により,
+\emph{注釈なしに}主要型 (principal type) を推論できることが保証される.
+AIPL の推論器は \code{unify} / \code{generalize} / \code{instantiate} と
+let 多相からなる教科書的 HM を採用する (\S\ref{sec:infer}).
+
+\paragraph{段階的型付け・効果・線形・セッション.}
+Siek--Taha の gradual typing~\cite{gradual} は静的型と動的型の
+連続的な共存を可能にする.AIPL は推論版を主軸としつつ,
+注釈版で capability 効果~\cite{capability},線形型~\cite{linear},
+セッション型~\cite{session} を参照実装として保持し,
+両者を一言語の二軸 (推論的 HM 軸と注釈的段階的軸) として統合する
+(\S\ref{sec:gradual}).
+
+\paragraph{構造化並行と分散.}
+\code{scope \{ \dots \}} による構造化並行は Java Project Loom の
+\textsf{StructuredTaskScope}~\cite{loom} と意味論を同じくする.
+分散層では CRDT~\cite{crdt} によるアクター状態複製,
+saga パターンによる補償トランザクションを取り込む.
+
+\paragraph{進化的言語設計.}
+AIPL の次世代機能群は,MAP-Elites~\cite{mapelites} に基づく
+進化計算で言語設計の軸を経験導出し,その勝者を機能として実装する,
+という独自のループ (\S\ref{sec:evo}) を経て決定された.
+
+\paragraph{既存のアクター/エージェント基盤との比較.}
+Erlang/OTP,Akka,Pony,Ray などは成熟したアクター/分散基盤だが,
+LLM 連携・型推論・コード生成多様性の観点では設計目標が異なる
+(表~\ref{tab:compare}).AIPL の独自性は,(i) 注釈フリー HM 推論を
+アクター言語に適用した点,(ii) 単一フロントエンドから 9 バックエンドへ
+射影する点,(iii) LLM 呼び出しとトークン予算を言語/ランタイムで
+第一級に統治する点,の三つの同時実現にある.
+
+\begin{table}[h]
+\centering\small
+\caption{既存基盤との設計目標比較}\label{tab:compare}
+\begin{tabularx}{\linewidth}{@{}l c c c c X@{}}
+\toprule
+ & 三種送信 & 型推論 & 多バックエンド & LLM 第一級 & 主たる並行モデル \\
+\midrule
+Erlang/OTP & \Part & \No & \No & \No & M:N (BEAM) \\
+Akka (Scala) & \Part & \Part & \No & \No & M:N (JVM) \\
+Pony & \No & \Part & \No & \No & M:N (参照能力) \\
+Ray (Python) & \Part & \No & \No & \Part & 1:1 + クラスタ \\
+\textbf{AIPL} & \Yes & \Yes & \Yes & \Yes & 1:1 / M:N / event-loop \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{AIPL の言語設計}\label{sec:design}
+% =====================================================================
+
+\subsection{計算モデル}
+AIPL のプログラムは \code{class} 宣言の集合である.
+各 \code{class} は一つのアクター種を定義し,\code{new C(args)} で
+インスタンス (アクター) を生成する.各アクターは独立した
+\textbf{mailbox} を持ち,フィールド (状態) はアクター内に閉じて
+外部から直接 read/write できない.アクター間の唯一の相互作用は
+メッセージ送信である.
+
+\subsection{三種の送信}
+ABCL/1 を継承し,AIPL は次の三種の送信を持つ
+(リスト~\ref{lst:send}).
+
+\begin{lstlisting}[caption={三種送信と reply},label={lst:send},float=h]
+class Counter {
+  var count = 0;
+  method tick() { count = count + 1; print("count = " + count); }
+  method get()  { reply(count); }     // 同期送信への応答
+}
+var c = new Counter();
+send   c.tick();      // 過去型 (past)   : fire-and-forget
+var v = now c.get();  // 現在型 (now)    : reply 到着までブロック
+var f = future c.get();   // 未来型 (future) : 非同期ハンドル
+var w = await(f);         // ハンドルから値を取得
+\end{lstlisting}
+
+\code{reply(value)} は now/future 送信の reply スロットを充足する.
+\code{future\_done(f)} で非ブロッキングにポーリングでき,
+\code{await(f)} でブロックして値を取得する.
+メソッド本体内では特殊変数 \code{self} (自アクター) と
+\code{sender} (送信元) が利用可能である.
+
+\subsection{become と select}
+\code{become C(args)} はアクターのクラスとフィールドを
+実行時に差し替える (状態遷移の表現).
+\code{select \{ case \dots \}} は複数チャネル/メッセージからの
+選択受信を行い,Erlang の \code{receive} に相当する.
+
+\subsection{チャネルと構造化並行}
+\code{channel[T]} / \code{channel[T,cap=N]} は CSP 風の
+型付きチャネルを提供する (\code{channel\_send} / \code{channel\_recv} /
+\code{select\_recv}).
+\code{scope \{ \dots \}} ブロックは,その内部で生成された
+未来 (future) をブロック脱出時に自動 join する構造化並行構文であり,
+親スコープが子タスクのライフタイムを所有することを保証する.
+
+\subsection{LLM 連携プリミティブ}
+LLM 呼び出しは \code{ai\_call([provider,] prompt)} として言語に
+組み込まれている.プロバイダ ID は
+\code{1}=Gemini (既定) / \code{2}=Anthropic (Claude) /
+\code{3}=OpenAI / \code{0}=auto であり,環境変数
+\code{AIPL\_AI\_PROVIDER=mock} で全呼び出しをオフライン化できる.
+三種送信のいずれからも LLM を駆動できる (リスト~\ref{lst:ai}).
+
+\begin{lstlisting}[caption={LLM × 未来型による並列問い合わせ},label={lst:ai},float=h]
+class Asker { method ask(q) { var r = ai_call(2, q); reply(r); } }
+var a = new Asker();
+var f1 = future a.ask("Translate hello to French.");
+var f2 = future a.ask("Translate hello to German.");
+print(await(f1));   // 2 つの LLM 呼び出しが並列に走る
+print(await(f2));
+\end{lstlisting}
+
+% =====================================================================
+\section{型システムと型推論}\label{sec:type}
+% =====================================================================
+
+\subsection{型の世界}
+AIPL の型は次のとおりである.
+基本型 \code{int} (64-bit),\code{float} (倍精度;\code{100.} のように
+末尾ドット可),\code{string} (UTF-8),\code{bool},\code{unit};
+構造型 \code{actor(C)} (クラス C のインスタンス),\code{array},
+\code{tuple(\dots)} (位置・不変・固定アリティ;長さと各スロット型が
+型の一部),\code{record\{a:int,b:string\}} (構造的・名前付きフィールド),
+\code{channel[T]},関数型,\code{future};そして単一文字の型変数
+(\code{T U V \dots}) による暗黙多相である.
+ジェネリック関数は \code{function id(x:T)->T} のように書ける.
+
+\subsection{Hindley--Milner 型推論}\label{sec:infer}
+AIPL の正典実装 (OCaml) の推論器 \code{infer.ml} は教科書的 HM を実装する:
+mutable union-find による型変数,\code{unify} / \code{generalize} /
+\code{instantiate},let 多相からなる.
+クラスのメソッドは仮の型変数で\textbf{事前登録}され,
+本体検査でボトムアップに具体化される\textbf{2 パス方式}をとる.
+これにより,呼び出しサイトからの情報がメソッドシグネチャを
+\emph{自動的にモノモルフィズ}する.
+
+\begin{lstlisting}[caption={注釈なし=全推論。呼び出しサイトが型を確定する},label={lst:infer},float=h]
+class Hello {
+  var count = 0.;        // 0. リテラルから count:float
+  method init(n) {       // n は注釈なし
+    count = n;           // count:float なので n:float に確定
+    print("hi " + n);
+  }
+  method greet() { print("count = " + count); }
+}
+var h = new Hello(5);    // init 引数型を呼び出しサイトから再確定
+\end{lstlisting}
+
+リスト~\ref{lst:infer} に対し,推論器は
+\code{count : float},\code{init : (int) -> unit},
+\code{greet : () -> unit} を導く.
+\code{Counter.dec(x)} のようなメソッドは宣言時には
+$\forall \alpha.\,\alpha \to \mathit{unit}$ だが,
+本体 \code{count - x} (count:float) によって $\alpha = \mathit{float}$ に
+固定され,別途モノモルフィゼーション・パスを要さない
+(HM の \code{unify} が自動的に果たす).
+なお高階多相 (rank-2 以上) は持たず,関数を引数に取る位置は
+\code{any} 扱いとする.
+
+\subsubsection{2 パス推論アルゴリズム}
+アクター言語に HM を適用する際の中心的課題は,
+\emph{メソッド間の相互参照}と\emph{フィールドの共有}である.
+クラス \code{C} のメソッド \code{m} が同じクラスの別メソッド \code{n} を
+\code{self.n(\dots)} で呼ぶとき,\code{n} の型が未確定でも \code{m} を
+検査できねばならない.AIPL はこれを 2 パスで解く.
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item \textbf{パス 1 (事前登録)}:クラス内の各フィールドに新鮮な型変数を,
+        各メソッドに $\vec{\alpha}\to\beta$ 形の仮シグネチャ
+        (引数・戻り値とも新鮮な型変数) を割り当て,型環境
+        $\Gamma$ に登録する.
+  \item \textbf{パス 2 (本体検査)}:各メソッド本体をボトムアップに検査し,
+        代入・呼び出し・演算が生む等式制約を \code{unify} で解く.
+        フィールドはメソッドを跨いで共有されるため,
+        あるメソッドでの使用が他メソッドの型を確定させる.
+\end{enumerate}
+
+パス 2 の単一化は標準的な occurs-check 付き union-find であり,
+\code{instantiate} は \code{let} 束縛の汎化済みスキームを新鮮化し,
+\code{generalize} は環境に自由でない型変数を $\forall$ で閉じる.
+リスト~\ref{lst:infer} では,パス 1 で \code{init} を
+$(\alpha)\to\mathit{unit}$ とし,パス 2 で本体 \code{count = n}
+(ただし \code{count : float}) から $\alpha = \mathit{float}$ を導く.
+さらに \code{new Hello(5)} の呼び出しサイトが整数リテラル \code{5} を
+与えるため,最終的に \code{init} 引数は \code{int} に再確定される.
+
+\subsubsection{単一化の主要規則}
+単一化 $\mathsf{unify}(\tau_1,\tau_2)$ は次の規則に従う
+(抜粋).$\sigma$ は型変数代入,$\doteq$ は被単一化対を表す.
+\begin{align*}
+\alpha \doteq \tau &\;\Rightarrow\; [\alpha \mapsto \tau]\quad
+  (\alpha \notin \mathrm{ftv}(\tau)\ \text{occurs-check}) \\
+(\tau_1 \to \tau_2) \doteq (\tau_1' \to \tau_2') &\;\Rightarrow\;
+  \mathsf{unify}(\tau_1,\tau_1');\ \mathsf{unify}(\tau_2,\tau_2') \\
+\mathsf{actor}(C) \doteq \mathsf{actor}(C') &\;\Rightarrow\;
+  C = C' \\
+\mathsf{record}(R_1) \doteq \mathsf{record}(R_2) &\;\Rightarrow\;
+  \text{共通フィールドを単一化}\ (\text{width subtyping}) \\
+\mathsf{any} \doteq \tau &\;\Rightarrow\;
+  \text{成功}\ (\text{gradual 境界,transient cast を挿入})
+\end{align*}
+最後の \code{any} 規則が段階的型付けとの接合点であり,
+\S\ref{sec:sound} の健全性境界を生む箇所である.
+
+\subsection{段階的型付けの第二軸}\label{sec:gradual}
+AIPL は推論版を主軸としつつ,注釈版を\emph{参照実装}として保持し,
+段階的型付けの諸機能を提供する.
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{capability 効果}:
+        \code{function read\_url(u:string)->string !\{net,fs\}\{\dots\}}
+        のように,メソッド型に \code{\{ai,fs,net,mut\}} の効果行を付す.
+        43 個の組込関数に既定効果 \code{BUILTIN\_EFFECTS} を割当て,
+        効果を推論する.
+  \item \textbf{線形型}:\code{var fh: linear int = open("x");}
+        のように,リソースの一回使用を静的に保証する.
+  \item \textbf{所有}:\code{pub var holder: string = "";} で
+        公開フィールドを区別する.
+  \item \textbf{セッション型}:\code{session\_define("Solve", "solver.solve(string) ! string -> reviewer.review(\dots) -> \dots")}
+        のように,アクター間プロトコルを動的に定義する.
+  \item \textbf{refinement}:整数・実数・有理数に対する述語制約を
+        SMT ソルバ Z3 へ委譲して検査する (宣言時に
+        vacuously-false を検出する).
+\end{itemize}
+これらは推論版にはランタイム経由でのみ存在し,
+注釈版が静的検査の参照実装を担う,という二軸構造をとる.
+
+\subsection{型健全性}\label{sec:sound}
+型健全性は progress と preservation の二命題で論じられる.
+\begin{definition}[Progress]
+型付け済みプログラムの実行は,型不整合
+(例:文字列に対する数値演算) によって stuck しない.
+\end{definition}
+\begin{definition}[Preservation]
+評価ステップを進めても,値の型は宣言型と
+(\code{any} を含む単純な部分順序の下で) 互換である.
+\end{definition}
+
+AIPL は段階的型付け言語であるため,典型的な
+\emph{局所健全 (local soundness) だが大域非健全 (global unsoundness)}
+の特性を持つ.健全性が崩れうる境界は次の四つである:
+(1) 未注釈領域から注釈領域への \code{any} 流入,
+(2) 動的反射 (\code{compile} / \code{become} / \code{add\_method}) による
+クラス形状の変化,
+(3) 動的ディスパッチで送信先シグネチャが乖離する場合,
+(4) record 経由でアクターフィールドを書き換える場合.
+最優先の unsoundness gap である \code{any}$\to$\code{T} 境界に対しては,
+\code{--transient} フラグによる \textbf{transient cast} を導入し,
+変数宣言・メソッド引数・関数引数の 3 境界で,静的検査の互換規則と
+同一規則のランタイムチェックを挿入して塞いだ.
+
+% =====================================================================
+\section{実現:7 ランタイムと 9 バックエンド}\label{sec:impl}
+% =====================================================================
+
+\subsection{多実装アーキテクチャ}
+AIPL は単一のソース言語に対し \textbf{7 種のランタイム実装}を持つ
+(表~\ref{tab:runtimes}).このうち HM 推論を採用するのは
+OCaml・推論版 Python・C コード生成の 3 実装である.
+
+\begin{table}[h]
+\centering\small
+\caption{AIPL の 7 ランタイム実装}\label{tab:runtimes}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+短縮名 & ソース & 型システム \\
+\midrule
+Py-A (注釈版) & \code{python-aipl/} & 段階的型付け (Phase 11--17 参照実装,最も機能完備) \\
+Py-I (推論版) & \code{python-aipl-inferred/} & \textbf{HM 推論} (interp は Py-A を共有,899 行) \\
+OCaml (正典) & \code{src/*.ml} & \textbf{HM 推論} (\code{infer.ml} 484 行,WebSocket 内蔵) \\
+JS-O (OCaml 経由) & \code{src/app.js} + gateway & = OCaml HM (\code{/api/typecheck}) \\
+JS-B (ブラウザ) & \code{browser-abcl/} & flow-sensitive 軽量推論 (\code{typecheck.js} 308 行) \\
+JS-N (Node) & \code{node-aipl-server/} & flow-sensitive (継承),HTTP wrap \\
+C (\code{aipl2c}) & \code{aipl2c.ml} + 各 C runtime & \textbf{HM + コード特殊化} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{パース機構}
+OCaml 正典実装は \code{lexer.mll} (ocamllex) +
+\code{parser.mly} (Menhir) で字句・構文解析を行い,
+\code{infer.ml} → \code{eval\_thread.ml} へ流す.
+Python 実装は Lark 文法 (\code{grammar.lark}) を用い,
+AST を \code{aipl\_typeck} / \code{aipl\_inference} へ渡す.
+ブラウザ/Node 実装は browser-abcl の自前パーサを共有する.
+
+\subsection{HM 駆動のコード特殊化}\label{sec:codegen}
+C バックエンド (\code{aipl2c}) の中核技術は,
+HM 推論結果を用いた\textbf{コード特殊化}である.
+\code{l\_a, l\_b} が \code{int} と推論されれば,
+\code{value\_t} タグ付き共用体演算
+\code{v\_binop("+",l\_a,l\_b)} ではなく,
+ネイティブな \code{long l\_x = (l\_a + l\_b);} を発行する.
+\code{value\_t} はアクター間メッセージ境界 (\code{value\_t args[]}) のみで
+uniform に保ち,アクター内部は特殊化する.これにより
+\emph{mailbox の一様性}と\emph{内部の静的特殊化}を両立する.
+
+\subsection{9 種のコード生成バックエンド}\label{sec:backends}
+OCaml 製の \code{aipl2c} は単一フロントエンドから
+複数のバックエンドへコードを生成する (表~\ref{tab:backends}).
+送信操作は各ターゲットの並行プリミティブへ射影される:
+C+pthread は \code{enqueue(\dots)},Pony は \code{obj.method(args)},
+Erlang は \code{Pid ! \{method,Args\}},Go は \code{obj.mailbox <- msgT\{\dots\}},
+Prolog は \code{thread\_send\_message(\dots)} である.
+Pony/Go/Erlang では構築と init 本体を分離する二段階初期化をとる.
+
+\begin{table}[h]
+\centering\small
+\caption{単一フロントエンドからの 9 バックエンド}\label{tab:backends}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+フラグ & ターゲット & 並行モデル \\
+\midrule
+(既定) & C + pthread & 1:1 OS スレッド \\
+\code{-lSDL2} & C + SDL2 GUI & 1:1 (描画付き) \\
+\code{--xinu} & Xinu C & ベアメタル協調 \\
+\code{--python} & Python & 1:1 OS スレッド \\
+\code{--pony} & Pony & M:N 軽量 \\
+\code{--erlang} & Erlang/BEAM & M:N 軽量 \\
+\code{--go} & Go goroutine & M:N 軽量 \\
+\code{--prolog} & SWI-Prolog & スレッド \\
+\code{--llvm / --openmp} & LLVM / OpenMP & ホット/コールド注釈・並列 for \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{実行環境(1):並行モデルと LLM 連携}\label{sec:runtime}
+% =====================================================================
+
+\subsection{3 並行モデルの統一}
+AIPL の重要な実証は,\emph{同一の \code{.abcl} ソースを無改変で}
+3 つの並行モデルへ配置できる点である.
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+  \item \textbf{1:1 OS スレッド} (Python/OCaml/C):
+        $\sim$100--1000 アクター規模.
+  \item \textbf{M:N 軽量スレッド} (Pony/Erlang/Go codegen):
+        $\sim 10^5$--$10^7$ アクター規模.
+  \item \textbf{協調イベントループ} (browser-abcl/node):
+        単一スレッドの \code{setTimeout(0)} スケジューリング.
+\end{enumerate}
+アクター抽象が並行モデルから独立しているため,
+プロトタイプ (イベントループ) から高スループット
+(M:N) まで,ソースを変えずに移行できる.
+
+\subsection{LLM ガバナンス}\label{sec:llm}
+\code{ai\_call} 系プリミティブ
+(\code{ai\_call\_with\_system},\code{ai\_call\_retry},
+\code{ai\_call\_image},\code{ai\_call\_priority}) は,
+ランタイムが次の環境変数で統治する:
+\code{ABCL\_AI\_TOKEN\_BUDGET} (超過で \code{BudgetExceeded}),
+\code{ABCL\_AI\_MAX\_CONCURRENT} (in-flight セマフォ),
+\code{ABCL\_AI\_FALLBACK\_MODELS} (フォールバック連鎖),
+\code{ABCL\_AI\_USAGE\_FILE} (利用量記録),
+\code{AIPL\_AI\_PROVIDER=mock} (オフライン smoke).
+バックエンドは Ollama (ローカル),OpenAI,Gemini,Anthropic に対応する.
+
+\subsection{WebSocket とダッシュボード}
+全 7 ランタイムが統一ワイヤプロトコルの WebSocket を備える:
+OCaml は \code{web\_gateway.ml} に RFC 6455 を自前実装 (40 行),
+Python は \code{aipl\_websocket.py},JS-B はブラウザネイティブ,
+JS-N は \code{ws},C は libwebsockets である.
+クライアントは \code{?sid=<group>} で参加し,
+\code{\{"kind":"welcome","sid":\dots,"peers":N\}} を受信する.
+\code{aipl\_main.py --dashboard 8800} はライブカウンタ・
+観測トラフィック表・SSE イベントストリームを提供し,
+\code{ABCL\_PEER\_DASHBOARDS} で複数 worker を TOTAL 行に集約する.
+
+% =====================================================================
+\section{実行環境(2):分散ランタイムと実機分散}\label{sec:dist}
+% =====================================================================
+
+\subsection{分散ランタイム DR-1..13}
+\code{AIPL\_DIST\_ENABLE=1} で有効化される分散ランタイム層
+(\code{aipl\_dist}) は,AI エージェント運用に必要なガバナンス機能を
+opt-in で提供する (表~\ref{tab:dr}).
+
+\begin{table}[h]
+\centering\small
+\caption{分散ランタイム機能 DR-1..13}\label{tab:dr}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+ID & 機能 & 概要 \\
+\midrule
+DR-1 & env-var ルーティング & \code{AIPL\_ROUTE},アクター名→tag テーブル \\
+DR-2 & 構造化ログ & ND-JSON 1 行/event \\
+DR-3 & トークン予算協調 & 60 秒スライディング窓 (RPM/TPM) \\
+DR-4 & checkpoint/resume & atomic save/restore \\
+DR-5 & 隔離とスキップ & 自動 quarantine (TTL) \\
+DR-6 & quorum 複製 & 並列 multi-provider \\
+DR-7 & 部分木隔離 & OTP 的 blast-radius 限定 \\
+DR-8 & spawn-tree 追跡 & TLS-auto parent \\
+DR-9 & ランタイムフック & interp/actor/call\_ai (opt-in) \\
+DR-10 & CRDT 状態 & G-Counter/OR-Set/LWW-Register (15 prims) \\
+DR-11 & saga 補償 & \code{saga\{step\{\}compensate\{\}\}} (LIFO) \\
+DR-12 & 多リージョン failover & per-region route + chain walk \\
+DR-13 & 自動スケール pool & hysteresis 駆動 (\code{pool\_create} 等) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{HTTP/JSON 分散とリモート送信}
+リモート送信は HTTP/JSON ワイヤプロトコルで実現される:
+\code{POST /api/json/send} (fire-and-forget) と
+\code{POST /api/json/call} (同期 reply).
+Python では \code{remote\_call} / \code{remote\_now} /
+\code{remote\_future},\code{web\_listen(port)} /
+\code{web\_expose} / \code{serve\_forever} を提供する.
+\code{ABCL\_REMOTE\_SECRET} を設定すると HMAC-SHA256 署名
+(\code{X-ABCL-Sig}) を必須化し,Python/OCaml/C 間でワイヤ互換である
+(OCaml は純正 \code{hmac\_sha256.ml}).
+これにより,プロバイダの異なる 3 ノード
+(coordinator / solver / verifier) を跨ぐ協調が可能となる.
+
+\subsection{Mac × Raspberry Pi (Xinu) 実機分散}
+さらに AIPL は,Mac 上のホストアクターと
+Raspberry Pi 上のベアメタル OS \textbf{Xinu} 上の AIPL アクターを
+跨いだ実機分散を実証した.両者は UART/TCP 上の行指向 RPC
+(opcode: PING/LIST/SEND/QUERY/LOAD/COMPILE/RUN/SPAWN) で接続され,
+推論版 Python は \code{uart1://} スキームでこれを透過的に送信に翻訳する.
+代表例として「分散 5 人の哲学者」を Mac 3 ノード + Xinu 2 ノードで
+構成し,5 本のフォークを Xinu アクター化して境界を跨いだ
+相互排他同期を実機で達成した.
+
+\subsection{進化的言語設計パイプライン}\label{sec:evo}
+AIPL の次世代機能群 (CE-1..13 の型推論強化,DR-1..13 の分散機能) は,
+\code{aice-evolution-v2} の \textbf{MAP-Elites} 遺伝的アルゴリズムが
+言語仕様 (\code{.aice}) を入力に cross-task 評価と LLM 誘導突然変異を
+行い,``言語設計の普遍軸'' を経験導出した結果として実装された.
+たとえば構造化並行 (\code{scope\{future\dots\}}) は,
+進化計算が \code{concurrency=structured}・\code{ownership=linear}・
+\code{type=dependent} を上位軸として pin した予測に基づいて
+言語機能化された.
+パイプラインは \code{.aice} → \code{.ga.json} → \code{.abcl} の三段からなる.
+表~\ref{tab:evo} に,進化計算が導出し実装へ反映した予測軸を示す.
+
+\begin{table}[h]
+\centering\small
+\caption{進化計算が導出した言語軸とその実装}\label{tab:evo}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+予測 (軸) & 勝者の値 & 実装 \\
+\midrule
+type\_safety & dependent & refinement + Z3 (CE-6/CE-9) \\
+effect & capability & capability 効果行 (CE-10/CE-11) \\
+concurrency & csp\_channels & \code{channel[T]} (CE 系 / Phase 13) \\
+ownership & linear & 線形型 \code{linear} \\
+state & symbol\_owned & アクター閉包フィールド \\
+concurrency (再) & structured & \code{scope\{future\dots\}} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+勝者個体 (balanced / hang-resilience / Erlang-OTP-like) は,
+8 seed × 30 世代 × 2 run (各約 24 分,1400 超の LLM 呼び出し) の
+MAP-Elites 探索から選抜された.
+これらが DR-1..13 の実装母体となった.
+
+% =====================================================================
+\section{ケーススタディ}\label{sec:case}
+% =====================================================================
+本節では,AIPL の設計が実アプリケーションにどう結実するかを,
+二つのケーススタディで示す.
+
+\subsection{LLM マルチエージェント・パイプライン}
+プランナ・ソルバ・レビュアの 3 エージェントが協調して
+問題を解く構成を,三種送信と \code{ai\_call} で簡潔に記述できる
+(リスト~\ref{lst:pipeline}).
+未来型送信により solver と reviewer の LLM 呼び出しを
+重ね合わせ,\code{scope} で子タスクのライフタイムを束ねる.
+
+\begin{lstlisting}[caption={planner→solver→reviewer の協調},label={lst:pipeline},float=h]
+class Solver   { method solve(q)      { reply(ai_call(2, "Solve: " + q)); } }
+class Reviewer { method review(q, a)  { reply(ai_call(2, "Grade:" + q + a)); } }
+class Planner {
+  var s = new Solver();
+  var r = new Reviewer();
+  method run(q) {
+    scope {
+      var fa = future s.solve(q);     // solver の LLM 呼び出し
+      var a  = await(fa);
+      var fr = future r.review(q, a); // reviewer の LLM 呼び出し
+      reply(await(fr));
+    }                                 // scope 脱出時に未完了 future を auto-join
+  }
+}
+var p = new Planner();
+print(now p.run("integral of x^2"));
+\end{lstlisting}
+
+トークン予算 (\code{ABCL\_AI\_TOKEN\_BUDGET}),並行度
+(\code{ABCL\_AI\_MAX\_CONCURRENT}),quorum 複製 (DR-6),
+フォールバック (\code{ABCL\_AI\_FALLBACK\_MODELS}) は,
+このソースを一切変えずに環境変数とランタイムで統治される.
+
+\subsection{Mac × Xinu 実機分散:5 人の哲学者}
+古典的な食事する哲学者問題を,5 本のフォークを
+Raspberry Pi 上の Xinu アクターとして配置し,
+哲学者を Mac 上のアクターとして配置した混在トポロジで実行した.
+Mac 側の推論版 Python は,フォークアクターへの送信を
+\code{uart1://} スキームの行指向 RPC (QUERY/SEND) へ透過翻訳し,
+境界を跨いだ相互排他同期を実機で達成した.
+同一の哲学者ロジックを,(a) 単一プロセス 1:1 スレッド,
+(b) Go goroutine codegen による M:N,
+(c) Mac+Xinu の実機分散,の三形態へ\emph{無改変}で配置できる点が,
+\S\ref{sec:runtime} の並行モデル独立性を具体的に裏づける.
+
+% =====================================================================
+\section{評価}\label{sec:eval}
+% =====================================================================
+
+\subsection{推論の cross-validation}
+AIPL の主要な経験的主張は,HM を備える 3 実装
+(OCaml / 推論版 Python / C コード生成) が
+\emph{同一 \code{.abcl} ソースに対し完全一致する推論型}を
+産出することである.代表例を以下に示す
+(3 実装すべてで一致):
+\begin{verbatim}
+Hello:   count : float;  init : (int) -> unit;
+         greet : () -> unit;  inc : () -> unit
+Counter: count : float;  inc : () -> unit;
+         dec : (float) -> unit   <- monomorphized via call site
+\end{verbatim}
+
+\subsection{機能パリティとテスト}
+次世代機能群 CE-1..13 + DR-1..13 は,主要ランタイム間で機能同等
+(parity) が確認されている.Phase O 完了時点で,
+分散 DR-1..9 と型推論 CE-1..9 が Py-A / OCaml / JS-O の各実装で
+9/9,合計 18/18 (実装 $\sim$1305 LOC) であった.
+JS-B / JS-N も CE-10/CE-12/CE-13/DR-11 を含めて 26/26 で closeout した.
+表~\ref{tab:smoke} にスモークテストの集計を示す.
+
+\begin{table}[h]
+\centering\small
+\caption{スモークテスト集計 (代表値)}\label{tab:smoke}
+\begin{tabularx}{\linewidth}{@{}X r@{}}
+\toprule
+項目 & 結果 \\
+\midrule
+OCaml ランタイム & 52/52 \\
+ブラウザ (構文/パース) & 7/7 + 4/4 \\
+Python (\code{.abcl} / 旧 \code{.aipl}) & 33/33 + 21/21 \\
+分散クロス言語 (3-node mock) & 8/8 \\
+セルフホスト塔 (10 段階,41 samples) & 47/47 \\
+\code{aipl\_dist} 単体 & 27/27 \\
+分散 MVP デモ (8 feature × 3) & 24/24 \\
+next-gen / self-host アサーション & 103 全 PASS \\
+\midrule
+\textbf{合計} & \textbf{213+ テスト/デモが green} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{セルフホスト}
+AIPL を AIPL 自身で記述する \code{aipl-self-host/} の塔は,
+10 段階 (Level A--C-3 と統合 Level Z) からなり,
+47/47 のスモークがすべて green である.
+Level Z は 18 行の Python bootstrap と
+CE-11 capability-checked な \code{io\_bridge.abcl} による
+統合フルセルフホストであり,各 Level の checker を
+自身に適用して phase monotonicity を実証している.
+
+\subsection{実装規模}
+主要コンポーネントの規模は次のとおりである:
+OCaml HM $\approx$985 行 (\code{infer.ml} 484 + \code{types.ml} +
+\code{typing\_env.ml}),推論版 Python 899 行,
+\code{aipl\_inference.py} $\sim$1255 行,\code{aipl\_dist.py} 591 行,
+\code{typecheck.js} 308 行,WebSocket 40 行,
+C+SDL2 ランタイム 1178 行,セルフホスト 9 モジュール $\sim$1500 行.
+
+% =====================================================================
+\section{議論と限界}\label{sec:discuss}
+% =====================================================================
+
+\paragraph{健全性の限界.}
+\S\ref{sec:sound} で述べたとおり,AIPL は段階的型付け言語であり,
+注釈領域については局所健全だが,未注釈領域・動的反射との境界では
+大域健全性が成り立たない.transient cast は最優先 gap を塞ぐが,
+ランタイム型キャストは限定的で,完全な transient soundness には届かない
+弱い保証である.動的反射 (\code{become} / \code{compile}) を含む
+プログラムの健全性保証は今後の課題である.
+
+\paragraph{推論の表現力.}
+現状の HM は高階多相 (rank-2 以上) を持たず,
+関数を引数に取る位置は \code{any} に退避する.
+また narrowing は単純条件に限られ,\code{\&\&} 連鎖や
+ネストした条件の絞り込みは未対応である.
+
+\paragraph{版差.}
+本稿の数値は時期の異なる複数のレポートから統合しており,
+ランタイム数 (7 vs 6,Py-A の数え方),
+セルフホスト段階数 (9/37 vs 10/47) などに版差がある.
+本稿では最新の機能マトリクス (10 段階・47/47・7 ランタイム) を採用した.
+
+\paragraph{今後の課題.}
+(i) 動的反射を含む健全性保証の強化,
+(ii) 高階多相と本格的な flow-sensitive narrowing,
+(iii) M:N バックエンドでの大規模 (>$10^6$ アクター) 実機評価,
+(iv) 進化的パイプラインによる言語機能予測の定量検証,が挙げられる.
+
+% =====================================================================
+\section{結論}\label{sec:concl}
+% =====================================================================
+本稿は,LLM 駆動 AI システムの自然なアーキテクチャである
+``協調する複数エージェント'' を言語仕様に第一級表現する
+型付き AI エージェント言語 AIPL の,設計・実現・実行環境を一貫して述べた.
+AIPL は ABCL/1 の三種送信に HM 型推論と段階的型機能,
+そして \code{ai\_call} による第一級 AI 連携を重ね,
+7 ランタイム・9 バックエンド・3 並行モデルを単一ソースから駆動し,
+HTTP/JSON および UART/TCP を介して Mac と Raspberry Pi (Xinu) を跨ぐ
+実機分散までを実現した.HM を備える 3 実装が同一ソースに対し
+完全一致する推論型を産出すること,そして 213 超のテスト/デモが
+green であることを経験的に示した.
+AIPL は,アクター言語の古典的理想と現代の AI エージェント運用を
+橋渡しする ``AI-OS のスクリプト層'' としての一つの到達点を提供する.
+
+% =====================================================================
+\begin{thebibliography}{99}
+\bibitem{hewitt} C. Hewitt, P. Bishop, R. Steiger.
+  A Universal Modular ACTOR Formalism for Artificial Intelligence.
+  \textit{IJCAI}, 1973.
+\bibitem{abcl1} A. Yonezawa, J.-P. Briot, E. Shibayama.
+  Object-Oriented Concurrent Programming in ABCL/1.
+  \textit{OOPSLA}, 1986.
+\bibitem{hindley} J. R. Hindley.
+  The Principal Type-Scheme of an Object in Combinatory Logic.
+  \textit{Trans. AMS}, 1969.
+\bibitem{milner} R. Milner.
+  A Theory of Type Polymorphism in Programming.
+  \textit{J. Computer and System Sciences}, 1978.
+\bibitem{damas} L. Damas, R. Milner.
+  Principal Type-Schemes for Functional Programs.
+  \textit{POPL}, 1982.
+\bibitem{gradual} J. G. Siek, W. Taha.
+  Gradual Typing for Functional Languages.
+  \textit{Scheme Workshop}, 2006.
+\bibitem{capability} A. Mettler, D. Wagner, T. Close.
+  Joe-E: A Security-Oriented Subset of Java.
+  \textit{NDSS}, 2010.
+\bibitem{linear} P. Wadler.
+  Linear Types Can Change the World!
+  \textit{Programming Concepts and Methods}, 1990.
+\bibitem{session} K. Honda, V. T. Vasconcelos, M. Kubo.
+  Language Primitives and Type Discipline for Structured
+  Communication-Based Programming. \textit{ESOP}, 1998.
+\bibitem{loom} R. Pressler et al.
+  JEP 453: Structured Concurrency (Java Project Loom). 2023.
+\bibitem{crdt} M. Shapiro, N. Pregui\c{c}a, C. Baquero, M. Zawirski.
+  Conflict-Free Replicated Data Types. \textit{SSS}, 2011.
+\bibitem{mapelites} J.-B. Mouret, J. Clune.
+  Illuminating Search Spaces by Mapping Elites. arXiv:1504.04909, 2015.
+\end{thebibliography}
+
+\end{document}
