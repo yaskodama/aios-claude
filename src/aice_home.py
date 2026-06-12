@@ -124,8 +124,35 @@ TARGETS = [
         "cwd": REPO,
         "cmd": "python3 src/pi5_screen_designer.py",
     },
+    {
+        "id": "milky",
+        "glyph": "Milky",
+        "portlabel": ":8030",
+        "title": "Milky Character Studio",
+        "desc": "Procedurally-generated cyborg-gal characters (MAKINA-7 / CHIHARU-3 / NAVI-bot / PROF-K) in a Blender-style in-browser 3D editor: Orbit/Transform gizmo, Outliner, Properties, shading, idle/walk/run/dance animation, glTF export.",
+        "addr": "127.0.0.1:8030/index.html",
+        "href": "http://127.0.0.1:8030/index.html",
+        "port": 8030,
+        "cwd": os.path.join(os.path.expanduser("~"), "projects", "milky-character"),
+        "cmd": "python3 -m http.server 8030 --bind 127.0.0.1",
+    },
+    {
+        "id": "rover",
+        "glyph": "Rover",
+        "portlabel": ":8020/rover.html",
+        "title": "Robot arm &amp; rover &mdash; Xinu/AIPL motor control",
+        "desc": "6-axis robot arm (7 environments + end-effector PiP camera) and a 4-wheel visual-navigation litter-collecting rover, each joint/wheel a separate Xinu node driven by AIPL messages over a soft-Xinu (Py-I) server. Opens the rover page.",
+        "addr": "127.0.0.1:8020/rover.html",
+        "href": "http://127.0.0.1:8020/rover.html",
+        "port": 8020,
+        "cwd": os.path.join(os.path.expanduser("~"), "projects", "robot-arm"),
+        "cmd": "python3 soft_xinu.py",
+    },
 ]
 TARGET_BY_ID = {t["id"]: t for t in TARGETS}
+
+# Targets shown in their own section above, not in the generic Dashboards grid.
+_ROBOT_IDS = {"milky", "rover"}
 
 # id -> Popen for processes this portal launched (so we can stop them)
 _PROCS: dict[str, subprocess.Popen] = {}
@@ -224,6 +251,8 @@ class _Handler(BaseHTTPRequestHandler):
 def _render_cards() -> str:
     out = []
     for t in TARGETS:
+        if t["id"] in _ROBOT_IDS:
+            continue
         out.append(f"""
   <div class="card" data-id="{t['id']}">
    <div class="thumb"><span class="glyph">{t['glyph']}</span><span class="port">{t['portlabel']}</span>
@@ -385,6 +414,32 @@ _PAGE_TMPL = r"""<!doctype html>
     <p>Block-based robot programming &amp; video lecture, hosted at lecture.site44.com. Opens in a new tab.</p>
     <span class="addr">lecture.site44.com/index-ro03-editor2.html</span></div>
   </a>
+  <div class="card" data-id="milky">
+   <div class="thumb"><span class="glyph">&#128118;&#10024;</span><span class="port">:8030</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Milky Character Studio &mdash; 3D character editor</h3>
+    <p>Procedurally-generated cyborg-gal characters (MAKINA-7 / CHIHARU-3 / NAVI-bot / PROF-K) in a Blender-style in-browser 3D editor: Orbit/Transform gizmo, Outliner, Properties, shading, idle/walk/run/dance animation, and glTF export.</p>
+    <span class="addr">127.0.0.1:8030/index.html</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8030/index.html">Open &#8599;</button>
+    </div></div>
+  </div>
+  <div class="card" data-id="rover">
+   <div class="thumb"><span class="glyph">&#129302;&#128663;</span><span class="port">:8020/rover.html</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Robot arm &amp; rover &mdash; Xinu/AIPL motor control</h3>
+    <p>6-axis robot arm (7 environments + end-effector PiP camera) and a 4-wheel visual-navigation litter-collecting rover, each joint/wheel a separate Xinu node driven by AIPL messages over a soft-Xinu (Py&middot;I) server. Opens the rover page.</p>
+    <span class="addr">127.0.0.1:8020/rover.html</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8020/rover.html">Open &#8599;</button>
+    </div></div>
+  </div>
  </div>
 </section>
 
