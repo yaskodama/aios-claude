@@ -16,6 +16,7 @@ let () =
   let go = ref false in
   let pl = ref false in
   let llvm = ref false in
+  let avm = ref false in
   let openmp = ref false in
   let no_typecheck = ref false in
   let dump_types = ref false in
@@ -34,6 +35,7 @@ let () =
     | "--go" :: rest -> go := true; loop rest
     | "--prolog" :: rest -> pl := true; loop rest
     | "--llvm" :: rest -> llvm := true; loop rest
+    | "--avm" :: rest -> avm := true; loop rest
     | "--openmp" :: rest -> openmp := true; loop rest
     | "--no-typecheck" :: rest -> no_typecheck := true; loop rest
     | "--dump-types" :: rest -> dump_types := true; loop rest
@@ -51,6 +53,7 @@ let () =
     else if !erl then ".erl"
     else if !go then ".go"
     else if !pl then ".pl"
+    else if !avm then ".avm"
     else ".c"
   in
   let output =
@@ -108,7 +111,8 @@ let () =
      the type checker (which has already run) needed it. *)
   let prog = Ast.normalize_program prog in
   let c_code =
-    if !pony      then C_translator.gen_program_pony                       prog
+    if !avm then Avm_gen.gen_program_avm prog
+    else     if !pony      then C_translator.gen_program_pony                       prog
     else if !erl  then C_translator.gen_program_erlang                     prog
     else if !go   then C_translator.gen_program_go                         prog
     else if !pl   then C_translator.gen_program_prolog                     prog

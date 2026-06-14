@@ -19,6 +19,7 @@
   eval_thread
   compiler
   c_translator
+  avm_gen
   web_gateway
   ai
   aipl_dist
