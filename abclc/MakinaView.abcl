@@ -1,0 +1,56 @@
+// MakinaView.abcl — MAKINA-7 を回して表示するアクター (AIPL).
+//
+// Mesh アクターが三角形群を保持し、Spinner が毎 tick に yaw を進めて Renderer に
+// 再描画を要求する。Renderer は yaw/pitch で回したワイヤフレームを白で描く。
+// Xinu ネイティブ版 makina3d.c の静的ビューア(回転 + シェーディング)を AIPL
+// アクターで表現したもの。実機ではメッシュは /actor/loadmesh で送って差し替える。
+
+class Main {
+  var mesh = 0;
+  var view = 0;
+  method tick() {
+    mesh = new Mesh();   send mesh.load();         // 頂点 / 三角形を用意
+    view = new Renderer(); send view.setMesh(mesh);
+    var sp = new Spinner();
+    send sp.run(view);                              // 自動回転を開始
+  }
+}
+
+// 回転角を進め続けるアクター。
+class Spinner {
+  var yaw = 32;
+  var pitch = 8;
+  var r = 0;
+  method run(rr) { r = rr; send self.step(); }
+  method step() {
+    yaw = yaw + 2;
+    if (yaw > 255) { yaw = yaw - 256; }
+    send r.draw(yaw, pitch);
+    wait(33);
+    send self.step();
+  }
+}
+
+// 三角形群(メッシュ)。実機では loadmesh で受けた MK3D を保持する。
+class Mesh {
+  var n = 0;        // 三角形数
+  method load() { n = 5172; }       // 例: grid=60 で間引いた MAKINA-7
+  method count() { return n; }
+}
+
+// yaw/pitch で回してワイヤフレームを描く。
+class Renderer {
+  var mesh = 0;
+  method setMesh(m) { mesh = m; }
+  method draw(yaw, pitch) {
+    cls();
+    // 各三角形の 3 頂点を yaw(Y軸)・pitch(X軸)で回し、画面へ射影して
+    // 前向きの面だけ白い線で 3 辺を描く(整数固定小数点)。
+    //   x1 = (x*cos(yaw) - z*sin(yaw)) >> 12
+    //   z1 = (x*sin(yaw) + z*cos(yaw)) >> 12
+    //   y2 = (y*cos(pitch) - z1*sin(pitch)) >> 12
+    //   px = cx + (x1 >> 2);  py = cy - (y2 >> 2)
+    // 面積(外積)が正の三角形のみ line(ax,ay,bx,by,15) を 3 本。
+    drawMesh(mesh, yaw, pitch);     // ホスト/カーネル提供のメッシュ描画
+  }
+}

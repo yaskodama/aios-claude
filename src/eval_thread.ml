@@ -1292,6 +1292,63 @@ let prim_table : (string, value list -> value) Hashtbl.t =
            in
            find lines
        | _ -> failwith "xinu_send(host:string, to:int, method:string, arg:int): arity 4 expected"));
+
+    (* xinu_loadvm(host, abcl_path) — compile an AIPL source file to a .avm
+       actor-bytecode module (Avm_gen) and POST it to the Xinu dynamic-actor
+       loader at http://<host>/actor/loadvm, which spawns it as a live actor
+       on the running kernel WITHOUT a recompile, and returns the spawned
+       actor id (parsed from "spawned actor id=N"), or -1.  Pass host as
+       "ip:port" with no scheme.  Append ?ask=0 via xinu_loadvm_noask to skip
+       the on-screen accept dialog (benchmarks). *)
+    ("xinu_loadvm",
+     (fun args -> match args with
+       | [VString host; VString path] | [VString host; VString path; VInt _] ->
+           (* ?ask=0 only when a 3rd (truthy) arg is given. *)
+           let noask = (match args with [_; _; VInt n] -> n <> 0 | _ -> false) in
+           (* 1. read + parse + compile the .abcl to .avm bytes. *)
+           let ic = open_in_bin path in
+           let len = in_channel_length ic in
+           let src = really_input_string ic len in
+           close_in ic;
+           let lb = Lexing.from_string src in
+           let prog = Ast.normalize_program (Parser.program Lexer.token lb) in
+           let avm = Avm_gen.gen_program_avm prog in
+           (* 2. write bytes to a tempfile and curl POST them. *)
+           let tmp = Filename.temp_file "aipl_vm_" ".avm" in
+           let oc_t = open_out_bin tmp in
+           output_string oc_t avm; close_out oc_t;
+           let url = "http://" ^ host ^ "/actor/loadvm" ^ (if noask then "?ask=0" else "") in
+           let cmd = Printf.sprintf
+             "curl -s --max-time 120 -X POST --data-binary @%s %s"
+             (Filename.quote tmp) (Filename.quote url) in
+           let ic2 = Unix.open_process_in cmd in
+           let buf = Buffer.create 256 in
+           let chunk = Bytes.create 4096 in
+           let rec drain () =
+             let n = input ic2 chunk 0 (Bytes.length chunk) in
+             if n > 0 then (Buffer.add_subbytes buf chunk 0 n; drain ()) in
+           (try drain () with End_of_file -> ());
+           let _ = Unix.close_process_in ic2 in
+           (try Sys.remove tmp with _ -> ());
+           let body = Buffer.contents buf in
+           (* 3. parse "spawned actor id=N" out of the reply. *)
+           let key = "spawned actor id=" in
+           let klen = String.length key and blen = String.length body in
+           let rec scan i =
+             if i + klen > blen then VInt (-1)
+             else if String.sub body i klen = key then begin
+               let j = ref (i + klen) in
+               let neg = !j < blen && body.[!j] = '-' in
+               if neg then incr j;
+               let b = Buffer.create 8 in
+               while !j < blen && body.[!j] >= '0' && body.[!j] <= '9' do
+                 Buffer.add_char b body.[!j]; incr j done;
+               (try let v = int_of_string (Buffer.contents b) in VInt (if neg then -v else v)
+                with _ -> VInt (-1))
+             end else scan (i + 1)
+           in
+           scan 0
+       | _ -> failwith "xinu_loadvm(host:string, abcl_path:string [, noask:int]): arity 2-3 expected"));
   ];
   h
 

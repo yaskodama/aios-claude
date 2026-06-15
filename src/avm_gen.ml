@@ -11,6 +11,7 @@
      - new C(args)      -> spawn an actor of C; if args, also send it init(args)
      - print(e)         -> e may be a string-concat of literals + ints (printf)
      - call wait(ms)    -> sleep the actor ms milliseconds
+     - call line(x1,y1,x2,y2,col) / cls() -> draw into the VM graphics window
      - top-level globals are compiled into a synthetic __boot actor (class 0)
        whose tick() runs them; loadvm spawns class 0 and kicks it with "tick".
 
@@ -21,7 +22,7 @@
    Opcodes: 01 PUSHI(i32) 02 LDF(u8) 03 STF(u8) 04 LDA(u8) 05 SELF 06 SENDER
      07 WAIT 08 DUP   10..14 ADD SUB MUL DIV MOD   20..25 LT LE GT GE EQ NE
      30 JMP(u16) 31 JZ(u16)  40 SEND(u16 mIdx,u8 nargs) 41 SPAWN(u16 cIdx)
-     42 PRINT  43 RET  44 PRINTF(u16 fmtIdx,u8 nargs)                          *)
+     42 PRINT  43 RET  44 PRINTF(u16 fmtIdx,u8 nargs)  45 LINE  46 CLS         *)
 
 open Ast
 
@@ -29,6 +30,7 @@ let op_pushi=0x01 and op_ldf=0x02 and op_stf=0x03 and op_lda=0x04 and op_self=0x
 let op_sender=0x06 and op_wait=0x07 and op_dup=0x08
 let op_jmp=0x30 and op_jz=0x31 and op_send=0x40 and op_spawn=0x41
 let op_print=0x42 and op_ret=0x43 and op_printf=0x44
+let op_line=0x45 and op_cls=0x46
 
 let binop_code = function
   | "+" -> 0x10 | "-" -> 0x11 | "*" -> 0x12 | "/" -> 0x13 | "%" -> 0x14
@@ -123,7 +125,10 @@ let compile_method ~fields ~params (body : stmt) : string =
         u8 op_send; u16 (sid m); u8 (List.length args)
     | CallStmt ("print", [a]) -> emit_print a
     | CallStmt ("wait", [ms]) -> ce ms; u8 op_wait
-    | CallStmt (f, _) -> failwith ("avm: unsupported call '" ^ f ^ "' (only print / wait)")
+    | CallStmt ("line", [x1; y1; x2; y2; col]) ->
+        ce x1; ce y1; ce x2; ce y2; ce col; u8 op_line   (* draw into the VM graphics window *)
+    | CallStmt ("cls", []) -> u8 op_cls                  (* clear the graphics window *)
+    | CallStmt (f, _) -> failwith ("avm: unsupported call '" ^ f ^ "' (only print / wait / line / cls)")
     | VarDecl _ | TypedVarDecl _ -> failwith "avm: method-local var unsupported (use class fields)"
     | Return _ -> ()
     | _ -> failwith "avm: unsupported statement"

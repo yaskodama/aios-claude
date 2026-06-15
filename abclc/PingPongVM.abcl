@@ -12,7 +12,7 @@ class Main {
     p = new Pinger();
     send p.setq(q);
     send q.setp(p);
-    send p.serve(5);
+    send p.serve(15);
   }
 }
 

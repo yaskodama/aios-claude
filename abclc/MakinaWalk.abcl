@@ -1,0 +1,115 @@
+// MakinaWalk.abcl — MAKINA-7 が歩くアクター (AIPL).
+//
+// 各ボーン(hip/knee/ankle, shoulder/elbow)を 1 つのアクターにし、Gait アクターが
+// 毎 tick に歩行位相を配る。各 Bone は親ボーンの先端から自分の先端を順運動学で
+// 求め、白い線分(skeleton)を Renderer に描かせる。左右の脚・腕は位相を 128 (=π)
+// ずらして交互に振る。整数のみ(三角関数なし)で、振りは三角波 wave() で近似する。
+// Xinu ネイティブ版 makina3d.c の FK / ギャイトを AIPL アクターで表現したもの。
+
+class Main {
+  var r = 0;
+  method tick() {
+    r = new Renderer();
+
+    // pelvis = 固定の根(画面中央やや上)。len=0, parent=0(なし)。
+    var pelvis = new Bone(); send pelvis.setup(0, 380, 230, 0);
+
+    // 左脚: hip -> knee -> ankle
+    var hipL  = new Bone(); send hipL.setup(pelvis,  70,   0, r);
+    var knL   = new Bone(); send knL.setup(hipL,     64,   0, r);
+    var anL   = new Bone(); send anL.setup(knL,      40,   0, r);
+
+    // 右脚 (位相 128 ずれ)
+    var hipR  = new Bone(); send hipR.setup(pelvis,  70, 128, r);
+    var knR   = new Bone(); send knR.setup(hipR,     64, 128, r);
+    var anR   = new Bone(); send anR.setup(knR,      40, 128, r);
+
+    // 腕は脚と逆位相: 左腕=128, 右腕=0
+    var shL   = new Bone(); send shL.setup(pelvis,   60, 128, r);
+    var elL   = new Bone(); send elL.setup(shL,      52, 128, r);
+    var shR   = new Bone(); send shR.setup(pelvis,   60,   0, r);
+    var elR   = new Bone(); send elR.setup(shR,      52,   0, r);
+
+    var g = new Gait();
+    send g.run(pelvis, hipL, knL, anL, hipR, knR, anR, shL, elL, shR, elR, r);
+  }
+}
+
+// 1 本のボーン。親の先端を起点に、位相に応じて横へ振った先端を計算する。
+class Bone {
+  var par = 0;     // 親ボーン(根は 0)
+  var len = 0;     // 長さ(下方向)
+  var ph  = 0;     // 位相オフセット
+  var r   = 0;     // Renderer
+  var tx  = 380;   // 自分の先端 x
+  var ty  = 230;   // 自分の先端 y
+
+  // 根の setup: (id0, x, y, ph0)
+  method setup(p, l, phase) { par = p; len = l; ph = phase; }
+  // 根用の固定座標 setter
+  method anchor(x, y) { tx = x; ty = y; }
+
+  // この tick の姿勢を計算して線を描く
+  method pose(phase) {
+    if (par == 0) {
+      // 根: 固定。線は描かない。
+    } else {
+      var bx = 0; var by = 0;
+      bx = par.tipX();   // 親の先端を起点に
+      by = par.tipY();
+      var sw = wave(phase + ph);   // 横方向の振り (-32..32)
+      tx = bx + sw;
+      ty = by + len;
+      send r.line(bx, by, tx, ty);  // 白い線分
+    }
+  }
+
+  method tipX() { return tx; }
+  method tipY() { return ty; }
+
+  // 三角波 (周期 256, 振幅 32) で sin を近似
+  method wave(x) {
+    var t = x;
+    while (t < 0)   { t = t + 256; }
+    while (t > 255) { t = t - 256; }
+    if (t < 64)  { return t - 0; }       //  0 .. 63   ->   0..63 ? -> scale below
+    if (t < 192) { return 128 - t; }     //  下り
+    return t - 256;                       //  上り(負側)
+  }
+}
+
+// 歩行クロック。毎 tick に位相を進め、根->末端の順で pose() を送る。
+class Gait {
+  var phase = 0;
+  var pel = 0; var hL = 0; var kL = 0; var aL = 0;
+  var hR = 0; var kR = 0; var aR = 0;
+  var sL = 0; var eL = 0; var sR = 0; var eR = 0; var r = 0;
+
+  method run(p, h1, k1, a1, h2, k2, a2, s1, e1, s2, e2, rr) {
+    pel = p; hL = h1; kL = k1; aL = a1; hR = h2; kR = k2; aR = a2;
+    sL = s1; eL = e1; sR = s2; eR = e2; r = rr;
+    send self.step();
+  }
+
+  method step() {
+    send r.cls();
+    // 根から末端の順(親が先に姿勢確定)
+    send pel.pose(phase);
+    send hL.pose(phase);  send kL.pose(phase);  send aL.pose(phase);
+    send hR.pose(phase);  send kR.pose(phase);  send aR.pose(phase);
+    send sL.pose(phase);  send eL.pose(phase);
+    send sR.pose(phase);  send eR.pose(phase);
+    send r.flush();
+    phase = phase + 6;
+    if (phase > 255) { phase = phase - 256; }
+    wait(40);
+    send self.step();
+  }
+}
+
+// 受け取った線分を白で描く。
+class Renderer {
+  method cls()   { cls(); }
+  method line(x1, y1, x2, y2) { line(x1, y1, x2, y2, 15); }  // 15 = white
+  method flush() { wait(0); }
+}

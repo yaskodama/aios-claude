@@ -40,6 +40,18 @@ TARGETS = [
                "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl",
     },
     {
+        "id": "phil5",
+        "glyph": "5&phi;",
+        "portlabel": ":8901/actors",
+        "title": "Py-I &mdash; 5 Dining Philosophers",
+        "desc": "Five philosophers as Python actor threads, laid out in a pentagon and coloured by state (think / hungry / eat); forks are drawn as arrows pointing at whoever holds them. Ordered fork acquisition &rarr; deadlock-free.",
+        "addr": "127.0.0.1:8901/actors",
+        "href": "http://127.0.0.1:8901/actors",
+        "port": 8901,
+        "cwd": REPO,
+        "cmd": "python3 philosophers5_web.py 8901",
+    },
+    {
         "id": "ocaml",
         "glyph": "OCaml",
         "portlabel": ":8080/dashboard",
