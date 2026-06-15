@@ -108,6 +108,78 @@ the OCaml side and the Python coordinator can `remote_now` into
 it.  See `abclc/samples-remote/client.abcl` for the OCaml-side
 view.
 
+## Compiling actors to a binary (`.avm`) and sending them to other computers
+
+An AIPL program is just text, but it can be **compiled to a compact
+binary actor module** — an `.avm` file (magic `AVM1`) — with the
+OCaml code generator:
+
+```sh
+# X.abcl  ->  X.avm   (integer-only actor bytecode; classes + methods + sends)
+aipl2c.exe --avm --no-typecheck abclc/Rotate4Lines.abcl -o Rotate4Lines.avm
+```
+
+The `.avm` is a small, self-contained bytecode image: its classes,
+methods, and `send` instructions are serialized into a fixed format
+that any AIPL **dynamic VM** can load and run.  Because it carries no
+host-specific code, the same binary can be **sent over the network to
+another computer and executed there without recompiling anything** —
+including a bare-metal **Xinu** kernel running on a Raspberry Pi, which
+embeds a small actor VM:
+
+```sh
+# Send the actor binary to a running Xinu (Pi); it loads the classes,
+# spawns the first actor, and kicks it with tick() — no kernel rebuild.
+curl --data-binary @Rotate4Lines.avm http://<pi-ip>:8080/actor/loadvm?ask=0
+```
+
+Xinu accepts three actor payloads over HTTP, all the same way:
+
+| Route | Payload | What runs |
+|---|---|---|
+| `POST /actor/loadvm`   | `.avm` actor bytecode (`AVM1`) | spawns the actor on the kernel's dynamic VM |
+| `POST /actor/loadmesh` | 3-D mesh binary (`MK3D`)        | shaded 3-D model shown by the native viewer |
+| `POST /actor/loadrig`  | skeletal rig binary (`MKR1`)    | articulated walking character |
+
+So an actor is portable as **data**: write it as `.abcl`, compile it
+to `.avm`, and ship it to any machine with an AIPL VM — phone, browser,
+server, or a Pi running Xinu.
+
+---
+
+### アクターをバイナリ（`.avm`）に変換し、他のコンピュータへ送る（日本語）
+
+AIPL プログラムはテキストですが、**コンパクトなバイナリのアクターモジュール**
+＝ `.avm` ファイル（マジック `AVM1`）に**コンパイル**できます（OCaml コード生成器）:
+
+```sh
+# X.abcl  ->  X.avm （整数のみのアクターバイトコード。class + method + send を内包）
+aipl2c.exe --avm --no-typecheck abclc/Rotate4Lines.abcl -o Rotate4Lines.avm
+```
+
+`.avm` はクラス・メソッド・`send` 命令を固定フォーマットに直列化した、
+小さく自己完結したバイトコードイメージです。ホスト依存のコードを含まないため、
+**同じバイナリをネットワーク経由で別のコンピュータへ送り、何も再コンパイル
+せずにそのまま実行**できます。これには、Raspberry Pi 上でベアメタル動作する
+**Xinu**（カーネルに小さなアクター VM を内蔵）も含まれます:
+
+```sh
+# 動作中の Xinu（Pi）へアクターバイナリを送信。クラスを読み込み、最初のアクターを
+# spawn して tick() で起動する。カーネルの再ビルドは不要。
+curl --data-binary @Rotate4Lines.avm http://<pi-ip>:8080/actor/loadvm?ask=0
+```
+
+Xinu は 3 種類のアクター・ペイロードを HTTP で同じ要領で受け取れます:
+
+| ルート | ペイロード | 実行内容 |
+|---|---|---|
+| `POST /actor/loadvm`   | `.avm` アクターバイトコード（`AVM1`） | カーネルの動的 VM 上でアクターを spawn |
+| `POST /actor/loadmesh` | 3D メッシュバイナリ（`MK3D`）         | ネイティブビューアでシェーディング表示 |
+| `POST /actor/loadrig`  | スケルトンリグバイナリ（`MKR1`）       | 関節歩行キャラクターを表示 |
+
+つまりアクターは**データとして可搬**です。`.abcl` で書き、`.avm` にコンパイルし、
+AIPL VM を持つ任意のマシン（スマホ・ブラウザ・サーバ・Xinu 上の Pi）へ送れます。
+
 ## Live dashboard
 
 ```sh
