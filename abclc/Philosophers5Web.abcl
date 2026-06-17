@@ -1,0 +1,96 @@
+// Philosophers5Web.abcl — 5 dining philosophers for the :8899/actors web view.
+//
+// Runs on Py-I (each Fork / Philosopher is its own actor thread).  Deadlock is
+// avoided by ORDERED acquisition: every philosopher requests the lower-id fork
+// first.  Philosopher 4 bridges fork 4 and fork 0, so it takes fork 0 (the
+// lower one) first — breaking the circular-wait condition.
+//
+// `pub var` fields expose live state for the visualiser:
+//   Philosopher.state : 0 = thinking, 1 = hungry, 2 = eating
+//   Fork.held / holder : whether the fork is taken and by whom
+// (No negative literals — Py-I dislikes `var x = -1`; `held == 0` means free.)
+
+class Fork {
+  pub var idx: int = 0;
+  pub var held: int = 0;
+  pub var holder: int = 0;
+
+  method init(i: int) {
+    idx = i;
+  }
+  method request(pid: int) {
+    if (held == 0) {
+      held = 1;
+      holder = pid;
+      send sender.granted();
+    } else {
+      send sender.refused();
+    }
+  }
+  method release() {
+    held = 0;
+  }
+}
+
+class Philosopher {
+  pub var id: int = 0;
+  pub var state: int = 0;     // 0 think, 1 hungry, 2 eat
+  pub var meals: int = 0;
+  var left = 0;               // lower-id fork (requested first)
+  var right = 0;
+  var got_left: int = 0;
+
+  method init(my_id: int, l, r) {
+    id = my_id;
+    left = l;
+    right = r;
+    got_left = 0;
+    state = 0;
+    send self.think();
+  }
+
+  method think() {
+    state = 0;
+    sleep(0.4 + random());     // ponder 0.4 .. 1.4 s
+    state = 1;                 // hungry
+    send left.request(id);
+  }
+
+  method granted() {
+    if (got_left == 0) {
+      got_left = 1;
+      send right.request(id);  // now reach for the higher-id fork
+    } else {
+      state = 2;               // eating
+      meals = meals + 1;
+      sleep(0.6);
+      got_left = 0;
+      send left.release();
+      send right.release();
+      send self.think();       // loop forever
+    }
+  }
+
+  method refused() {
+    if (got_left == 1) {
+      send left.release();     // drop the one we hold, avoid holding-and-waiting
+      got_left = 0;
+    }
+    sleep(0.2);
+    state = 1;
+    send left.request(id);     // retry the lower fork
+  }
+}
+
+var f0 = new Fork(0);
+var f1 = new Fork(1);
+var f2 = new Fork(2);
+var f3 = new Fork(3);
+var f4 = new Fork(4);
+
+// left = lower-id fork in every pair; p4 takes f0 first (asymmetry).
+var p0 = new Philosopher(0, f0, f1);
+var p1 = new Philosopher(1, f1, f2);
+var p2 = new Philosopher(2, f2, f3);
+var p3 = new Philosopher(3, f3, f4);
+var p4 = new Philosopher(4, f0, f4);

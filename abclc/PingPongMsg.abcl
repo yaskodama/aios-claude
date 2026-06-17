@@ -1,0 +1,24 @@
+// PingPongMsg.abcl — exercises the new .avm features: string-concat print,
+// sender, and call wait.  Main links the two actors (no global vars).
+class Main {
+  var p = 0;
+  var q = 0;
+  method tick() { q = new Ponger(); p = new Pinger(); send p.serve(q, 5); }
+}
+class Pinger {
+  var left = 0;
+  method serve(peer, n) { left = n; send peer.ping(left); }
+  method pong(n) {
+    print("Ping got pong " + n);
+    call wait(300);
+    left = left - 1;
+    if (left > 0) { send sender.ping(left); }
+  }
+}
+class Ponger {
+  method ping(n) {
+    print("Pong got ping " + n);
+    call wait(300);
+    send sender.pong(n);
+  }
+}

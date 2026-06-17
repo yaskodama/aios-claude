@@ -1,0 +1,206 @@
+// Philosophers5XinuVM.abcl — 5 dining philosophers for the Xinu dynamic VM (.avm).
+// Generated (pentagon geometry + fork arrows) from the Py-I :8901 logic.
+// Renderer-centric: each Phil/Fork reports state by message; Renderer redraws.
+// Palette: 1 blue think, 6 yellow hungry, 2 green eat; fork arrow in holder hue
+// (p0 12 p1 9 p2 10 p3 11 p4 13); free fork = small grey box.
+class Main {
+  var r = 0;
+  var f0 = 0; var f1 = 0; var f2 = 0; var f3 = 0; var f4 = 0;
+  var p0 = 0; var p1 = 0; var p2 = 0; var p3 = 0; var p4 = 0;
+  method tick() {
+    r = new Rend();
+    f0 = new Fork(); send f0.setup(0, r);
+    f1 = new Fork(); send f1.setup(1, r);
+    f2 = new Fork(); send f2.setup(2, r);
+    f3 = new Fork(); send f3.setup(3, r);
+    f4 = new Fork(); send f4.setup(4, r);
+    p0 = new Phil(); send p0.setup(0, f0, f1, r);
+    p1 = new Phil(); send p1.setup(1, f1, f2, r);
+    p2 = new Phil(); send p2.setup(2, f2, f3, r);
+    p3 = new Phil(); send p3.setup(3, f3, f4, r);
+    p4 = new Phil(); send p4.setup(4, f0, f4, r);
+    send r.tick();
+  }
+}
+
+class Rend {
+  var p0 = 0; var p1 = 0; var p2 = 0; var p3 = 0; var p4 = 0;
+  var f0 = 0; var f1 = 0; var f2 = 0; var f3 = 0; var f4 = 0;
+  method setp(i, c) {
+    if (i == 0) { p0 = c; }
+    if (i == 1) { p1 = c; }
+    if (i == 2) { p2 = c; }
+    if (i == 3) { p3 = c; }
+    if (i == 4) { p4 = c; }
+  }
+  method setf(i, h) {
+    if (i == 0) { f0 = h; }
+    if (i == 1) { f1 = h; }
+    if (i == 2) { f2 = h; }
+    if (i == 3) { f3 = h; }
+    if (i == 4) { f4 = h; }
+  }
+  method tick() {
+    cls();
+    if (f0 == 0) {
+      line(266, 120, 274, 120, 8);
+      line(274, 120, 274, 128, 8);
+      line(274, 128, 266, 128, 8);
+      line(266, 128, 266, 120, 8);
+    }
+    if (f0 == 1) {
+      line(270, 124, 379, 45, 12);
+      line(271, 124, 380, 45, 12);
+      line(379, 45, 372, 59, 12);
+      line(379, 45, 364, 48, 12);
+    }
+    if (f0 == 5) {
+      line(270, 124, 162, 202, 13);
+      line(271, 124, 163, 202, 13);
+      line(162, 202, 169, 188, 13);
+      line(162, 202, 177, 199, 13);
+    }
+    if (f1 == 0) {
+      line(538, 120, 546, 120, 8);
+      line(546, 120, 546, 128, 8);
+      line(546, 128, 538, 128, 8);
+      line(538, 128, 538, 120, 8);
+    }
+    if (f1 == 1) {
+      line(542, 124, 433, 45, 12);
+      line(543, 124, 434, 45, 12);
+      line(433, 45, 448, 48, 12);
+      line(433, 45, 440, 59, 12);
+    }
+    if (f1 == 2) {
+      line(542, 124, 650, 202, 9);
+      line(543, 124, 651, 202, 9);
+      line(650, 202, 635, 199, 9);
+      line(650, 202, 643, 188, 9);
+    }
+    if (f2 == 0) {
+      line(622, 378, 630, 378, 8);
+      line(630, 378, 630, 386, 8);
+      line(630, 386, 622, 386, 8);
+      line(622, 386, 622, 378, 8);
+    }
+    if (f2 == 2) {
+      line(626, 382, 667, 254, 9);
+      line(627, 382, 668, 254, 9);
+      line(667, 254, 669, 269, 9);
+      line(667, 254, 656, 265, 9);
+    }
+    if (f2 == 3) {
+      line(626, 382, 584, 509, 10);
+      line(627, 382, 585, 509, 10);
+      line(584, 509, 582, 494, 10);
+      line(584, 509, 595, 498, 10);
+    }
+    if (f3 == 0) {
+      line(402, 537, 410, 537, 8);
+      line(410, 537, 410, 545, 8);
+      line(410, 545, 402, 545, 8);
+      line(402, 545, 402, 537, 8);
+    }
+    if (f3 == 3) {
+      line(406, 541, 540, 541, 10);
+      line(407, 541, 541, 541, 10);
+      line(540, 541, 526, 548, 10);
+      line(540, 541, 526, 534, 10);
+    }
+    if (f3 == 4) {
+      line(406, 541, 272, 541, 11);
+      line(407, 541, 273, 541, 11);
+      line(272, 541, 286, 534, 11);
+      line(272, 541, 286, 548, 11);
+    }
+    if (f4 == 0) {
+      line(182, 378, 190, 378, 8);
+      line(190, 378, 190, 386, 8);
+      line(190, 386, 182, 386, 8);
+      line(182, 386, 182, 378, 8);
+    }
+    if (f4 == 4) {
+      line(186, 382, 228, 509, 11);
+      line(187, 382, 229, 509, 11);
+      line(228, 509, 217, 498, 11);
+      line(228, 509, 230, 494, 11);
+    }
+    if (f4 == 5) {
+      line(186, 382, 145, 254, 13);
+      line(187, 382, 146, 254, 13);
+      line(145, 254, 156, 265, 13);
+      line(145, 254, 143, 269, 13);
+    }
+    line(390, 9, 422, 9, p0);
+    line(422, 9, 422, 41, p0);
+    line(422, 41, 390, 41, p0);
+    line(390, 41, 390, 9, p0);
+    line(661, 206, 693, 206, p1);
+    line(693, 206, 693, 238, p1);
+    line(693, 238, 661, 238, p1);
+    line(661, 238, 661, 206, p1);
+    line(558, 525, 590, 525, p2);
+    line(590, 525, 590, 557, p2);
+    line(590, 557, 558, 557, p2);
+    line(558, 557, 558, 525, p2);
+    line(222, 525, 254, 525, p3);
+    line(254, 525, 254, 557, p3);
+    line(254, 557, 222, 557, p3);
+    line(222, 557, 222, 525, p3);
+    line(119, 206, 151, 206, p4);
+    line(151, 206, 151, 238, p4);
+    line(151, 238, 119, 238, p4);
+    line(119, 238, 119, 206, p4);
+    wait(50);
+    send self.tick();
+  }
+}
+
+class Fork {
+  var idx = 0;
+  var held = 0;
+  var rend = 0;
+  method setup(i, rr) { idx = i; held = 0; rend = rr; send rend.setf(idx, 0); }
+  method request(pid) {
+    if (held == 0) {
+      held = 1;
+      send rend.setf(idx, pid + 1);
+      send sender.granted();
+    } else {
+      send sender.refused();
+    }
+  }
+  method release() { held = 0; send rend.setf(idx, 0); }
+}
+
+class Phil {
+  var id = 0;
+  var lf = 0;
+  var rf = 0;
+  var got = 0;
+  var rend = 0;
+  method setup(i, l, r, rr) { id = i; lf = l; rf = r; got = 0; rend = rr; send self.think(); }
+  method think() {
+    send rend.setp(id, 1);
+    wait(40);
+    send rend.setp(id, 6);
+    send lf.request(id);
+  }
+  method granted() {
+    if (got == 0) { got = 1; send rf.request(id); }
+    else {
+      send rend.setp(id, 2);
+      wait(50);
+      got = 0;
+      send lf.release();
+      send rf.release();
+      send self.think();
+    }
+  }
+  method refused() {
+    if (got == 1) { send lf.release(); got = 0; }
+    wait(20);
+    send self.think();
+  }
+}

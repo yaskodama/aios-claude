@@ -1,0 +1,55 @@
+// ArmRobotVM.abcl - 6-axis robot arm, VM-compatible (integer, line/cls).
+// A self-drawing Renderer interpolates precomputed keyframe joint positions
+// (forward kinematics baked on the host) and strokes the links + gripper
+// into the Xinu VM graphics window. No floats/sin needed on the kernel VM.
+class Main {
+  var r = 0;
+  method tick() { r = new Renderer(); send r.run(); }
+}
+class Renderer {
+  var cex = 0;
+  var cey = 0;
+  var cwx = 0;
+  var cwy = 0;
+  var ctx = 0;
+  var cty = 0;
+  var cf1x = 0;
+  var cf1y = 0;
+  var cf2x = 0;
+  var cf2y = 0;
+  var kf = 0; var sub = 0;
+  method run() {
+    cex = 292;
+    cey = 120;
+    cwx = 343;
+    cwy = 155;
+    ctx = 357;
+    cty = 180;
+    cf1x = 360;
+    cf1y = 192;
+    cf2x = 367;
+    cf2y = 188;
+    kf = 0; sub = 0;
+    send self.frame();
+  }
+  method frame() {
+    sub = sub + 1;
+    if (sub >= 18) { sub = 0; kf = kf + 1; if (kf >= 6) { kf = 0; } }
+    if (kf == 0) { cex = cex + (292 - cex) / 4; cey = cey + (120 - cey) / 4; cwx = cwx + (343 - cwx) / 4; cwy = cwy + (155 - cwy) / 4; ctx = ctx + (357 - ctx) / 4; cty = cty + (180 - cty) / 4; cf1x = cf1x + (360 - cf1x) / 4; cf1y = cf1y + (192 - cf1y) / 4; cf2x = cf2x + (367 - cf2x) / 4; cf2y = cf2y + (188 - cf2y) / 4; }
+    if (kf == 1) { cex = cex + (250 - cex) / 4; cey = cey + (92 - cey) / 4; cwx = cwx + (295 - cwx) / 4; cwy = cwy + (49 - cwy) / 4; ctx = ctx + (321 - ctx) / 4; cty = cty + (38 - cty) / 4; cf1x = cf1x + (333 - cf1x) / 4; cf1y = cf1y + (37 - cf1y) / 4; cf2x = cf2x + (330 - cf2x) / 4; cf2y = cf2y + (30 - cf2y) / 4; }
+    if (kf == 2) { cex = cex + (302 - cex) / 4; cey = cey + (138 - cey) / 4; cwx = cwx + (359 - cwx) / 4; cwy = cwy + (162 - cwy) / 4; ctx = ctx + (374 - ctx) / 4; cty = cty + (185 - cty) / 4; cf1x = cf1x + (377 - cf1x) / 4; cf1y = cf1y + (197 - cf1y) / 4; cf2x = cf2x + (384 - cf2x) / 4; cf2y = cf2y + (193 - cf2y) / 4; }
+    if (kf == 3) { cex = cex + (302 - cex) / 4; cey = cey + (182 - cey) / 4; cwx = cwx + (317 - cwx) / 4; cwy = cwy + (242 - cwy) / 4; ctx = ctx + (310 - ctx) / 4; cty = cty + (269 - cty) / 4; cf1x = cf1x + (296 - cf1x) / 4; cf1y = cf1y + (278 - cf1y) / 4; cf2x = cf2x + (318 - cf2x) / 4; cf2y = cf2y + (283 - cf2y) / 4; }
+    if (kf == 4) { cex = cex + (287 - cex) / 4; cey = cey + (113 - cey) / 4; cwx = cwx + (348 - cwx) / 4; cwy = cwy + (124 - cwy) / 4; ctx = ctx + (376 - ctx) / 4; cty = cty + (128 - cty) / 4; cf1x = cf1x + (386 - cf1x) / 4; cf1y = cf1y + (140 - cf1y) / 4; cf2x = cf2x + (389 - cf2x) / 4; cf2y = cf2y + (119 - cf2y) / 4; }
+    if (kf == 5) { cex = cex + (305 - cex) / 4; cey = cey + (167 - cey) / 4; cwx = cwx + (320 - cwx) / 4; cwy = cwy + (227 - cwy) / 4; ctx = ctx + (318 - ctx) / 4; cty = cty + (255 - cty) / 4; cf1x = cf1x + (313 - cf1x) / 4; cf1y = cf1y + (267 - cf1y) / 4; cf2x = cf2x + (321 - cf2x) / 4; cf2y = cf2y + (268 - cf2y) / 4; }
+    cls();
+    line(235, 240, 235, 160, 8);
+    line(210, 242, 260, 242, 8);
+    line(235, 160, cex, cey, 6);
+    line(cex, cey, cwx, cwy, 12);
+    line(cwx, cwy, ctx, cty, 3);
+    line(ctx, cty, cf1x, cf1y, 7);
+    line(ctx, cty, cf2x, cf2y, 7);
+    wait(40);
+    send self.frame();
+  }
+}

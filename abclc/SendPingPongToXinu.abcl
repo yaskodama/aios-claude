@@ -1,0 +1,24 @@
+// SendPingPongToXinu.abcl
+// ------------------------------------------------------------------
+// Mac-side AIPL orchestrator (OCaml AIPL runtime, repl_thread).
+// It ships the PingPong actor program to a running Xinu kernel and
+// starts it there WITHOUT recompiling the kernel:
+//
+//   xinu_loadvm(host, abcl_path)
+//     1. reads + compiles abcl_path to a .avm bytecode module (Avm_gen)
+//     2. POSTs it to  http://<host>/actor/loadvm  (the Xinu dynamic
+//        actor loader), which spawns its first class as a live actor
+//        and kicks it with tick()
+//     3. returns the spawned actor id (or -1)
+//
+// PingPongVM.abcl is the VM-compatible PingPong (integer-only, no
+// top-level globals) that the kernel bytecode VM can run.
+// ------------------------------------------------------------------
+var host = "192.168.3.50:8080";
+var prog = "/Users/kodamay/ocaml-app/abclcp-project/abclc/PingPongVM.abcl";
+
+print("[mac-aipl] sending PingPong.abcl to Xinu...");
+var id = xinu_loadvm(host, prog);
+print("[mac-aipl] Xinu spawned actor id:");
+print(id);
+print("[mac-aipl] done — watch the 'VM print' window on Xinu.");
