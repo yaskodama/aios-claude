@@ -254,6 +254,7 @@ export class Runtime {
 
   // Schedule an actor to process its next dispatchable message
   scheduleActor(actor, delayMs = 0) {
+    if (this._halt) return;                 // host stopped the program (e.g. drag takeover)
     if (actor.processing || actor.scheduled) return;
     actor.scheduled = true;
     setTimeout(() => {
@@ -263,6 +264,7 @@ export class Runtime {
   }
 
   _processNextFor(actor) {
+    if (this._halt) return;                 // host stopped the program
     const idx = actor.mailbox.findIndex(msg => actor.methods.has(msg.methodName));
     if (idx < 0) return;
 
@@ -474,7 +476,12 @@ export class Runtime {
         if (actor) actor.__nextDelay = ms;
         // wait() is the natural frame boundary for cls/line/tri figures: flush the
         // accumulated draw buffers to the canvas before the actor sleeps.
-        if (this.segs.length || this.tris.length) this._redrawCanvas();
+        if (this.segs.length || this.tris.length) {
+          this._redrawCanvas();
+          // host hook: a viewer can snapshot the just-finished frame here (used by
+          // makina_poly.html to cache the turntable for mouse-drag scrubbing).
+          if (this._onFrame) this._onFrame();
+        }
         break;
       }
       case "line": {

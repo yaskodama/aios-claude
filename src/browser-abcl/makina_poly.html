@@ -51,6 +51,45 @@
     const srcDiv = document.getElementById("src");
     let activeTimers = [], running = false, SRC = "";
 
+    // ---- mouse-drag rotation -------------------------------------------------
+    // The actor plays a baked 24-frame yaw turntable.  As it runs the first full
+    // turn, we cache every finished frame; then the host takes over so dragging
+    // left/right scrubs through the cached frames (release = gentle auto-rotate).
+    // (The .avm stays a plain turntable; on Xinu the kernel maps input -> frame.)
+    const FRAMES_EXPECTED = 24;
+    let interpRef = null, frames = [], locked = false;
+    let viewPos = 0, dragging = false, lastX = 0, lastIdx = -1, rotTimer = 0;
+
+    function drawCached(idx) {
+      const rt = interpRef.runtime;
+      rt.segs = frames[idx].segs;
+      rt.tris = frames[idx].tris;
+      rt._redrawCanvas();
+    }
+    function rotLoop() {
+      if (!dragging) viewPos += 0.06;            // gentle, slow auto-rotate when idle
+      const n = FRAMES_EXPECTED;
+      const idx = ((Math.round(viewPos) % n) + n) % n;
+      if (idx !== lastIdx) { lastIdx = idx; drawCached(idx); }
+      rotTimer = setTimeout(rotLoop, 33);        // ~30 Hz (setTimeout, not rAF: headless-friendly)
+    }
+    function enableDrag() {
+      if (locked) return;
+      locked = true;
+      if (interpRef && interpRef.runtime) interpRef.runtime._halt = true;  // stop the actor cleanly
+      stopAll();                                  // host drives now
+      appendLog("[turntable cached — drag to rotate · release = auto-rotate]");
+      if (rotTimer) clearTimeout(rotTimer);
+      rotLoop();
+    }
+    canvas.addEventListener("mousedown", (e) => { dragging = true; lastX = e.clientX; e.preventDefault(); });
+    window.addEventListener("mouseup",   () => { dragging = false; });
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX; lastX = e.clientX;
+      viewPos -= dx * (FRAMES_EXPECTED / 460);    // drag right -> rotate right
+    });
+
     const _origSetTimeout = window.setTimeout.bind(window);
     window.setTimeout = function(fn, ms, ...rest) {
       const id = _origSetTimeout(fn, ms, ...rest);
@@ -68,16 +107,29 @@
       running = false;
       activeTimers.forEach(id => clearTimeout(id));
       activeTimers = [];
+      if (rotTimer) { clearTimeout(rotTimer); rotTimer = 0; }
     }
     function runProgram() {
       stopAll();
+      if (rotTimer) { clearTimeout(rotTimer); rotTimer = 0; }
       logDiv.textContent = "";
+      frames = []; locked = false; viewPos = 0; lastIdx = -1;
       const parser = window.parser;
       if (!parser) { appendLog("[ERROR] parser not loaded"); return; }
       parser.yy = AST;
       running = true;
       const interp = new Interpreter(appendLog);
+      interpRef = interp;
+      interp.runtime._halt = false;
       interp.setCanvas(canvas);
+      // Cache each finished turntable frame; once a full turn is in, enable drag.
+      interp.runtime._onFrame = () => {
+        if (locked) return;
+        frames.push({ segs: interp.runtime.segs.slice(), tris: interp.runtime.tris.slice() });
+        if (frames.length === 1 || frames.length % 6 === 0)
+          appendLog("[baking turntable… " + frames.length + "/" + FRAMES_EXPECTED + "]");
+        if (frames.length >= FRAMES_EXPECTED) enableDrag();
+      };
       try {
         const ast = parser.parse(SRC);
         appendLog("[parse ok — " + SRC.split("\n").length.toLocaleString() + " lines]");
