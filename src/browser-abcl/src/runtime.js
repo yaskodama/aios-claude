@@ -900,7 +900,7 @@ export class Runtime {
     // kernel/AVM runtime (line(...,color)) and here unchanged.
     if (this.segs.length) {
       const PAL = [
-        "#0a0a1a", "#ff5d6c", "#5dff8b", "#ffe14d",
+        "#39414f", "#ff5d6c", "#5dff8b", "#ffe14d",   // 0 = Blender-grid grey
         "#5db4ff", "#ff7fe0", "#5df0ff", "#e8f0f8",
       ];
       ctx.lineWidth = 2;

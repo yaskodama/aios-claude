@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>AIPL — MAKINA-7 3D (Blender-style viewport)</title>
+  <style>
+    body { margin: 0; background: #232733; color: #cdd5e3; font-family: monospace;
+           display: flex; flex-direction: column; align-items: center; }
+    h2 { margin: 12px 0 4px; font-size: 1rem; color: #7fd0ff; }
+    #info { font-size: 0.75rem; color: #8a98b0; margin-bottom: 8px; text-align: center; }
+    canvas { border: 1px solid #2a3344; display: block; background: #1b1f2a; }
+    #controls { margin: 10px 0; display: flex; gap: 8px; }
+    button { padding: 6px 14px; background: #222a38; color: #aef; border: 1px solid #3a465c;
+             cursor: pointer; font-family: monospace; border-radius: 6px; }
+    button:hover { background: #2e3a4e; }
+    #log { width: 820px; height: 80px; background: #11151d; color: #5db98b; font-size: 0.72rem;
+           overflow-y: auto; padding: 6px; margin-top: 6px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>AIPL — MAKINA-7 plays the trumpet · 3-D turntable (Blender-style viewport)</h2>
+  <div id="info">
+    The procedural character from <b>lecture.site44.com/robot/standalone.html</b> baked into
+    36 rotation frames of a projected wireframe (~1300 edges/frame) and described as an AIPL actor.<br>
+    Ground grid + XYZ gizmo = the Blender display system going into the Xinu kernel.
+    Same source compiles to <code>abclc/MakinaTrumpet3D.avm</code> (1.2&nbsp;MB binary).
+  </div>
+  <canvas id="canvas" width="820" height="820"></canvas>
+  <div id="controls">
+    <button id="btnRun">▶ Run</button>
+    <button id="btnStop">■ Stop</button>
+  </div>
+  <div id="log"></div>
+
+  <script src="/src/parser/parser.js"></script>
+  <script type="module">
+    import * as AST from "/src/ast.js";
+    import { Interpreter } from "/src/interpreter.js";
+
+    const canvas = document.getElementById("canvas");
+    const logDiv = document.getElementById("log");
+    let activeTimers = [], running = false, SRC = "";
+
+    const _origSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = function(fn, ms, ...rest) {
+      const id = _origSetTimeout(fn, ms, ...rest);
+      if (running) activeTimers.push(id);
+      return id;
+    };
+    function appendLog(s) {
+      if (s === undefined || s === null) return;
+      s = String(s);
+      if (s.startsWith("[send]") || s.startsWith("[actor created]")) return;
+      logDiv.textContent += s + "\n";
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    function stopAll() {
+      running = false;
+      activeTimers.forEach(id => clearTimeout(id));
+      activeTimers = [];
+    }
+    function runProgram() {
+      stopAll();
+      logDiv.textContent = "";
+      const parser = window.parser;
+      if (!parser) { appendLog("[ERROR] parser not loaded"); return; }
+      parser.yy = AST;
+      running = true;
+      const interp = new Interpreter(appendLog);
+      interp.setCanvas(canvas);
+      try {
+        const ast = parser.parse(SRC);
+        appendLog("[parse ok — " + SRC.split("\n").length + " lines]");
+        interp.runProgram(ast);
+        appendLog("[MAKINA-7 3D turntable running]");
+      } catch (e) {
+        running = false;
+        appendLog("[ERROR] " + e);
+      }
+    }
+
+    document.getElementById("btnRun").addEventListener("click", runProgram);
+    document.getElementById("btnStop").addEventListener("click", () => { stopAll(); appendLog("[stopped]"); });
+
+    (async () => {
+      SRC = await (await fetch("/MakinaTrumpet3D.abcl")).text();
+      runProgram();
+    })();
+  </script>
+</body>
+</html>
