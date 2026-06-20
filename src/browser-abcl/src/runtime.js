@@ -10,6 +10,7 @@ export class Runtime {
     this.replies = [];
     this.canvas = null;        // set externally for canvas output
     this.scene = new Map();    // actorName → {x1,y1,x2,y2,color}   (for rotating lines)
+    this.segs  = [];           // accumulating polyline buffer (cls/seg/present figures, e.g. MAKINA)
     this.philoStates = new Map(); // id → 0(think)/1(hungry)/2(eat) (for philosophers)
     this.forkStates  = new Map(); // id → 0(free)/1(taken)
     this.forkHolders = new Map(); // id → holding philosopher id (absent when free)
@@ -63,6 +64,7 @@ export class Runtime {
     this.replySlots.clear();
     this._nextSlotId = 1;
     this.scene.clear();
+    this.segs.length = 0;
     this.philoStates.clear();
     this.forkStates.clear();
     this.forkHolders.clear();
@@ -468,8 +470,23 @@ export class Runtime {
         // Delay next message dispatch for this actor
         const ms = Number(args[0]) || 0;
         if (actor) actor.__nextDelay = ms;
+        // wait() is the natural frame boundary for cls/line figures: flush the
+        // accumulated polyline buffer to the canvas before the actor sleeps.
+        if (this.segs.length) this._redrawCanvas();
         break;
       }
+      case "line": {
+        // Kernel/AVM-compatible draw: line(x1,y1,x2,y2[,col]) accumulates into the
+        // polyline buffer (mirrors the .avm op_line + Xinu VM graphics window, so
+        // one .abcl renders here AND compiles to .avm unchanged).  cls() resets it.
+        const [x1, y1, x2, y2, color] = args;
+        this.segs.push({ x1, y1, x2, y2, color: (color === undefined ? 7 : Number(color)) });
+        break;
+      }
+      case "cls":
+        this.segs.length = 0;
+        this._redrawCanvas();   // blank the frame immediately
+        break;
       case "canvas_line":
       case "sdl_line": {
         const [x1, y1, x2, y2] = args;
@@ -480,13 +497,25 @@ export class Runtime {
         this._redrawCanvas();
         break;
       }
+      case "canvas_seg":
+      case "sdl_seg": {
+        // Accumulating polyline segment (figures with many lines per actor, e.g.
+        // MAKINA): canvas_seg(x1,y1,x2,y2[,color]).  Unlike canvas_line (one line
+        // per actor) these pile up in this.segs until canvas_clear resets them.
+        const [x1, y1, x2, y2, color] = args;
+        this.segs.push({ x1, y1, x2, y2, color: (color === undefined ? 7 : Number(color)) });
+        break;
+      }
       case "canvas_clear":
       case "sdl_clear":
-        // No-op: redrawCanvas clears automatically before drawing
+        // Reset the accumulating polyline buffer (frame start).  The per-actor
+        // scene (rotate4lines etc.) is untouched, so those demos are unaffected.
+        this.segs.length = 0;
         break;
       case "canvas_present":
       case "sdl_present":
-        // No-op for canvas (immediate mode)
+        // Flush the accumulated frame to the canvas.
+        this._redrawCanvas();
         break;
       case "philo_state": {
         // args: (id, state)  state: 0=thinking, 1=hungry, 2=eating
@@ -864,6 +893,25 @@ export class Runtime {
       ctx.moveTo(seg.x1, seg.y1);
       ctx.lineTo(seg.x2, seg.y2);
       ctx.stroke();
+    }
+
+    // Accumulating polyline figures (canvas_seg buffer, e.g. MAKINA character).
+    // Colour is a small palette index so the same source runs on the integer
+    // kernel/AVM runtime (line(...,color)) and here unchanged.
+    if (this.segs.length) {
+      const PAL = [
+        "#0a0a1a", "#ff5d6c", "#5dff8b", "#ffe14d",
+        "#5db4ff", "#ff7fe0", "#5df0ff", "#e8f0f8",
+      ];
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      for (const s of this.segs) {
+        ctx.strokeStyle = PAL[((s.color % 8) + 8) % 8];
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        ctx.stroke();
+      }
     }
 
     // Dining Philosophers wireframe

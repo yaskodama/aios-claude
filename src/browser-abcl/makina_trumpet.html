@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>AIPL — MAKINA-7 Trumpet (actor)</title>
+  <style>
+    body { margin: 0; background: #0d0d1a; color: #ccc; font-family: monospace;
+           display: flex; flex-direction: column; align-items: center; }
+    h2 { margin: 12px 0 4px; font-size: 1rem; color: #8af; }
+    #info { font-size: 0.75rem; color: #777; margin-bottom: 8px; text-align: center; }
+    canvas { border: 1px solid #333; display: block; background: #0a0a1a; }
+    #controls { margin: 10px 0; display: flex; gap: 8px; }
+    button { padding: 6px 14px; background: #222; color: #aef; border: 1px solid #446;
+             cursor: pointer; font-family: monospace; }
+    button:hover { background: #334; }
+    #log { width: 540px; height: 96px; background: #050510; color: #4a4; font-size: 0.72rem;
+           overflow-y: auto; padding: 6px; margin-top: 6px; white-space: pre-wrap; }
+    nav { margin: 6px; font-size: 0.8rem; }
+    nav a { color: #6af; margin: 0 6px; }
+  </style>
+</head>
+<body>
+  <h2>AIPL — MAKINA-7 plays the trumpet (one self-looping actor)</h2>
+  <div id="info">
+    The character from <b>lecture.site44.com/robot/standalone.html</b> described as an
+    AIPL actor, drawn with cls()/line()/wait().<br>
+    The same source compiles to a portable <b>.avm</b> binary
+    (<code>aipl2c.exe --avm abclc/MakinaTrumpet.abcl -o MakinaTrumpet.avm</code>).
+  </div>
+  <canvas id="canvas" width="540" height="540"></canvas>
+  <div id="controls">
+    <button id="btnRun">▶ Run</button>
+    <button id="btnStop">■ Stop</button>
+    <button id="btnShowSrc">Show ABCL source</button>
+  </div>
+  <div id="log"></div>
+  <nav>
+    <a href="/rotate4lines.html">← Rotate 4 Lines</a> |
+    <a href="/philosophers.html">Dining Philosophers</a>
+  </nav>
+
+  <script src="/src/parser/parser.js"></script>
+  <script type="module">
+    import * as AST from "/src/ast.js";
+    import { Interpreter } from "/src/interpreter.js";
+
+    const ABCL_SOURCE = `\
+class Makina {
+  var phase = 0;
+  var q     = 0;
+  var sway  = 0;
+  var bob   = 0;
+  var press = 0;
+  var hx    = 270;
+  var hy    = 120;
+  var mx    = 0;
+  var my    = 0;
+
+  method run() { send self.frame(); }
+
+  method frame() {
+    cls();
+
+    q = phase;
+    sway = 0;
+    if (q < 128) { sway = q - 64; } else { sway = 192 - q; }
+    sway = sway / 13;
+    bob = 0;
+    if (q < 128) { bob = q; } else { bob = 256 - q; }
+    bob = bob / 40;
+    press = 0;
+    if (q < 40) { press = 3; }
+
+    hx = 270 + sway;
+    hy = 120 + bob;
+
+    line(hx+46, hy+0,  hx+40, hy+23, 7);
+    line(hx+40, hy+23, hx+23, hy+40, 7);
+    line(hx+23, hy+40, hx+0,  hy+46, 7);
+    line(hx+0,  hy+46, hx-23, hy+40, 7);
+    line(hx-23, hy+40, hx-40, hy+23, 7);
+    line(hx-40, hy+23, hx-46, hy+0,  7);
+    line(hx-46, hy+0,  hx-40, hy-23, 7);
+    line(hx-40, hy-23, hx-23, hy-40, 7);
+    line(hx-23, hy-40, hx+0,  hy-46, 7);
+    line(hx+0,  hy-46, hx+23, hy-40, 7);
+    line(hx+23, hy-40, hx+40, hy-23, 7);
+    line(hx+40, hy-23, hx+46, hy+0,  7);
+
+    line(hx-40, hy-23, hx-50, hy-54, 3);
+    line(hx-20, hy-42, hx-26, hy-66, 3);
+    line(hx+0,  hy-46, hx+0,  hy-70, 3);
+    line(hx+20, hy-42, hx+26, hy-66, 3);
+    line(hx+40, hy-23, hx+50, hy-54, 3);
+    line(hx-46, hy+0,  hx-58, hy+30, 3);
+    line(hx+46, hy+0,  hx+58, hy+30, 3);
+
+    line(hx-22, hy+2,  hx-10, hy+2,  4);
+    line(hx+10, hy+2,  hx+22, hy+2,  4);
+    line(hx-8,  hy+24, hx+8,  hy+24, 7);
+
+    line(hx-10, hy+46, hx-12, hy+64, 7);
+    line(hx+10, hy+46, hx+12, hy+64, 7);
+    line(270+sway-48, 212, 270+sway+48, 212, 1);
+    line(270+sway-48, 212, 240, 340, 1);
+    line(270+sway+48, 212, 300, 340, 1);
+    line(240, 340, 300, 340, 1);
+    line(270+sway, 214, 270, 340, 1);
+
+    line(248, 340, 252, 500, 4);
+    line(252, 500, 232, 500, 4);
+    line(292, 340, 288, 500, 4);
+    line(288, 500, 308, 500, 4);
+
+    line(270+sway-46, 214, 248, 250, 1);
+    line(248, 250, hx-6, hy+26, 7);
+    line(270+sway+46, 214, 300, 250, 1);
+    line(300, 250, 330, 196, 7);
+
+    mx = hx + 2;
+    my = hy + 24;
+    line(mx, my, mx+60, my-6, 3);
+    line(mx+60, my-6, mx+150, my-26, 3);
+    line(mx+150, my-26, mx+196, my-58, 3);
+    line(mx+150, my-26, mx+200, my-12, 3);
+    line(mx+196, my-58, mx+212, my-34, 3);
+    line(mx+212, my-34, mx+200, my-12, 3);
+    line(mx+150, my-26, mx+140, my+12, 3);
+    line(mx+140, my+12, mx+40, my+24, 3);
+    line(mx+40, my+24, mx+6, my+12, 3);
+
+    line(mx+82,  my-15, mx+82,  my-2,       6);
+    line(mx+98,  my-17, mx+98,  my-4+press, 6);
+    line(mx+114, my-19, mx+114, my-6,       6);
+
+    wait(40);
+    phase = phase + 4;
+    if (phase > 255) { phase = phase - 256; }
+    send self.frame();
+  }
+}
+
+var m = new Makina();
+send m.run();
+`;
+
+    const canvas = document.getElementById("canvas");
+    const logDiv = document.getElementById("log");
+    let activeTimers = [], running = false;
+
+    const _origSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = function(fn, ms, ...rest) {
+      const id = _origSetTimeout(fn, ms, ...rest);
+      if (running) activeTimers.push(id);
+      return id;
+    };
+
+    function appendLog(line) {
+      if (line === undefined || line === null) return;
+      const s = String(line);
+      if (s.startsWith("[send]")) return;
+      logDiv.textContent += s + "\n";
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    function stopAll() {
+      running = false;
+      activeTimers.forEach(id => clearTimeout(id));
+      activeTimers = [];
+    }
+    function runProgram() {
+      stopAll();
+      logDiv.textContent = "";
+      const parser = window.parser;
+      if (!parser) { appendLog("[ERROR] parser not loaded"); return; }
+      parser.yy = AST;
+      running = true;
+      const interp = new Interpreter(appendLog);
+      interp.setCanvas(canvas);
+      try {
+        const ast = parser.parse(ABCL_SOURCE);
+        appendLog("[parse ok]");
+        interp.runProgram(ast);
+        appendLog("[MAKINA-7 actor started]");
+      } catch (e) {
+        running = false;
+        appendLog("[ERROR] " + e);
+      }
+    }
+
+    document.getElementById("btnRun").addEventListener("click", runProgram);
+    document.getElementById("btnStop").addEventListener("click", () => { stopAll(); appendLog("[stopped]"); });
+    document.getElementById("btnShowSrc").addEventListener("click", () => { logDiv.textContent = ABCL_SOURCE; });
+    window.addEventListener("load", runProgram);
+  </script>
+</body>
+</html>

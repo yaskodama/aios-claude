@@ -1,0 +1,127 @@
+// MakinaTrumpet.abcl — MAKINA-7 playing a trumpet, described as an AIPL actor.
+//
+// A front-view line-art portrait of the MAKINA-7 character from
+// https://lecture.site44.com/robot/standalone.html (the milky☆ cyber-gal who
+// raises a brass horn and plays).  The whole figure is one self-looping actor:
+// each frame clears the canvas, redraws the head / hair / jacket / legs / folded
+// arms / trumpet, then sleeps — with a gentle "playing" animation (upper-body
+// sway, breathing bob, and the middle valve pressing down on the down-beat).
+//
+// Integer-only and drawn purely with cls() / line(x1,y1,x2,y2,colour) / wait(),
+// so the SAME source renders in the browser AIPL runtime (canvas) AND compiles
+// to a portable .avm binary:  aipl2c.exe --avm --no-typecheck \
+//   abclc/MakinaTrumpet.abcl -o abclc/MakinaTrumpet.avm
+//
+// Colour palette (index, both runtimes map it the same):
+//   1 pink/red jacket   3 yellow hair+brass   4 blue eyes+pants
+//   6 cyan valves       7 white skin/outline
+// NB: the .avm backend has no method-local `var`, so every working value is a
+// class field (the actor's private state).
+class Makina {
+  var phase = 0;
+  var q     = 0;
+  var sway  = 0;
+  var bob   = 0;
+  var press = 0;
+  var hx    = 270;
+  var hy    = 120;
+  var mx    = 0;
+  var my    = 0;
+
+  method run() {
+    send self.frame();
+  }
+
+  method frame() {
+    cls();
+
+    // ---- animation params (integer triangle waves over phase 0..255) ----
+    q = phase;
+    sway = 0;
+    if (q < 128) { sway = q - 64; } else { sway = 192 - q; }
+    sway = sway / 13;                 // upper-body sway  ~ -4..4
+    bob = 0;
+    if (q < 128) { bob = q; } else { bob = 256 - q; }
+    bob = bob / 40;                   // breathing bob    0..3
+    press = 0;
+    if (q < 40) { press = 3; }        // valve pressed on the down-beat
+
+    hx = 270 + sway;                 // head / upper-body centre x
+    hy = 120 + bob;                 // head centre y
+
+    // ---- HEAD (12-gon, white outline) ----
+    line(hx+46, hy+0,  hx+40, hy+23, 7);
+    line(hx+40, hy+23, hx+23, hy+40, 7);
+    line(hx+23, hy+40, hx+0,  hy+46, 7);
+    line(hx+0,  hy+46, hx-23, hy+40, 7);
+    line(hx-23, hy+40, hx-40, hy+23, 7);
+    line(hx-40, hy+23, hx-46, hy+0,  7);
+    line(hx-46, hy+0,  hx-40, hy-23, 7);
+    line(hx-40, hy-23, hx-23, hy-40, 7);
+    line(hx-23, hy-40, hx+0,  hy-46, 7);
+    line(hx+0,  hy-46, hx+23, hy-40, 7);
+    line(hx+23, hy-40, hx+40, hy-23, 7);
+    line(hx+40, hy-23, hx+46, hy+0,  7);
+
+    // ---- HAIR (yellow strokes over the crown + side bangs) ----
+    line(hx-40, hy-23, hx-50, hy-54, 3);
+    line(hx-20, hy-42, hx-26, hy-66, 3);
+    line(hx+0,  hy-46, hx+0,  hy-70, 3);
+    line(hx+20, hy-42, hx+26, hy-66, 3);
+    line(hx+40, hy-23, hx+50, hy-54, 3);
+    line(hx-46, hy+0,  hx-58, hy+30, 3);
+    line(hx+46, hy+0,  hx+58, hy+30, 3);
+
+    // ---- EYES + mouth (blue eyes, white mouth at the mouthpiece) ----
+    line(hx-22, hy+2,  hx-10, hy+2,  4);
+    line(hx+10, hy+2,  hx+22, hy+2,  4);
+    line(hx-8,  hy+24, hx+8,  hy+24, 7);
+
+    // ---- NECK + JACKET TORSO (pink) ----
+    line(hx-10, hy+46, hx-12, hy+64, 7);
+    line(hx+10, hy+46, hx+12, hy+64, 7);
+    line(270+sway-48, 212, 270+sway+48, 212, 1);   // shoulders
+    line(270+sway-48, 212, 240, 340, 1);           // left side
+    line(270+sway+48, 212, 300, 340, 1);           // right side
+    line(240, 340, 300, 340, 1);                   // waist
+    line(270+sway, 214, 270, 340, 1);              // centre zip
+
+    // ---- LEGS (blue trousers) ----
+    line(248, 340, 252, 500, 4);
+    line(252, 500, 232, 500, 4);                   // left foot
+    line(292, 340, 288, 500, 4);
+    line(288, 500, 308, 500, 4);                   // right foot
+
+    // ---- ARMS folded up to the horn (jacket upper, skin forearm) ----
+    line(270+sway-46, 214, 248, 250, 1);           // L upper arm
+    line(248, 250, hx-6, hy+26, 7);                // L forearm -> mouthpiece
+    line(270+sway+46, 214, 300, 250, 1);           // R upper arm
+    line(300, 250, 330, 196, 7);                   // R forearm -> valves
+
+    // ---- TRUMPET (brass yellow), bell flaring up to the right ----
+    mx = hx + 2;
+    my = hy + 24;
+    line(mx, my, mx+60, my-6, 3);                  // leadpipe from the lips
+    line(mx+60, my-6, mx+150, my-26, 3);           // main tube
+    line(mx+150, my-26, mx+196, my-58, 3);         // bell flare (upper)
+    line(mx+150, my-26, mx+200, my-12, 3);         // bell flare (lower)
+    line(mx+196, my-58, mx+212, my-34, 3);         // bell rim
+    line(mx+212, my-34, mx+200, my-12, 3);         // bell rim
+    line(mx+150, my-26, mx+140, my+12, 3);         // return bow (down)
+    line(mx+140, my+12, mx+40, my+24, 3);          // bottom tube
+    line(mx+40, my+24, mx+6, my+12, 3);            // back to the lips
+
+    // ---- THREE VALVES (cyan); middle one pressed on the down-beat ----
+    line(mx+82,  my-15, mx+82,  my-2,       6);
+    line(mx+98,  my-17, mx+98,  my-4+press, 6);
+    line(mx+114, my-19, mx+114, my-6,       6);
+
+    wait(40);
+    phase = phase + 4;
+    if (phase > 255) { phase = phase - 256; }
+    send self.frame();
+  }
+}
+
+var m = new Makina();
+send m.run();
