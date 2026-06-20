@@ -11,6 +11,7 @@ export class Runtime {
     this.canvas = null;        // set externally for canvas output
     this.scene = new Map();    // actorName → {x1,y1,x2,y2,color}   (for rotating lines)
     this.segs  = [];           // accumulating polyline buffer (cls/seg/present figures, e.g. MAKINA)
+    this.tris  = [];           // accumulating filled-polygon buffer (tri(); painter order)
     this.philoStates = new Map(); // id → 0(think)/1(hungry)/2(eat) (for philosophers)
     this.forkStates  = new Map(); // id → 0(free)/1(taken)
     this.forkHolders = new Map(); // id → holding philosopher id (absent when free)
@@ -65,6 +66,7 @@ export class Runtime {
     this._nextSlotId = 1;
     this.scene.clear();
     this.segs.length = 0;
+    this.tris.length = 0;
     this.philoStates.clear();
     this.forkStates.clear();
     this.forkHolders.clear();
@@ -470,9 +472,9 @@ export class Runtime {
         // Delay next message dispatch for this actor
         const ms = Number(args[0]) || 0;
         if (actor) actor.__nextDelay = ms;
-        // wait() is the natural frame boundary for cls/line figures: flush the
-        // accumulated polyline buffer to the canvas before the actor sleeps.
-        if (this.segs.length) this._redrawCanvas();
+        // wait() is the natural frame boundary for cls/line/tri figures: flush the
+        // accumulated draw buffers to the canvas before the actor sleeps.
+        if (this.segs.length || this.tris.length) this._redrawCanvas();
         break;
       }
       case "line": {
@@ -483,8 +485,18 @@ export class Runtime {
         this.segs.push({ x1, y1, x2, y2, color: (color === undefined ? 7 : Number(color)) });
         break;
       }
+      case "tri": {
+        // Filled shaded polygon: tri(x1,y1,x2,y2,x3,y3[,col]) — mirrors the .avm
+        // op_tri + the Xinu kernel's Blender polygon renderer.  Drawn in call order
+        // (painter's algorithm; the generator emits back-to-front).  The colour
+        // packs a part base + a shade level (see the PAL/shade decode in _redraw).
+        const [x1, y1, x2, y2, x3, y3, color] = args;
+        this.tris.push({ x1, y1, x2, y2, x3, y3, color: (color === undefined ? 7 : Number(color)) });
+        break;
+      }
       case "cls":
         this.segs.length = 0;
+        this.tris.length = 0;
         this._redrawCanvas();   // blank the frame immediately
         break;
       case "canvas_line":
@@ -508,9 +520,10 @@ export class Runtime {
       }
       case "canvas_clear":
       case "sdl_clear":
-        // Reset the accumulating polyline buffer (frame start).  The per-actor
-        // scene (rotate4lines etc.) is untouched, so those demos are unaffected.
+        // Reset the accumulating polyline + polygon buffers (frame start).  The
+        // per-actor scene (rotate4lines etc.) is untouched, so demos are unaffected.
         this.segs.length = 0;
+        this.tris.length = 0;
         break;
       case "canvas_present":
       case "sdl_present":
@@ -895,9 +908,10 @@ export class Runtime {
       ctx.stroke();
     }
 
-    // Accumulating polyline figures (canvas_seg buffer, e.g. MAKINA character).
-    // Colour is a small palette index so the same source runs on the integer
-    // kernel/AVM runtime (line(...,color)) and here unchanged.
+    // Accumulating polyline figures (canvas_seg / line buffer): the Blender-style
+    // ground grid + gizmo and wireframe drawing.  Drawn BEFORE the filled polygons
+    // so the floor grid sits behind the solid character.  Colour is a palette
+    // index so the same source runs on the kernel/AVM runtime unchanged.
     if (this.segs.length) {
       const PAL = [
         "#39414f", "#ff5d6c", "#5dff8b", "#ffe14d",   // 0 = Blender-grid grey
@@ -910,6 +924,34 @@ export class Runtime {
         ctx.beginPath();
         ctx.moveTo(s.x1, s.y1);
         ctx.lineTo(s.x2, s.y2);
+        ctx.stroke();
+      }
+    }
+
+    // Accumulating FILLED polygons (tri buffer; painter's order = call order, so
+    // the generator emits back-to-front).  Colour packs a part base + a shade
+    // level: col = base(0..7) + shade(0..3)*8 — the same integer encoding drives
+    // the Mac canvas and the Xinu kernel's Blender polygon renderer.
+    if (this.tris.length) {
+      const BASE = [
+        [57,65,79], [255,93,108], [93,255,139], [255,225,77],
+        [93,180,255], [255,127,224], [93,240,255], [232,240,248],
+      ];
+      const SHADE = [0.40, 0.62, 0.82, 1.06];
+      for (const t of this.tris) {
+        const b = BASE[((t.color % 8) + 8) % 8];
+        const sh = SHADE[Math.min(3, Math.max(0, Math.floor(t.color / 8)))];
+        const r = Math.min(255, b[0]*sh) | 0, g = Math.min(255, b[1]*sh) | 0, bl = Math.min(255, b[2]*sh) | 0;
+        const css = "rgb(" + r + "," + g + "," + bl + ")";
+        ctx.fillStyle = css;
+        ctx.strokeStyle = css;          // 1px stroke closes hairline seams between faces
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(t.x1, t.y1);
+        ctx.lineTo(t.x2, t.y2);
+        ctx.lineTo(t.x3, t.y3);
+        ctx.closePath();
+        ctx.fill();
         ctx.stroke();
       }
     }
