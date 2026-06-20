@@ -932,23 +932,17 @@ export class Runtime {
     }
 
     // Accumulating FILLED polygons (tri buffer; painter's order = call order, so
-    // the generator emits back-to-front).  Colour packs a part base + a shade
-    // level: col = base(0..7) + shade(0..3)*8 — the same integer encoding drives
-    // the Mac canvas and the Xinu kernel's Blender polygon renderer.
+    // the generator emits back-to-front).  Colour is a 24-bit 0xRRGGBB value with
+    // the flat shading already baked in by the generator (true material colours,
+    // matching standalone.html) — the same integer drives the Mac canvas and the
+    // Xinu kernel's Blender polygon renderer.
     if (this.tris.length) {
-      const BASE = [
-        [57,65,79], [255,93,108], [93,255,139], [255,225,77],
-        [93,180,255], [255,127,224], [93,240,255], [232,240,248],
-      ];
-      const SHADE = [0.40, 0.62, 0.82, 1.06];
+      ctx.lineWidth = 1;
       for (const t of this.tris) {
-        const b = BASE[((t.color % 8) + 8) % 8];
-        const sh = SHADE[Math.min(3, Math.max(0, Math.floor(t.color / 8)))];
-        const r = Math.min(255, b[0]*sh) | 0, g = Math.min(255, b[1]*sh) | 0, bl = Math.min(255, b[2]*sh) | 0;
-        const css = "rgb(" + r + "," + g + "," + bl + ")";
+        const c = (t.color | 0) & 0xFFFFFF;
+        const css = "rgb(" + ((c>>16)&255) + "," + ((c>>8)&255) + "," + (c&255) + ")";
         ctx.fillStyle = css;
         ctx.strokeStyle = css;          // 1px stroke closes hairline seams between faces
-        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(t.x1, t.y1);
         ctx.lineTo(t.x2, t.y2);
