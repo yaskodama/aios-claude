@@ -495,9 +495,12 @@ export class Runtime {
         break;
       }
       case "cls":
+        // Start a new frame: clear the draw buffers but DON'T repaint yet — the
+        // canvas keeps showing the finished previous frame until wait() flushes
+        // the fully-accumulated new one.  (Repainting here would blank the canvas
+        // for the whole frame's worth of chunk dispatches => visible flicker.)
         this.segs.length = 0;
         this.tris.length = 0;
-        this._redrawCanvas();   // blank the frame immediately
         break;
       case "canvas_line":
       case "sdl_line": {
