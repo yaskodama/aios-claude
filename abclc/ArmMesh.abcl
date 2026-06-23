@@ -1,0 +1,14 @@
+// MakinaMesh.abcl - AVM2: full 3-D mesh embedded as a binary vertex buffer.
+// 1276 unique verts (i16 xyz + u8 rgb), 2492 indexed tris.  Renders in 3-D at any angle.
+
+class Main {
+  var d = 0;
+  method tick() { d = new MeshDisplay(); send d.draw(550, 160); }
+}
+
+class MeshDisplay {
+  // cls() clears; mesh3d(yaw,pitch) projects+shades+rasterises the embedded mesh.
+  method draw(yaw, pitch) { cls(); mesh3d(yaw, pitch); }
+}
+
+var boot = new Main(); send boot.tick();
