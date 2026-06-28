@@ -1,0 +1,91 @@
+// dining_mesh.abcl — 5-philosopher dining solved with AIPL actors, with the
+// philosophers *load-distributed* across a 3-board Xinu WiFi mesh
+// (rpi3 / rpi4 / rpi5).  This is the AIPL specification of the protocol that
+// the benchmark harness (dining_mesh_bench.py) executes against the live mesh.
+//
+// Model
+// -----
+//   * 5 Fork actors   — each fork is a mutex shared by 2 adjacent philosophers.
+//   * 5 Phil actors    — each philosopher has a `host` = the mesh board on which
+//                        it performs the physical act of eating.  A meal is:
+//                            take(lo) -> take(hi) -> eat@host -> drop(hi) -> drop(lo)
+//                        and the philosopher repeats until it has eaten 50 times.
+//   * 1 Tally actor    — counts finished philosophers and the wall-clock to the
+//                        250th (= 5 x 50) meal.
+//
+//   `eat@host` is a single network round-trip from the coordinator to the
+//   philosopher's board (the board does the physical "eat").  Forks live on the
+//   coordinator, so fork hand-off is local; only the eat crosses the network.
+//   The *distribution* under test is the assignment Phil.host -> {rpi3,rpi4,rpi5}.
+//
+// Deadlock freedom: forks are acquired in global id order (lo < hi); the last
+// philosopher (P4) takes its high fork first — the classic asymmetric solution.
+
+class Fork {
+  var holder = 0;          // 0 = free, else philosopher id (1..5)
+  var waiter = 0;          // one pending philosopher id, or 0
+
+  method take(pid) {
+    if (holder == 0) { holder = pid; send sender.granted(); }
+    else             { waiter = pid; }
+  }
+  method drop(pid) {
+    if (waiter == 0) { holder = 0; }
+    else { holder = waiter; var w = waiter; waiter = 0; send w.granted_id(holder); }
+  }
+}
+
+class Phil {
+  var id    = 0;
+  var lo    = 0;           // low-id fork actor
+  var hi    = 0;           // high-id fork actor
+  var host  = 0;           // mesh board: 3=rpi3, 4=rpi4, 5=rpi5, 0=coordinator
+  var meals = 0;
+  var phase = 0;           // 0=want lo, 1=want hi, 2=eating
+  var tally = 0;
+
+  method init(i, l, h, t) { id = i; lo = l; hi = h; tally = t; meals = 0; phase = 0; send lo.take(id); }
+  method set_host(hh)     { host = hh; }
+
+  method granted() {
+    if (phase == 0) { phase = 1; send hi.take(id); }
+    else {
+      // both forks held -> eat on this philosopher's board (1 network round-trip)
+      eat_at(host);                  // harness: GET http://<host>/fb   (the physical meal)
+      meals = meals + 1;
+      phase = 0;
+      send hi.drop(id);
+      send lo.drop(id);
+      if (meals >= 50) { send tally.done(id); }
+      else             { send lo.take(id); }
+    }
+  }
+}
+
+class Tally {
+  var n_done = 0;
+  var t0     = 0;
+  method begin()    { t0 = now Clock.ms(); }
+  method done(pid) {
+    n_done = n_done + 1;
+    if (n_done >= 5) { print("[DINING-MESH] all done elapsed_ms=" + ((now Clock.ms()) - t0)); }
+  }
+}
+
+// ---- topology: 5 philosophers around the ring sharing 5 forks --------------
+//   P1: f1,f2   P2: f2,f3   P3: f3,f4   P4: f4,f5   P5: f1,f5
+var t  = new Tally();
+var f1 = new Fork(); var f2 = new Fork(); var f3 = new Fork();
+var f4 = new Fork(); var f5 = new Fork();
+var p1 = new Phil(); var p2 = new Phil(); var p3 = new Phil();
+var p4 = new Phil(); var p5 = new Phil();
+
+// distribution under test (overwritten per-config by the harness):
+//   e.g. 2-2-1 spread  ->  p1,p2 on rpi5 ; p3,p4 on rpi3 ; p5 on rpi4
+send p1.set_host(5); send p2.set_host(5);
+send p3.set_host(3); send p4.set_host(3);
+send p5.set_host(4);
+
+send t.begin();
+send p1.init(1, f1, f2, t); send p2.init(2, f2, f3, t); send p3.init(3, f3, f4, t);
+send p4.init(4, f4, f5, t); send p5.init(5, f1, f5, t);
