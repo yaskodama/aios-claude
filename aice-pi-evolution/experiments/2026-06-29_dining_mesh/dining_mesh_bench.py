@@ -85,11 +85,11 @@ CONFIGS = [
     cfg("mac",        [0,0,0,0,0], "coordinator-local baseline (no boards)"),
     cfg("all_rpi4",   [4,4,4,4,4], "all 5 on rpi4 (slow RTT, single board)"),
     cfg("all_rpi5",   [5,5,5,5,5], "all 5 on rpi5 (fast RTT, single board)"),
-    cfg("all_rpi3",   [3,3,3,3,3], "all 5 on rpi3 (fastest RTT but fragile)", pace=0.01),
     cfg("rpi45_3-2",  [4,4,4,5,5], "rpi4:3 rpi5:2 (2-board, slow-heavy)"),
     cfg("rpi45_2-3",  [4,4,5,5,5], "rpi4:2 rpi5:3 (2-board, fast-heavy)"),
-    cfg("spread_2-2-1",[5,5,3,3,4], "rpi5:2 rpi3:2 rpi4:1 (3-board even)", pace=0.005),
-    cfg("rtt_opt",    [5,5,5,3,3], "rpi5:3 rpi3:2, avoid slow rpi4 (predicted best)", pace=0.005),
+    cfg("mac_rpi5",   [0,0,0,5,5], "Mac:3 rpi5:2 (offload 2 to fast board)"),
+    cfg("spread_2-2-1",[5,5,3,3,4], "rpi5:2 rpi3:2 rpi4:1 (3-board)", pace=0.004),
+    cfg("rtt_opt",    [5,5,5,3,3], "rpi5:3 rpi3:2, avoid slow rpi4 (predicted best)", pace=0.004),
 ]
 
 def main():
