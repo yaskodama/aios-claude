@@ -1,0 +1,5 @@
+smoke.json
+__pycache__/
+*.aux
+*.log
+xelatex*.log
