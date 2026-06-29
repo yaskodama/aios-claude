@@ -1,0 +1,53 @@
+// nq_worker.tmpl.abcl — soft Xinu mesh worker node for the N-Queens
+// parallel-load-distribution evolution experiment.
+//
+// One process = one mesh node.  It exposes a single actor `worker` over the
+// Xinu-compatible actor HTTP gateway (POST /api/json/call).  The orchestrator
+// dispatches one row-0 column choice `k` per call:
+//
+//     remote_call_sync("localhost:PORT", "worker", "solve", [n, k])
+//       -> number of N-Queens solutions whose queen on row 0 sits in column k
+//
+// The inner backtracking stays plain function-call recursion (an actor send
+// per recursive step would explode to ~10^5 messages).  The "mesh-ness" lives
+// at the subtree-dispatch layer: one actor round-trip per column.
+//
+// __PORT__ is rewritten per node by mesh.py before launch.
+
+function safe(cols, row, c) {
+  var i = 0;
+  while (i < row) do {
+    var p = cols[i];
+    if (p == c)           { return 0; }
+    if (p - c == row - i) { return 0; }
+    if (c - p == row - i) { return 0; }
+    i = i + 1;
+  }
+  return 1;
+}
+
+function nq_count(cols, n, row) {
+  if (row == n) { return 1; }
+  var total = 0;
+  var c = 0;
+  while (c < n) do {
+    if (safe(cols, row, c)) {
+      cols[row] = c;
+      total = total + nq_count(cols, n, row + 1);
+    }
+    c = c + 1;
+  }
+  return total;
+}
+
+class Worker {
+  method solve(n, k) {
+    var cols[16];
+    cols[0] = k;
+    reply(nq_count(cols, n, 1));
+  }
+}
+
+var worker = new Worker();
+web_listen(__PORT__);
+print("[node] nq-worker up on http://localhost:__PORT__ (actor: worker)");
