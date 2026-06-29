@@ -1,0 +1,132 @@
+{
+  "name": "Xinu_RPi5_InternalEvolution",
+  "task": "起動済みの Raspberry Pi 5 Xinu (BCM2712 / Cortex-A76 x4 / AArch64、WiFi メッシュ + WM + AIPL JIT + worker-pool SMP + demand-paging が既に稼働) の内部サブシステムを進化させ、4 コアの並列性能を最大化する.遺伝子は 8 軸 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model).評価ゲート: (1) smp_model が worker_pool または full_smp で A76 x4 を実際に使う ✅、(2) scheduler + concurrency_safety が AArch64 A76 (DynamIQ DSU、MPIDR Aff1、PSCI、D-cache OFF) で実装可能 ✅、(3) memory_alloc + power_mgmt が BCM2712 の現実 (16GB RAM、firmware DVFS、caches OFF) と整合 ✅、(4) 既存ライブ機能 (ad-hoc MANET + AODV メッシュ、1080p WM、AIPL アクター + abcl2c JIT、kexec、demand-paging VM) を regression させない ✅ の 4 段.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "smp_model"
+    ],
+    "generations": 10,
+    "seed_count": 4,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "P0_WorkerPoolBaseline",
+      "P1_PerCoreRunqueue",
+      "P2_WorkStealing",
+      "P3_CrossCoreActorDispatch",
+      "S1_PriorityAging",
+      "S2_MlfqOrEdf",
+      "C1_TicketSpinlock",
+      "C2_RcuReadMostly",
+      "C3_LockFreeActorRing",
+      "M1_SlabOrBuddy",
+      "W1_HaltIdleOrDvfs",
+      "R_LiveCapabilitiesUnchanged",
+      "ImplCost"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "R_SmpExploitation",
+        "persona": "あなたは R_SmpExploitation を判定するレビュアーです。候補設計 (8 軸: scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model) が、Raspberry Pi 5 の Cortex-A76 x4 コアをどれだけ実際に並列活用するかを判定する。最重視は smp_model と、それを支える concurrency_safety + scheduler の協調。スコア基準: 1.0 = smp_model=full_smp + concurrency_safety=lock_free or rcu + scheduler=mlfq or priority_aging (= per-core runqueue + work-stealing + ロックフリー同期で 4 コア飽和、理想形)、0.7 = smp_model=worker_pool + concurrency_safety=lock_free (= 現行の実証済み worker-pool 約 3 倍、堅実)、0.4 = smp_model=full_smp + concurrency_safety=spinlock (= 全コア化はするが粗いロックで頭打ち)、0.1 = smp_model=single_core (= 4 コアを捨てる、退化)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクだけで全コア同期は不可能、矛盾)。半角数字の decimal で答えてください。",
+        "weight": 0.3
+      },
+      {
+        "name": "R_A76ConcurrencyImpl",
+        "persona": "あなたは R_A76ConcurrencyImpl を判定するレビュアーです。候補の scheduler + concurrency_safety + ipc_primitive + smp_model を、AArch64 Cortex-A76 (DynamIQ DSU、MPIDR Aff1 でコア識別、PSCI CPU_ON 起動、現状 D-cache OFF) の実機 Xinu で実装する困難度・現実性を判定する。低コストで確実に動くほど高得点。基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free + scheduler=priority_aging + ipc_primitive=sem_mailbox (= 既存 worker-pool + volatile lock-free をそのまま延長、実証済みパターン)、0.7 = smp_model=full_smp + concurrency_safety=spinlock + ipc=sem_mailbox (= per-core runqueue + LDXR/STXR ticket lock、追加実装だが教科書的)、0.4 = smp_model=full_smp + concurrency_safety=rcu (= 非プリエンプティブ RCU は Pi3 前例ありだが SMP では grace period 設計が要、難)、0.1 = concurrency_safety=stm or ipc_primitive=tuple_space (= ベアメタル Xinu に STM/タプル空間は過大、非現実的)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで cross-core 排他は原理的に不可)。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_Pi5HardwareReality",
+        "persona": "あなたは R_Pi5HardwareReality を判定するレビュアーです。候補の arch_target + memory_alloc + power_mgmt + smp_model が、Raspberry Pi 5 の実物ハード (BCM2712 / Cortex-A76 x4 / 16GB RAM / RP1 I/O / VideoCore VII / 0x107C000000 MMIO / firmware DVFS / 現状 caches OFF) と整合する程度を判定する。基準: 1.0 = arch_target=arm_rpi5 + memory_alloc=slab or buddy + power_mgmt=halt_idle + smp_model=worker_pool or full_smp (= まさに Pi 5 を狙い、現実的な割当・省電力・SMP)、0.7 = arch_target=arm_rpi5 + memory_alloc=demand_paged + power_mgmt=dvfs (= demand-paging は実装済みで現実的、DVFS は firmware mailbox で可能だが追加)、0.4 = arch_target=multi_arch (= Pi5 を含むが汎用で最適化が薄い)、0.1 = arch_target=arm_rpi4 or arm_rpi3 (= 旧 Pi 向け、Pi5 では config/MMIO/PSCI が違う)、0.0 = arch_target=x86_64 or riscv32 (= 物理的に Pi 5 で動かない)。caches OFF 前提なので memory_alloc=cow のような MMU 重依存はやや減点。半角数字の decimal で答えてください。",
+        "weight": 0.25
+      },
+      {
+        "name": "R_LiveCapabilityCompat",
+        "persona": "あなたは R_LiveCapabilityCompat を判定するレビュアーです。候補設計が、既に実機で動いているライブ機能 — ad-hoc(IBSS) MANET + AODV メッシュ、1920x1080 WM デスクトップ (複数シェル窓 + BASIC 窓 + Pi3/4 画面ミラー)、AIPL アクター + abcl2c オンデバイス JIT、kexec OS セレクタ、demand-paging 仮想記憶 — を壊さずに共存できる確率を判定する。重視: (a) ipc_primitive を sem_mailbox (= AIPL アクター mailbox) から動かさない (channel_typed までは許容、tuple_space/capability は全替えで危険)、(b) isolation を none / user_kernel_split に留め flat identity map + demand-paging 窓を壊さない (mmu_per_process/container_like は MMU 再設計で WM/mesh の MMIO マップが危険)、(c) full_smp 化でも WM 描画・SDIO WiFi 割り込み・AODV を司る core0 の専有処理が機能継続。スコア基準: 1.0 = ipc=sem_mailbox + isolation=none or user_kernel_split + smp_model=worker_pool (= 純粋追加、ライブ機能ノーリスク)、0.7 = 上記 + smp_model=full_smp (= 全コア化だが mailbox/isolation 据置で共存可、core0 専有処理の移行コストのみ)、0.4 = isolation=capability_token or memory_alloc を大きく変更 (= 既存に波及、検証要)、0.1 = isolation=mmu_per_process or container_like (= MMU 再設計でメッシュ/WM の MMIO マップが壊れるリスク大)、0.0 = ipc_primitive=tuple_space or capability (= AIPL アクター mailbox 全替えで JIT/メッシュ/アクター全滅)。半角数字の decimal で答えてください。",
+        "weight": 0.2
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}

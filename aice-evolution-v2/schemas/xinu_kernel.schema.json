@@ -35,6 +35,7 @@
       "arm_versatilepb",
       "arm_rpi3",
       "arm_rpi4",
+      "arm_rpi5",
       "x86_64",
       "riscv32",
       "multi_arch"
@@ -51,6 +52,11 @@
       "lock_free",
       "rcu",
       "stm"
+    ],
+    "smp_model": [
+      "single_core",
+      "worker_pool",
+      "full_smp"
     ]
   },
   "ordinal_axes": {
@@ -58,7 +64,8 @@
     "memory_alloc":       ["bump", "freelist", "buddy", "slab", "demand_paged", "cow"],
     "isolation":          ["none", "user_kernel_split", "capability_token", "mmu_per_process", "container_like"],
     "power_mgmt":         ["always_on", "halt_idle", "dvfs", "deep_sleep"],
-    "concurrency_safety": ["critical_section", "spinlock", "lock_free", "rcu", "stm"]
+    "concurrency_safety": ["critical_section", "spinlock", "lock_free", "rcu", "stm"],
+    "smp_model":          ["single_core", "worker_pool", "full_smp"]
   },
   "coherence": [
     {"if": {"isolation": "mmu_per_process"},   "then_in":  {"memory_alloc": ["demand_paged", "cow", "buddy", "slab"]}},
@@ -69,11 +76,16 @@
     {"if": {"arch_target": "arm_versatilepb"}, "then_in":  {"isolation": ["none", "user_kernel_split", "capability_token"]}},
     {"if": {"scheduler": "edf_soft"},          "then_in":  {"power_mgmt": ["always_on", "halt_idle"]}},
     {"if": {"scheduler": "cfs_like"},          "then_in":  {"concurrency_safety": ["lock_free", "rcu"]}},
-    {"if": {"power_mgmt": "dvfs"},             "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "x86_64"]}},
-    {"if": {"power_mgmt": "deep_sleep"},       "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "x86_64", "riscv32"]}},
+    {"if": {"power_mgmt": "dvfs"},             "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "arm_rpi5", "x86_64"]}},
+    {"if": {"power_mgmt": "deep_sleep"},       "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "arm_rpi5", "x86_64", "riscv32"]}},
     {"if": {"ipc_primitive": "capability"},    "then_in":  {"isolation": ["capability_token", "mmu_per_process", "container_like"]}},
-    {"if": {"ipc_primitive": "tuple_space"},   "then_not": {"concurrency_safety": "critical_section"}}
+    {"if": {"ipc_primitive": "tuple_space"},   "then_not": {"concurrency_safety": "critical_section"}},
+    {"if": {"arch_target": "arm_versatilepb"}, "then_in":  {"smp_model": ["single_core"]}},
+    {"if": {"arch_target": "riscv32"},         "then_in":  {"smp_model": ["single_core"]}},
+    {"if": {"smp_model": "worker_pool"},       "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "arm_rpi5", "x86_64", "multi_arch"]}},
+    {"if": {"smp_model": "full_smp"},          "then_in":  {"arch_target": ["arm_rpi3", "arm_rpi4", "arm_rpi5", "x86_64", "multi_arch"]}},
+    {"if": {"smp_model": "full_smp"},          "then_in":  {"concurrency_safety": ["spinlock", "lock_free", "rcu", "stm"]}}
   ],
   "open_axes": true,
-  "notes": "Gene axes for evolving Embedded Xinu's kernel subsystems (scheduler, memory, IPC, isolation, target arch, power, concurrency).  ordinal_axes give a partial order so trend-vector extraction sees 'higher = more sophisticated'.  coherence rules prevent nonsense combinations like demand_paged on a non-MMU bare-versatilepb kernel."
+  "notes": "Gene axes for evolving Embedded Xinu's kernel subsystems (scheduler, memory, IPC, isolation, target arch, power, concurrency, smp_model).  ordinal_axes give a partial order so trend-vector extraction sees 'higher = more sophisticated'.  coherence rules prevent nonsense combinations like demand_paged on a non-MMU bare-versatilepb kernel, worker_pool/full_smp on a single-core target, or full_smp without real cross-core synchronisation.  arm_rpi5 = BCM2712 / Cortex-A76 x4 / AArch64 (the live Pi 5 board); worker_pool = OS on core0 + compute workers on cores1-3 (proven ~3x on Pi4/Pi5, D-cache-off lock-free); full_smp = all cores run the kernel with shared state."
 }

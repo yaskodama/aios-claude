@@ -1,0 +1,290 @@
+// Xinu_RPi5_InternalEvolution.aice  (2026-06-29)
+//
+// 設計空間 GA Round — *起動済み* の Raspberry Pi 5 Xinu の「中身」を進化させる。
+//
+// 前提 (= もう動いている、ここは進化の出発点であって課題ではない):
+//   ~/projects/xinu-rpi5 (GitHub yaskodama/xinu-rpi5) が実機 Pi 5 でフル稼働:
+//     - BCM2712 / Cortex-A76 x4 / AArch64、firmware → loader.S → C main → 1920x1080 WM
+//     - WiFi (CYW43455 over SDIO2) ad-hoc(IBSS) MANET + AODV 多ホップメッシュ
+//     - microSD r/w、kexec OS セレクタ、AIPL アクター + abcl2c オンデバイス JIT
+//     - 4 コア SMP = worker-pool 型 (core0=OS / core1-3=計算ワーカー、PSCI CPU_ON 起動、
+//       D-cache OFF ゆえ lock-free=volatile+dsb/sev)。素数 1 vs 4 コア = 約 3 倍 実測。
+//     - デマンドページング仮想記憶 (32GiB 窓、回復可能 sync 例外経路)。
+//
+// この Round の狙い: 上記を壊さずに、A76 x4 という *最大の未活用フロンティア* を
+//   さらに引き出すカーネル設計を探索する。新しい遺伝子軸 smp_model
+//   (single_core / worker_pool / full_smp) を中心に、scheduler / memory_alloc /
+//   concurrency_safety / power_mgmt を協調設計する。champion は実カーネルへ手実装する。
+//
+//   worker_pool (現状, proven ~3x)  →  full_smp (全コアがカーネルを走らせ per-core
+//   runqueue + cross-core 同期を持つ) への進化が本命。ただし D-cache OFF の現実、
+//   firmware DVFS、ライブのメッシュ/WM/JIT/VM を壊さない後方互換が選択圧になる。
+//
+// 採点は Gemini レビュアー (evaluator=ai_v1)。実機ビルドはしない (設計空間 GA)。
+// champion は別途 ~/projects/xinu-rpi5 に手実装し、コールドブートで実機投入する。
+
+aice Xinu_RPi5_InternalEvolution {
+  dialect = "aice_evolution_v2";
+
+  task = "起動済みの Raspberry Pi 5 Xinu (BCM2712 / Cortex-A76 x4 / AArch64、WiFi メッシュ + WM + AIPL JIT + worker-pool SMP + demand-paging が既に稼働) の内部サブシステムを進化させ、4 コアの並列性能を最大化する.遺伝子は 8 軸 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model).評価ゲート: (1) smp_model が worker_pool または full_smp で A76 x4 を実際に使う ✅、(2) scheduler + concurrency_safety が AArch64 A76 (DynamIQ DSU、MPIDR Aff1、PSCI、D-cache OFF) で実装可能 ✅、(3) memory_alloc + power_mgmt が BCM2712 の現実 (16GB RAM、firmware DVFS、caches OFF) と整合 ✅、(4) 既存ライブ機能 (ad-hoc MANET + AODV メッシュ、1080p WM、AIPL アクター + abcl2c JIT、kexec、demand-paging VM) を regression させない ✅ の 4 段.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json";
+
+  // ─── MAP-Elites 探索設定 ─────────────────────────────────────
+  // cell 軸 = smp_model: single_core / worker_pool / full_smp の各セルで
+  // best 設計を保持 → 「full_smp は worker_pool に勝るか」を直接照らし出す。
+  // 完走優先で seed=4 / gen=10 に縮小。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "smp_model";
+    seed_count  = 4;
+    generations = 10;
+    rng_seed    = 42;
+  }
+
+  seed_from {
+    base_kernel       = "/Users/kodamay/projects/xinu-rpi5 (GitHub yaskodama/xinu-rpi5、main HEAD は 4 コア SMP worker-pool + demand-paging + WM + mesh が載った状態)";
+    base_smp          = "worker-pool 型 SMP: core0=OS / core1-3=WFE 計算ワーカー、PSCI CPU_ON(SMC #0) 起動、MPIDR Aff1(bits15:8) でコア識別 (A76 DynamIQ DSU)、D-cache OFF ゆえ lock-free=volatile+dsb/sev.smp_parallel_sum で行帯域分割フリップ + 素数ベンチ約 3 倍.";
+    base_scheduler    = "priority-based round-robin (Xinu 既定)、単一 runqueue、resched は core0 のみ.";
+    base_memory       = "freelist (getmem/freemem) + demand-paged 仮想窓 (32GiB、静的 512 ページプール、translation fault → vm_fault → PTE 書込 → tlbi).";
+    base_concurrency  = "critical_section (mask IRQ) + worker-pool は lock-free volatile.LDREX/STREX 系の本格 atomics はまだ最小利用.";
+    base_ipc          = "AIPL アクター mailbox (sem_mailbox 相当) + abcl2c JIT で送受信.";
+    base_power        = "always_on (idle は WFE スピン).DVFS / deep-sleep は未実装.";
+    base_arch         = "arm_rpi5 (= 本 Round で schema に追加した値).0x107C000000 high-mem MMIO、RP1 I/O hub、PL011 debug UART 0x107D001000.";
+    live_capabilities = "ad-hoc(IBSS) MANET + AODV メッシュ (10.0.0.3)、1920x1080 WM デスクトップ + 複数シェル窓 + BASIC 窓、AIPL アクター + abcl2c オンデバイス JIT、kexec OS セレクタ、demand-paging VM — すべて absolute 不変条件.";
+    parity_anchor     = "AIPL CE-1..13 + DR-1..13 x 6 runtimes (project_aipl_nextgen_parity).";
+  }
+
+  // ─── 評価タスク = phase 候補 ───────────────────────────────────
+  evaluation_tasks {
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction P — Parallelism / SMP (本 Round の本命)
+    // ═══════════════════════════════════════════════════════════
+
+    task P0_WorkerPoolBaseline {
+      spec = "現行 worker-pool (core0=OS / core1-3 計算ワーカー、smp_parallel_sum) を baseline として保持・微調整.ワーカーへの仕事投入を素数/フリップ以外 (AIPL par_safe アクターのメッセージ分散) にも広げる.smp_model=worker_pool の最小コスト経路.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) cores_online=4、(2) /smp-bench が約 3 倍を維持、(3) par_safe アクターが core1-3 に分散.";
+    }
+
+    task P1_PerCoreRunqueue {
+      spec = "full_smp の中核: 各コアが自前の runqueue を持ち、resched をコアローカル化.core0 専有だった scheduler を全コアに展開.MPIDR Aff1 でコア別 ready list を引く.D-cache OFF なので runqueue は volatile + dsb で共有.";
+      weight = 0.12;
+      acceptance = "4 assertion: (1) 各コアが独立に resched、(2) スレッドが任意コアで実行、(3) ready スレッド数 > コア数で全コア飽和、(4) WM/mesh の core0 専有処理が壊れない.";
+    }
+
+    task P2_WorkStealing {
+      spec = "コア間ロードバランス: 空いたコアが他コアの runqueue から末尾スレッドを steal.cross-core 同期が要るので concurrency_safety の選択 (spinlock/lock_free/rcu) と強く結合.偏った負荷でもコア使用率が均等化する.";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) 偏り負荷で steal が発生、(2) コア使用率の分散が縮小、(3) steal の race が無い (cross-core 同期正当性).";
+    }
+
+    task P3_CrossCoreActorDispatch {
+      spec = "AIPL アクターのメッセージ配送を全コアに分散 (par_safe = WAIT/描画無しのアクターのみ).SEND をコア別バッファへ、SPAWN をコア別スロット範囲へ.既存描画デモは par_safe=0 で従来 core0 パス維持 (無改変).";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) par_safe アクター群が 4 コアで並列実行、(2) 描画アクターは core0 維持で映像不変、(3) メッセージ順序保証が壊れない.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction S — Scheduler
+    // ═══════════════════════════════════════════════════════════
+
+    task S1_PriorityAging {
+      spec = "priority_aging: ready で待たされたスレッドの実効優先度を時間で昇格させ starvation を防ぐ.per-core runqueue 上でコアローカルに aging.";
+      weight = 0.07;
+      acceptance = "3 assertion: (1) 低優先度スレッドが餓死しない、(2) clkhandler で aging 進行、(3) 高優先度の応答性は維持.";
+    }
+
+    task S2_MlfqOrEdf {
+      spec = "mlfq (multi-level feedback queue) もしくは edf_soft: 対話 (WM/shell) は高優先キュー、計算 (素数/AIPL) は低優先キューに自然分離.SMP では各コアが MLFQ を保持.";
+      weight = 0.07;
+      acceptance = "3 assertion: (1) 対話レイテンシが計算負荷下でも低い、(2) キュー降格/昇格が動く、(3) 4 コアで MLFQ 状態が一貫.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction C — Concurrency safety (SMP の正当性)
+    // ═══════════════════════════════════════════════════════════
+
+    task C1_TicketSpinlock {
+      spec = "full_smp 用の cross-core ロック: A76 の LDXR/STXR + WFE/SEV で ticket spinlock を実装 (D-cache OFF でも DMB で順序保証).runqueue / 共有テーブルの最小クリティカルセクションを保護.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) 4 コア同時 acquire で相互排他、(2) fairness (ticket 順)、(3) deadlock 無し.";
+    }
+
+    task C2_RcuReadMostly {
+      spec = "rcu: process table / route table (AODV) など read-mostly 構造を read 側ロックフリーに.非プリエンプティブ前提の quiescent-state RCU (Pi3 で前例).reader はコア間で free に走る.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) reader が lock 無しで走る、(2) grace period 後に安全 reclaim、(3) AODV ルート更新中も lookup が壊れない.";
+    }
+
+    task C3_LockFreeActorRing {
+      spec = "アクター mailbox の lock-free ring を本格 atomics (LDXR/STXR) で全コア対応に.現行は worker-pool 内 volatile.cross-core SPSC/MPSC ring に拡張.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) cross-core send/recv が lock 無し、(2) ABA/wrap 無し、(3) スループット向上.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction M — Memory allocator
+    // ═══════════════════════════════════════════════════════════
+
+    task M1_SlabOrBuddy {
+      spec = "slab もしくは buddy allocator: 固定サイズ (スレッド struct / アクター / mailbox) は slab、可変は buddy.SMP では per-core slab cache で lock contention を消す.demand-paged 仮想窓は維持.";
+      weight = 0.07;
+      acceptance = "3 assertion: (1) alloc/free が freelist より速い、(2) per-core cache で contention 減、(3) demand-paging VM と共存.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction W — Power management
+    // ═══════════════════════════════════════════════════════════
+
+    task W1_HaltIdleOrDvfs {
+      spec = "halt_idle: idle コアを WFI で停止 (現行 WFE スピンより省電力).余裕があれば dvfs: A76 のクロックを firmware mailbox で負荷に応じ変動.SMP の idle コア検出と結合.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) idle コアが WFI で消費低下、(2) IPI/タイマで即復帰、(3) DVFS 時もメッシュ/WM が安定.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═══════════════════════════════════════════════════════════
+
+    task R_LiveCapabilitiesUnchanged {
+      spec = "ad-hoc MANET + AODV メッシュ、1920x1080 WM (複数シェル窓 + BASIC 窓 + Pi3/4 画面ミラー)、AIPL アクター + abcl2c JIT、kexec、demand-paging VM が完全に regression-clean.full_smp 化で core0 専有だった WM/mesh/SDIO 割り込み処理が壊れないこと、ipc_primitive を actor mailbox から動かさないこと.";
+      weight = 0.10;
+      acceptance = "ライブ機能スモーク: wifi status=connected MANET 10.0.0.3、AODV route to 10.0.0.1/.2 が 1 hop、/fb 1920x1080、AIPL hello + abcl2c JIT 成功、vmstat/vmdemand が fault カウント正常、すべて PASS のまま.";
+    }
+
+    task ImplCost {
+      spec = "champion 実装は ~/projects/xinu-rpi5 に system/smp.c / system/resched.c / system/queue.c / device/ 周辺 ~500..1500 LOC、abclcp-project 側は実験ディレクトリのみ (カーネルコードは別 repo).コールドブートで実機投入 (kernel_2712.img のみ cp、config.txt 不変).";
+      weight = 0.05;
+    }
+  }
+
+  // ─── レビュアー (Gemini 進化計算の選択圧) ───────────────────
+  evaluator = "ai_v1";
+
+  reviewers {
+
+    reviewer R_SmpExploitation {
+      persona = "あなたは R_SmpExploitation を判定するレビュアーです。候補設計 (8 軸: scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model) が、Raspberry Pi 5 の Cortex-A76 x4 コアをどれだけ実際に並列活用するかを判定する。最重視は smp_model と、それを支える concurrency_safety + scheduler の協調。スコア基準: 1.0 = smp_model=full_smp + concurrency_safety=lock_free or rcu + scheduler=mlfq or priority_aging (= per-core runqueue + work-stealing + ロックフリー同期で 4 コア飽和、理想形)、0.7 = smp_model=worker_pool + concurrency_safety=lock_free (= 現行の実証済み worker-pool 約 3 倍、堅実)、0.4 = smp_model=full_smp + concurrency_safety=spinlock (= 全コア化はするが粗いロックで頭打ち)、0.1 = smp_model=single_core (= 4 コアを捨てる、退化)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクだけで全コア同期は不可能、矛盾)。半角数字の decimal で答えてください。";
+      weight = 0.30;
+    }
+
+    reviewer R_A76ConcurrencyImpl {
+      persona = "あなたは R_A76ConcurrencyImpl を判定するレビュアーです。候補の scheduler + concurrency_safety + ipc_primitive + smp_model を、AArch64 Cortex-A76 (DynamIQ DSU、MPIDR Aff1 でコア識別、PSCI CPU_ON 起動、現状 D-cache OFF) の実機 Xinu で実装する困難度・現実性を判定する。低コストで確実に動くほど高得点。基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free + scheduler=priority_aging + ipc_primitive=sem_mailbox (= 既存 worker-pool + volatile lock-free をそのまま延長、実証済みパターン)、0.7 = smp_model=full_smp + concurrency_safety=spinlock + ipc=sem_mailbox (= per-core runqueue + LDXR/STXR ticket lock、追加実装だが教科書的)、0.4 = smp_model=full_smp + concurrency_safety=rcu (= 非プリエンプティブ RCU は Pi3 前例ありだが SMP では grace period 設計が要、難)、0.1 = concurrency_safety=stm or ipc_primitive=tuple_space (= ベアメタル Xinu に STM/タプル空間は過大、非現実的)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで cross-core 排他は原理的に不可)。半角数字の decimal で答えてください。";
+      weight = 0.25;
+    }
+
+    reviewer R_Pi5HardwareReality {
+      persona = "あなたは R_Pi5HardwareReality を判定するレビュアーです。候補の arch_target + memory_alloc + power_mgmt + smp_model が、Raspberry Pi 5 の実物ハード (BCM2712 / Cortex-A76 x4 / 16GB RAM / RP1 I/O / VideoCore VII / 0x107C000000 MMIO / firmware DVFS / 現状 caches OFF) と整合する程度を判定する。基準: 1.0 = arch_target=arm_rpi5 + memory_alloc=slab or buddy + power_mgmt=halt_idle + smp_model=worker_pool or full_smp (= まさに Pi 5 を狙い、現実的な割当・省電力・SMP)、0.7 = arch_target=arm_rpi5 + memory_alloc=demand_paged + power_mgmt=dvfs (= demand-paging は実装済みで現実的、DVFS は firmware mailbox で可能だが追加)、0.4 = arch_target=multi_arch (= Pi5 を含むが汎用で最適化が薄い)、0.1 = arch_target=arm_rpi4 or arm_rpi3 (= 旧 Pi 向け、Pi5 では config/MMIO/PSCI が違う)、0.0 = arch_target=x86_64 or riscv32 (= 物理的に Pi 5 で動かない)。caches OFF 前提なので memory_alloc=cow のような MMU 重依存はやや減点。半角数字の decimal で答えてください。";
+      weight = 0.25;
+    }
+
+    reviewer R_LiveCapabilityCompat {
+      persona = "あなたは R_LiveCapabilityCompat を判定するレビュアーです。候補設計が、既に実機で動いているライブ機能 — ad-hoc(IBSS) MANET + AODV メッシュ、1920x1080 WM デスクトップ (複数シェル窓 + BASIC 窓 + Pi3/4 画面ミラー)、AIPL アクター + abcl2c オンデバイス JIT、kexec OS セレクタ、demand-paging 仮想記憶 — を壊さずに共存できる確率を判定する。重視: (a) ipc_primitive を sem_mailbox (= AIPL アクター mailbox) から動かさない (channel_typed までは許容、tuple_space/capability は全替えで危険)、(b) isolation を none / user_kernel_split に留め flat identity map + demand-paging 窓を壊さない (mmu_per_process/container_like は MMU 再設計で WM/mesh の MMIO マップが危険)、(c) full_smp 化でも WM 描画・SDIO WiFi 割り込み・AODV を司る core0 の専有処理が機能継続。スコア基準: 1.0 = ipc=sem_mailbox + isolation=none or user_kernel_split + smp_model=worker_pool (= 純粋追加、ライブ機能ノーリスク)、0.7 = 上記 + smp_model=full_smp (= 全コア化だが mailbox/isolation 据置で共存可、core0 専有処理の移行コストのみ)、0.4 = isolation=capability_token or memory_alloc を大きく変更 (= 既存に波及、検証要)、0.1 = isolation=mmu_per_process or container_like (= MMU 再設計でメッシュ/WM の MMIO マップが壊れるリスク大)、0.0 = ipc_primitive=tuple_space or capability (= AIPL アクター mailbox 全替えで JIT/メッシュ/アクター全滅)。半角数字の decimal で答えてください。";
+      weight = 0.20;
+    }
+  }
+
+  // ─── 実装順序 (依存最小トポロジー) ─────────────────────────
+  implementation_order {
+
+    // SMP 基盤から。per-core runqueue が full_smp の土台。
+    step P0_WorkerPoolBaseline      { dep = "baseline"; }
+    step P1_PerCoreRunqueue         { dep = "P0"; }
+    step C1_TicketSpinlock          { dep = "P0";  note = "P1/P2 の cross-core 同期に必要、並行着手可"; }
+    step P2_WorkStealing            { dep = "P1, C1"; }
+    step P3_CrossCoreActorDispatch  { dep = "P1, C3"; }
+
+    // Scheduler は per-core runqueue の上に乗る。
+    step S1_PriorityAging           { dep = "P1"; }
+    step S2_MlfqOrEdf               { dep = "S1"; }
+
+    // Concurrency。
+    step C2_RcuReadMostly           { dep = "C1"; }
+    step C3_LockFreeActorRing       { dep = "C1"; }
+
+    // Memory / Power は独立に進められる。
+    step M1_SlabOrBuddy             { dep = "P0";  note = "per-core slab cache は C1 と結合"; }
+    step W1_HaltIdleOrDvfs          { dep = "P1";  note = "idle コア検出が要る"; }
+  }
+
+  // ─── アーキテクチャ決定 ──────────────────────────────────────
+  decisions {
+
+    decision target_hardware {
+      primary  = "Raspberry Pi 5 4GB/8GB — BCM2712 / Cortex-A76 x4 / RP1 / VideoCore VII (= 既に Xinu フル稼働中の実機)";
+      smp      = "PSCI CPU_ON(SMC #0) でセカンダリ起動、MPIDR Aff1(bits15:8) でコア識別 (DynamIQ DSU)、D-cache OFF ゆえ共有は volatile + dsb/sev / DMB";
+      mmio     = "0x107C000000 high-mem peripheral、PL011 debug UART 0x107D001000、GIC-400";
+      deploy   = "コールドブート: kernel_2712.img のみ /Volumes/bootfs に cp (config.txt 厳禁、make install_pi5 厳禁)";
+    }
+
+    decision evolution_method {
+      kind     = "設計空間 GA (実機ビルドはしない).Gemini レビュアー 4 本で 8 軸遺伝子を採点、MAP-Elites で世代更新.";
+      cell_axis = "scheduler (= MAP-Elites のセル軸、既定).smp_model は遺伝子として全セルで探索される.";
+      champion_path = "完走後 analyze_lineage.py で champion 抽出 → ~/projects/xinu-rpi5 に手実装 → コールドブート実機投入.";
+      scope    = "完走優先で seed=4 / gen=10 に縮小 (生成 .abcl の seed_count/generations をパッチ).";
+    }
+
+    decision backward_compat {
+      invariants = "ad-hoc MANET + AODV メッシュ、1080p WM、AIPL + abcl2c JIT、kexec、demand-paging VM は absolute 不変条件.";
+      ipc_lock   = "ipc_primitive は sem_mailbox (AIPL アクター mailbox) を基本据置.full_smp 化でも core0 の WM/SDIO/AODV 専有処理を機能継続させる.";
+    }
+  }
+
+  // ─── 検証 (期待 assertion 合計) ──────────────────────────────
+  verification {
+    direction_P   = "13 assertion (P0:3 + P1:4 + P2:3 + P3:3)";
+    direction_S   = " 6 assertion (S1:3 + S2:3)";
+    direction_C   = " 9 assertion (C1:3 + C2:3 + C3:3)";
+    direction_M   = " 3 assertion (M1:3)";
+    direction_W   = " 3 assertion (W1:3)";
+    cross_cut     = "ライブ機能 (メッシュ/WM/JIT/kexec/VM) スモークを不変に保つ";
+    grand_total   = "34 assertion for Pi 5 internal-evolution round";
+  }
+
+  // ─── ファイル更新範囲 (champion 実装時) ──────────────────────
+  file_impact {
+    repo_xinu_rpi5 = [
+      "system/smp.c          (per-core runqueue / work-stealing / IPI)",
+      "system/resched.c      (コアローカル resched + priority_aging/mlfq)",
+      "system/queue.c        (per-core ready list、cross-core steal)",
+      "system/lock.c (new)   (ticket spinlock LDXR/STXR、または rcu)",
+      "system/mailbox        (cross-core lock-free ring、abcl2c JIT 連携)",
+      "system/memory         (slab/buddy per-core cache、demand-paging 維持)",
+      "loader/main.c         (idle WFI / DVFS、core0 専有処理の維持)"
+    ];
+    abclcp_project = [
+      "aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/  (本 .aice + .ga.json + .abcl + lineage + analyze)",
+      "aice-evolution-v2/schemas/xinu_kernel.schema.json  (arm_rpi5 + smp_model 追加済)"
+    ];
+    untouched = [
+      "ライブ機能 (mesh/WM/JIT/kexec/VM) のインターフェイスは不変、内部実装のみ進化"
+    ];
+  }
+
+  // ─── 実行例 (進化計算の起動コマンド) ─────────────────────────
+  sample_session {
+
+    generate_aipl {
+      cmd  = "cd aice-evolution-v2 && python3 -m src.cli --no-run --abcl -o ../aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/ ../aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/Xinu_RPi5_InternalEvolution.aice";
+      output = "Xinu_RPi5_InternalEvolution.abcl (= MAP-Elites orchestrator)";
+      post  = "use_ai 0 -> 1 を 4 reviewer に patch、seed_count 8 -> 4、generations 30 -> 10";
+    }
+
+    run_evolution {
+      requires = "GEMINI_API_KEY が export 済、google-genai SDK が import 可";
+      cmd      = "AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/Xinu_RPi5_InternalEvolution.abcl --timeout 1800 --idle-ms 600000";
+      output   = "lineage.json (各個体の 8 軸遺伝子 + score + generation)";
+      duration = "数十分 (seed=4 + gen=10 + 4 reviewers)";
+    }
+
+    analyze {
+      cmd = "python3 aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/analyze_lineage.py <lineage.json>";
+      output = "champion (max score) の 8 軸遺伝子 + top-N + 世代別ベスト + 軸頻度ヒストグラム";
+    }
+  }
+
+  // ─── 最終目標 ─────────────────────────────────────────────────
+  goal = "設計空間 GA を完走し、Raspberry Pi 5 の Cortex-A76 x4 を最大活用する champion カーネル設計 (8 軸: smp_model を中心に scheduler / memory_alloc / concurrency_safety / power_mgmt を協調) を得る.champion は worker-pool から full_smp (per-core runqueue + work-stealing + cross-core lock-free 同期) への現実的な進化路を示し、かつ既存ライブ機能 (ad-hoc MANET + AODV メッシュ、1920x1080 WM、AIPL アクター + abcl2c JIT、kexec、demand-paging VM) を absolute 不変条件として保つ.最終的に champion の軸を ~/projects/xinu-rpi5 に手実装し、コールドブートで実機 Pi 5 に投入して並列性能 (素数/AIPL アクター) の向上を実測する.";
+}
