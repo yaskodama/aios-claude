@@ -1,0 +1,604 @@
+[
+  {
+    "config": "mac",
+    "n": 8,
+    "wall_s": 0.5785283750010421,
+    "total": 92,
+    "known": 92,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "mac",
+        "c0": 0,
+        "c1": 8,
+        "solutions": 92,
+        "dev_ms": 265,
+        "cores": 1,
+        "wall_s": 0.5757732499987469
+      }
+    ],
+    "reps": 1
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 8,
+    "wall_s": 0.01753025000289199,
+    "total": 92,
+    "known": 92,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 8,
+        "solutions": 92,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.017122249999374617
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 8,
+    "wall_s": 0.11927854199893773,
+    "total": 92,
+    "known": 92,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 4,
+        "solutions": 46,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.021722541001508944
+      },
+      {
+        "worker": "rpi4",
+        "c0": 4,
+        "c1": 8,
+        "solutions": 46,
+        "dev_ms": 0,
+        "cores": 4,
+        "wall_s": 0.11847049999778392
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 8,
+    "wall_s": 0.11002674999690498,
+    "total": 92,
+    "known": 92,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 3,
+        "solutions": 28,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.015943791997415246
+      },
+      {
+        "worker": "rpi4",
+        "c0": 3,
+        "c1": 6,
+        "solutions": 52,
+        "dev_ms": 1,
+        "cores": 4,
+        "wall_s": 0.10880599999654805
+      },
+      {
+        "worker": "rpi5",
+        "c0": 6,
+        "c1": 8,
+        "solutions": 12,
+        "dev_ms": 0,
+        "cores": 4,
+        "wall_s": 0.0256145839994133
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac",
+    "n": 9,
+    "wall_s": 1.6671584169998823,
+    "total": 352,
+    "known": 352,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "mac",
+        "c0": 0,
+        "c1": 9,
+        "solutions": 352,
+        "dev_ms": 1337,
+        "cores": 1,
+        "wall_s": 1.665832833998138
+      }
+    ],
+    "reps": 1
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 9,
+    "wall_s": 0.020461750002141343,
+    "total": 352,
+    "known": 352,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 9,
+        "solutions": 352,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.019863708002958447
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 9,
+    "wall_s": 0.1359682910006086,
+    "total": 352,
+    "known": 352,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 5,
+        "solutions": 203,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.018520917001296766
+      },
+      {
+        "worker": "rpi4",
+        "c0": 5,
+        "c1": 9,
+        "solutions": 149,
+        "dev_ms": 0,
+        "cores": 4,
+        "wall_s": 0.13481558399871574
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 9,
+    "wall_s": 0.1065026249998482,
+    "total": 352,
+    "known": 352,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 3,
+        "solutions": 105,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.017836082999565406
+      },
+      {
+        "worker": "rpi4",
+        "c0": 3,
+        "c1": 6,
+        "solutions": 142,
+        "dev_ms": 1,
+        "cores": 4,
+        "wall_s": 0.10526066600141348
+      },
+      {
+        "worker": "rpi5",
+        "c0": 6,
+        "c1": 9,
+        "solutions": 105,
+        "dev_ms": 4,
+        "cores": 4,
+        "wall_s": 0.027732417001971044
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac",
+    "n": 10,
+    "wall_s": 7.29503058300179,
+    "total": 724,
+    "known": 724,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "mac",
+        "c0": 0,
+        "c1": 10,
+        "solutions": 724,
+        "dev_ms": 6946,
+        "cores": 1,
+        "wall_s": 7.292860666999331
+      }
+    ],
+    "reps": 1
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 10,
+    "wall_s": 0.027342749999661464,
+    "total": 724,
+    "known": 724,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 10,
+        "solutions": 724,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.027124125001137145
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 10,
+    "wall_s": 0.1379692909977166,
+    "total": 724,
+    "known": 724,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 5,
+        "solutions": 362,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.02635300000110874
+      },
+      {
+        "worker": "rpi4",
+        "c0": 5,
+        "c1": 10,
+        "solutions": 362,
+        "dev_ms": 4,
+        "cores": 4,
+        "wall_s": 0.1367526670001098
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 10,
+    "wall_s": 0.11153537500285893,
+    "total": 724,
+    "known": 724,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 4,
+        "solutions": 270,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.020176875001197914
+      },
+      {
+        "worker": "rpi4",
+        "c0": 4,
+        "c1": 7,
+        "solutions": 277,
+        "dev_ms": 4,
+        "cores": 4,
+        "wall_s": 0.11028895900017233
+      },
+      {
+        "worker": "rpi5",
+        "c0": 7,
+        "c1": 10,
+        "solutions": 177,
+        "dev_ms": 5,
+        "cores": 4,
+        "wall_s": 0.029938375002529938
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac",
+    "n": 11,
+    "wall_s": 40.46055216700188,
+    "total": 2680,
+    "known": 2680,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "mac",
+        "c0": 0,
+        "c1": 11,
+        "solutions": 2680,
+        "dev_ms": 40131,
+        "cores": 1,
+        "wall_s": 40.4584912499995
+      }
+    ],
+    "reps": 1
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 11,
+    "wall_s": 0.06353316699824063,
+    "total": 2680,
+    "known": 2680,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 11,
+        "solutions": 2680,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.06332870799815282
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 11,
+    "wall_s": 0.15267620799932047,
+    "total": 2680,
+    "known": 2680,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 6,
+        "solutions": 1515,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.04217883299861569
+      },
+      {
+        "worker": "rpi4",
+        "c0": 6,
+        "c1": 11,
+        "solutions": 1165,
+        "dev_ms": 15,
+        "cores": 4,
+        "wall_s": 0.15196074999767006
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 11,
+    "wall_s": 0.16146866700000828,
+    "total": 2680,
+    "known": 2680,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 4,
+        "solutions": 819,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.03142104200014728
+      },
+      {
+        "worker": "rpi4",
+        "c0": 4,
+        "c1": 8,
+        "solutions": 1337,
+        "dev_ms": 12,
+        "cores": 4,
+        "wall_s": 0.16072004200032097
+      },
+      {
+        "worker": "rpi5",
+        "c0": 8,
+        "c1": 11,
+        "solutions": 524,
+        "dev_ms": 11,
+        "cores": 4,
+        "wall_s": 0.037194125001406064
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 12,
+    "wall_s": 0.25586858300084714,
+    "total": 14200,
+    "known": 14200,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 12,
+        "solutions": 14200,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.25546762500016484
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 12,
+    "wall_s": 0.23422745900097652,
+    "total": 14200,
+    "known": 14200,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 6,
+        "solutions": 7100,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.13377249999757623
+      },
+      {
+        "worker": "rpi4",
+        "c0": 6,
+        "c1": 12,
+        "solutions": 7100,
+        "dev_ms": 97,
+        "cores": 4,
+        "wall_s": 0.23340408299918636
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 12,
+    "wall_s": 0.1602840829982597,
+    "total": 14200,
+    "known": 14200,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 4,
+        "solutions": 3830,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.0947587080008816
+      },
+      {
+        "worker": "rpi4",
+        "c0": 4,
+        "c1": 8,
+        "solutions": 6540,
+        "dev_ms": 54,
+        "cores": 4,
+        "wall_s": 0.15918954099834082
+      },
+      {
+        "worker": "rpi5",
+        "c0": 8,
+        "c1": 12,
+        "solutions": 3830,
+        "dev_ms": 25,
+        "cores": 4,
+        "wall_s": 0.050548084000183735
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3",
+    "n": 13,
+    "wall_s": 2.3442017909983406,
+    "total": 73712,
+    "known": 73712,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 13,
+        "solutions": 73712,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 2.3435463749992778
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4",
+    "n": 13,
+    "wall_s": 0.7176670410008228,
+    "total": 73712,
+    "known": 73712,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 7,
+        "solutions": 40891,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 0.7169294589984929
+      },
+      {
+        "worker": "rpi4",
+        "c0": 7,
+        "c1": 13,
+        "solutions": 32821,
+        "dev_ms": 480,
+        "cores": 4,
+        "wall_s": 0.6522687500000757
+      }
+    ],
+    "reps": 3
+  },
+  {
+    "config": "mac+rpi3+rpi4+rpi5",
+    "n": 13,
+    "wall_s": 1.506642374999501,
+    "total": 73712,
+    "known": 73712,
+    "correct": true,
+    "parts": [
+      {
+        "worker": "rpi3",
+        "c0": 0,
+        "c1": 5,
+        "solutions": 25436,
+        "dev_ms": 0,
+        "cores": 1,
+        "wall_s": 1.5057797079971351
+      },
+      {
+        "worker": "rpi4",
+        "c0": 5,
+        "c1": 9,
+        "solutions": 30186,
+        "dev_ms": 274,
+        "cores": 4,
+        "wall_s": 0.3952376249981171
+      },
+      {
+        "worker": "rpi5",
+        "c0": 9,
+        "c1": 13,
+        "solutions": 18090,
+        "dev_ms": 124,
+        "cores": 4,
+        "wall_s": 0.14892062500075554
+      }
+    ],
+    "reps": 3
+  }
+]

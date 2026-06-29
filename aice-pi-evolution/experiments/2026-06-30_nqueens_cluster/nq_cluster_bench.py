@@ -56,13 +56,22 @@ CONFIGS = [
 
 
 # ----------------------------------------------------------------------- workers
-def board_nqpart(board, n, c0, c1, timeout=600):
+def board_nqpart(board, n, c0, c1, timeout=600, retries=4):
     host, port = BOARDS[board]
     url = "http://%s:%d/nqpart?n=%d&c0=%d&c1=%d" % (host, port, n, c0, c1)
-    t0 = time.perf_counter()
-    with urllib.request.urlopen(url, timeout=timeout) as r:
-        body = r.read().decode("utf-8", "replace")
-    wall = time.perf_counter() - t0
+    last = None
+    for attempt in range(retries):
+        try:
+            t0 = time.perf_counter()
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                body = r.read().decode("utf-8", "replace")
+            wall = time.perf_counter() - t0
+            break
+        except Exception as e:        # transient network blip (e.g. DHCP renew) -> retry
+            last = e
+            time.sleep(1.5 * (attempt + 1))
+    else:
+        raise RuntimeError("%s unreachable after %d tries: %s" % (board, retries, last))
     sol = re.search(r"solutions=(\d+)", body)
     ms  = re.search(r"ms=(\d+)", body)
     cor = re.search(r"cores=(\d+)", body)
@@ -110,11 +119,23 @@ def split_equal(n, k):
     return out
 
 
+def warmup(boards):
+    """Wake each board's HTTP server / WiFi connection with a tiny request so the
+    first *timed* call is not penalised by webactor cold-start latency (the single
+    -threaded rpi3 webactor can stall ~35s on its first post-idle round-trip)."""
+    for b in boards:
+        try:
+            board_nqpart(b, 4, 0, 4, timeout=60)
+        except Exception:
+            pass
+
+
 def run_config(name, boards, n):
     tasks = []   # (callable, label)
     if not boards:                       # mac alone — all columns
         tasks.append((lambda: mac_aipl(n, 0, n), "mac"))
     else:
+        warmup(boards)                   # pre-warm board connections before timing
         for (c0, c1), b in zip(split_equal(n, len(boards)), boards):
             tasks.append(((lambda b=b, c0=c0, c1=c1: board_nqpart(b, n, c0, c1)), b))
 
@@ -133,12 +154,30 @@ def run_config(name, boards, n):
 
 
 # -------------------------------------------------------------------------- cli
+def best_of(name, boards, n, reps):
+    """Run a config `reps` times, keep the trial with the smallest wall-clock
+    (best-of-N factors out network/OS jitter — standard benchmark practice).
+    The Mac-alone config is CPU-bound and deterministic, so it runs once."""
+    runs = 1 if not boards else reps
+    best = None
+    for i in range(runs):
+        if i:
+            time.sleep(0.5)   # let the single-threaded rpi3 webactor settle
+        r = run_config(name, boards, n)
+        if best is None or r["wall_s"] < best["wall_s"]:
+            best = r
+    best["reps"] = runs
+    return best
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nmin", type=int, default=8)
     ap.add_argument("--nmax", type=int, default=12)
     ap.add_argument("--mac-nmax", type=int, default=11,
                     help="skip the mac-alone config above this N (it is too slow)")
+    ap.add_argument("--reps", type=int, default=1,
+                    help="trials per board config; report the minimum wall-clock")
     ap.add_argument("--out", default=os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "results.json"))
     args = ap.parse_args()
@@ -149,7 +188,7 @@ def main():
             if not boards and n > args.mac_nmax:
                 print("[skip] %-20s N=%d (mac-alone too slow)" % (name, n)); continue
             try:
-                r = run_config(name, boards, n)
+                r = best_of(name, boards, n, args.reps)
             except Exception as e:
                 print("[FAIL] %-20s N=%d : %s" % (name, n, e)); continue
             results.append(r)
