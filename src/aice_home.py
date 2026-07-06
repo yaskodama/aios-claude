@@ -27,6 +27,18 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # working directory are fixed here, never taken from the request.
 TARGETS = [
     {
+        "id": "manet",
+        "glyph": "MANET",
+        "portlabel": ":8090",
+        "title": "避難支援 MANET &mdash; soft-Xinu (荒川区)",
+        "desc": "多賀(2021) 第4章の 4エージェント (info / nodemgr / diffusion / collecting) &times; soft-Xinu 避難支援シミュレータ。第6章 大規模火災シナリオの<b>実地図(東京都荒川区・約800&times;625m)</b>を OpenStreetMap から再現。避難者=1 soft-Xinu ノード、native <code>now remote(...)</code> で端末間を移動。道路網・避難所・危険地域・避難者を可視化。",
+        "addr": "localhost:8090",
+        "href": "http://localhost:8090/",
+        "port": 8090,
+        "cwd": os.path.join(os.path.expanduser("~"), "projects", "drone-taga", "aipl_xinu_sim"),
+        "cmd": "python3 manet_aipl_sim.py",
+    },
+    {
         "id": "pyi",
         "glyph": "Py&middot;I",
         "portlabel": ":8899/actors",
@@ -79,14 +91,14 @@ TARGETS = [
     {
         "id": "node",
         "glyph": "JS&middot;Node",
-        "portlabel": ":8090",
+        "portlabel": ":8091",
         "title": "JavaScript &mdash; Node server",
         "desc": "AIPL parsed &amp; run inside a Node process (<code>/api/run</code>). Editor + examples (incl. dining philosophers), type-check, console.",
-        "addr": "localhost:8090",
-        "href": "http://localhost:8090/",
-        "port": 8090,
+        "addr": "localhost:8091",
+        "href": "http://localhost:8091/",
+        "port": 8091,
         "cwd": os.path.join(REPO, "src", "node-aipl-server"),
-        "cmd": "node server.mjs",
+        "cmd": "PORT=8091 node server.mjs",
     },
     {
         "id": "web",
