@@ -405,7 +405,7 @@ let rec string_of_expr (e : Ast.expr) =
   
 let string_of_send_target = function
   | LocalTarget t -> t
-  | RemoteTarget (hp, a) -> "remote(" ^ hp ^ ", " ^ a ^ ")"
+  | RemoteTarget _ -> "remote(...)"
 
 let rec string_of_stmt (st: Ast.stmt) =
   match st.sdesc with

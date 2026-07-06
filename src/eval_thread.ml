@@ -1423,7 +1423,9 @@ let rec eval_expr (actor:actor) (e : expr) =
            send_message ~msg_id:slot_id ~from:actor.name actual_target
              (mk_stmt (CallStmt (meth, arg_exprs)));
            wait_reply_slot slot_id
-       | RemoteTarget (hostport, to_actor) ->
+       | RemoteTarget (hp_e, ta_e) ->
+           let hostport = string_of_value (eval_expr actor hp_e) in
+           let to_actor = string_of_value (eval_expr actor ta_e) in
            let json_reply = Remote_client.remote_call ~hostport ~to_actor
              ~meth ~args:arg_exprs ~from:actor.name () in
            value_of_json_atom json_reply)
@@ -1450,7 +1452,9 @@ let rec eval_expr (actor:actor) (e : expr) =
            send_message ~msg_id:slot_id ~from:actor.name actual_target
              (mk_stmt (CallStmt (meth, arg_exprs)));
            VFuture slot_id
-       | RemoteTarget (hostport, to_actor) ->
+       | RemoteTarget (hp_e, ta_e) ->
+           let hostport = string_of_value (eval_expr actor hp_e) in
+           let to_actor = string_of_value (eval_expr actor ta_e) in
            let (slot_id, _) = new_reply_slot () in
            scope_register slot_id;  (* auto-join if inside a scope { } *)
            let from_name = actor.name in
@@ -1710,10 +1714,12 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
         send_message ~from:actor.name actual_target
           (mk_stmt (CallStmt (meth, arg_exprs)))
 
-    | RemoteTarget (hostport, tgt) ->
+    | RemoteTarget (hp_e, ta_e) ->
+        let hostport = string_of_value (eval_expr actor hp_e) in
+        let to_actor = string_of_value (eval_expr actor ta_e) in
         Remote_client.remote_send
           ~hostport
-          ~to_actor:tgt
+          ~to_actor
           ~meth
           ~args:arg_exprs
           ~from:actor.name
@@ -1734,10 +1740,12 @@ and eval_stmt (actor:actor) (s : Ast.stmt) =
         in
         send_message ~from:actor.name actual_target
           (mk_stmt (CallStmt (meth, arg_exprs)))
-    | RemoteTarget (hostport, tgt) ->
+    | RemoteTarget (hp_e, ta_e) ->
+        let hostport = string_of_value (eval_expr actor hp_e) in
+        let to_actor = string_of_value (eval_expr actor ta_e) in
         Remote_client.remote_send
           ~hostport
-          ~to_actor:tgt
+          ~to_actor
           ~meth
           ~args:arg_exprs
           ~from:actor.name

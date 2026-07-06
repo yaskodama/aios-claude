@@ -38,9 +38,8 @@ and refine_pred = Types.refine_pred =
 
 type send_target =
   | LocalTarget of string
-  | RemoteTarget of string * string
-
-type expr = {
+  | RemoteTarget of expr * expr      (* remote(hostport_expr, actor_expr): both evaluated at send time *)
+and expr = {
   loc : Location.t;
   desc : expr_desc;
 } and expr_desc =
@@ -260,10 +259,10 @@ let rec string_of_expr (e:expr) : string =
     Printf.sprintf "Array[%s]" xs
   | Now (tgt, m, args) ->
     let xs = args |> List.map string_of_expr |> String.concat ", " in
-    Printf.sprintf "Now(%s.%s, [%s])" (match tgt with LocalTarget t -> t | RemoteTarget (h,a) -> "remote("^h^","^a^")") m xs
+    Printf.sprintf "Now(%s.%s, [%s])" (match tgt with LocalTarget t -> t | RemoteTarget _ -> "remote(...)") m xs
   | Future (tgt, m, args) ->
     let xs = args |> List.map string_of_expr |> String.concat ", " in
-    Printf.sprintf "Future(%s.%s, [%s])" (match tgt with LocalTarget t -> t | RemoteTarget (h,a) -> "remote("^h^","^a^")") m xs
+    Printf.sprintf "Future(%s.%s, [%s])" (match tgt with LocalTarget t -> t | RemoteTarget _ -> "remote(...)") m xs
   | Await e ->
     Printf.sprintf "Await(%s)" (string_of_expr e)
   | RecordLit fs ->
@@ -283,7 +282,7 @@ let rec string_of_expr (e:expr) : string =
 
 let string_of_send_target = function
   | LocalTarget t -> t
-  | RemoteTarget (hp, a) -> "remote(" ^ hp ^ "," ^ a ^ ")"
+  | RemoteTarget _ -> "remote(...)"
 
 let rec string_of_stmt (s:stmt) : string =
   match s.sdesc with
@@ -349,9 +348,9 @@ let label_of_expr (e:expr) : string =
   | New (cls, _)   -> "New " ^ cls                 (* ★ 追加 *)
   | Array (_,_)    -> "Array"
   | Now (LocalTarget t, m, _) -> "Now " ^ t ^ "." ^ m
-  | Now (RemoteTarget (h,a), m, _) -> "Now remote(" ^ h ^ "," ^ a ^ ")." ^ m
+  | Now (RemoteTarget _, m, _) -> "Now remote(...)." ^ m
   | Future (LocalTarget t, m, _) -> "Future " ^ t ^ "." ^ m
-  | Future (RemoteTarget (h,a), m, _) -> "Future remote(" ^ h ^ "," ^ a ^ ")." ^ m
+  | Future (RemoteTarget _, m, _) -> "Future remote(...)." ^ m
   | Await _        -> "Await"
   | RecordLit _    -> "RecordLit"
   | TupleLit _     -> "TupleLit"
@@ -390,9 +389,9 @@ let label_of_stmt (s:stmt) : string =
   | Assign (x,_)         -> "Assign " ^ x
   | CallStmt (f,_)       -> "CallStmt " ^ f
   | Send (LocalTarget t, m, _) -> "Send " ^ t ^ "." ^ m
-  | Send (RemoteTarget (hp, a), m, _) -> "Send remote(" ^ hp ^ "," ^ a ^ ")." ^ m
+  | Send (RemoteTarget _, m, _) -> "Send remote(...)." ^ m
   | UnsafeSend (LocalTarget t, m, _) -> "UnsafeSend " ^ t ^ "." ^ m
-  | UnsafeSend (RemoteTarget (hp, a), m, _) -> "UnsafeSend remote(" ^ hp ^ "," ^ a ^ ")." ^ m
+  | UnsafeSend (RemoteTarget _, m, _) -> "UnsafeSend remote(...)." ^ m
   | Become (cls,_)       -> "Become " ^ cls
   | Seq _                -> "Seq"
   | Scope _              -> "Scope"

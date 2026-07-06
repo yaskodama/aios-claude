@@ -213,7 +213,7 @@ dim_list:
 
 send_target:
     ID                                                { LocalTarget $1 }
-  | REMOTE LPAREN STRINGLIT COMMA STRINGLIT RPAREN    { RemoteTarget ($3, $5) }
+  | REMOTE LPAREN expr COMMA expr RPAREN    { RemoteTarget ($3, $5) }
 
 stmts:
   | stmt { [$1] }

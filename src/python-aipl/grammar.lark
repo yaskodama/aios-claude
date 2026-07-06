@@ -125,6 +125,7 @@ assign_stmt: NAME "=" expr ";"
            | NAME ("." NAME)+ "=" expr ";"                            -> field_assign
 send_stmt: "send" "self"   "." NAME "(" args ")" ";"   -> send_self
          | "send" "sender" "." NAME "(" args ")" ";"   -> send_sender
+         | "send" "remote" "(" args ")" "." NAME "(" args ")" ";"  -> send_remote
          | "send" NAME     "." NAME "(" args ")" ";"   -> send_named
 call_stmt: ("call")? NAME "(" args ")" ";"
 if_stmt: "if" "(" expr ")" stmt ("else" stmt)?
@@ -188,10 +189,12 @@ args: (expr ("," expr)*)?
      // now-type send: synchronous, returns reply value
      | "now"    "self"   "." NAME "(" args ")"       -> now_self
      | "now"    "sender" "." NAME "(" args ")"       -> now_sender
+     | "now"    "remote" "(" args ")" "." NAME "(" args ")"  -> now_remote
      | "now"    NAME     "." NAME "(" args ")"       -> now_call
      // future-type send: returns Future immediately, await(f) for value
      | "future" "self"   "." NAME "(" args ")"       -> future_self
      | "future" "sender" "." NAME "(" args ")"       -> future_sender
+     | "future" "remote" "(" args ")" "." NAME "(" args ")"  -> future_remote
      | "future" NAME     "." NAME "(" args ")"       -> future_call
      // await keyword: `await fut` blocks on a future and returns its value.
      // Equivalent to the builtin `await(f)` form, kept for parity with the

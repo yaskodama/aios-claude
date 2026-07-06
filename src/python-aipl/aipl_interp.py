@@ -19,7 +19,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall, Scope, Spawn, SelectStmt, SelectCase,
+    NowCall, FutureCall, RemoteSend, Scope, Spawn, SelectStmt, SelectCase,
     SagaStmt, SagaStep,
 )
 from aipl_runtime import Actor, Future, Scheduler
@@ -675,6 +675,8 @@ class Interpreter:
                       flush=True)
         elif kind is Send:
             self._do_send(s.target, s.method, s.args, frame)
+        elif kind is RemoteSend:
+            self._do_remote_send(s, frame)
         elif kind is CallStmt:
             self._call_builtin(s.name, [self.eval_expr(a, frame) for a in s.args], frame)
         elif kind is If:
@@ -967,7 +969,41 @@ class Interpreter:
             return self._do_now_send(e.target, e.method, e.args, frame)
         if kind is FutureCall:
             return self._do_future_send(e.target, e.method, e.args, frame)
+        if kind is RemoteSend:
+            return self._do_remote_send(e, frame)
         raise RuntimeError(f"unknown expr: {e!r}")
+
+    def _do_remote_send(self, e, frame):
+        """Native `<kind> remote(host, actor).method(args)` — bridges to the
+        same wire path as the remote_now/remote_call/remote_future builtins."""
+        dest = [self.eval_expr(a, frame) for a in e.dest]
+        if len(dest) < 2:
+            raise ValueError('remote(host, actor).m(): needs host and actor')
+        hostport = _to_str(dest[0])
+        to_actor = _to_str(dest[1])
+        args = [self.eval_expr(a, frame) for a in e.args]
+        sender_name = frame.actor.name if frame.actor is not None else "main"
+        if e.kind == "send":
+            from aipl_remote import remote_send
+            remote_send(hostport, to_actor, e.method, args, from_name=sender_name)
+            return None
+        if e.kind == "future":
+            from aipl_remote import remote_call_sync
+            fut = Future()
+
+            def _runner():
+                try:
+                    fut.set(remote_call_sync(hostport, to_actor, e.method, args,
+                                             from_name=sender_name))
+                except Exception as ex:
+                    print(f"[future remote] {hostport}/{to_actor}.{e.method}: {ex}")
+                    fut.set(None)
+            threading.Thread(target=_runner, daemon=True).start()
+            return fut
+        # kind == "now"
+        from aipl_remote import remote_call_sync
+        return remote_call_sync(hostport, to_actor, e.method, args,
+                                from_name=sender_name)
 
     def _do_now_send(self, target_name: str, method: str, raw_args: list, frame: Frame):
         tgt = self._resolve_actor(target_name, frame)

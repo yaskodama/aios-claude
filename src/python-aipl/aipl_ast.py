@@ -116,9 +116,21 @@ class FutureCall:
     args: List['Expr']
 
 
+@dataclass
+class RemoteSend:
+    """Native cross-node send: `<kind> remote(host, actor).method(args)`.
+    kind is 'now' (sync, returns reply), 'future' (returns a Future) or
+    'send' (fire-and-forget, used as a statement). Bridges to the same
+    wire path as the remote_now/remote_call/remote_future builtins."""
+    kind: str            # 'now' | 'future' | 'send'
+    dest: List['Expr']   # remote(...) args, normally [hostport, actor]
+    method: str
+    args: List['Expr']
+
+
 Expr = Union[IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
              ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess,
-             TupleLit, NowCall, FutureCall]
+             TupleLit, NowCall, FutureCall, RemoteSend]
 
 
 # ---------- Statements ----------

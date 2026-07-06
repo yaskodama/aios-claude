@@ -629,6 +629,16 @@ def infer_expr(env: dict[str, list[Scheme]], e) -> Ty:
             else:
                 t = T_ANY
         return t
+    if isinstance(e, A.RemoteSend):
+        # native cross-node send: `<kind> remote(host, actor).method(args)`.
+        # dest = [hostport, actor] (typically strings); args = method args.
+        for a in e.dest:
+            infer_expr(env, a)
+        for a in e.args:
+            infer_expr(env, a)
+        # 'future' yields a future handle; 'now' yields the remote reply.
+        # Neither can be resolved statically across nodes — gradual (any).
+        return T_ANY
     # Fallthrough: any unknown node type is gradual
     return T_ANY
 
@@ -689,6 +699,13 @@ def check_stmt(env: dict[str, list[Scheme]], s) -> None:
                         except TypeError_ as ex:
                             raise TypeError_(
                                 f"{tgt.cls}.{s.method}: {ex}") from ex
+        return
+    if isinstance(s, A.RemoteSend):
+        # native `send remote(host, actor).method(args)` statement form.
+        for a in s.dest:
+            infer_expr(env, a)
+        for a in s.args:
+            infer_expr(env, a)
         return
     if isinstance(s, A.CallStmt):
         targs = [infer_expr(env, a) for a in s.args]

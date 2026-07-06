@@ -13,7 +13,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall, Scope, SelectStmt, SelectCase, SagaStmt, SagaStep,
+    NowCall, FutureCall, RemoteSend, Scope, SelectStmt, SelectCase, SagaStmt, SagaStep,
 )
 
 
@@ -50,6 +50,14 @@ class _Builder(Transformer):
     def future_sender(self, method, args):   return FutureCall("sender", str(method), list(args.children))
     def future_call(self, target, method, args):
         return FutureCall(str(target), str(method), list(args.children))
+
+    # native cross-node sends: `<kind> remote(host, actor).method(args)`
+    def now_remote(self, dest, method, args):
+        return RemoteSend("now", list(dest.children), str(method), list(args.children))
+    def future_remote(self, dest, method, args):
+        return RemoteSend("future", list(dest.children), str(method), list(args.children))
+    def send_remote(self, dest, method, args):
+        return RemoteSend("send", list(dest.children), str(method), list(args.children))
 
     def await_expr(self, e):
         # `await x` desugars to the existing `await(x)` builtin call.

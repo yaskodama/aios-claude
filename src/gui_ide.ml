@@ -157,7 +157,7 @@ let starts_with s p =
 
 let string_of_send_target = function
   | LocalTarget t -> t
-  | RemoteTarget (hp, a) -> "remote(" ^ hp ^ ", " ^ a ^ ")"
+  | RemoteTarget _ -> "remote(...)"
 
 let parse_arg_token (t:string) : Ast.expr =
   let t = trim t in
