@@ -1703,6 +1703,12 @@ let handle_client (client: file_descr) : unit =
 	 let code, ctype, resp_body =
            match meth, path with
 	   | "GET", "/" -> (200, "text/html; charset=utf-8", html_index ())
+	   | "GET", "/manet" -> serve_asset "manet_dashboard.html" "text/html; charset=utf-8"
+	   | "GET", "/manet.js" -> serve_asset "manet_dashboard.js" "application/javascript; charset=utf-8"
+	   | "GET", "/fire" -> serve_asset "manet_fire_dash.html" "text/html; charset=utf-8"
+	   | "GET", "/fire.js" -> serve_asset "manet_fire_dash.js" "application/javascript; charset=utf-8"
+	   | "GET", "/arakawa_map266.json" -> serve_asset "arakawa_map266.json" "application/json; charset=utf-8"
+	   | "GET", "/phone_node_fire.abcl" -> serve_asset "phone_node_fire.abcl" "text/plain; charset=utf-8"
 	   | "GET", "/dashboard" -> serve_asset "gateway_dashboard.html" "text/html; charset=utf-8"
 	   | "GET", "/dashboard.html" -> serve_asset "gateway_dashboard.html" "text/html; charset=utf-8"
 	   | "GET", "/gateway_dashboard.js" -> serve_asset "gateway_dashboard.js" "application/javascript; charset=utf-8"

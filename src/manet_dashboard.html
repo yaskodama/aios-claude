@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>避難支援MANET — OCaml AIPL (型推論クリーン)</title>
+<style>
+ body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+ header{padding:10px 16px;border-bottom:1px solid #30363d}
+ h1{margin:0;font-size:15px} header p{margin:4px 0 0;font-size:12px;color:#8b949e}
+ header code{color:#79c0ff}
+ .wrap{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
+ .stage{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px}
+ canvas{background:#0a0e14;border-radius:6px;display:block}
+ .side{width:290px;display:flex;flex-direction:column;gap:12px}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+ .card h2{margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.04em}
+ .row{display:flex;gap:8px} .row button{flex:1}
+ button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:9px;font-size:13px;cursor:pointer}
+ button:hover{background:#2d333b}
+ #bStart{background:#1f883d;border-color:#1f883d} #bStop{background:#9e6a03;border-color:#9e6a03}
+ #bDanger{background:#1f6feb;border-color:#1f6feb}
+ button:disabled{opacity:.4;cursor:not-allowed}
+ .metric{display:flex;justify-content:space-between;margin:6px 0;font-size:13px}
+ .metric b{font-size:18px;font-variant-numeric:tabular-nums}
+ .bar{height:8px;background:#21262d;border-radius:4px;overflow:hidden;margin-top:4px}
+ .bar>div{height:100%;background:linear-gradient(90deg,#f97316,#22c55e);width:0;transition:width .25s}
+ label{font-size:12px;color:#8b949e;display:flex;justify-content:space-between;gap:8px;align-items:center;margin:6px 0}
+ input[type=range]{flex:1}
+ .legend{font-size:12px;display:flex;flex-direction:column;gap:6px}
+ .legend div{display:flex;align-items:center;gap:8px}
+ .dot{width:12px;height:12px;border-radius:50%}
+ .note{font-size:11px;color:#8b949e;line-height:1.55}
+ #status{font-size:12px;color:#8b949e}
+</style>
+</head>
+<body>
+<header>
+ <h1>移動エージェント避難支援 — MANET シミュレータ</h1>
+ <p>多賀(2021) 第4章の4エージェント避難支援を <b>OCaml版 AIPL(型推論クリーン)</b> で記述。世界(端末の位置・移動・電波到達・情報拡散/収集)は単一の <code>World</code> アクター。駆動 <code>POST /api/json/send</code>・状態 <code>GET /api/log</code>。</p>
+</header>
+<div class="wrap">
+ <div class="stage">
+   <canvas id="cv" width="800" height="625"></canvas>
+ </div>
+ <div class="side">
+   <div class="card">
+     <h2>制御</h2>
+     <div class="row">
+       <button id="bStart">▶ スタート</button>
+       <button id="bStop" disabled>⏸ ストップ</button>
+     </div>
+     <div class="row" style="margin-top:8px">
+       <button id="bDanger">⚠ 危険地点を発生</button>
+     </div>
+     <label>避難者数 <span id="nVal">30</span><input id="nRange" type="range" min="10" max="120" value="30"></label>
+     <label>通信範囲 <span id="rVal">60</span> m<input id="rRange" type="range" min="30" max="150" value="60"></label>
+     <div id="status">未起動</div>
+   </div>
+   <div class="card">
+     <h2>計測</h2>
+     <div class="metric"><span>情報到達</span><b id="mInf">0 / 0</b></div>
+     <div class="bar"><div id="mBar"></div></div>
+     <div class="metric"><span>時刻 (step)</span><b id="mT">0</b></div>
+     <div class="metric"><span>中継総数 (hops)</span><b id="mHop">0</b></div>
+     <div class="metric"><span>危険地点</span><b id="mDng">0</b></div>
+   </div>
+   <div class="card">
+     <h2>凡例</h2>
+     <div class="legend">
+       <div><span class="dot" style="background:#f97316"></span> 未通知の避難者</div>
+       <div><span class="dot" style="background:#22c55e"></span> 危険情報を受信済</div>
+       <div><span class="dot" style="background:#58a6ff"></span> 避難所(頂点)</div>
+       <div><span style="width:14px;height:0;border-top:2px solid #3fb950"></span> MANITリンク(電波内)</div>
+     </div>
+     <p class="note">各避難者=1ノード。電波内の隣人と危険情報を交換(拡散push/収集pullの対称)。基地局なし=自分の隣人しか見えないMANETの現実。</p>
+   </div>
+ </div>
+</div>
+<script src="/manet.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>第6章 大規模火災シナリオ (荒川区) — OCaml AIPL</title>
+<style>
+ body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+ header{padding:10px 16px;border-bottom:1px solid #30363d}
+ h1{margin:0;font-size:15px} header p{margin:4px 0 0;font-size:12px;color:#8b949e} header code{color:#79c0ff}
+ .wrap{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
+ .stage{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px}
+ canvas{background:#0a0e14;border-radius:6px;display:block}
+ .side{width:300px;display:flex;flex-direction:column;gap:12px}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+ .card h2{margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.04em}
+ .row{display:flex;gap:8px} .row button{flex:1}
+ button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:9px;font-size:13px;cursor:pointer}
+ button:hover{background:#2d333b}
+ #bStart{background:#1f883d;border-color:#1f883d} #bStop{background:#9e6a03;border-color:#9e6a03}
+ button:disabled{opacity:.4;cursor:not-allowed}
+ .seg{display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;margin:6px 0}
+ .seg button{flex:1;border:0;border-radius:0;background:#161b22}
+ .seg button.on{background:#1f6feb;color:#fff}
+ .metric{display:flex;justify-content:space-between;margin:6px 0;font-size:13px}
+ .metric b{font-size:18px;font-variant-numeric:tabular-nums}
+ .bar{height:8px;background:#21262d;border-radius:4px;overflow:hidden;margin-top:4px}
+ .bar>div{height:100%;background:linear-gradient(90deg,#f97316,#22c55e);width:0;transition:width .25s}
+ label{font-size:12px;color:#8b949e;display:flex;justify-content:space-between;gap:8px;align-items:center;margin:6px 0}
+ input[type=range]{flex:1}
+ .legend{font-size:12px;display:flex;flex-direction:column;gap:6px}
+ .legend div{display:flex;align-items:center;gap:8px}
+ .dot{width:12px;height:12px;border-radius:50%}
+ .note{font-size:11px;color:#8b949e;line-height:1.55}
+ #status{font-size:12px;color:#8b949e}
+ #bAgents{background:#1f6feb;border-color:#1f6feb;width:100%;margin-top:8px}
+ .modal-bg{position:fixed;inset:0;background:rgba(1,4,9,.75);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+ .modal-bg.on{display:flex}
+ .modal{background:#0d1117;border:1px solid #30363d;border-radius:12px;max-width:1000px;width:100%;max-height:90vh;overflow:auto;padding:18px 20px;box-shadow:0 12px 48px rgba(0,0,0,.6)}
+ .modal h2{margin:0 0 2px;font-size:16px} .modal .sub{margin:0 0 12px;font-size:12px;color:#8b949e}
+ .modal .close{float:right;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+ .agents{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+ @media(max-width:720px){.agents{grid-template-columns:1fr}}
+ .ag{border:1px solid #30363d;border-radius:8px;background:#161b22;overflow:hidden}
+ .ag h3{margin:0;padding:9px 12px;font-size:13px;display:flex;align-items:center;gap:8px;background:#1c2330}
+ .ag .tag{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+ .tag.static{background:#193c2a;color:#3fb950;border:1px solid #2ea043}
+ .tag.mobile{background:#1c2f4a;color:#58a6ff;border:1px solid #388bfd}
+ .ag p{margin:8px 12px;font-size:11px;line-height:1.6;color:#c9d1d9}
+ .ag pre{margin:0;padding:10px 12px;background:#0a0e14;overflow:auto;max-height:300px;font-size:11px;line-height:1.5;color:#d6e2f0;border-top:1px solid #21262d}
+ .modal .foot{margin-top:12px;font-size:11px;color:#8b949e;line-height:1.6;border-top:1px solid #21262d;padding-top:10px}
+</style>
+</head>
+<body>
+<header>
+ <h1>大規模火災シナリオ 避難支援シミュレーション — 多賀(2021) 第6章</h1>
+ <p><b>東京都荒川区の実道路網(OpenStreetMap)</b>を実地図タイルに貼り付けて描画(図6.1)。<b>266頂点/4避難所(実在: 第三峡田小学校ほか)</b>。<b>OCaml版 AIPL(型推論クリーン)</b> の単一 <code>Fire</code> アクターで、避難者=最寄り避難所へ最短経路、火災=通行不能点が次々発生。<b>システム利用</b>で接触回数・死亡が減る(図6.2/6.4)。<span style="color:#f0a">※地図タイル表示にはインターネット接続が必要。</span></p>
+</header>
+<div class="wrap">
+ <div class="stage"><canvas id="cv" width="800" height="625"></canvas></div>
+ <div class="side">
+   <div class="card">
+     <h2>制御</h2>
+     <div class="seg">
+       <button id="mUse" class="on">避難支援システム 利用</button>
+       <button id="mNo">不使用</button>
+     </div>
+     <div class="row">
+       <button id="bStart">▶ スタート</button>
+       <button id="bStop" disabled>⏸ ストップ</button>
+     </div>
+     <label>避難者数 <span id="nVal">80</span><input id="nRange" type="range" min="80" max="200" value="80" step="10"></label>
+     <button id="bAgents">🛰 各避難者=1 Xinu の 4エージェント定義を表示</button>
+     <div id="status">未起動</div>
+   </div>
+   <div class="card">
+     <h2>計測 (図6.2 / 6.4)</h2>
+     <div class="metric"><span>通行不能点への接触</span><b id="mCon">0</b></div>
+     <div class="metric"><span>死亡扱い</span><b id="mDie">0</b></div>
+     <div class="metric"><span>避難完了</span><b id="mArr">0 / 0</b></div>
+     <div class="bar"><div id="mBar"></div></div>
+     <div class="metric"><span>通行不能点(火災)</span><b id="mFire">0</b></div>
+     <div class="metric"><span>時刻 (step)</span><b id="mT">0</b></div>
+   </div>
+   <div class="card">
+     <h2>凡例</h2>
+     <div class="legend">
+       <div><span class="dot" style="background:#5096ff"></span> 頂点(交差点)</div>
+       <div><span style="width:14px;height:0;border-top:2px solid #dc3c3c"></span> 道路(辺)</div>
+       <div><span class="dot" style="background:#ff5a5a;border:2px solid #fff"></span> 避難所(4・実在)</div>
+       <div><span class="dot" style="background:#ff4d3d"></span> 通行不能点(火災)</div>
+       <div><span class="dot" style="background:#ff9500"></span> 避難中の避難者</div>
+       <div><span class="dot" style="background:#22c55e"></span> 避難完了</div>
+       <div><span class="dot" style="background:#8b949e"></span> 死亡扱い</div>
+     </div>
+     <p class="note">利用時は接触した火災を情報拡散エージェントで共有→他の避難者が事前回避し経路を再構成。不使用時は各自が接触して初めて知る。「利用/不使用」を切り替えて2回走らせ、接触・死亡を比べてください。</p>
+   </div>
+ </div>
+</div>
+<div class="modal-bg" id="agModal">
+  <div class="modal">
+    <button class="close" id="agClose">閉じる ✕</button>
+    <h2>各避難者 = 1 台の soft-Xinu / AIPL ノード の 4 エージェント</h2>
+    <p class="sub">多賀(2021) 第4章の 4 エージェントを火災シナリオ用に定義(<code>phone_node_fire.abcl</code>)。実機 Xinu 互換 HTTP(<code>POST /api/json/call</code>)に <code>web_expose</code> で公開。端末内は非同期 <code>send</code>、端末間の「移動」は <code>now remote(host,"actor").method()</code>(拡散はホップ1)。</p>
+    <div class="agents" id="agGrid"></div>
+    <div class="foot">世界(位置・移動・電波到達・火災発生)はコントローラが司り、毎 tick <code>set_step(隣人)</code> を渡す。避難者が通行不能点に接触 → <code>info.contact(id)</code> → <code>nodemgr.store</code> → <code>diffusion.dispatch</code>(50m隣人へ push, hop1) / <code>collecting.dispatch</code>(隣人の nodemgr を pull)。「システム利用」時のみこの MANET 共有が働き、他避難者が事前回避 → 接触回数が減る(図6.2)。</div>
+  </div>
+</div>
+<script src="/fire.js"></script>
+</body>
+</html>
