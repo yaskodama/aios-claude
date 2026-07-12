@@ -39,6 +39,32 @@ TARGETS = [
         "cmd": "python3 manet_aipl_sim.py",
     },
     {
+        "id": "manet2",
+        "glyph": "MANET(2)",
+        "portlabel": ":8097/fire",
+        "title": "避難支援 MANET(2) &mdash; OCaml AIPL 火災シナリオ",
+        "desc": "多賀(2021) <b>第6章 大規模火災シナリオ</b>を <b>OCaml版 AIPL(型推論クリーン)</b> で再現。荒川区の実道路網(OpenStreetMap)<b>266頂点・4避難所</b>。各避難者=1台の soft-Xinu(4エージェント)。最寄り避難所へ最短経路で避難し、通行不能点(火災)を回避。<b>MANET メッシュ</b>のリンクと、火災発見時の<b>情報拡散ブロードキャスト(50m)</b>を可視化。図6.2/6.4 の傾向を再現。",
+        "addr": "localhost:8097/fire",
+        "href": "http://localhost:8097/fire",
+        "port": 8097,
+        "cwd": REPO,
+        "cmd": "( printf 'load %s\\ncompile\\n'; tail -f /dev/null ) | ./_build/default/src/repl_thread.exe"
+               % os.path.join(os.path.expanduser("~"), "projects", "drone-taga",
+                              "aipl_xinu_sim", "ocaml", "manet_fire.abcl"),
+    },
+    {
+        "id": "ns3",
+        "glyph": "ns-3",
+        "portlabel": ":8098",
+        "title": "MANET + ドローン中継 可視化 (ns-3 検証)",
+        "desc": "<b>ns-3</b> で検証した多賀論文の避難支援シナリオのブラウザ可視化（単体HTML・依存なし）。避難者の MANET・情報到達率・<b>ドローン中継</b>による改善を，道路網・通信リンク・ドローン軌道とともにアニメーション表示。ns-3 C++ 実装は <code>drone-manet-evacuation.cc</code> / <code>coupled-evacuation.cc</code> 等。",
+        "addr": "localhost:8098/simulation.html",
+        "href": "http://localhost:8098/simulation.html",
+        "port": 8098,
+        "cwd": os.path.join(os.path.expanduser("~"), "projects", "drone-taga"),
+        "cmd": "python3 -m http.server 8098 --bind 127.0.0.1",
+    },
+    {
         "id": "pyi",
         "glyph": "Py&middot;I",
         "portlabel": ":8899/actors",
@@ -172,11 +198,23 @@ TARGETS = [
         "cwd": os.path.join(os.path.expanduser("~"), "projects", "robot-arm"),
         "cmd": "python3 soft_xinu.py",
     },
+    {
+        "id": "mecharm",
+        "glyph": "mecharm",
+        "portlabel": ":8021/mecharm_sim.html",
+        "title": "mecharm 6軸アーム &mdash; 分散Xinu制御 + TinyML 強化学習",
+        "desc": "実機 elephant robotics <b>mecharm</b> 相当の6軸アームを疑似3Dで可視化。<b>各関節に2台の soft-Xinu(計12)</b>を接続し、<b>Capability推論</b>で役割を分離(<code>Motor!{mut,net}</code> / <code>Sensor!{net}</code> / <code>Learner!{ai,net}</code>)。アプリ層の <b>TinyML方策(強化学習済)</b> がコンベア上の部品を把持→組付けする滑らかな動作を生成。Sensor→Learner→Motor の情報経路と、駆動中の Xinu を実時間ハイライト。",
+        "addr": "127.0.0.1:8021/mecharm_sim.html",
+        "href": "http://127.0.0.1:8021/mecharm_sim.html",
+        "port": 8021,
+        "cwd": os.path.join(os.path.expanduser("~"), "projects", "mecharm_rl"),
+        "cmd": "python3 -m http.server 8021 --bind 127.0.0.1",
+    },
 ]
 TARGET_BY_ID = {t["id"]: t for t in TARGETS}
 
 # Targets shown in their own section above, not in the generic Dashboards grid.
-_ROBOT_IDS = {"milky", "rover"}
+_ROBOT_IDS = {"milky", "rover", "mecharm"}
 
 # id -> Popen for processes this portal launched (so we can stop them)
 _PROCS: dict[str, subprocess.Popen] = {}
@@ -243,6 +281,20 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self._send(_PAGE.encode("utf-8"), "text/html; charset=utf-8")
+        elif path == "/aipl":
+            try:
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "aipl_intro.html"), "rb") as f:
+                    self._send(f.read(), "text/html; charset=utf-8")
+            except OSError:
+                self.send_response(404); self.end_headers()
+        elif path in ("/tinyml_aipl_xinu_guide.pdf", "/AICE_Meta_Research.pdf"):
+            try:
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       path.lstrip("/")), "rb") as f:
+                    self._send(f.read(), "application/pdf")
+            except OSError:
+                self.send_response(404); self.end_headers()
         elif path == "/api/status":
             self._json(_status())
         else:
@@ -426,6 +478,12 @@ _PAGE_TMPL = r"""<!doctype html>
   <span class="pill">AIPL actors</span><span class="pill">5 runtimes</span>
   <span class="pill">MAP-Elites evolution</span><span class="pill">AIPL &rarr; C / Erlang / Prolog / Go &hellip;</span>
  </div>
+ <p style="margin-top:20px">
+  <a href="/aipl" style="display:inline-flex;align-items:center;gap:9px;text-decoration:none;
+     font-family:'Space Grotesk',ui-monospace,monospace;font-weight:700;font-size:15px;color:#0C0E14;
+     background:linear-gradient(92deg,#5EEAD4,#818CF8);border-radius:10px;padding:11px 20px;
+     box-shadow:0 10px 30px rgba(94,234,212,.25)">&#128218; AIPL とは — 言語の詳細解説 &rarr;</a>
+ </p>
 </div>
 
 <section class="container" id="robot">
@@ -462,6 +520,19 @@ _PAGE_TMPL = r"""<!doctype html>
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
      <button class="btn btn-open" data-href="http://127.0.0.1:8020/rover.html">Open &#8599;</button>
+    </div></div>
+  </div>
+  <div class="card" data-id="mecharm">
+   <div class="thumb"><span class="glyph">&#129693;</span><span class="port">:8021/mecharm_sim.html</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>mecharm 6軸アーム &mdash; 分散Xinu制御 + TinyML 強化学習</h3>
+    <p>実機 elephant robotics <b>mecharm</b> 相当の6軸アームを疑似3Dで可視化。<b>各関節に2台の soft-Xinu(計12)</b>を接続し、<b>Capability推論</b>で役割を分離(<code>Motor!{mut,net}</code> / <code>Sensor!{net}</code> / <code>Learner!{ai,net}</code>)。アプリ層の <b>TinyML方策(強化学習済)</b> がコンベア上の部品を把持→組付けする滑らかな動作を生成する製造ライン組立シミュレーション。</p>
+    <span class="addr">127.0.0.1:8021/mecharm_sim.html</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8021/mecharm_sim.html">Open &#8599;</button>
     </div></div>
   </div>
  </div>
