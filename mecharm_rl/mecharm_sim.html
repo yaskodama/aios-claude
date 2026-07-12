@@ -27,6 +27,18 @@
  label{font-size:12px;color:#8b949e;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
  .legend{font-size:11px;color:#8b949e;line-height:1.7}
  #status{font-size:12px;color:#8b949e;margin-top:6px}
+ .node,.learner,.coord{cursor:pointer}
+ .node:hover{border-color:#58a6ff}.learner:hover,.coord:hover{border-color:#bc8cff}
+ #srcModal{position:fixed;inset:0;background:rgba(3,6,12,.74);display:none;align-items:center;justify-content:center;z-index:50}
+ #srcModal.open{display:flex}
+ .modal{background:#0d1117;border:1px solid #30363d;border-radius:12px;width:min(780px,93vw);max-height:87vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+ .modal h3{margin:0;padding:12px 16px;border-bottom:1px solid #30363d;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+ .modal h3 .x{cursor:pointer;color:#8b949e;font-size:20px;line-height:1}.modal h3 .x:hover{color:#e6edf3}
+ .modal .meta{padding:8px 16px;font-size:12px;color:#8b949e;border-bottom:1px solid #21262d}
+ .modal .meta code{color:#bc8cff;font-weight:600}
+ .modal pre{margin:0;padding:14px 16px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.55;tab-size:2}
+ .tok-cm{color:#8b949e;font-style:italic}.tok-kw{color:#79c0ff}.tok-cap{color:#bc8cff;font-weight:600}
+ .tok-st{color:#7ee787}.tok-cls{color:#f0a830;font-weight:600}
 </style></head><body>
 <header>
  <h1>mecharm 6軸アーム — 製造ライン 部品組立シミュレーション</h1>
@@ -42,14 +54,16 @@
    <div class="metric"><span>手先ジャーク(滑らかさ)</span><b id="mJerk">0.00</b></div>
    <div class="metric"><span>制御アクター</span><b>Coordinator</b></div>
    <div class="row"><button id="bPause">⏸ 一時停止</button><button id="bView">👁 視点回転</button></div>
+   <div class="row"><button id="bSrc">&lt;/&gt; AIPL ソース全体を表示</button></div>
    <div id="status">TinyML方策で稼働中 …</div>
   </div>
   <div class="card"><h2>12 Xinu（6関節 × 2）+ アプリ層</h2>
    <div class="xn" id="nodes"></div>
    <div class="learner" id="learner"><span class="t">LearnerActor（TinyML方策）</span>
      <div class="c"><span class="cap-ai">!{ai</span>,<span class="cap-net">net}</span> — 強化学習した方策で行動決定</div></div>
-   <div class="coord"><span class="t">Coordinator</span>
+   <div class="coord" id="coord"><span class="t">Coordinator</span>
      <div class="c"><span class="cap-net">!{net}</span> — センサ読取→学習→駆動を巡回</div></div>
+   <div style="font-size:11px;color:#6e7681;margin-top:8px">各ノード／アクターを<b style="color:#8b949e">クリック</b>すると、その AIPL ソースコードを表示します。</div>
   </div>
   <div class="card"><h2>凡例 / 動作</h2>
    <div class="legend">
@@ -61,6 +75,11 @@
   </div>
  </div>
 </div>
+<div id="srcModal"><div class="modal">
+ <h3><span id="smTitle">ソース</span><span class="x" id="smX">&times;</span></h3>
+ <div class="meta" id="smMeta"></div>
+ <pre><code id="smCode"></code></pre>
+</div></div>
 <script>
 (function(){
  const $=id=>document.getElementById(id), cv=$("cv"), ctx=cv.getContext("2d");
@@ -200,6 +219,8 @@
    for(const role of [["A","Motor","!{mut,net}","cap-mut"],["B","Sensor","!{net}","cap-net"]]){
      const d=document.createElement("div");d.className="node";
      d.innerHTML=`<span class="t">J${j}-${role[0]} ${role[1]}</span><div class="c ${role[3]}">${role[2]}</div>`;
+     const cls=role[1]==="Motor"?"MotorActor":"SensorActor";
+     d.onclick=()=>showSrc(cls,`関節 <b style="color:#e6edf3">J${j}</b> の Xinu-${role[0]}（${role[1]}）· Capability <code>${role[2]}</code>`);
      nodesEl.appendChild(d);nodeDivs.push({j,role:role[1],el:d});
    }
  }
@@ -207,6 +228,54 @@
    nodeDivs.forEach(n=>n.el.classList.toggle("act", activeJoint>0 && n.j===activeJoint));
    $("learner").classList.toggle("act", learnerActive);
  }
+
+ // ============ 各アクターの AIPL ソース閲覧 ============
+ let SRC="", CLASSES={};
+ const srcModal=$("srcModal"), smTitle=$("smTitle"), smMeta=$("smMeta"), smCode=$("smCode");
+ function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+ function hl(code){                              // 1パスの結合正規表現で着色(replaceは自分の出力を再走査しないため
+   return code.split("\n").map(line=>{           // 注入した class= 属性がキーワードに再マッチする事故が起きない)
+     const c=line.indexOf("//");
+     let cp=(c>=0)?line.slice(0,c):line, cm=(c>=0)?line.slice(c):"";
+     let h=esc(cp).replace(/(!\{[^}]*\})|(&quot;[^&]*&quot;)|\b(class|method|var|while|do|if|else|new|send|now|reply|print|return|array_push)\b/g,
+       (m,cap,st,kw)=> cap?'<span class="tok-cap">'+cap+'</span>'
+                     : st ?'<span class="tok-st">'+st+'</span>'
+                     :     '<span class="tok-kw">'+kw+'</span>');
+     h=h.replace(/(<span class="tok-kw">class<\/span>\s+)(\w+)/,'$1<span class="tok-cls">$2</span>');  // クラス名
+     if(cm) h+='<span class="tok-cm">'+esc(cm)+'</span>';
+     return h;
+   }).join("\n");
+ }
+ function parseClasses(txt){                     // class 定義を(先頭コメント込みで)波括弧対応で切り出す
+   const L=txt.split("\n"), map={};
+   for(let i=0;i<L.length;i++){
+     const mm=L[i].match(/^\s*class\s+(\w+)/); if(!mm) continue;
+     let top=i; while(top>0 && /^\s*\/\//.test(L[top-1])) top--;
+     let depth=0, started=false, j=i;
+     for(;j<L.length;j++){ for(const ch of L[j]){ if(ch==="{"){depth++;started=true;} else if(ch==="}"){depth--;} } if(started&&depth<=0) break; }
+     map[mm[1]]=L.slice(top,j+1).join("\n");
+   }
+   return map;
+ }
+ function showSrc(name, sub){
+   const code = (name==="__ALL__") ? SRC : CLASSES[name];
+   smTitle.textContent = (name==="__ALL__") ? "mecharm_arm.abcl — AIPL ソース全体" : name+" — AIPL ソース";
+   smMeta.innerHTML = sub || "";
+   if(code) smCode.innerHTML = hl(code);
+   else smCode.textContent = "(ソースを読み込めませんでした。サーバ経由で開いてください: "+name+")";
+   srcModal.classList.add("open"); smCode.parentElement.scrollTop=0;
+ }
+ function closeSrc(){ srcModal.classList.remove("open"); }
+ $("smX").onclick=closeSrc;
+ srcModal.onclick=e=>{ if(e.target===srcModal) closeSrc(); };
+ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSrc(); });
+ $("learner").onclick=()=>showSrc("LearnerActor",'アプリ層（Pi） · TinyML 方策で行動決定 · <code>!{ai,net}</code>');
+ $("coord").onclick =()=>showSrc("Coordinator",'12 Xinu を巡回する調整アクター（センサ読取→学習→駆動） · <code>!{net}</code>');
+ $("bSrc").onclick  =()=>showSrc("__ALL__",'各関節に2台の soft-Xinu（計12）+ LearnerActor + Coordinator。Capability 推論が役割分離を保証します。');
+ fetch("mecharm_arm.abcl").then(r=>r.text()).then(t=>{ SRC=t; CLASSES=parseClasses(t);
+   const show=new URLSearchParams(location.search).get("show");   // ?show=MotorActor 等でソースを起動時に開く
+   if(show) showSrc(show, '');
+ }).catch(()=>{});
 
  let last=performance.now();
  function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;step(dt);draw();requestAnimationFrame(loop);}
