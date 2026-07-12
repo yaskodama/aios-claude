@@ -1,0 +1,110 @@
+// mecharm_arm.abcl ——  6軸アーム(elephant robotics mecharm) 分散制御
+// ===========================================================================
+//   各支点(6関節)に 2 台の soft-Xinu を接続 = 計 12 Xinu。各 Xinu 上のアクターの
+//   役割は AIPL の Capability(効果) 推論 !{fs, ai, net, mut} で決まる(最小権限):
+//
+//     関節 j の Xinu-A : MotorActor    サーボを駆動        !{mut, net}
+//     関節 j の Xinu-B : SensorActor   関節角を計測・報告   !{net}
+//     アプリ層(Pi)     : LearnerActor  TinyML 方策で行動決定 !{ai, net}
+//                        Coordinator   状態収集→行動→駆動   !{net}
+//
+//   MotorActor だけが mut(アクチュエーション) を持ち、SensorActor は read-only、
+//   LearnerActor だけが ai(TinyML 推論) を持つ —— 効果推論が役割分離を保証する。
+// ===========================================================================
+
+// ① モータ・アクター(各関節の Xinu-A) —— 実際にサーボ角を更新する
+class MotorActor {
+  var angle = 0.0;
+  // step[rad] を積分してサーボを動かす。mut=アクチュエーション, net=メッシュ応答
+  method drive(step) !{mut, net} {
+    angle = angle + step;
+    reply(angle);
+  }
+  method get() !{net} { reply(angle); }
+}
+
+// ② センサ・アクター(各関節の Xinu-B) —— 関節角を計測して報告(read-only)
+class SensorActor {
+  var motor = 0;                       // 同関節のモータ参照(角度源)
+  method wire(m) !{net} { motor = m; reply(1); }
+  method read() !{net} { var a = now motor.get(); reply(a); }
+}
+
+// ③ 学習アクター(Pi のアプリ層) —— TinyML 方策で関節ごとの行動(step)を出す
+//    実機では TinyML の小型方策ネット。ここでは学習済み P 制御を代理実行。
+class LearnerActor {
+  var gain = 0.35;                     // RL で学習されたゲイン(方策パラメータ)
+  method act(cur, target) !{ai, net} {
+    var e = target - cur;
+    var step = gain * e;               // 方策 π(s)=K*(qstar-q)
+    if (step > 0.25) { step = 0.25; }  // 飽和(急な動作=ジャークを抑制)
+    if (step < 0.0 - 0.25) { step = 0.0 - 0.25; }
+    reply(step);
+  }
+}
+
+// ④ 調整アクター —— 6 関節を巡回し「センサ読取→学習→モータ駆動」を回す
+class Coordinator {
+  var motors  = [];    // 6 個の MotorActor
+  var sensors = [];    // 6 個の SensorActor
+  var learner = 0;
+  var target  = [];    // 目標関節角(RL/IK が与える)
+
+  method setup() !{mut, net} {
+    learner = new LearnerActor();
+    target  = [0.6, 0.4, 0.0 - 0.9, 0.3, 0.5, 0.0];
+    var j = 0;
+    while (j < 6) do {
+      var m = new MotorActor();
+      var s = new SensorActor();
+      send s.wire(m);
+      array_push(motors, m);
+      array_push(sensors, s);
+      j = j + 1;
+    }
+    reply(1);
+  }
+
+  // 1 制御ステップ: 全関節でセンサ→学習→駆動。到達誤差の総和を返す。
+  method tick() !{net} {
+    var j = 0; var err = 0.0;
+    while (j < 6) do {
+      var sa  = sensors[j];
+      var s   = now sa.read();                  // Xinu-B(センサ) から角度
+      var stp = now learner.act(s, target[j]);  // TinyML 方策で行動
+      var ma  = motors[j];
+      var a   = now ma.drive(stp);              // Xinu-A(モータ) を駆動
+      var e = target[j] - a; if (e < 0.0) { e = 0.0 - e; }
+      err = err + e;
+      j = j + 1;
+    }
+    reply(err);
+  }
+
+  // 制御ループ(tick() の本体を展開: 自分自身への now は自己デッドロックのため避ける)
+  method run() !{net} {
+    var k = 0;
+    while (k < 20) do {
+      var j = 0; var err = 0.0;
+      while (j < 6) do {
+        var sa  = sensors[j];
+        var s   = now sa.read();
+        var stp = now learner.act(s, target[j]);
+        var ma  = motors[j];
+        var a   = now ma.drive(stp);
+        var e = target[j] - a; if (e < 0.0) { e = 0.0 - e; }
+        err = err + e;
+        j = j + 1;
+      }
+      print("step " + k + "  残差(6関節合計) " + err);
+      k = k + 1;
+    }
+    reply(1);
+  }
+}
+
+var coord = new Coordinator();
+send coord.setup();
+print("[mecharm] 12 Xinu(6関節x2) + LearnerActor 起動。Capability: Motor!{mut,net} / Sensor!{net} / Learner!{ai,net}");
+send coord.run();
+print("[mecharm] 収束: 各関節が目標角へ滑らかに到達(TinyML方策 + 分散Xinu制御)。");

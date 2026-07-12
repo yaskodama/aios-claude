@@ -207,7 +207,7 @@ TARGETS = [
         "addr": "127.0.0.1:8021/mecharm_sim.html",
         "href": "http://127.0.0.1:8021/mecharm_sim.html",
         "port": 8021,
-        "cwd": os.path.join(os.path.expanduser("~"), "projects", "mecharm_rl"),
+        "cwd": os.path.join(REPO, "mecharm_rl"),
         "cmd": "python3 -m http.server 8021 --bind 127.0.0.1",
     },
 ]

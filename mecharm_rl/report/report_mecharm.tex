@@ -1,0 +1,154 @@
+\documentclass[11pt,a4paper]{ltjsarticle}
+\usepackage{luatexja-fontspec}
+\usepackage{amsmath}\usepackage{amssymb}
+\usepackage[margin=23mm]{geometry}
+\usepackage{enumitem}\usepackage{booktabs}\usepackage{array}
+\usepackage{listings}\usepackage{xcolor}
+\usepackage{pgfplots}\pgfplotsset{compat=1.18}
+\usepackage{caption}
+
+\definecolor{cbg}{HTML}{F6F8FA}\definecolor{ckw}{HTML}{CF222E}
+\definecolor{ccm}{HTML}{6E7781}\definecolor{cst}{HTML}{0A7D33}\definecolor{cef}{HTML}{8250DF}
+\lstdefinelanguage{AIPL}{morekeywords={class,method,function,var,while,do,if,else,return,reply,send,now,remote,new,print,array_push},
+  sensitive=true,morecomment=[l]{//},morestring=[b]",moredelim=[s][\color{cef}\bfseries]{!\{}{\}}}
+\lstset{basicstyle=\ttfamily\scriptsize,keywordstyle=\color{ckw}\bfseries,commentstyle=\color{ccm}\itshape,
+  stringstyle=\color{cst},numberstyle=\tiny\color{ccm},backgroundcolor=\color{cbg},frame=single,rulecolor=\color{ccm!40},
+  columns=fullflexible,keepspaces=true,breaklines=true,showstringspaces=false,numbers=left,numbersep=7pt,
+  xleftmargin=20pt,framexleftmargin=18pt}
+
+\title{\textbf{製造ライン向け 6 軸アームの分散 Xinu 制御と TinyML 強化学習}\\[3pt]
+\large ―― AIPL による設計・実装と実機シミュレーション（elephant robotics mecharm 相当）――}
+\author{}\date{}
+
+\begin{document}\maketitle\thispagestyle{empty}
+
+\begin{abstract}\small\noindent
+製造工場の組立ラインで部品の把持・配置を行う 6 軸アーム（elephant robotics \textbf{mecharm} 相当）を対象に，
+\textbf{各関節に 2 台の soft-Xinu を接続（計 12 Xinu）}し，各 Xinu 上のアクターの役割を AIPL の
+\textbf{Capability（効果）推論} $!\{$fs, ai, net, mut$\}$ で最小権限に分離する分散制御系を設計した。
+アプリケーション層では \textbf{TinyML} の小型方策を\textbf{強化学習}（CEM: Cross-Entropy Method）で学習し，
+組立の到達位置決めを\textbf{滑らかかつ正確}にする。AIPL で実装した 12 Xinu の分散制御は残差を
+$1.82 \to 5.1\times10^{-4}$ へ滑らかに収束させ，強化学習は到達誤差を $24.0 \to 7.0$\,cm（$-71\%$），
+ジャークを $0.247 \to 0.172$（$-30\%$，滑らかさ向上），成功率を $0 \to 30\%$ へ改善した。
+本稿は AIPL および Python のソースコードを引用しながら，設計・シミュレーション・結果を示す。
+\end{abstract}
+
+\section{目的と想定}
+本システムは，\textbf{製造工場の組立ライン}で 6 軸アームが流れてくる部品を把持し所定位置へ組み付ける
+作業を想定する。組立では，位置決めの\textbf{正確さ}（部品公差内に収める）と\textbf{滑らかさ}
+（急な加減速=ジャークを抑え，機構・部品を傷めず高速に反復）が同時に要る。本稿の目的は，
+(1) 6 軸アームを\textbf{分散 Xinu}（各関節 2 台=12 Xinu）で制御し，(2) 各 Xinu のアクター役割を
+\textbf{Capability 推論}で安全に分離し，(3) \textbf{TinyML の方策を強化学習}して滑らかで正確な
+到達動作を獲得する，という設計を AIPL で実装し，シミュレーションで検証することである。
+
+\section{システム設計}
+\subsection{構成：6 軸 $\times$ 2 Xinu = 12 Xinu}
+各関節 $j\,(=1..6)$ に 2 台の soft-Xinu を割り当てる。Xinu-A は\textbf{モータ・アクター}（サーボ駆動），
+Xinu-B は\textbf{センサ・アクター}（関節角の計測・報告）を担う。アプリ層の Raspberry Pi には
+\textbf{学習アクター}（TinyML 方策）と\textbf{調整アクター}（状態収集$\to$行動$\to$駆動）を置く。
+端末間は AIPL のメッシュ（\texttt{now remote(...)}）で結ばれる。
+
+\subsection{Capability 推論による役割分離（最小権限）}
+AIPL は，各メソッドの副作用集合 $!\{$fs, ai, net, mut$\}$ を\textbf{コードから推論}し，実行時には
+必要な capability だけを付与する（Phase 12 効果システム）。これにより役割が自動的に分離される。
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+アクター & 配置 & 推論される Capability \\\midrule
+MotorActor（駆動） & 各関節 Xinu-A & $!\{$mut, net$\}$（アクチュエーション＋通信）\\
+SensorActor（計測） & 各関節 Xinu-B & $!\{$net$\}$（read-only 報告のみ）\\
+LearnerActor（学習） & Pi（アプリ層）& $!\{$ai, net$\}$（TinyML 推論＋通信）\\
+Coordinator（調整） & Pi（アプリ層）& $!\{$net$\}$ \\\bottomrule
+\end{tabular}\end{center}
+\textbf{MotorActor だけが mut}（サーボを動かす権限）を持ち，SensorActor は read-only で誤って
+アクチュエータを動かせない。\textbf{LearnerActor だけが ai}（TinyML 推論）を持つ。安全性が要る
+組立ラインで，この最小権限分離は重要である。以下に AIPL 実装を示す。
+
+\lstinputlisting[language=AIPL,firstline=16,lastline=45,caption={モータ／センサ／学習アクターと Capability 注釈\;/\;\texttt{mecharm\_arm.abcl}}]{../mecharm_arm.abcl}
+
+\subsection{分散制御ループ}
+調整アクターは毎ステップ，全関節で「センサ読取（Xinu-B）$\to$ 学習アクターが TinyML 方策で行動決定
+$\to$ モータ駆動（Xinu-A）」を回す。
+
+\lstinputlisting[language=AIPL,firstline=85,lastline=104,caption={分散制御ループ（\texttt{run}）\;/\;\texttt{mecharm\_arm.abcl}}]{../mecharm_arm.abcl}
+
+この AIPL を Python AIPL 実機（\texttt{aipl\_main.py}，capability 付与 \texttt{AIPL\_CAP\_GRANT="ai,net,mut"}）で
+実行すると，6 関節の残差（目標角との差の合計）が滑らかに収束する（表~\ref{tab:conv}）。
+
+\begin{table}[htbp]\centering\small
+\caption{AIPL 分散制御の収束（12 Xinu，実機 Python AIPL 実行ログ）。}
+\label{tab:conv}
+\begin{tabular}{c|cccccc}\toprule
+step & 0 & 4 & 8 & 12 & 16 & 19 \\\midrule
+残差（6 関節合計）& 1.820 & 0.325 & 0.058 & 0.0104 & 0.00185 & 0.000507 \\\bottomrule
+\end{tabular}
+\end{table}
+
+\section{TinyML 強化学習}
+\subsection{タスクと報酬}
+組立の位置決めを，\textbf{手先を目標点へ到達}させる課題として定式化する。方策 $\pi_\phi$ は目標手先位置
+$s\in\mathbb{R}^3$ から目標関節角 $q^\ast(6)$ と関節ゲイン $K(6)$ を出す（\textbf{学習される簡易 IK ＋ 制御}
+＝TinyML の小型方策）。各ステップ $v_j=\mathrm{clip}(K_j(q^\ast_j-q_j))$ で駆動し，順運動学で手先を得る。
+報酬は
+\[
+R(\phi)= -\underbrace{\lVert p_{\mathrm{ee}}-s\rVert}_{\text{到達誤差}}
+        -\lambda_j\underbrace{\textstyle\sum|\Delta v|}_{\text{ジャーク}}
+        -\lambda_o\underbrace{\text{overshoot}}_{\text{振動}}
+\]
+とし，\textbf{正確さ・滑らかさ・振動の少なさ}を同時に最適化する。
+
+\subsection{手法：CEM 方策探索}
+方策パラメータ $\phi$（30 次元）を \textbf{CEM}（母集団サンプル $\to$ エリート抽出 $\to$ 平均・分散更新）で
+最適化する。毎世代 8 個のランダム到達目標で平均評価して汎化させる。
+
+\lstinputlisting[language=Python,firstline=39,lastline=52,caption={ロールアウトと報酬（到達＋ジャーク＋振動）\;/\;\texttt{mecharm\_rl.py}}]{../mecharm_rl.py}
+
+\section{シミュレーション結果}
+図~\ref{fig:lc} と表~\ref{tab:ba} に，120 世代の学習曲線を示す。学習が進むにつれ\textbf{到達誤差と
+ジャークが減り，成功率が上がる}。
+
+\begin{figure}[htbp]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.86\linewidth,height=6cm,xlabel={世代},ylabel={到達誤差〔cm〕/ 成功率〔\%〕},
+  ymin=0,ymax=40,legend style={at={(0.98,0.98)},anchor=north east,font=\scriptsize},tick label style={font=\small}]
+\addplot[color=red!70,mark=*,mark size=1pt,thick] coordinates
+ {(0,23.99)(10,15.74)(20,13.82)(30,12.62)(40,11.79)(50,11.46)(60,10.54)(70,9.36)(80,8.69)(90,8.0)(100,7.75)(110,7.23)(119,6.99)};
+\addplot[color=green!55!black,mark=square*,mark size=1pt,thick] coordinates
+ {(0,0)(10,5)(20,5)(30,5)(40,0)(50,5)(60,15)(70,10)(80,10)(90,30)(100,25)(110,35)(119,30)};
+\legend{到達誤差 (cm),成功率 (\%)}
+\end{axis}\end{tikzpicture}
+\caption{強化学習（CEM）の学習曲線。到達誤差は単調に減少（$24\to7$\,cm），成功率（4\,cm 以内到達）は上昇。}
+\label{fig:lc}
+\end{figure}
+
+\begin{table}[htbp]\centering\small
+\caption{学習前（世代 0）と学習後（世代 119）の比較。}
+\label{tab:ba}
+\begin{tabular}{l|ccc}\toprule
+ & 到達誤差〔cm〕& ジャーク（小さいほど滑らか）& 成功率〔\%〕\\\midrule
+学習前 & 23.99 & 0.247 & 0 \\
+学習後 & \textbf{6.99} & \textbf{0.172} & \textbf{30} \\
+改善 & $-71\%$ & $-30\%$ & $+30$pt \\\bottomrule
+\end{tabular}
+\end{table}
+
+\section{考察 —— どう使うと良い結果が出るか}
+シミュレーションから，組立ラインで良い結果を出すための要点が得られた。
+\begin{enumerate}[label=(\arabic*),leftmargin=2.2em,itemsep=2pt]
+\item \textbf{報酬にジャーク項を入れる}：到達誤差だけでなく $\sum|\Delta v|$ を罰することで，正確さと
+\textbf{滑らかさ}を両立できた（ジャーク $-30\%$）。急停止・振動は組立不良や機構摩耗の原因になるため重要。
+\item \textbf{目標条件付き方策（学習 IK）}：方策を目標位置 $s$ の関数にすることで，固定 1 点でなく
+\textbf{作業空間の任意点}へ汎化して到達できる（誤差 $24\to7$\,cm）。ライン上で部品位置が変わる状況に適合する。
+\item \textbf{Capability 推論による安全な役割分離}：MotorActor のみ mut を持つため，学習アクターや
+センサが誤ってアクチュエータを動かせない。人と協働する組立ラインでの\textbf{安全性}に直結する。
+\item \textbf{分散 Xinu ＋ シミュレータで反復}：実機を止めずにシミュレータ上で方策を学習・検証し，
+学習済み方策のみを実機（12 Xinu）へ配布する。実機損耗・危険を避けつつ良方策へ収束できる。
+\end{enumerate}
+
+\section{まとめ}
+製造ライン向け 6 軸アーム（mecharm 相当）を，各関節 2 台・計 12 Xinu の分散制御として AIPL で実装し，
+Capability 推論で役割を最小権限に分離した。TinyML の方策を CEM で強化学習し，シミュレーションで
+到達誤差 $-71\%$・ジャーク $-30\%$・成功率 $+30$pt を得た。AIPL の分散制御は残差を $1.8\to5\times10^{-4}$ へ
+滑らかに収束させ，実機 Python AIPL で動作を確認した。シミュレータ上で学習し，Capability で安全化した
+方策を実機へ配布する本方式は，組立ラインで\textbf{滑らかで正確な動作}を安全に実現する道筋を示す。
+
+\end{document}

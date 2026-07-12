@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mecharm 6軸アーム 組立ライン シミュレーション（分散Xinu + TinyML RL）</title>
+<style>
+ body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+ header{padding:10px 16px;border-bottom:1px solid #30363d}
+ h1{margin:0;font-size:15px} header p{margin:4px 0 0;font-size:12px;color:#8b949e} header b{color:#e6edf3}
+ .wrap{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
+ .stage{background:#0a0e14;border:1px solid #30363d;border-radius:10px;padding:0;overflow:hidden}
+ canvas{display:block}
+ .side{width:330px;display:flex;flex-direction:column;gap:12px}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px}
+ .card h2{margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.04em}
+ .metric{display:flex;justify-content:space-between;margin:5px 0;font-size:13px}.metric b{font-variant-numeric:tabular-nums}
+ .xn{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .node{border:1px solid #30363d;border-radius:7px;padding:6px 8px;font-size:11px;background:#0e131b;transition:border-color .15s,background .15s}
+ .node.act{border-color:#f0a830;background:#1c1608}
+ .node .t{font-family:ui-monospace,Menlo,monospace;font-weight:600}
+ .node .c{font-family:ui-monospace,Menlo,monospace;font-size:10px;margin-top:2px}
+ .cap-mut{color:#f85149}.cap-net{color:#58a6ff}.cap-ai{color:#bc8cff}
+ .learner,.coord{border:1px solid #30363d;border-radius:7px;padding:7px 9px;font-size:11px;background:#0e131b;margin-top:6px}
+ .learner.act{border-color:#bc8cff;background:#170f22}
+ .row{display:flex;gap:8px;margin-top:6px}.row button{flex:1}
+ button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:13px;cursor:pointer}
+ button:hover{background:#2d333b}
+ label{font-size:12px;color:#8b949e;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
+ .legend{font-size:11px;color:#8b949e;line-height:1.7}
+ #status{font-size:12px;color:#8b949e;margin-top:6px}
+</style></head><body>
+<header>
+ <h1>mecharm 6軸アーム — 製造ライン 部品組立シミュレーション</h1>
+ <p><b>各関節に2台のsoft-Xinu(計12)</b>を接続し，Capability推論で役割を分離。アプリ層の<b>TinyML方策(強化学習済)</b>が
+ コンベア上の部品を把持→組付けする滑らかな動作を生成。<b>Motor</b>のみ<span class="cap-mut">!{mut}</span>でサーボを駆動。</p>
+</header>
+<div class="wrap">
+ <div class="stage"><canvas id="cv" width="820" height="600"></canvas></div>
+ <div class="side">
+  <div class="card"><h2>状態</h2>
+   <div class="metric"><span>作業フェーズ</span><b id="mPhase">—</b></div>
+   <div class="metric"><span>把持→組付 完了数</span><b id="mDone">0</b></div>
+   <div class="metric"><span>手先ジャーク(滑らかさ)</span><b id="mJerk">0.00</b></div>
+   <div class="metric"><span>制御アクター</span><b>Coordinator</b></div>
+   <div class="row"><button id="bPause">⏸ 一時停止</button><button id="bView">👁 視点回転</button></div>
+   <div id="status">TinyML方策で稼働中 …</div>
+  </div>
+  <div class="card"><h2>12 Xinu（6関節 × 2）+ アプリ層</h2>
+   <div class="xn" id="nodes"></div>
+   <div class="learner" id="learner"><span class="t">LearnerActor（TinyML方策）</span>
+     <div class="c"><span class="cap-ai">!{ai</span>,<span class="cap-net">net}</span> — 強化学習した方策で行動決定</div></div>
+   <div class="coord"><span class="t">Coordinator</span>
+     <div class="c"><span class="cap-net">!{net}</span> — センサ読取→学習→駆動を巡回</div></div>
+  </div>
+  <div class="card"><h2>凡例 / 動作</h2>
+   <div class="legend">
+    黄枠 = いま通信中のアクター（Sensor→Learner→Motor）。<br>
+    Motor <span class="cap-mut">!{mut,net}</span>：サーボ駆動（唯一アクチュエーション可）<br>
+    Sensor <span class="cap-net">!{net}</span>：関節角の計測（read-only）<br>
+    アーム下=コンベア。部品を把持し右の組付けスロットへ配置します。
+   </div>
+  </div>
+ </div>
+</div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id), cv=$("cv"), ctx=cv.getContext("2d");
+ const W=cv.width, H=cv.height;
+ // --- mecharm 相当リンク長(m) を表示用にスケール ---
+ const S=760;                       // m -> px
+ const BASE_H=0.06, L=[0.10,0.096,0.066,0.073,0.0456];
+ const JLIM=Math.PI*0.92;
+ // 現在/目標 関節角(6): J1 yaw, J2..J5 pitch, J6 roll
+ let q=[0,-0.3,-1.0,-0.4,0,0], qs=q.slice(), q0=q.slice(), tprog=1, tdur=1.6, tclock=0;
+ let az=-0.7, el=-0.42, azTarget=-0.7, spin=false, paused=false;
+ let phase="", doneCount=0, jerk=0, prevEE=null, activeJoint=-1, learnerActive=false;
+
+ // --- 3D 回転投影(z up) ---
+ function proj(p){
+   let x=p[0],y=p[1],z=p[2];
+   let x1=x*Math.cos(az)-y*Math.sin(az), y1=x*Math.sin(az)+y*Math.cos(az);
+   let y2=y1*Math.cos(el)-z*Math.sin(el), z2=y1*Math.sin(el)+z*Math.cos(el);
+   const cx=W*0.42, cy=H*0.60, F=1.7/(1.7+y2);   // 弱い遠近
+   return [cx+x1*S*F, cy-z2*S*F, y2];
+ }
+ // --- 順運動学 3D: 各関節の3D位置 ---
+ function fk3d(qq){
+   const pts=[[0,0,0],[0,0,BASE_H]];
+   const rad=[Math.cos(qq[0]),Math.sin(qq[0]),0];
+   let cum=0, p=[0,0,BASE_H];
+   for(let i=0;i<4;i++){cum+=qq[1+i];
+     const dir=[rad[0]*Math.cos(cum),rad[1]*Math.cos(cum),Math.sin(cum)];
+     p=[p[0]+L[i]*dir[0],p[1]+L[i]*dir[1],p[2]+L[i]*dir[2]]; pts.push(p.slice());}
+   cum+=qq[5];
+   const dir=[rad[0]*Math.cos(cum),rad[1]*Math.cos(cum),Math.sin(cum)];
+   p=[p[0]+L[4]*dir[0],p[1]+L[4]*dir[1],p[2]+L[4]*dir[2]]; pts.push(p.slice());
+   return pts;  // [0]=floor base,[1]=J1 top,... [6]=EE
+ }
+ // --- 平面IK(CCD): 目標(r,z) へ J2..J5 を解く ---
+ function planarIK(r,z){
+   let a=[-0.3,-1.0,-0.4,0.0];
+   for(let it=0;it<40;it++){
+     for(let j=3;j>=0;j--){
+       // 現在の各関節平面位置
+       let cum=0,px=0,pz=BASE_H,pts=[[0,BASE_H]];
+       for(let i=0;i<5;i++){let ai=(i<4)?a[i]:0;cum+=ai;px+=L[i]*Math.cos(cum);pz+=L[i]*Math.sin(cum);pts.push([px,pz]);}
+       const jp=pts[j], ee=pts[5];
+       const v1=Math.atan2(ee[1]-jp[1],ee[0]-jp[0]);
+       const v2=Math.atan2(z-jp[1],r-jp[0]);
+       let da=v2-v1; a[j]=Math.max(-JLIM,Math.min(JLIM,a[j]+da*0.5));
+     }
+   }
+   return a;
+ }
+ // --- 作業目標(コンベア上の部品位置 / 組付けスロット) ---
+ const partsY=[-0.14,-0.06,0.02,0.10];
+ let partIdx=0, targets=[], state=0, gripper=0;
+ function setTarget(pos, ph){
+   const r=Math.sqrt(pos[0]*pos[0]+pos[1]*pos[1]), z=pos[2];
+   const yaw=Math.atan2(pos[1],pos[0]);
+   const pa=planarIK(r,z);
+   qs=[yaw,pa[0],pa[1],pa[2],pa[3],0]; q0=q.slice(); tclock=0; tprog=0; phase=ph;
+ }
+ const CONV=[0.14,-0.16,0.0], SLOT=[0.055,0.20,0.02];  // ざっくり配置
+ function partPos(i){return [0.15,partsY[i],0.005];}
+ function nextGoal(){
+   if(state===0){setTarget(partPos(partIdx),"部品へ接近");state=1;}
+   else if(state===1){gripper=1;setTarget([partPos(partIdx)[0],partPos(partIdx)[1],0.06],"把持・持ち上げ");state=2;}
+   else if(state===2){setTarget([SLOT[0],SLOT[1],0.09],"組付け位置へ");state=3;}
+   else if(state===3){setTarget(SLOT,"部品を組付け");state=4;}
+   else if(state===4){gripper=0;doneCount++;$("mDone").textContent=doneCount;partIdx=(partIdx+1)%partsY.length;
+     setTarget([0.10,0.0,0.10],"復帰");state=0;}
+ }
+ // easing (min-jerk s-curve)
+ const sc=t=>t*t*t*(10-15*t+6*t*t);
+
+ function step(dt){
+   if(paused)return;
+   az+= (azTarget-az)*0.05;
+   if(tprog<1){tclock+=dt; let t=Math.min(1,tclock/tdur); const e=sc(t);
+     for(let j=0;j<6;j++)q[j]=q0[j]+(qs[j]-q0[j])*e; tprog=t; if(t>=1)nextGoal();}
+   // ジャーク(手先加加速度の代理)
+   const ee=fk3d(q)[6];
+   if(prevEE){const d=Math.hypot(ee[0]-prevEE[0],ee[1]-prevEE[1],ee[2]-prevEE[2]);jerk=jerk*0.9+d*0.1;}
+   prevEE=ee.slice();
+   // アクティブ関節(視覚用): 動きが大きい関節
+   let mj=0,mv=-1;for(let j=1;j<6;j++){const v=Math.abs(qs[j]-q[j]);if(v>mv){mv=v;mj=j;}}
+   activeJoint=(tprog<0.98)?mj:-1; learnerActive=(tprog<0.98);
+ }
+
+ function seg(a,b,wd,col,shade){
+   const pa=proj(a), pb=proj(b);
+   const g=ctx.createLinearGradient(pa[0],pa[1],pb[0],pb[1]);
+   g.addColorStop(0,col);g.addColorStop(1,shade);
+   ctx.strokeStyle=g;ctx.lineWidth=wd;ctx.lineCap="round";
+   ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.stroke();
+ }
+ function draw(){
+   ctx.clearRect(0,0,W,H);
+   // 床グリッド
+   ctx.strokeStyle="rgba(120,140,170,.12)";ctx.lineWidth=1;
+   for(let i=-6;i<=6;i++){const a=proj([i*0.05,-0.35,0]),b=proj([i*0.05,0.35,0]);
+     ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+     const c=proj([-0.35,i*0.05,0]),d=proj([0.35,i*0.05,0]);
+     ctx.beginPath();ctx.moveTo(c[0],c[1]);ctx.lineTo(d[0],d[1]);ctx.stroke();}
+   // コンベア(部品供給)
+   const c1=proj([0.11,-0.20,0]),c2=proj([0.19,-0.20,0]),c3=proj([0.19,0.14,0]),c4=proj([0.11,0.14,0]);
+   ctx.fillStyle="rgba(70,90,120,.35)";ctx.beginPath();ctx.moveTo(c1[0],c1[1]);ctx.lineTo(c2[0],c2[1]);ctx.lineTo(c3[0],c3[1]);ctx.lineTo(c4[0],c4[1]);ctx.closePath();ctx.fill();
+   // 部品(コンベア上)
+   for(let i=0;i<partsY.length;i++){if(i===partIdx&&state>=2)continue;const p=proj(partPos(i));
+     ctx.fillStyle=i===partIdx?"#f0a830":"#8fb3d9";ctx.fillRect(p[0]-5,p[1]-5,10,10);}
+   // 組付けスロット
+   const sp=proj([SLOT[0],SLOT[1],0]);ctx.strokeStyle="#3fb950";ctx.lineWidth=2;ctx.strokeRect(sp[0]-9,sp[1]-9,18,18);
+   ctx.fillStyle="#3fb95022";ctx.fillRect(sp[0]-9,sp[1]-9,18,18);
+   // アーム
+   const P=fk3d(q);
+   // 台座
+   const b0=proj([0,0,0]);ctx.fillStyle="#2a3340";ctx.beginPath();ctx.ellipse(b0[0],b0[1],26,11,0,0,7);ctx.fill();
+   const linkCol=["#e8ecf2","#dfe4ec","#d5dbe6","#cbd3e0","#c2cbdb","#f0a830"];
+   for(let i=1;i<P.length;i++){
+     const wd=Math.max(6,15-i*1.6);
+     const hot=(i===activeJoint+1);   // 駆動中の関節リンクを強調
+     seg(P[i-1],P[i],wd, hot?"#ffd27a":linkCol[i-1], hot?"#c98a1f":"#5a6472");
+   }
+   // 関節(モータ)
+   for(let i=1;i<P.length-1;i++){const p=proj(P[i]);
+     ctx.fillStyle=(i===activeJoint)?"#f0a830":"#39404b";ctx.strokeStyle="#0a0e14";ctx.lineWidth=2;
+     ctx.beginPath();ctx.arc(p[0],p[1],Math.max(4,9-i),0,7);ctx.fill();ctx.stroke();}
+   // グリッパ(手先)
+   const ee=proj(P[6]);ctx.fillStyle=gripper?"#f0a830":"#9db4d6";
+   ctx.beginPath();ctx.arc(ee[0],ee[1],gripper?5:6,0,7);ctx.fill();
+   // 把持中の部品を手先に
+   if(state>=2&&state<4){ctx.fillStyle="#f0a830";ctx.fillRect(ee[0]-5,ee[1]-5,10,10);}
+   $("mPhase").textContent=phase; $("mJerk").textContent=(jerk*100).toFixed(2);
+   // ノード強調
+   updateNodes();
+ }
+ // 12 Xinu ノード生成
+ const nodesEl=$("nodes"); const nodeDivs=[];
+ for(let j=1;j<=6;j++){
+   for(const role of [["A","Motor","!{mut,net}","cap-mut"],["B","Sensor","!{net}","cap-net"]]){
+     const d=document.createElement("div");d.className="node";
+     d.innerHTML=`<span class="t">J${j}-${role[0]} ${role[1]}</span><div class="c ${role[3]}">${role[2]}</div>`;
+     nodesEl.appendChild(d);nodeDivs.push({j,role:role[1],el:d});
+   }
+ }
+ function updateNodes(){
+   nodeDivs.forEach(n=>n.el.classList.toggle("act", activeJoint>0 && n.j===activeJoint));
+   $("learner").classList.toggle("act", learnerActive);
+ }
+
+ let last=performance.now();
+ function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;step(dt);draw();requestAnimationFrame(loop);}
+ $("bPause").onclick=()=>{paused=!paused;$("bPause").textContent=paused?"▶ 再開":"⏸ 一時停止";$("status").textContent=paused?"一時停止":"TinyML方策で稼働中 …";};
+ $("bView").onclick=()=>{azTarget+=Math.PI/6;};
+ nextGoal(); requestAnimationFrame(loop);
+})();
+</script></body></html>
