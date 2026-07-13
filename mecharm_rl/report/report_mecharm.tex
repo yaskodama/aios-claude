@@ -2,6 +2,7 @@
 \usepackage{luatexja-fontspec}
 \usepackage{amsmath}\usepackage{amssymb}
 \usepackage[margin=23mm]{geometry}
+\usepackage{graphicx}
 \usepackage{enumitem}\usepackage{booktabs}\usepackage{array}
 \usepackage{listings}\usepackage{xcolor}
 \usepackage{pgfplots}\pgfplotsset{compat=1.18}
@@ -130,6 +131,39 @@ R(\phi)= -\underbrace{\lVert p_{\mathrm{ee}}-s\rVert}_{\text{到達誤差}}
 改善 & $-71\%$ & $-30\%$ & $+30$pt \\\bottomrule
 \end{tabular}
 \end{table}
+
+\section{可視化シミュレーション画面}
+学習した方策・分散 Xinu 構成・Capability 役割を，ブラウザ上の\textbf{疑似 3 次元 CG}として可視化した
+（\texttt{mecharm\_sim.html}，\S 8021 で配信）。図~\ref{fig:cg} に実行画面を示す。実機 mecharm 相当の
+リンク長（\texttt{BASE\_H}=0.06，$L=[0.10,0.096,0.066,0.073,0.0456]$）と本稿の順運動学（J1 ヨー＋J2--J5 ピッチ＋
+J6 ロール）で 6 軸アームを立体投影し，学習した方策で\textbf{コンベア上の部品を把持$\to$組付けスロットへ配置}する
+組立動作を，最小ジャークの補間で滑らかに再生する。左が CG ステージ（床グリッド・コンベア・部品・組付けスロット・
+台座付き 6 軸アーム・グリッパ），右のパネルが\textbf{12 Xinu（6 関節 $\times$ 2）＋アプリ層}で，各ノードに
+Capability（\texttt{Motor !\{mut,net\}} を赤，\texttt{Sensor !\{net\}} を青，\texttt{Learner !\{ai,net\}} を紫）を
+色分け表示する。駆動中の関節の Motor/Sensor と LearnerActor が黄・紫に点灯し，\textbf{Sensor$\to$Learner$\to$Motor}
+の情報経路が動く。手先ジャーク（滑らかさ指標）も実時間で表示する。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{sim_cg.png}
+\caption{\texttt{mecharm\_sim.html} の実行画面。左：疑似 3D の 6 軸アームがコンベア上の部品（橙）を把持し，
+右の組付けスロット（緑）へ配置する製造ライン組立動作を，学習済み方策で滑らかに再生。右：12 Xinu（6 関節 $\times$ 2）
+＋ LearnerActor（TinyML）＋ Coordinator を Capability で色分けし，駆動中のアクター（黄枠＝J4）を強調表示。}
+\label{fig:cg}
+\end{figure}
+
+さらに，画面上の\textbf{各アクター（Xinu ノード／LearnerActor／Coordinator）をクリック}すると，その
+\textbf{実 AIPL ソースコード}（\texttt{mecharm\_arm.abcl}）を取得して表示する（図~\ref{fig:cgsrc}）。表示コードは
+\S\ref{tab:conv} 前後で引用したソースと同一の実ファイルを配信時に読み出しており，Capability 注釈
+\texttt{!\{mut,net\}} 等を本レポートと同じ配色（紫）で強調する。可視化と実装（本稿のリスト 1--3）が
+1 対 1 に対応するため，「どの Xinu 上のどのアクターが，どの権限で，何をしているか」を画面から直接たどれる。
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=0.86\linewidth]{sim_src.png}
+\caption{ノードをクリックすると当該アクターの AIPL ソースを表示する（図は \texttt{MotorActor}）。
+\texttt{class}（青）・クラス名（橙）・文字列（緑）・コメント（灰）に加え，Capability 注釈
+\texttt{!\{mut, net\}} を紫で強調。可視化が実装ソースと同期する。}
+\label{fig:cgsrc}
+\end{figure}
 
 \section{考察 —— どう使うと良い結果が出るか}
 シミュレーションから，組立ラインで良い結果を出すための要点が得られた。
