@@ -210,11 +210,23 @@ TARGETS = [
         "cwd": os.path.join(REPO, "mecharm_rl"),
         "cmd": "python3 -m http.server 8021 --bind 127.0.0.1",
     },
+    {
+        "id": "dofbot",
+        "glyph": "DOFBOT",
+        "portlabel": ":8022/index.html",
+        "title": "Yahboom DOFBOT 6軸アーム &mdash; 12 Xinu + Capability推論 + Pick&amp;Place",
+        "desc": "実機 <b>Yahboom DOFBOT</b>(6DOF/Raspberry Pi 5)を Three.js で忠実に3D再現(黒シャーシ+青バスサーボ+手首カメラ+2指グリッパ)。<b>各サーボ ID1..ID6 に soft-Xinu 2台=計12</b>を接続し、<b>効果注釈は書かず</b>メソッド本体から <b>Capability推論</b>で役割を導出(<code>ServoMotor!{mut,net}</code> / <code>ServoSensor!{net}</code> / <code>Planner!{net}</code> / <code>Camera!{ai,net}</code>)。実機API <code>Arm_serial_servo_write/read</code> で駆動し、<b>掴む→回転→離す</b>の Pick&amp;Place を再現。カードクリックで各アクターの AIPL ソースを閲覧。",
+        "addr": "127.0.0.1:8022/index.html",
+        "href": "http://127.0.0.1:8022/index.html",
+        "port": 8022,
+        "cwd": os.path.join(os.path.expanduser("~"), "aipl_line_simulator"),
+        "cmd": "python3 -m http.server 8022 --bind 127.0.0.1",
+    },
 ]
 TARGET_BY_ID = {t["id"]: t for t in TARGETS}
 
 # Targets shown in their own section above, not in the generic Dashboards grid.
-_ROBOT_IDS = {"milky", "rover", "mecharm"}
+_ROBOT_IDS = {"milky", "rover", "mecharm", "dofbot"}
 
 # id -> Popen for processes this portal launched (so we can stop them)
 _PROCS: dict[str, subprocess.Popen] = {}
@@ -533,6 +545,19 @@ _PAGE_TMPL = r"""<!doctype html>
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
      <button class="btn btn-open" data-href="http://127.0.0.1:8021/mecharm_sim.html">Open &#8599;</button>
+    </div></div>
+  </div>
+  <div class="card" data-id="dofbot">
+   <div class="thumb"><span class="glyph">&#129302;</span><span class="port">:8022/index.html</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Yahboom DOFBOT 6軸アーム &mdash; 12 Xinu + Capability推論 + Pick&amp;Place</h3>
+    <p>実機 <b>Yahboom DOFBOT</b>(6DOF/Raspberry Pi 5)を Three.js で忠実に3D再現。<b>各サーボ ID1..ID6 に soft-Xinu 2台=計12</b>を接続し、メソッド本体から <b>Capability推論</b>で役割を導出(<code>ServoMotor!{mut,net}</code> / <code>ServoSensor!{net}</code> / <code>Planner!{net}</code>)。実機API <code>Arm_serial_servo_write/read</code> で駆動し、掴む→回転→離す の Pick&amp;Place を再現。</p>
+    <span class="addr">127.0.0.1:8022/index.html</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8022/index.html">Open &#8599;</button>
     </div></div>
   </div>
  </div>
