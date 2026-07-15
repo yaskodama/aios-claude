@@ -73,6 +73,16 @@ BUILTIN_EFFECTS: "dict[str, set]" = {
     # array_*, typeof, methods_of, json_parse / json_stringify, time, etc.
     # Anything not in this dict is considered effect-free.
 }
+# ---- Yahboom DOFBOT 実機デバイス + TinyML の効果 ----
+# Arm_serial_servo_write が唯一の駆動権限(mut)。servo_read / camera_grab は計測
+# のみなので効果なし。tinyml_infer はローカル推論なので {ai} だけを持ち、
+# ai_call 系の {ai, net} と違って「機外へ何も出さない」ことを型で示せる。
+try:
+    from aipl_dofbot import EFFECTS as _DOFBOT_EFFECTS
+    BUILTIN_EFFECTS.update(_DOFBOT_EFFECTS)
+except Exception:
+    pass
+
 
 
 def _typevars_in(t: str) -> set:

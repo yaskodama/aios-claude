@@ -186,7 +186,7 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     "write_file":     "function(path:string, content:string) -> int",
     "append_file":    "function(path:string, content:string) -> int",
     "file_exists":    "function(path:string) -> int",
-    "env_get":        "function(name:string [, default:string]) -> string",
+    "env_get":        "function(string+) -> string",   # env_get(name) / env_get(name, default)
     # I/O — binary
     "read_bytes":     "function(path:string) -> array[int]",
     "write_bytes":    "function(path:string, bytes:array[int]) -> int",
@@ -225,6 +225,17 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     "cos":            "function(x:float) -> float",
     "sin":            "function(x:float) -> float",
     "sqrt":           "function(x:float) -> float",
+    "tan":            "function(x:float) -> float",
+    "acos":           "function(x:float) -> float",
+    "asin":           "function(x:float) -> float",
+    "atan":           "function(x:float) -> float",
+    "atan2":          "function(y:float, x:float) -> float",
+    "exp":            "function(x:float) -> float",
+    "log":            "function(x:float) -> float",
+    "pow":            "function(x:float, y:float) -> float",
+    "floor":          "function(x:float) -> int",
+    "ceil":           "function(x:float) -> int",
+    "pi":             "function() -> float",
     "abs":            "function(x:int|float) -> int|float",
     "max":            "function(int|float+) -> int|float",
     "min":            "function(int|float+) -> int|float",
@@ -3291,6 +3302,18 @@ _BUILTINS = {
     "cos":     lambda a, f, i: math.cos(a[0]),
     "sin":     lambda a, f, i: math.sin(a[0]),
     "sqrt":    lambda a, f, i: math.sqrt(a[0]),
+    # 逆運動学など幾何計算に要る三角関数一式（cos/sin/sqrt の自然な仲間）
+    "tan":     lambda a, f, i: math.tan(a[0]),
+    "acos":    lambda a, f, i: math.acos(max(-1.0, min(1.0, float(a[0])))),
+    "asin":    lambda a, f, i: math.asin(max(-1.0, min(1.0, float(a[0])))),
+    "atan":    lambda a, f, i: math.atan(a[0]),
+    "atan2":   lambda a, f, i: math.atan2(a[0], a[1]),
+    "exp":     lambda a, f, i: math.exp(a[0]),
+    "log":     lambda a, f, i: math.log(a[0]) if float(a[0]) > 0 else float("-inf"),
+    "pow":     lambda a, f, i: math.pow(a[0], a[1]),
+    "floor":   lambda a, f, i: int(math.floor(a[0])),
+    "ceil":    lambda a, f, i: int(math.ceil(a[0])),
+    "pi":      lambda a, f, i: math.pi,
     "abs":     lambda a, f, i: abs(a[0]),
     "max":     lambda a, f, i: max(a),
     "min":     lambda a, f, i: min(a),
@@ -3432,3 +3455,14 @@ _BUILTINS = {
     "session_events":                _b_session_events,
     "session_check":                 _b_session_check,
 }
+
+# ---- Yahboom DOFBOT 実機デバイス + TinyML（aipl_dofbot.py） ----
+# 実機アームを AIPL から直接駆動するためのプリミティブ。バックエンドは
+# DOFBOT_BACKEND=log|armlib|http で差し替わる（既定 log = 実機非接続）。
+try:
+    from aipl_dofbot import BUILTINS as _DOFBOT_BUILTINS, SIGNATURES as _DOFBOT_SIGS
+    _BUILTINS.update(_DOFBOT_BUILTINS)
+    BUILTIN_SIGNATURES.update(_DOFBOT_SIGS)
+except Exception as _e:      # デバイス層が無くても処理系本体は動かす
+    print(f"[aipl] dofbot builtins unavailable: {_e}", flush=True)
+

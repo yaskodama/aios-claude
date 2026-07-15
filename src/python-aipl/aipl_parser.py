@@ -24,6 +24,24 @@ with open(_GRAMMAR_PATH) as f:
 _parser = Lark(_GRAMMAR, parser="lalr", propagate_positions=False)
 
 
+def _unescape(s: str) -> str:
+    r"""文字列リテラルのエスケープ(\n, \t, \", \\, \uXXXX ...)を展開する。
+
+    非ASCII を壊さないことが要件。unicode_escape は入力を latin-1 とみなすので、
+    一旦 utf-8 バイト列にしてから unicode_escape で展開し、latin-1 で元のバイト列
+    へ戻して utf-8 として解釈し直す（\uXXXX が生む BMP 文字は surrogatepass で温存）。
+    """
+    if "\\" not in s:
+        return s                       # エスケープ無しなら触らない（大半はここ）
+    try:
+        return (s.encode("utf-8")
+                 .decode("unicode_escape")
+                 .encode("latin-1", "backslashreplace")
+                 .decode("utf-8", "replace"))
+    except Exception:
+        return s
+
+
 @v_args(inline=True)
 class _Builder(Transformer):
     # ---- atoms / expressions ----
@@ -31,7 +49,11 @@ class _Builder(Transformer):
     def float_lit(self, tok):   return FloatLit(float(tok))
     def string_lit(self, tok):
         s = str(tok)[1:-1]      # strip surrounding quotes
-        return StringLit(bytes(s, "utf-8").decode("unicode_escape"))
+        # NOTE: 以前は bytes(s,"utf-8").decode("unicode_escape") だったが、
+        # unicode_escape は入力を latin-1 として解釈するため、非ASCII が必ず
+        # 二重符号化されていた（"日" -> 'æ\x97¥'）。日本語の文字列リテラルが
+        # すべて文字化けする原因。utf-8 へ戻す round-trip を挟んで修正する。
+        return StringLit(_unescape(s))
     def self_var(self):         return Var("self")
     def sender_var(self):       return Var("sender")
     def var_expr(self, name):   return Var(str(name))

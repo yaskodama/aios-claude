@@ -10,6 +10,33 @@ rather than raising, so `.abcl` programs can probe gracefully.
 > Internal module/file/extension names (`abcl_*.py`, `.abcl`,
 > `ABCL_AI_PROVIDER`) retain the historical naming for backward compat.
 
+## Yahboom DOFBOT (6DOF) 実機デバイス
+
+`aipl_dofbot.py`。実機アームを AIPL から直接駆動する。バックエンドは環境変数で差替え:
+
+| `DOFBOT_BACKEND` | 動作 |
+|---|---|
+| `log` (既定) | 指令を標準出力へ。実機が無くても `.abcl` は完走する |
+| `armlib` | DOFBOT の Raspberry Pi 上で Yahboom `Arm_Lib` を叩く（実機駆動） |
+| `http` | `DOFBOT_URL` のブリッジへ POST（LAN 越しに駆動） |
+
+| Name | Signature | Effects | Notes |
+|---|---|---|---|
+| `Arm_serial_servo_write(id, angle, ms)` | `(int, float, int)` → `int` | `{mut}` | サーボ id を angle[deg] へ ms かけて駆動。可動域 0..180 外はクランプして警告 |
+| `Arm_serial_servo_write6(a1..a6, ms)` | `(float+)` → `int` | `{mut}` | 6 軸同時指令 |
+| `Arm_serial_servo_read(id)` | `(int)` → `float` | — | 現在角の計測（read-only なので効果なし） |
+| `dofbot_servo_writes()` | `()` → `int` | — | 発行済み指令の総数（ベンチ用） |
+| `dofbot_camera_grab([path])` | `([string])` → `array` | — | 手首カメラ 1 フレームを特徴量で返す。省略時は `DOFBOT_FRAMES` |
+| `dofbot_camera_truth([path])` | `([string])` → `int` | — | 直前フレームの正解ラベル（答え合わせ用） |
+
+## TinyML（ローカル小型推論）
+
+| Name | Signature | Effects | Notes |
+|---|---|---|---|
+| `tinyml_load(path)` | `(string)` → `any` | `{fs}` | 学習済み重みを読む |
+| `tinyml_infer(model, features)` | `(any, array)` → `array` | `{ai}` | クラス確率。**`net` を持たない**＝機外へ何も出さないローカル推論であることを型で示す（`ai_call` 系は `{ai, net}`） |
+| `tinyml_argmax(probs)` | `(array)` → `int` | — | 最尤クラスの添字 |
+
 ## I/O and clock
 
 | Name | Signature | Notes |
@@ -43,8 +70,11 @@ rather than raising, so `.abcl` programs can probe gracefully.
 
 ## Math passthroughs
 
-`cos(x)`, `sin(x)`, `sqrt(x)`, `abs(x)`, `max(...args)`, `min(...args)`,
-`int(x)`, `float(x)`, `str(x)`.
+`cos(x)`, `sin(x)`, `tan(x)`, `asin(x)`, `acos(x)`, `atan(x)`, `atan2(y, x)`,
+`sqrt(x)`, `exp(x)`, `log(x)`, `pow(x, y)`, `floor(x)`, `ceil(x)`, `pi()`,
+`abs(x)`, `max(...args)`, `min(...args)`, `int(x)`, `float(x)`, `str(x)`.
+
+`asin`/`acos` は定義域外を ±1 に飽和させる（逆運動学で数値誤差が入っても落ちない）。
 
 ## Actor semantics
 
