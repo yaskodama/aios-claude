@@ -175,6 +175,22 @@ def b_servo_writes(args, frame, interp):
     return backend().writes
 
 
+def b_belt_drive(args, frame, interp):
+    """dofbot_belt_drive(cmd) -> int  —— コンベアを駆動する。
+
+    cmd: 1=前進（次の部品をストッパまで送る） / 2=排出（ストッパを開けて流す）
+         0=停止。作業セルのアクチュエータなので効果は {mut}。
+    """
+    cmd = int(args[0]) if args else 0
+    st = interp.__dict__.setdefault("_dofbot_belt", {"cmd": 0, "n": 0})
+    st["cmd"] = cmd
+    st["n"] += 1
+    if os.environ.get("DOFBOT_QUIET") != "1":
+        name = {0: "stop", 1: "feed", 2: "eject"}.get(cmd, str(cmd))
+        print(f"[belt ] {name}", flush=True)
+    return 1
+
+
 # ---------------------------------------------------------------- camera
 
 def b_camera_grab(args, frame, interp):
@@ -280,6 +296,7 @@ SIGNATURES = {
     "Arm_serial_servo_write6": "function(int|float+) -> int",
     "Arm_serial_servo_read":   "function(id:int) -> float",
     "dofbot_servo_writes":     "function() -> int",
+    "dofbot_belt_drive":       "function(cmd:int) -> int",
     "dofbot_camera_grab":      "function([path:string]) -> array",
     "dofbot_camera_truth":     "function([path:string]) -> int",
     "tinyml_load":             "function(path:string) -> any",
@@ -292,6 +309,7 @@ BUILTINS = {
     "Arm_serial_servo_write6": b_servo_write6,
     "Arm_serial_servo_read":   b_servo_read,
     "dofbot_servo_writes":     b_servo_writes,
+    "dofbot_belt_drive":       b_belt_drive,
     "dofbot_camera_grab":      b_camera_grab,
     "dofbot_camera_truth":     b_camera_truth,
     "tinyml_load":             b_tinyml_load,
@@ -305,6 +323,7 @@ EFFECTS = {
     "Arm_serial_servo_write6": {"mut"},
     "Arm_serial_servo_read":   set(),
     "dofbot_servo_writes":     set(),
+    "dofbot_belt_drive":       {"mut"},   # コンベアも作業セルのアクチュエータ
     "dofbot_camera_grab":      set(),
     "dofbot_camera_truth":     set(),
     "tinyml_load":             {"fs"},

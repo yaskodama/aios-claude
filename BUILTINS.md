@@ -26,6 +26,7 @@ rather than raising, so `.abcl` programs can probe gracefully.
 | `Arm_serial_servo_write6(a1..a6, ms)` | `(float+)` → `int` | `{mut}` | 6 軸同時指令 |
 | `Arm_serial_servo_read(id)` | `(int)` → `float` | — | 現在角の計測（read-only なので効果なし） |
 | `dofbot_servo_writes()` | `()` → `int` | — | 発行済み指令の総数（ベンチ用） |
+| `dofbot_belt_drive(cmd)` | `(int)` → `int` | `{mut}` | コンベア駆動。1=前進 / 2=排出 / 0=停止 |
 | `dofbot_camera_grab([path])` | `([string])` → `array` | — | 手首カメラ 1 フレームを特徴量で返す。省略時は `DOFBOT_FRAMES` |
 | `dofbot_camera_truth([path])` | `([string])` → `int` | — | 直前フレームの正解ラベル（答え合わせ用） |
 
