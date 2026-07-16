@@ -1,0 +1,246 @@
+% ======================================================================
+% experiments/dcache.tex — Level 2: enabling the D-cache
+%
+% ★ 軸はボードではなく「キャッシュ構成」。ゆえに boards/ ではなく
+%    experiments/ に置く。同じ枠組みで別の軸を切りたくなったら
+%    experiments/ に足す（例: 動的ワークスティーリング = Level 3）。
+%
+%    設計・制約・DMA棚卸し・ハーネスは測定に依存せず確定。
+%    D-cache ON の「スケールするか」の実測値だけがシリアル取得待ち
+%    （§末尾の \TODO を、数値が出たら差し替える）。
+% ======================================================================
+
+\subsection{動機：支配変数はキャッシュ構成である}
+
+第 \ref{sec:rpi3} 節の測定で最も効いていた制約は、SMP の方式ではなく
+\textbf{D-cache が OFF であること}であった。メモリ律速がスケールしなかったのも
+（\bench{fill} \spd{0.93}）、\texttt{volatile} を外したら \spd{3.04} が
+\spd{3.66} に上がったのも（第 \ref{sec:rpi3-volatile} 項）、動的ワークスティーリングを
+断念して静的分割にしたのも、すべて D-cache OFF が原因である。
+
+そこで問いは：\textbf{D-cache を ON にすると、メモリ律速の処理はスケールし始めるか}。
+もしそうなら「ウィンドウシステムは並列化しない」という第 \ref{sec:rpi3}\,節の
+結論が覆る。この問いは SMP の方式とは独立であり、キャッシュ構成という別の軸に属する。
+
+\subsection{D-cache ON は「フラグを 1 にする」ではない}
+
+素朴に \texttt{SCTLR.C} を 1 にするのは\textbf{危険で、過去に一度 Pi 3 を
+brick させている}（\texttt{mmu.c} 冒頭に記録あり）。安全に ON にするには、
+この移植に 1 行も存在しなかったキャッシュ管理を新規に書く必要があった。
+本実験で顕在化した罠は 4 つある。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{リセット直後のキャッシュはゼロでなくゴミ。}
+        invalidate せずに \texttt{C=1} にすると、コアはゴミを有効データと
+        見なす。これが brick の原因である。set/way invalidate ループを
+        \texttt{C=1} の\textbf{前に}実行しなければならない（後では、いま
+        キャッシュした本物のデータを捨ててしまう）。
+
+  \item \textbf{Cortex-A53 は SMPEN なしでは非コヒーレント。}
+        \texttt{mmu.c} は RAM を shareable にマップしているが、
+        A53 では shareable かつ cacheable なメモリでも \texttt{CPUECTLR.SMPEN}
+        を立てるまで\textbf{コア間でコヒーレントにならない}。\texttt{C=1} かつ
+        SMPEN=0 だと、第 \ref{sec:design} 節のロックフリー・ジョブメールボックス
+        （\texttt{volatile} + \texttt{dsb}）が静かに壊れる。\texttt{volatile} は
+        コンパイラを縛るだけで、キャッシュは縛らない。
+
+  \item \textbf{二次コアの起動窓。}
+        二次コアは \texttt{\_smp\_start} の時点で\textbf{まだ MMU も
+        キャッシュも OFF}であり、その状態でスタックポインタを RAM から読む。
+        この読みはコア 0 のキャッシュをスヌープしない。ゆえにコア 0 は
+        スタックアドレスを\textbf{起こす前に clean}せねばならず、さもなくば
+        二次コアは null スタックで起きて最初の push で死ぬ。
+
+  \item \textbf{\texttt{mmu\_disable} の前提が崩れる。}
+        「キャッシュ OFF だから flush 不要」というコメントが \texttt{C=1} で
+        偽になる。\texttt{kexec} 前にキャッシュを落とすと、\texttt{/upload} が
+        キャッシュ経由で書いた次カーネルのイメージが dirty ライン内に取り残され、
+        \textbf{stale メモリへジャンプ}する。clean を追加した。
+\end{enumerate}
+
+\noindent
+これらを \texttt{cache.c}（set/way・範囲・SMPEN の各操作を新規実装）と、
+\texttt{mmu.c} の \texttt{DCACHE\_ON} 経路（順序が命：invalidate と SMPEN を
+\texttt{C=1} の前に）で処理した。
+
+\subsection{最大の障害：USB DMA はページ属性で直せない}
+\label{sec:dcache-usb}
+
+D-cache ON でも DMA するハードとの共有メモリは非コヒーレントになる。
+そこでカーネル全体の\textbf{DMA 地点を棚卸し}した。結果は明快で、
+FB・電源・WiFi のメールボックスや SD/SDIO は\textbf{全て PIO}（DATA レジスタ
+経由）であり、コヒーレンシ問題を持たない。唯一の DMA エンジンは
+\textbf{DWC USB}であり、これが有線 LAN を担っている。
+
+そして USB こそが\textbf{構造的に直せない}地点であった。DWC ドライバは
+呼び出し側のポインタをそのまま DMA アドレスに渡し、呼び出し側は
+\textbf{ヒープ}バッファ（\texttt{memget} は 8 バイト境界＝隣の割り当てと
+64 バイトのキャッシュラインを共有）と、あろうことか\textbf{スタック上の
+局所変数}（\texttt{smsc9512.c} のレジスタ操作が 4 バイトを DMA する）を渡す。
+64 バイトのラインを invalidate すれば、\textbf{同じラインにある戻り番地や
+退避レジスタごと破棄}する。これはページ属性では解けず、バウンスバッファと
+ドライバ全域の 64 バイト境界化を要する。
+
+この発見自体が結論である：\textbf{D-cache を入れられないのはキャッシュ管理を
+書くのが面倒だからではなく、ドライバの DMA バッファの出自が構造的に許さない
+から}である。
+
+\subsection{実験の切り分け：USB を解かずに問いに答える}
+
+問いは「D-cache でメモリ律速はスケールするか」であり、これに答えるのに
+USB を解く必要はない。そこで実験用ビルド変種を用意した。
+
+\begin{center}
+\texttt{-DDCACHE\_EXPERIMENT -DDCACHE\_ON -DOS\_MINIMAL}
+\end{center}
+
+\noindent
+\texttt{OS\_MINIMAL} でネットと WM を落とし、\texttt{DCACHE\_EXPERIMENT} で
+さらに \texttt{usbinit}（唯一の DMA エンジン）を落とす。これで DMA する相手が
+一つも存在しない状態で \texttt{C=1} にでき、USB の構造問題を回避したまま
+本題を測れる。ただし\textbf{HDMI は残した}——ユーザ要求であり、また
+フレームバッファの扱いが D-cache ON 実装の良い試金石でもあるためである。
+
+HDMI を残すには 2 つの手当てが要った。FB のメールボックス要求構造体は
+元は\textbf{スタック上}にあり（GPU が stale RAM を読み \texttt{address=0}
+＝SYSERR ＝画面出ず）、64 バイト境界・64 バイト詰めの専用 static に移して
+handshake の前後で clean/invalidate した。FB のピクセル領域自体は、
+GPU がアドレスを返した\textbf{後に} \texttt{mmu\_set\_range\_noncached()} で
+Normal Non-cacheable へ貼り替えた（アドレスは \texttt{mmu\_init} の後に
+判明するため、静的な表には焼けない）。
+
+\subsection{測定ハーネス}
+
+実験変種はネットが無いので \route{/bench} を提供できない。そこでワークロード本体を
+\texttt{apps/smpbench.c} に切り出し、\textbf{HTTP 経路（既定カーネル）と起動時
+コンソール経路（実験カーネル）が同一のコードを呼ぶ}ようにした。キャッシュ
+ON/OFF の比較は、両者が同一実装を走らせて初めて意味を持つ——別実装なら
+「キャッシュ設定の差」ではなく「実装の差」を測ってしまう。この切り出しの
+過程で、第 \ref{sec:rpi3-measbug} 項の測定バグを発見・修正している。
+
+実験カーネルは起動時に \texttt{smpbench\_run\_all()} を実行し、\bench{fill} の
+サイズ掃引を中心とした結果をシリアルへ出力する。
+
+\subsection{実測結果}
+\label{sec:dcache-result}
+
+D-cache ON カーネルを実機に投入し、起動時ハーネスの出力をシリアルで取得した。
+まず 3 つの前提が\textbf{すべて確認された}。
+
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{起動した（brick 回避）}。Xinu のバナーからシェルまで正常に立ち
+        上がった。set/way invalidate を \texttt{C=1} の前に置く順序が効いている。
+  \item \textbf{\texttt{cores\_online = 4}、全ベンチ \texttt{agree = ok}}。
+        SMPEN を立てたことで、\texttt{C=1} 下でもロックフリー・ジョブメールボックスの
+        コヒーレンシが保たれている。逐次と並列の答えは全ベンチで一致した。
+  \item \textbf{\texttt{sctlr = 0x00c5183d}}。D-cache OFF の \texttt{0x00c51839} に
+        対しビット 2（C）が立ち、実機で D-cache が有効化されたことを裏付ける。
+\end{itemize}
+
+\subsubsection*{本命：メモリ律速はキャッシュでスケールする——ただし容量まで}
+
+\begin{table}[htbp]
+\centering
+\caption{\bench{fill} の速度向上：D-cache OFF vs ON（8 パス、作業セット掃引）}
+\label{tab:dcache-fill}
+\small
+\begin{tabular}{@{}rccl@{}}
+\toprule
+語数（作業セット） & OFF の速度向上 & ON の速度向上 & \\
+\midrule
+64          & \spd{0.38} & \spd{2.00} & \\
+256         & \spd{0.61} & \spd{2.50} & \\
+1{,}024 (4\,KB)   & \spd{1.13} & \spd{3.60} & \\
+4{,}096 (16\,KB)  & \spd{1.27} & \spd{3.88} & \\
+16{,}384 (64\,KB) & \spd{1.34} & \spd{4.01} & ← 完全スケール \\
+65{,}536 (256\,KB)& \spd{1.24} & \spd{2.51} & ← 低下開始 \\
+262{,}144 (1\,MB) & \spd{1.35} & \spd{1.40} & ← 帯域律速へ回帰 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+表 \ref{tab:dcache-fill} が本実験の答えである。第 \ref{sec:rpi3} 節の結論
+「メモリ律速はスケールしない」は、\textbf{D-cache OFF に固有の現象}であった。
+D-cache ON では、作業セットがキャッシュに収まる限り\textbf{メモリ書込は
+理想的にスケールする}（64\,KB で \spd{4.01}）。
+
+しかしスケールするのは容量までである。作業セットが 256\,KB を超えると速度向上は
+崩れ、1\,MB では \spd{1.40} まで戻る。これは\textbf{キャッシュ容量効果}である。
+小さい \bench{fill} は同じ領域を 8 回書くため 2 回目以降はキャッシュに当たり、
+実質\textbf{計算律速}になってスケールする。作業セットがキャッシュ（Pi 3 の
+Cortex-A53 は L1 データ 32\,KB／コア＋共有 L2 512\,KB）を超えると、
+書き戻しと充填で\textbf{再び帯域律速}に戻る。速度向上が 64\,KB で頂点、
+256\,KB で崩れ始めるのは、この容量境界と整合する。
+
+\subsubsection*{ウィンドウシステムの結論は覆るか——覆らない}
+
+一見、これは「WM は並列化しない」（第 \ref{sec:rpi3} 節）を覆すように見える。
+だが\textbf{覆らない}。理由が 2 つある。
+
+第一に、\textbf{実フレームバッファはキャッシュ不可にマップしてある}
+（第 \ref{sec:dcache-usb} 項、\texttt{mmu\_set\_range\_noncached}）。GPU が
+スヌープしないため、これは D-cache ON でも変えられない。表 \ref{tab:dcache-fill}
+の \bench{fill} は\textbf{通常のキャッシュ可能バッファ}での測定であり、
+実描画はこの恩恵を受けない。
+
+第二に、恩恵を受けるのは作業セットがキャッシュに収まる場合だけだが、
+全画面ブリットは 1280$\times$800$\times$4 = 3.9\,MB でキャッシュを大きく超え、
+仮にキャッシュ可能でも \spd{1.40} 程度に留まる。
+
+したがって結論は次のように\textbf{精緻化}される：メモリ律速の処理は、
+D-cache ON かつ\textbf{作業セットがキャッシュ内}なら 4 コアでスケールする。
+だが実描画は（キャッシュ不可の FB へ、キャッシュを超える量を書くため）
+どちらの条件も満たさず、依然スケールしない。中間バッファ上での
+合成のように、キャッシュ内で完結する処理を挟めば話は別である。
+
+\subsubsection*{副産物：D-cache は単一コア性能も大きく上げる}
+
+計算律速側では、\bench{dining}(\spd{3.99})・\bench{primes}(\spd{2.05}) の
+速度向上比は D-cache OFF とほぼ不変であった（元々スケールしていたため）。
+一方で\textbf{絶対性能}は激変した。\bench{nqueens n=12} の 1 コア時間は
+D-cache OFF の約 167{,}000\,\textmu s から\textbf{約 19{,}000\,\textmu s へ、
+実に 8.8 倍高速化}している。クロック差（起動直後 2.33 倍）だけでは説明できず、
+再帰探索が触る盤面配列 \texttt{cols[]} とスタックがキャッシュに載った効果である。
+並列スケーリングとは独立に、D-cache は\textbf{計算律速の絶対性能そのもの}を
+底上げする。
+
+\subsubsection*{ただし本番投入はできない}
+
+以上は\textbf{実験変種}（\texttt{DCACHE\_EXPERIMENT}、USB を落とした構成）での
+結果である。本番カーネルに D-cache を入れるには、第 \ref{sec:dcache-usb} 項の
+USB DMA 問題——ヒープとスタックのバッファへのバウンス、およびドライバ全域の
+64 バイト境界化——を解く必要がある。それは本実験の範囲外であり、次段階の課題である。
+
+\subsection{付録：実機シリアル出力（D-cache ON）}
+
+参考のため、実機（コールドブート）から取得した起動時ハーネスの生出力を示す。
+
+\begin{lstlisting}[language=,basicstyle=\ttfamily\scriptsize]
+===== smpbench =====
+cores_online = 4
+D-cache      = ON   (SCTLR.C=1, SMPEN set)
+sctlr        = 0x00c5183d
+
+-- compute-bound (expect x3.2-x4.0) --
+  bench           1-core us  N-core us  speedup
+  dining n=5          51290      12828   x3.99  ok
+  nqueens n=11         3716       1027   x3.61  ok
+  nqueens n=12        19024       4865   x3.91  ok
+  primes 200k         66761      32550   x2.05  ok
+
+-- memory-store-bound: THE QUESTION (x1.0 = no benefit) --
+  words           1-core us  N-core us  speedup
+  fill 64                 2          1   x2.00  ok
+  fill 256                5          2   x2.50  ok
+  fill 1024              18          5   x3.60  ok
+  fill 4096              70         18   x3.88  ok
+  fill 16384            285         71   x4.01  ok
+  fill 65536           1177        468   x2.51  ok
+  fill 262144          4682       3330   x1.40  ok
+
+-- pool round trip (the parallelise/don't break-even) --
+  null                    0          1   x0.00  ok
+
+===== end smpbench =====
+\end{lstlisting}

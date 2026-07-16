@@ -10,7 +10,7 @@ OUT := smp_report
 
 all: $(OUT).pdf
 
-$(OUT).pdf: $(DOC).tex boards/rpi3.tex boards/rpi4.tex boards/rpi5.tex
+$(OUT).pdf: $(DOC).tex boards/rpi3.tex boards/rpi4.tex boards/rpi5.tex experiments/dcache.tex
 	xelatex -interaction=nonstopmode -halt-on-error $(DOC).tex
 	xelatex -interaction=nonstopmode -halt-on-error $(DOC).tex
 	mv $(DOC).pdf $(OUT).pdf

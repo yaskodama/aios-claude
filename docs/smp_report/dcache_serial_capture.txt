@@ -1,0 +1,29 @@
+===== smpbench =====
+cores_online = 4
+D-cache      = ON   (SCTLR.C=1, SMPEN set)
+sctlr        = 0x00c5183d
+ compare RATIOS, not absolute us: the firmware moves the ARM
+  clock (first run after boot is ~2.33x faster). The serial and
+  parallel halves run back-to-back, so the ratio is stable.
+
+-- compute-bound (expect x3.2-x4.0) --
+  bench           1-core us  N-core us  speedup
+  dining n=5          51290      12828   x3.99  ok
+  nqueens n=11         3716       1027   x3.61  ok
+  nqueens n=12        19024       4865   x3.91  ok
+  primes 200k         66761      32550   x2.05  ok
+
+-- memory-store-bound: THE QUESTION (x1.0 = no benefit) --
+  words           1-core us  N-core us  speedup
+  fill 64                 2          1   x2.00  ok
+  fill 256                5          2   x2.50  ok
+  fill 1024              18          5   x3.60  ok
+  fill 4096              70         18   x3.88  ok
+  fill 16384            285         71   x4.01  ok
+  fill 65536           1177        468   x2.51  ok
+  fill 262144          4682       3330   x1.40  ok
+
+-- pool round trip (the parallelise/don't break-even) --
+  null                    0          1   x0.00  ok
+
+===== end smpbench =====

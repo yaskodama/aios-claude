@@ -25,6 +25,11 @@
 \usepackage{makecell}
 \usepackage{graphicx}
 
+% 測定待ちの箇所を目立つ形で残すマクロ（数値が出たら本文を差し替える）。
+\newcommand{\TODO}[1]{\par\medskip\noindent%
+  \colorbox{yellow!25}{\parbox{0.97\linewidth}{%
+  \textbf{［測定待ち］}\ #1}}\par\medskip}
+
 \setCJKmainfont{Hiragino Mincho ProN}
 \setCJKsansfont{Hiragino Sans}
 \setCJKmonofont{Hiragino Sans}
@@ -91,8 +96,19 @@ CPU コアを使うように拡張した。設計は、コア 0 が既存の単�
 であり、これを下回る仕事は並列化すると\textbf{かえって遅くなる}
 （実測 \spd{0.38}）。この 2 つの境界が、並列化すべき対象を決める。
 
-Raspberry Pi 3 についての実装と測定を第 \ref{sec:rpi3} 節に示す。
-Raspberry Pi 4 および 5 についても同一の枠組みで追記予定である。
+さらに、この「メモリ律速はスケールしない」という結論が\textbf{D-cache OFF に
+固有}であることを、D-cache を有効化する実験で実測した（第 \ref{sec:dcache} 節）。
+D-cache ON では、作業セットがキャッシュに収まる限りメモリ書込は理想的に
+スケールし（64\,KB で \spd{4.01}）、超えると帯域律速へ回帰する（1\,MB で
+\spd{1.40}）。ただし実フレームバッファはキャッシュ不可であり、かつ全画面
+描画はキャッシュを超えるため、ウィンドウシステムの結論自体は覆らない。
+D-cache の有効化は Cortex-A53 で set/way invalidate・SMPEN・DMA コヒーレンシを
+要し、とりわけ USB ドライバがスタック上のバッファを DMA する構造が
+最大の障害であることを明らかにした。
+
+Raspberry Pi 3 についての実装と測定を第 \ref{sec:rpi3} 節、D-cache 実験を
+第 \ref{sec:dcache} 節に示す。Raspberry Pi 4 および 5 についても同一の
+枠組みで追記予定である。
 \end{abstract}
 
 \tableofcontents
@@ -238,6 +254,11 @@ Raspberry Pi 3 B+ の $1.4\,\mathrm{GHz} \div 600\,\mathrm{MHz} = 2.33$ と
 % \input{boards/rpi5}
 
 % =======================================================================
+\section{実験：D-cache を有効化する（Level 2）}
+\label{sec:dcache}
+\input{experiments/dcache}
+
+% =======================================================================
 \section{ボード横断比較}
 \label{sec:cross}
 
@@ -287,10 +308,23 @@ Raspberry Pi 4 および 5 についても、本レポートと同一の枠組�
         以上の純計算を持ち、\texttt{send}/\texttt{print}/\texttt{wait} を
         含まない）を満たす唯一の対象に適用した。
 
-  \item 測定基盤そのものにも 2 つの落とし穴があった。タイマ割り込みに依存した
-        時計が常に 0 を返していたこと（第\ref{sec:clock}項）、および
-        CPU クロックが一定でないこと（第\ref{sec:ratio}項）である。
-        いずれも、比を指標とし、フリーランニングカウンタを直読することで回避した。
+  \item 測定基盤そのものにも 3 つの落とし穴があった。タイマ割り込みに依存した
+        時計が常に 0 を返していたこと（第\ref{sec:clock}項）、CPU クロックが
+        一定でないこと（第\ref{sec:ratio}項）、そして 1 コア基準と並列で
+        別関数を測って \spd{4.42} という不可能な値を出していたこと
+        （第\ref{sec:rpi3-measbug}項）である。いずれも、比を指標とし、
+        フリーランニングカウンタを直読し、両辺で同一関数を測ることで解決した。
+        \textbf{安定して再現する誤りは、ノイズより見つけにくい}。
+
+  \item \textbf{支配変数はキャッシュ構成であった}（第 \ref{sec:dcache} 節）。
+        D-cache を有効化すると、メモリ律速の処理は作業セットがキャッシュに
+        収まる限り理想的にスケールし（\spd{4.01}）、超えると帯域律速へ回帰する
+        （\spd{1.40}）。「メモリ律速はスケールしない」は D-cache OFF に固有の
+        現象だった。ただし実描画は（キャッシュ不可の FB へキャッシュを超える量を
+        書くため）依然スケールせず、ウィンドウシステムの結論は精緻化されつつも
+        覆らない。D-cache 有効化には set/way invalidate・SMPEN・DMA コヒーレンシが
+        要り、USB がスタック上のバッファを DMA する構造が最大の障害である——
+        これは本番投入に残された次段階の課題である。
 \end{enumerate}
 
 \end{document}

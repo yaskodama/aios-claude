@@ -110,13 +110,21 @@ offline 扱いで 1 コアにフォールバックして起動は継続する設
 ベンチマーク & 性質 & 1 コア (\textmu s) & 4 コア (\textmu s) & 速度向上 & \texttt{agree} \\
 \midrule
 \bench{dining n=5}        & 純レジスタ演算   & 119{,}626  & 29{,}920  & \spd{3.99} & yes \\
-\bench{nqueens n=12}      & 純計算（再帰）   & 260{,}053  & 70{,}149  & \spd{3.70} & yes \\
-\bench{nqueens n=11}      & 純計算（再帰）   & 50{,}803   & 15{,}022  & \spd{3.38} & yes \\
-\bench{nqueens n=13}      & 純計算（再帰）   & 1{,}419{,}536 & 445{,}639 & \spd{3.18} & yes \\
+\bench{nqueens n=12}      & 純計算（再帰）   & 167{,}052  & 45{,}637  & \spd{3.66} & yes \\
+\bench{nqueens n=11}      & 純計算（再帰）   & ---        & ---       & \spd{3.33} & yes \\
+\bench{nqueens n=13}      & 純計算（再帰）   & ---        & ---       & \spd{3.12} & yes \\
 \bench{primes n=200000}   & 計算（下記参照） & 155{,}686  & 75{,}958  & \spd{2.04} & yes \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\noindent
+表 \ref{tab:rpi3-compute} の N-Queens の値は、第 \ref{sec:rpi3-measbug} 項に述べる
+測定バグの修正後のものである。修正前は \bench{nqueens n=12} が
+\spd{4.42}(!) という物理的にあり得ない値を安定して示していた。n=11 と n=13 の
+1 コア／4 コアの絶対時間を「---」としたのは、修正後の再測がクロック状態の
+異なるタイミングで行われ、速度向上比（クロックに対して安定）のみが
+横並びで信頼できるためである（第 \ref{sec:ratio} 項）。
 
 \noindent
 \bench{dining} が理想値 \spd{4.00} にほぼ届く \spd{3.99} を示したことは、
@@ -295,7 +303,42 @@ nqueens-result done=1 received=12 expected=12 total=14200
   \item \textbf{タイマ割り込み由来の時計が常に 0（既存）。}
         第\ref{sec:clock}項。本作業以前から存在した。
         \texttt{clkcount()} 直読で回避した。
+
+  \item \textbf{不公平な速度向上の測定（自作、実機で発見）。}
+        第\ref{sec:rpi3-measbug}項。1 コア基準と 4 コア測定に別関数を用いており、
+        \spd{4.42} という不可能な値を出していた。同一関数比較に修正した。
 \end{enumerate}
+
+\subsection{発見した測定バグ：不公平な基準が \spd{4.42} を生んだ}
+\label{sec:rpi3-measbug}
+
+ベンチマークを別モジュールへ切り出して整理した直後、\bench{nqueens n=12} が
+\textbf{\spd{4.42}}(!) を安定して示した。4 コアで \spd{4.00} を超えることは
+物理的に不可能である。\texttt{agree = yes}（逐次と並列の答えが一致）であり、
+仕事量も同一だったため、これは計算の誤りではなく\textbf{測定の欠陥}であった。
+
+原因は、\bench{nqueens} だけが\textbf{1 コアの基準と 4 コアの測定で別の関数を
+走らせていた}ことである。基準は逐次専用の \texttt{sb\_nqueens()}、並列は
+\texttt{sb\_nq\_par()} で、両者は同じ値を計算するが\textbf{別の関数}であり、
+コンパイラのインライン展開もコード配置も異なる。並列側の実装が 1 コアあたり
+約 10\% 効率が良く、$4.00 \times 1.10 \approx 4.42$ で辻褄が合う。
+\bench{dining} と \bench{primes} が汚染を免れていたのは、偶然どちらも
+逐次・並列で同一関数を経由していたためである。
+
+決定的な証拠は、モジュール移動という\textbf{論理を 1 行も変えない操作}だけで
+値が \spd{3.70} から \spd{4.42} へ動いたことである。比がコード配置に反応した
+以上、その比は並列性ではなく\textbf{コード生成の差}を測っていた。
+
+修正は、全ベンチの 1 コア基準を「並列と同じ関数の \texttt{stride=1}」に
+統一することである。両辺が同一コードになり、残る変数はコア数だけになる。
+修正後、\bench{nqueens n=12} は \spd{3.66} に落ち、\bench{dining}(\spd{3.99}) と
+\bench{primes}(\spd{2.04}) は不変であった（元々公平だったため）。
+
+\noindent
+教訓は\textbf{報告値の再現性だけでは正しさを保証しない}ことである。
+\spd{4.42} は 5 回連続で 442/442/441/441/442 と完全再現した。安定した誤りは、
+ノイズよりも見つけにくい。物理的な上界（4 コアなら \spd{4.00}）という
+外部知識と突き合わせて初めて露見した。
 
 \subsection{副次的な発見：\texttt{volatile} グローバルの代償}
 \label{sec:rpi3-volatile}
