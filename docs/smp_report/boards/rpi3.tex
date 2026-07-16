@@ -1,0 +1,313 @@
+% ======================================================================
+% boards/rpi3.tex — Raspberry Pi 3 (BCM2837) のマルチコア化
+%
+% ★ このファイルは rpi4.tex / rpi5.tex の雛形でもある。
+%    節構成（実装 → 起動 → 適用 → 実測 → 発見したバグ）を揃えると
+%    main.tex の横断比較表がそのまま使える。
+%    \section{} は main.tex 側に置いてあるので、ここは \subsection から始める。
+% ======================================================================
+
+\subsection{対象と前提}
+
+対象は Raspberry Pi 3 B+（BCM2837、Cortex-A53 $\times$ 4、1.4\,GHz）上の
+Embedded Xinu（リポジトリ \texttt{xinu-raz/xinu}）である。このボードは
+WiFi・有線 LAN・HDMI ウィンドウマネージャ・AIPL アクターランタイム・
+JIT が実機で動作している一方、\texttt{include/rcu.h} に
+「\textit{The arm-rpi3 port parks the secondary cores (MPIDR guard)}」と
+あるとおり、\textbf{4 コアのうち 3 コアを起動せずに放置}していた。
+
+本移植の前提として重要なのは、このポートの MMU 設定である。
+\texttt{system/platforms/arm-rpi3/mmu.c} は identity map（VA = PA）を張り、
+\textbf{MMU と I-cache は有効、D-cache は無効}のままにしている。
+実機で読み出した \texttt{SCTLR} がこれを裏付ける。
+
+\begin{lstlisting}[language=,caption={実機 \route{/api/mmu} の応答（D-cache OFF の確認）}]
+enabled=1
+sctlr=0x00c51839 M=1 C=0 I=1 Z=1
+ttbr0=0x0011c000
+\end{lstlisting}
+
+\noindent
+$C = 0$、すなわち D-cache は OFF である。よって第\ref{sec:design}節の
+ロックフリー調停の前提が、この実機で成立していることが確認できた。
+
+\subsection{コア起動：Pi 3 固有の差分}
+\label{sec:rpi3-bringup}
+
+Pi 4 / Pi 5 は AArch64 で PSCI やスピンテーブルによりコアを起動するが、
+Pi 3 は 32bit（\texttt{arm\_64bit=0}）で動作しており、機構が異なる。
+32bit のファームウェアは\textbf{コア 0 しか起動せず}、コア 1--3 は armstub7 の
+中で自分専用のメールボックス 3 を監視して待機している。そこへ入口アドレスを
+書き込み、\texttt{sev} で起こす。
+
+\begin{lstlisting}[caption={ARM ローカルのコア別メールボックス 3（\texttt{system/platforms/arm-rpi3/smp.c}）}]
+/* ARM-local per-core mailbox 3 SET register.  The 32-bit Pi 3 firmware leaves
+ * cores 1-3 spinning in armstub7 on exactly this word; writing a jump target
+ * and issuing SEV releases the core to that address.  This MMIO page is
+ * already Device-mapped by mmu.c (0x40000000..0x40FFFFFF). */
+#define ARM_LOCAL_MBOX3_SET(core) \
+    ((volatile unsigned long *)(0x4000008CUL + 0x10UL * (unsigned long)(core)))
+\end{lstlisting}
+
+\noindent
+この MMIO 領域は既に mmu.c が Device 属性で写像済みであったため、追加の
+写像は不要であった。起こされたコアは \texttt{start.S} に追加した
+\texttt{\_smp\_start} トランポリンに入り、SVC モードへ正規化し、
+IRQ/FIQ をマスクし、コア専用スタックを設定して C の入口へ入る。そこで
+コア 0 と\textbf{同一の}MMU 設定（コア 0 が構築した L1 テーブルを共有し、
+MMU と I-cache を有効化、D-cache は無効のまま）を適用する。設定を揃えるのは
+体裁の問題ではなく、4 コアの時間比較を公平にするためである。
+
+なお、コア解放の手掛かりを 2 系統用意した。armstub7 のメールボックスと、
+\texttt{start.S} 側の \texttt{smp\_release[]} である。後者はファームウェアが
+4 コアとも \texttt{\_start} に流し込む実装だった場合の保険である。この配列は
+\textbf{意図的に \texttt{.bss} ではなく \texttt{.data} に置いた}。コア 0 が
+\texttt{.bss} をゼロクリアしている最中に、待機中のコアが古い値を読むことを
+防ぐためである。
+
+\begin{table}[htbp]
+\centering
+\caption{起動が正しく構成されたことの確認（リンク結果）}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+シンボル & アドレス & セクション \\
+\midrule
+\texttt{\_smp\_start}   & \texttt{0x00008280} & \texttt{.text} \\
+\texttt{smp\_release}   & \texttt{0x0010e980} & \texttt{.data}（\texttt{D}）\\
+\texttt{smp\_stacktop}  & \texttt{0x0010e990} & \texttt{.data}（\texttt{D}）\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{実機での結果}
+
+最大の不確実性は「32bit ファームウェアが本当にこのメールボックスでコアを
+解放するか」であった。実機で\textbf{確認された}。
+
+\begin{lstlisting}[language=,caption={\route{/bench} の応答（4 コアが起動している）}]
+SMP bench kind=nqueens
+cores_online = 4
+\end{lstlisting}
+
+\noindent
+仮に外れていても、起動待ちは短くバウンドしてあり、応答しないコアは
+offline 扱いで 1 コアにフォールバックして起動は継続する設計とした。
+
+\subsection{実測 1：計算律速の処理は 4 コアでスケールする}
+
+表 \ref{tab:rpi3-compute} に計算律速のベンチマークを示す。値は全て
+安定状態（再起動後、クロックが落ち着いた状態、アクター未起動）での測定であり、
+第\ref{sec:ratio}項のとおり比を主指標とする。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 3：計算律速の速度向上（\route{/bench}、\texttt{cores\_online = 4}）}
+\label{tab:rpi3-compute}
+\small
+\begin{tabular}{@{}llrrcc@{}}
+\toprule
+ベンチマーク & 性質 & 1 コア (\textmu s) & 4 コア (\textmu s) & 速度向上 & \texttt{agree} \\
+\midrule
+\bench{dining n=5}        & 純レジスタ演算   & 119{,}626  & 29{,}920  & \spd{3.99} & yes \\
+\bench{nqueens n=12}      & 純計算（再帰）   & 260{,}053  & 70{,}149  & \spd{3.70} & yes \\
+\bench{nqueens n=11}      & 純計算（再帰）   & 50{,}803   & 15{,}022  & \spd{3.38} & yes \\
+\bench{nqueens n=13}      & 純計算（再帰）   & 1{,}419{,}536 & 445{,}639 & \spd{3.18} & yes \\
+\bench{primes n=200000}   & 計算（下記参照） & 155{,}686  & 75{,}958  & \spd{2.04} & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\bench{dining} が理想値 \spd{4.00} にほぼ届く \spd{3.99} を示したことは、
+本設計の妥当性を端的に示している。この処理はメモリに一切触れない純粋な
+レジスタ演算であり、コア間で奪い合う資源が存在しないためである。
+
+\bench{primes} だけが \spd{2.04} と低い。これは偶然ではなく、\textbf{仕事の
+配分がこの問題の構造と共鳴した}結果である。ストライド 4 で配ると、コア 0 と
+コア 2 は「4 の倍数」と「$4n+2$」すなわち\textbf{全て偶数}を担当し、
+$d = 2$ で即座に合成数と判明して一瞬で終わる。一方コア 1 と 3 が奇数を
+全て引き受ける。つまり実質 2 コアしか働いておらず、それがそのまま
+\spd{2.04} という数字になっている。N-Queens では同じストライド配分が
+正しく機能している（コストが列位置に対してなめらかで、偶奇と相関しないため）。
+ブロック巡回配分に変えれば解消するが、これはベンチマークの均衡の問題であり、
+本レポートの結論には影響しない。
+
+\subsection{実測 2：メモリ律速の処理はスケールしない}
+\label{sec:rpi3-fill}
+
+表 \ref{tab:rpi3-fill} に、大量のメモリ書込（\bench{fill}）の測定を示す。
+これは描画（フレームバッファへの書込）と同じ性質の処理であり、
+ウィンドウシステムを並列化すべきかを判定するために用意した。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 3：メモリ書込律速の速度向上（\bench{fill}、8 パス）}
+\label{tab:rpi3-fill}
+\small
+\begin{tabular}{@{}rrrc@{}}
+\toprule
+語数 & 1 コア (\textmu s) & 4 コア (\textmu s) & 速度向上 \\
+\midrule
+64      & 5      & 13     & \spd{0.38} \\
+256     & 11     & 18     & \spd{0.61} \\
+1{,}024 & 42     & 37     & \spd{1.13} \\
+4{,}096 & 174    & 136    & \spd{1.27} \\
+16{,}384 & 689   & 511    & \spd{1.34} \\
+65{,}536 & 2{,}665 & 2{,}137 & \spd{1.24} \\
+262{,}144 (=1\,MB) & 11{,}007 & 8{,}125 & \spd{1.35} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+2 つの重要な事実が読み取れる。
+
+第一に、\textbf{どれだけ仕事を大きくしても \spd{1.35} 程度で頭打ち}になる。
+1\,MB（1280$\times$800 の画面の約 1/4 に相当）を書いても \spd{1.35} であり、
+計算律速の \spd{3.99} とは比較にならない。なお高クロック状態で測ると
+同じ 1\,MB が \spd{0.95}、すなわち\textbf{4 コアの方がわずかに遅い}。
+いずれの状態でも、並列化に意味がないという結論は変わらない。
+
+第二に、\textbf{小さい仕事は並列化すると遅くなる}。64 語では \spd{0.38}、
+すなわち 2.6 倍遅い。これはプールの往復コストに負けているためである。
+
+\subsection{実測 3：プールの往復コストと損益分岐点}
+
+何もしないジョブを投入して、プール自体の往復コストを測定した
+（\bench{null}）。結果は\textbf{7--11\,\textmu s}であった。
+
+これが並列化の\textbf{損益分岐点}である。すなわち、これを下回る仕事を
+ワーカーに投げると必ず損をする。効率よく利得を得るには、その 10 倍、
+すなわち\textbf{1 メッセージあたり 70\,\textmu s 以上の純計算}が必要となる。
+この数値が、以降の適用判断の基準となった。
+
+\subsection{適用判断 1：ウィンドウシステムは並列化しない}
+
+「ウィンドウシステムなどのアプリケーションが 4 コアで速くなるか」という
+問いに対し、上記の測定は\textbf{否}と答える。理由は 2 つあり、
+どちらか一方だけでも致命的である。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{描画はメモリ律速である。}このポートは D-cache が OFF なので、
+        描画とはフレームバッファへの書込そのものであり、
+        第\ref{sec:rpi3-fill}項の \bench{fill} と同じ性質を持つ。
+        測定値は \spd{0.95}--\spd{1.35} であり、コアを足しても速くならない。
+  \item \textbf{粒度が足りない。}ウィンドウシステムの描画 1 回は小さい。
+        たとえばカーソルは 12$\times$12 = 144 画素であり、
+        往復コスト 7--11\,\textmu s を下回る。実測でも 64 語の仕事は
+        \spd{0.38} と\textbf{遅くなっている}。並列化すれば体感はむしろ悪化する。
+\end{enumerate}
+
+\noindent
+したがってウィンドウシステムには手を加えなかった。
+\textbf{速くならない上に遅くなる変更を入れないことも、工学上の判断である。}
+このボードにおける法則は「\textbf{計算はスケールする、描画はスケールしない}」
+と要約できる。
+
+\subsection{適用判断 2：AIPL アクターは 1 箇所だけが該当する}
+
+Pi 3 の AIPL ランタイムは、アクター 1 体につき Xinu スレッド 1 本と
+メールボックス（リングバッファ＋計数セマフォ）を持ち、スレッドが
+メッセージを取り出して \texttt{dispatch()} でメソッド本体を実行する
+モデルである。
+
+損益分岐点 70\,\textmu s に照らすと、\textbf{ほとんどの AIPL メソッドは
+対象外}である。\texttt{bump} や ping-pong は算術数命令と \texttt{send} で
+構成され、基準を 2--3 桁下回る。加えて \texttt{send}・\texttt{print}・
+\texttt{wait} といったカーネル呼び出しは、そもそもワーカーコアで実行できない。
+
+唯一の例外がロードバランサの \texttt{Worker.compute\_nq} である。
+
+\begin{lstlisting}[caption={対象となる構造（\texttt{apps/abcl\_program.c}）}]
+  int  ncores = smp_cores_online();
+  unsigned long t0 = clkcount();
+  long result = (long)abcl_nq_count_partial_smp((int)n, (int)first_col, ncores);
+  long elapsed = (long)((clkcount() - t0) / 1000UL);   /* us -> ms */
+  ...
+  enqueue(self_id, disp, "done", 3, ...);   /* kernel call: stays on core 0 */
+\end{lstlisting}
+
+\noindent
+重い計算が \texttt{abcl\_nq\_count\_partial()} の一点に隔離され、その前後が
+カーネル呼び出しという理想的な構造である。n=13 で 1 メッセージあたり
+約 100\,ms の純計算であり、基準を 3 桁上回る。ここだけを 4 コア化し、
+カーネル呼び出しはコア 0 に残した。
+
+\subsubsection*{分割の方法}
+
+first\_col 1 つ分は\textbf{1 回の再帰呼び出し}であるため、分割は 1 段下、
+すなわち\textbf{2 行目の合法な列}で行う。各コアにその剰余類を配る。
+連続分割ではなくインターリーブとしたのは、コストが列位置に対して
+中央が重く左右対称であり、連続分割では中央のコアに仕事が偏るためである。
+
+\textbf{各コアは専用の盤面配列を持つ必要がある}。\texttt{nq\_recurse} は
+探索の下降中に \texttt{cols[]} を破壊的に更新するため、配列を共有すると
+コア同士が互いの探索を壊すからである。この配列を静的変数ではなく
+呼び出し側スタックに置いたのは、プールが埋まって inline 実行に落ちた
+スレッドと、プールを保持するスレッドとが、\textbf{どちらもコア 0 上で}
+同じ配列を奪い合うためである。
+
+ホスト上での総当たり検証により、この分割の正しさとバランスを確認した。
+
+\begin{lstlisting}[language=,caption={カーネルのソースから当該関数を抜き出したホスト検証}]
+REAL-SOURCE partial n=1..12 x every first_col x nc=1..4: ok
+REAL-SOURCE summed partials vs known N-Queens counts: ok
+
+balance n=13 first_col=6 nc=4 (per-core counts):  2233  2233  1802  1802
+                                                        max/avg = 1.11
+\end{lstlisting}
+
+\subsubsection*{実機での結果}
+
+アクター経路（\route{/api/loadbal/nqueens?n=12}）は正しく完走した。
+
+\begin{lstlisting}[language=,caption={アクター経由の N-Queens（n=12 の正解は 14200）}]
+nqueens n=12 submitted=12 task_id_range=1..12
+nqueens-result done=1 received=12 expected=12 total=14200
+\end{lstlisting}
+
+\noindent
+答えは正しく、また各 Worker の \texttt{busy\_ms} に\textbf{値が入るようになった}
+（従来は壊れた \texttt{clkticks} を使っていたため常に 0 であった）。
+
+\subsection{発見した不具合}
+\label{sec:rpi3-bugs}
+
+本作業では、実機に投入する前のホスト検証と、測定データの精査により、
+以下の不具合を発見・修正した。いずれも\textbf{測定していなければ
+気付けなかった}ものである。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{素数分割の剰余類の誤り（自作、投入前に発見）。}
+        開始値の算出を誤り、剰余類がずれて一部の値を取りこぼし、
+        かつストライド 1 のとき 1 を素数に数えていた。ホスト検証で捕捉。
+
+  \item \textbf{ジョブ引数のスレッド間競合（自作、投入前に発見）。}
+        第\ref{sec:ud}項に述べた競合。アクターは Worker が 4 体、
+        すなわちスレッド 4 本であり、実際に起こり得た。API に \texttt{ud} を
+        追加して構造的に解消した。
+
+  \item \textbf{\texttt{smp\_parallel\_sum} の再入不可（自作、投入前に発見）。}
+        単一のジョブメールボックスを複数スレッドが同時に使うと破壊し合う。
+        使用中なら呼び出し側で全チャンクを実行する方式で解消した。
+
+  \item \textbf{タイマ割り込み由来の時計が常に 0（既存）。}
+        第\ref{sec:clock}項。本作業以前から存在した。
+        \texttt{clkcount()} 直読で回避した。
+\end{enumerate}
+
+\subsection{副次的な発見：\texttt{volatile} グローバルの代償}
+\label{sec:rpi3-volatile}
+
+第\ref{sec:ud}項の競合対策として、ジョブ引数を \texttt{volatile} な
+ファイルスコープ変数から呼び出し側スタックの構造体へ移したところ、
+\textbf{速度向上比が \spd{3.04} から \spd{3.70} へ改善した}。
+
+理由は D-cache が OFF であることにある。\texttt{volatile} 変数は参照のたびに
+必ず実メモリを読むため、D-cache のないこの環境では\textbf{内側ループの
+1 反復ごとに RAM 往復}が発生していた。通常の構造体メンバに変えたことで
+コンパイラがレジスタに載せられるようになった。
+
+すなわち\textbf{競合バグの修正が、同時に性能改善でもあった}。
+D-cache を持たない環境では、\texttt{volatile} の乱用は通常環境より遥かに高くつく。

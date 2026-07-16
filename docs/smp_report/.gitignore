@@ -1,0 +1,5 @@
+# xelatex の中間生成物（PDF は成果物なのでコミットする）
+*.aux
+*.log
+*.out
+*.toc

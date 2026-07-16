@@ -1,0 +1,14 @@
+% ======================================================================
+% boards/rpi5.tex — Raspberry Pi 5 (BCM2712) のマルチコア化  ★未執筆
+%
+% 書き方: boards/rpi3.tex を雛形として、同じ節構成で埋める（rpi4.tex 参照）。
+% Pi 5 固有: コア起動は PSCI CPU_ON、コア識別は MPIDR Aff1。
+% 設計空間 GA の champion が smp_model=worker_pool (0.507) で
+% full_smp (0.371) に勝っている経緯も書けるとよい。
+% 既存資料: aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/
+%           IMPLEMENTATION_PLAN.md
+% ======================================================================
+
+\subsection*{（未執筆）}
+本節は追記予定である。Raspberry Pi 5（BCM2712、Cortex-A76 $\times$ 4、AArch64）
+のワーカープール型 SMP について、本レポートと同一の枠組みで測定し記述する。

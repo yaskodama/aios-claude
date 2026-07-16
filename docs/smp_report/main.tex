@@ -1,0 +1,296 @@
+% !TEX program = xelatex
+% Raspberry Pi Xinu マルチコア化レポート
+%
+% ボードを追加するには:
+%   1. boards/ に rpi4.tex / rpi5.tex を用意する（boards/rpi3.tex が雛形）
+%   2. 下の「ボード別」節の \input を有効にする
+%   3. \boardrow{...} を横断比較表に足す（各ボード .tex の末尾で定義済みの
+%      \rpiXXXsummary を呼ぶだけで済むようにしてある）
+% 本文の共通部（設計・測定方法・結論）はボードに依存しない。
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{makecell}
+\usepackage{graphicx}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.82]
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!60!black,
+  citecolor=blue!50!black,
+  pdftitle={Raspberry Pi 上の Embedded Xinu のマルチコア化},
+  pdfauthor={Yasushi Kodama (児玉靖司)}
+}
+
+% ---- listings ----------------------------------------------------------
+\definecolor{codebg}{RGB}{248,248,242}
+\definecolor{codecmt}{RGB}{120,120,120}
+\definecolor{codekw}{RGB}{30,80,160}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  backgroundcolor=\color{codebg},
+  commentstyle=\color{codecmt}\itshape,
+  keywordstyle=\color{codekw}\bfseries,
+  breaklines=true,
+  frame=single,
+  framesep=3pt,
+  rulecolor=\color{black!25},
+  showstringspaces=false,
+  captionpos=b,
+  language=C,
+}
+
+% ---- ボード横断で使う共通マクロ ----------------------------------------
+% 各ボード節はこの体裁に従う。新ボードもこれを使えば見た目が揃う。
+\newcommand{\bench}[1]{\texttt{#1}}
+\newcommand{\route}[1]{\texttt{#1}}
+% 速度向上の書式（測定値は「比」で報告する。理由は §3.3）
+\newcommand{\spd}[1]{$\times$#1}
+
+\title{\textbf{Raspberry Pi 上の Embedded Xinu のマルチコア化}\\[2mm]
+       \large ワーカープール型 SMP の設計と実測\\[1mm]
+       \normalsize 何が速くなり、何が速くならないか}
+\author{児玉靖司\\\small 法政大学経営学部\\\small \texttt{yass@hosei.ac.jp}}
+\date{2026年7月16日}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Raspberry Pi 上でベアメタル動作する Embedded Xinu を、搭載された 4 つの
+CPU コアを使うように拡張した。設計は、コア 0 が既存の単一コア OS
+（スケジューラ・アクター・ネットワーク・ウィンドウシステム）を一切変更せずに
+実行し続け、残るコアを純計算専用のワーカーとして起こす「ワーカープール型」
+である。対称型 SMP を採らないのは、既存ランタイムが非リエントラントであり、
+共有 ready キューが実績のある機能を破壊するためである。
+
+本レポートの主眼は、速くなったという報告ではなく、\textbf{何が速くなり、
+何が速くならないかを実測で切り分けた}点にある。計算律速の処理は
+最大 \spd{3.99}（ほぼ理想値）まで向上した一方、メモリ書込律速の処理は
+\spd{0.95}--\spd{1.35} に留まり、並列化の意味がないことが分かった。
+この結果は「ウィンドウシステムを 4 コアで速くできるか」という問いに
+否と答える根拠となった。またワーカープールの起動コストは実測 7--11\,\textmu s
+であり、これを下回る仕事は並列化すると\textbf{かえって遅くなる}
+（実測 \spd{0.38}）。この 2 つの境界が、並列化すべき対象を決める。
+
+Raspberry Pi 3 についての実装と測定を第 \ref{sec:rpi3} 節に示す。
+Raspberry Pi 4 および 5 についても同一の枠組みで追記予定である。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =======================================================================
+\section{はじめに}
+
+Raspberry Pi に搭載される BCM2837 / BCM2711 / BCM2712 は、いずれも 4 コアの
+ARM プロセッサを持つ。しかし Embedded Xinu は単一コア OS であり、
+これらのボード上では 1 コアしか使わず、残る 3 コアは起動されないまま
+放置されていた。本作業の目的は、この遊休コアを実際の計算に使うことである。
+
+本レポートは次の順で述べる。第 \ref{sec:design} 節で全ボード共通の設計方針を、
+第 \ref{sec:method} 節で測定方法を述べる。第 \ref{sec:rpi3} 節以降が
+ボード別の実装と実測である。第 \ref{sec:cross} 節で横断比較を行い、
+第 \ref{sec:conclusion} 節で結論を述べる。
+
+% =======================================================================
+\section{共通設計：ワーカープール型 SMP}
+\label{sec:design}
+
+\subsection{なぜ対称型 SMP を採らないか}
+
+素朴な発想は、ready キューを全コアで共有する対称型 SMP である。しかし
+既存の Xinu ランタイム（AIPL アクター、ネットワークスタック、USB、
+ウィンドウマネージャ）は\textbf{非リエントラント}であり、複数コアから
+同時に呼ばれることを想定していない。共有 ready キューを導入すれば、
+実機で動作実績のあるこれらの機能を全面的に作り直す必要が生じ、
+リスクが利得を上回る。
+
+そこで本設計では次の非対称構成を採る。
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{コア 0} は既存の単一コア OS をそのまま実行する。
+        ready キューはコア 0 の専有であり、スケジューラ・アクター・
+        ネットワーク・描画は\textbf{一切変更しない}。
+  \item \textbf{コア 1--3} は専用の計算ワーカーとして起動する。低消費電力の
+        WFE で待機し、投入されたジョブ（仕事の範囲）を実行して完了を通知する。
+        OS には触れず、割り込みも受けず（IRQ/FIQ マスク）、メモリ確保も
+        行わないため、カーネルと競合し得ない。
+\end{itemize}
+
+この構成は、既存機能への退行リスクが構造的にゼロであるという点で優れている。
+コア 0 の挙動が変わらないからである。
+
+\subsection{ロックフリー調停が成立する理由}
+
+ワーカーとコア 0 の調停は、単一のジョブメールボックス（\texttt{volatile} な
+配列群）と \texttt{dsb} バリアのみで行い、スピンロックも
+LDREX/STREX も使わない。これが成立するのは、この移植が\textbf{D-cache を
+OFF にしている}ためである。すなわち全てのデータアクセスが RAM に直行するので、
+コア間のキャッシュコヒーレンシ問題が原理的に生じない。
+
+これは設計上の仮定であり、実機で検証した（第 \ref{sec:rpi3} 節）。
+なお D-cache を有効化すると、この仮定は崩れ、ジョブメールボックスには
+実際のキャッシュ管理が必要になる。
+
+\subsection{ジョブ引数は呼び出し側スタックに置く}
+\label{sec:ud}
+
+ジョブの引数をファイルスコープの変数で渡してはならない。コア 0 は
+プリエンプティブであり、かつプールの利用者は複数スレッド（HTTP サーバ
+スレッドと AIPL アクタースレッド）に及ぶ。ゆえに次の競合が起こり得る。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item スレッド A が引数を書く。
+  \item A がプリエンプトされる。
+  \item スレッド B が引数を上書きし、プールを取って実行する。
+  \item A が再開し、\textbf{B の引数で計算して誤った答えを返す}。
+\end{enumerate}
+
+本設計では API に不透明ポインタ \texttt{ud} を設け、引数を呼び出し側の
+スタックに置くことで、この競合を構造的に起こり得なくした。ロックで
+塞ぐより安全であり、副次的に性能も向上した（第 \ref{sec:rpi3-volatile} 項）。
+
+\subsection{プールの排他とフォールバック}
+
+ジョブメールボックスは 1 組しかないため、プールは同時に 1 人しか使えない。
+既に使用中の場合、後続の呼び出し元は\textbf{自分の全チャンクをその場で実行}する。
+待たせないので デッドロックせず、並列化の利得を諦めるだけで答えは常に正しい。
+
+同様に、ワーカーが応答しない場合はコア 0 がそのチャンクを引き取る。
+したがって\textbf{ワーカーの不調が OS を停止させることはない}。
+
+% =======================================================================
+\section{測定方法}
+\label{sec:method}
+
+\subsection{時計：割り込みではなくフリーランニングカウンタを読む}
+\label{sec:clock}
+
+当初、経過時間の測定には Xinu の \texttt{clktime}/\texttt{clkticks} を用いていたが、
+\textbf{どの測定も 0\,ms を返した}。原因はこれらがタイマ\textbf{割り込み}で
+加算される変数であり、その割り込みが安定して発火していないことにある。
+これはマルチコア化以前のカーネルでも同様であり、本作業が持ち込んだ
+問題ではない。
+
+そこで System Timer の 1\,MHz フリーランニングカウンタを直接読む
+\texttt{clkcount()} に切り替えた。割り込みに依存しないため停止せず、
+分解能も 1\,ms から 1\,\textmu s へ 1000 倍向上した。
+
+\subsection{正しさの同時検証}
+
+全てのベンチマークは、同一の仕事を\textbf{逐次で 1 回、並列で 1 回}実行し、
+両者の答えが一致するかを \texttt{agree} として毎回報告する。速いが誤った
+結果を、速いという理由で見逃さないためである。本レポートに載せた全測定で
+\texttt{agree = yes} である。
+
+さらに、分割ロジック（剰余類による仕事の配分）は実機に投入する前に、
+カーネルのソースから当該関数をそのまま抜き出してホスト上で総当たり検証した。
+この検証により、実機に載せる前に実際に 2 件の誤りを発見・修正している
+（第 \ref{sec:rpi3-bugs} 項）。
+
+\subsection{絶対時間ではなく比を報告する}
+\label{sec:ratio}
+
+測定中に、\textbf{CPU クロックが一定でない}ことを発見した。再起動直後の
+最初の測定だけが速く、以降は安定した遅い値に落ち着く。その比は実測 2.33 で、
+Raspberry Pi 3 B+ の $1.4\,\mathrm{GHz} \div 600\,\mathrm{MHz} = 2.33$ と
+一致する。ベアメタル Xinu は DVFS を制御しないため、ファームウェアが
+クロックを変更しているものと考えられる。
+
+したがって\textbf{絶対時間は再起動からの経過に依存し、比較に使えない}。
+一方 \textbf{速度向上比は安定}している。1 コア測定と 4 コア測定を同一
+リクエスト内で連続実行しているため、クロックの影響が相殺されるからである。
+実際、繰り返し測定で比は完全に一致した（例：\spd{3.99} が 3 回とも同値）。
+本レポートは比を主たる指標とし、絶対時間は状態を明記した上で参考値として示す。
+
+% =======================================================================
+\section{Raspberry Pi 3 (BCM2837)}
+\label{sec:rpi3}
+\input{boards/rpi3}
+
+% =======================================================================
+% ボード追加時はここの コメントを外す。
+% \section{Raspberry Pi 4 (BCM2711)}
+% \label{sec:rpi4}
+% \input{boards/rpi4}
+%
+% \section{Raspberry Pi 5 (BCM2712)}
+% \label{sec:rpi5}
+% \input{boards/rpi5}
+
+% =======================================================================
+\section{ボード横断比較}
+\label{sec:cross}
+
+\begin{table}[htbp]
+\centering
+\caption{ボード別 ワーカープール型 SMP の比較（rpi4 / rpi5 は追記予定）}
+\label{tab:cross}
+\small
+\begin{tabularx}{\textwidth}{@{}l l l l X@{}}
+\toprule
+ & \textbf{Pi 3 (BCM2837)} & \textbf{Pi 4 (BCM2711)} & \textbf{Pi 5 (BCM2712)} & \textbf{備考} \\
+\midrule
+CPU        & Cortex-A53 $\times$4 & Cortex-A72 $\times$4 & Cortex-A76 $\times$4 & \\
+実行状態   & AArch32 (32bit)      & AArch64 & AArch64 & Pi 3 のみ 32bit \\
+コア解放   & armstub7 mailbox 3   & spin table & PSCI & 第\ref{sec:rpi3-bringup}項 \\
+D-cache    & OFF                  & OFF & OFF & ロックフリーの前提 \\
+最大速度向上 & \spd{3.99}         & --- & --- & 計算律速 \\
+プール往復 & 7--11\,\textmu s      & --- & --- & 並列化の損益分岐 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent
+Raspberry Pi 4 および 5 についても、本レポートと同一の枠組み
+（同一の \route{/bench} ルート、同一の \texttt{agree} 検証、同一の比による報告）
+で測定し、本節の表と各ボード節に追記する予定である。
+
+% =======================================================================
+\section{結論}
+\label{sec:conclusion}
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item 遊休していた 3 コアを、既存 OS を一切変更せずに計算へ動員できた。
+        計算律速の処理で最大 \spd{3.99}（理想値 \spd{4.00}）を実測した。
+
+  \item \textbf{何でも速くなるわけではない}。メモリ書込律速の処理は
+        \spd{0.95}--\spd{1.35} に留まる。またプールの往復コスト
+        7--11\,\textmu s を下回る小さな仕事は、並列化すると\textbf{遅くなる}
+        （実測 \spd{0.38}）。この 2 つの境界が適用対象を決める。
+
+  \item 上記の測定に基づき、\textbf{ウィンドウシステムは並列化しないという
+        判断を下した}。描画はメモリ律速であり、かつ 1 回の描画が
+        往復コストを下回るため、速くならないばかりか遅くなるからである。
+        速くならない変更を入れないことも、工学上の成果である。
+
+  \item AIPL アクターについては、判定基準（1 メッセージあたり 70\,\textmu s
+        以上の純計算を持ち、\texttt{send}/\texttt{print}/\texttt{wait} を
+        含まない）を満たす唯一の対象に適用した。
+
+  \item 測定基盤そのものにも 2 つの落とし穴があった。タイマ割り込みに依存した
+        時計が常に 0 を返していたこと（第\ref{sec:clock}項）、および
+        CPU クロックが一定でないこと（第\ref{sec:ratio}項）である。
+        いずれも、比を指標とし、フリーランニングカウンタを直読することで回避した。
+\end{enumerate}
+
+\end{document}

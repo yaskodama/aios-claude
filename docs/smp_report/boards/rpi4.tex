@@ -1,0 +1,21 @@
+% ======================================================================
+% boards/rpi4.tex — Raspberry Pi 4 (BCM2711) のマルチコア化  ★未執筆
+%
+% 書き方: boards/rpi3.tex を雛形として、同じ節構成で埋める。
+%   \subsection{対象と前提}          ... SCTLR で D-cache OFF を確認
+%   \subsection{コア起動：Pi 4 固有の差分}  ... spin table @ 0xe0/0xe8/0xf0
+%   \subsection{実測 1：計算律速...}  ... /bench の同一ルートで測る
+%   \subsection{実測 2：メモリ律速...}
+%   \subsection{実測 3：プールの往復コスト}
+%   \subsection{適用判断 ...}
+%   \subsection{発見した不具合}
+% 測定は必ず「安定状態（再起動後クロックが落ち着き、アクター未起動）」で行い、
+% 絶対時間ではなく比を主指標とすること（main.tex 第3.3項）。
+% 埋めたら main.tex の \input{boards/rpi4} のコメントを外し、
+% 表 \ref{tab:cross} の該当列を更新する。
+% 既存資料: ~/projects/xinu-rpi4/docs/SMP_REPORT_JA.md
+% ======================================================================
+
+\subsection*{（未執筆）}
+本節は追記予定である。Raspberry Pi 4（BCM2711、Cortex-A72 $\times$ 4、AArch64）
+のワーカープール型 SMP について、本レポートと同一の枠組みで測定し記述する。
