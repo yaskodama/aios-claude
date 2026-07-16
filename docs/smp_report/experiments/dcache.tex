@@ -244,3 +244,94 @@ sctlr        = 0x00c5183d
 
 ===== end smpbench =====
 \end{lstlisting}
+\subsection{本番化の試みと限界：USB DMA は越えられなかった}
+\label{sec:dcache-prod}
+
+第 \ref{sec:dcache-usb} 項で「USB は構造的に難しい」と述べたが、実際に
+本番化を試みた。結果は\textbf{部分成功}であり、その失敗の様相そのものが
+価値ある結果なので記録する。
+
+\subsubsection*{方式：全 USB 転送を非キャッシュ・バウンス経由に}
+
+USB DMA の障害は、バッファがヒープ（\texttt{memget} は 8 バイト境界＝
+64 バイトのキャッシュラインを隣と共有）やスタック上にあり、per-transfer の
+clean/invalidate が\textbf{隣接データを巻き込む}ことだった。そこで
+per-transfer 管理を避け、\textbf{全転送を専用の非キャッシュ・アリーナ経由に
+バウンス}する方式を採った。DWC ドライバは元々、非境界バッファ用のバウンス
+経路（\texttt{aligned\_bufs} + TX/RX コピー）を持つので、その切替を
+「D-cache ON なら常にバウンス」に変え、アリーナを非キャッシュにマップした。
+非キャッシュ領域は CPU も DMA も同一 RAM を直接見るので、原理上キャッシュ
+管理命令が一切不要になる。
+
+\subsubsection*{実機結果：起動と HDMI は成功、USB は全滅}
+
+\begin{table}[htbp]
+\centering
+\caption{D-cache 本番化（フルカーネル）の実機結果}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+項目 & 結果 \\
+\midrule
+D-cache ON で起動 & $\checkmark$ brick なし（デスクトップ表示） \\
+HDMI / フレームバッファ & $\checkmark$ 動作（FB の非キャッシュ再マップが有効） \\
+set/way invalidate + SMPEN & $\checkmark$ 機能 \\
+単一コア性能 & $\checkmark$ 8.8 倍（実験変種で実測） \\
+\textbf{USB（マウス・キーボード・ethernet）} & $\times$ 全滅 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+HDMI が正しく映ることは、非キャッシュ化の機構そのもの
+（\texttt{mmu\_set\_range\_noncached}）が\textbf{正しく動作している証拠}である
+（フレームバッファも同じ関数で非キャッシュ化しており、壊れていれば画面が
+乱れる）。にもかかわらず USB は全滅した。Raspberry Pi 3 では
+マウス・キーボード・ethernet がすべて LAN9514 ハブの背後にあるため、
+USB が一つ壊れると全滅する。実機シリアルログには
+\texttt{[webactor] autostart: ETH0 never came up} が記録された。
+
+\subsubsection*{四つの修正を試みた——いずれも解決せず}
+
+原因を、実機を最小限しか使わずオフラインのコードレビューで追った。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{DSB バリア追加。} 非キャッシュ書き込みもライトバッファに
+        滞留し得るため、DMA 起動前に DSB で RAM へ排出。\textbf{必要だが
+        不十分}——単独では USB は復活しなかった。
+
+  \item \textbf{\texttt{packet\_count} オーバーフロー修正。} \texttt{packet\_count}
+        は 10 ビット（最大 1023）で、バウンスアリーナを 128\,KB に拡大した際に、
+        小さい \texttt{max\_packet\_size} で桁溢れし得ることを発見。しかし
+        \textbf{赤鰊だった}——スプリット転送では \texttt{transfer.size} が
+        \texttt{max\_packet\_size} に事前制限され \texttt{packet\_count} は
+        常に 1 で溢れない。撤回した。
+
+  \item \textbf{スプリット転送ロジックの精査。} Pi 3 は全転送がスプリット
+        （ハブ背後）なので、バウンスとスプリット再試行の相互作用を徹底
+        トレースした。\textbf{ロジックは正しかった}——\texttt{dma\_address} の
+        保持、再アーム、コピーバックのオフセットはすべて整合していた。
+
+  \item \textbf{アリーナ非キャッシュ化の SMP タイミング修正。} 最有力仮説。
+        非キャッシュ化を実行時（\texttt{usbinit} 内）に、しかも現在コアだけ
+        TLB 無効化で行っていたが、SMP のワーカーコアはそれ\textbf{以前}に
+        アリーナがキャッシュ可能なまま起動しており、コア間でマッピングが
+        不整合だった。アリーナのアドレスはコンパイル時に確定するので、
+        \texttt{mmu\_init} で全コア起動前・D-cache 有効化前に非キャッシュを
+        ベイクするよう変更した。しかし\textbf{これも USB を復活させなかった}。
+\end{enumerate}
+
+\subsubsection*{結論：本番化は USB DMA に阻まれた}
+
+四つの修正を尽くしても USB は動かなかった。バウンスロジックとスプリット
+処理は精査済みで正しく、コヒーレンシ機構も（HDMI が証明する通り）機能して
+いる。それでも USB が全滅する——真因は、これらより深い、実機レベルの精密
+診断（USB 列挙の詳細なシリアルログ等）を要する相互作用にある。手元の
+シリアルアダプタ（Prolific、macOS で不安定）ではそこまで追えなかった。
+
+したがって本レポートの範囲では、\textbf{D-cache は計算と表示には本番投入
+できるが、USB DMA が最後の、そして越えられない壁である}と結論する。第
+\ref{sec:dcache-usb} 項の構造的予測——USB のバッファ出自が本質的な障害——が、
+バウンスという迂回策すら退ける形で、より強く裏付けられた。8.8 倍の単一コア
+高速化という果実は実在するが、それを本番で収穫するには、USB ドライバの
+DMA 経路をより根本的に作り直す必要がある。これは明確に次段階の課題である。
