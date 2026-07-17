@@ -1,0 +1,134 @@
+{
+  "name": "Xinu_RPi3_InternalEvolution",
+  "task": "起動済みの Raspberry Pi 3 Xinu (BCM2837 / Cortex-A53 x4 / AArch32 32bit、WiFi ad-hoc MANET + AODV メッシュ + gwm WM + AIPL アクター/cc JIT + kexec + RCU + buddy + worker-pool SMP が既に稼働) の内部サブシステムを進化させ、4 コアの並列性能を最大化する.遺伝子は 8 軸 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model).★このセッションの実機実測を rubric の根拠とする: worker-pool は計算律速で ×3.99 実証、メモリ律速は D-cache OFF ではスケールせず、D-cache ON でキャッシュ内なら ×4.01 かつ単一コア 8.8 倍だが USB DMA が本番化を阻む、プール往復 7-11us が損益分岐、AIPL は compute_nq のみ 4 コア化が割に合う.評価ゲート: (1) smp_model が worker_pool で A53 x4 を実際に使う (full_smp は AArch32 A53 で core0 専有の WM/mesh/WiFi を壊すリスク) ✅、(2) scheduler + concurrency_safety が AArch32 A53 (armstub7 mailbox 3 でコア解放、MPIDR Aff0、D-cache OFF、LDREX/STREX は Pi3 実機で fault 前例) で実装可能 ✅、(3) memory_alloc + power_mgmt が BCM2837 の現実 (1GB RAM、firmware クロック変動、I-cache ON/D-cache OFF、D-cache ON は USB DMA が壁) と整合 ✅、(4) 既存ライブ機能 (ad-hoc MANET + AODV、gwm WM、AIPL + cc JIT、kexec、RCU、buddy、demand-paging) を regression させない ✅ の 4 段.",
+  "schema_ref": "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json",
+  "search": {
+    "algorithm": "map_elites",
+    "cell_axes": [
+      "smp_model"
+    ],
+    "generations": 10,
+    "seed_count": 4,
+    "open_axes": false,
+    "rng_seed": 42
+  },
+  "operators": {
+    "mutations": [
+      {
+        "name": "axis_resample",
+        "kind": "single_axis",
+        "weight": 0.5
+      },
+      {
+        "name": "coherent_paradigm_shift",
+        "kind": "multi_axis_correlated",
+        "weight": 0.3
+      },
+      {
+        "name": "llm_proposal",
+        "kind": "llm_directed",
+        "weight": 0.0
+      },
+      {
+        "name": "llm_new_axis",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ],
+    "crossovers": [
+      {
+        "name": "uniform",
+        "kind": "axis_uniform",
+        "weight": 0.5
+      },
+      {
+        "name": "one_point",
+        "kind": "schema_partition",
+        "weight": 0.5
+      },
+      {
+        "name": "llm_merge",
+        "kind": "llm_directed",
+        "weight": 0.0
+      }
+    ]
+  },
+  "evaluation": {
+    "tasks": [
+      "P0_WorkerPoolBaseline",
+      "P1_LoadBalanceStrideFix",
+      "P2_WorkStealing",
+      "P3_ParSafeActorDispatch",
+      "K1_DCacheForCompute",
+      "K2_DCacheMemoryScaling",
+      "K3_USBDMACoherency",
+      "S1_PriorityAging",
+      "S2_MlfqOrEdf",
+      "C1_RcuReadMostly",
+      "C2_TicketSpinlockDCacheGated",
+      "M1_BuddySlab",
+      "W1_HaltIdleOrDvfs",
+      "R_LiveCapabilitiesUnchanged",
+      "ImplCost"
+    ],
+    "evaluator": "ai_v1",
+    "reviewers": [
+      {
+        "name": "R_MeasuredSmpReality",
+        "persona": "あなたは R_MeasuredSmpReality を判定するレビュアーです。Raspberry Pi 3 (Cortex-A53 x4、AArch32 32bit) の SMP 設計を、このプロジェクトで得た *実機実測* に照らして採点します。実測事実: worker-pool は計算律速で dining ×3.99・nqueens ×3.66 を出し実証済み。full_smp は AArch32 A53 で core0 専有の WM/WiFi(EMMC共有)/AODV を壊すリスクが高く、しかも LDREX/STREX が Pi3 実機で fault した前例があり cross-core 同期が D-cache OFF では不安定。よって worker_pool が実測に最も裏付けられた選択。スコア基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free or rcu + scheduler=priority_aging or mlfq (= 実証済み worker-pool ×3.99 を磨く、最も現実的)、0.6 = smp_model=full_smp + concurrency_safety=lock_free (= 全コア化の野心だが AArch32 A53 で core0 専有機能を壊すリスク + LDREX 不安定)、0.3 = smp_model=full_smp + concurrency_safety=spinlock (= 粗いロックで頭打ち + 実装困難)、0.1 = smp_model=single_core (= 4 コアを捨てる退化)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで全コア同期は原理的に不可)。半角数字の decimal で答えてください。",
+        "weight": 0.28
+      },
+      {
+        "name": "R_DCacheDominance",
+        "persona": "あなたは R_DCacheDominance を判定するレビュアーです。このセッション最大の発見は「支配変数は SMP 方式ではなく *キャッシュ構成* (D-cache)」でした。実測: D-cache OFF ではメモリ律速が一切スケールしない (×0.95-1.35)。D-cache ON にすると単一コア計算が 8.8 倍高速化し、メモリ律速も作業セット≤キャッシュなら ×4.01 スケール。ゆえに memory_alloc + power_mgmt + concurrency_safety が D-cache を活かす設計かを判定する。ただし D-cache ON は USB DMA (DWC がヒープ/スタックを DMA) が本番化の壁で、バウンス方式でも全 USB が停止した実測がある。スコア基準: 1.0 = memory_alloc=buddy or slab + power_mgmt=halt_idle or dvfs + concurrency_safety=lock_free or rcu (= D-cache と相性が良く、キャッシュ効果を最大化しつつ実装済み基盤に乗る)、0.7 = memory_alloc=buddy + power_mgmt=always_on (= 堅実だが省電力/キャッシュ活用は控えめ)、0.4 = memory_alloc=demand_paged or cow (= MMU 重依存、D-cache と組むと USB DMA 問題が深刻化)、0.1 = memory_alloc=bump (= 原始的、キャッシュ効果を活かせない)、0.0 = concurrency_safety=stm (= ベアメタル Xinu に過大、キャッシュ以前に非現実的)。半角数字の decimal で答えてください。",
+        "weight": 0.24
+      },
+      {
+        "name": "R_A53Aarch32Impl",
+        "persona": "あなたは R_A53Aarch32Impl を判定するレビュアーです。候補の scheduler + concurrency_safety + ipc_primitive + smp_model を、AArch32 (32bit) Cortex-A53 の実機 Xinu で実装する困難度・現実性を判定する。rpi3 の実機事実: コア解放は armstub7 mailbox 3 (0x4000008C) + SEV (★PSCI ではない)、MPIDR Aff0 でコア識別、D-cache OFF、I-cache ON、タイマ割り込みが不安定 (clkticks が 0、clkcount 直読で回避)、LDREX/STREX が fault した前例。低コストで確実に動くほど高得点。基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free or rcu + scheduler=priority_aging + ipc_primitive=sem_mailbox (= 既存 worker-pool + volatile lock-free + RCU をそのまま延長、実証済み)、0.6 = smp_model=full_smp + concurrency_safety=spinlock (= LDREX/STREX ticket lock だが Pi3 で fault 前例、D-cache ON が前提で難度高)、0.3 = concurrency_safety=rcu + full_smp (= SMP RCU の grace period 設計が要、難)、0.1 = concurrency_safety=stm or ipc_primitive=tuple_space (= ベアメタルに過大)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで cross-core 排他は不可)。半角数字の decimal で答えてください。",
+        "weight": 0.24
+      },
+      {
+        "name": "R_LiveCapabilityCompat",
+        "persona": "あなたは R_LiveCapabilityCompat を判定するレビュアーです。候補設計が、実機で動いているライブ機能 — ad-hoc(IBSS) MANET + AODV メッシュ (10.0.0.1)、gwm WM デスクトップ (シェル窓 + BASIC 窓)、AIPL アクター + cc オンデバイス JIT、kexec、RCU、buddy、demand-paging — を壊さずに共存できる確率を判定する。★rpi3 固有のリスク: WiFi は EMMC を SD と共有 (WiFi ON 時のみ SD 動作) しており SDIO 割り込みは core0 専有、gwm 描画も core0 専有。full_smp 化はこれらを危険に晒す。重視: (a) ipc_primitive を sem_mailbox (AIPL mailbox) から動かさない、(b) isolation を none/user_kernel_split に留め flat identity map を壊さない、(c) full_smp でも core0 の WM/SDIO/AODV 専有処理が機能継続。スコア基準: 1.0 = ipc=sem_mailbox + isolation=none or user_kernel_split + smp_model=worker_pool (= 純粋追加、ライブ機能ノーリスク)、0.6 = 上記 + smp_model=full_smp (= core0 専有処理の移行コスト大だが理屈上共存可)、0.4 = isolation=capability_token or memory を大きく変更、0.1 = isolation=mmu_per_process or container_like (= MMU 再設計でメッシュ/WM/EMMC の MMIO マップ破壊リスク大)、0.0 = ipc_primitive=tuple_space or capability (= AIPL mailbox 全替えで JIT/メッシュ/アクター全滅)。半角数字の decimal で答えてください。",
+        "weight": 0.24
+      }
+    ]
+  },
+  "meta_fitness": {},
+  "ranking": {
+    "strategy": "pareto_then_pairwise",
+    "scenarios": [
+      "conservative",
+      "innovative",
+      "general_purpose"
+    ],
+    "scenario_weights": {
+      "conservative": {
+        "trend_alignment": 0.45,
+        "cross_task_generality": 0.2,
+        "implementability": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.05,
+        "novelty": 0.05
+      },
+      "innovative": {
+        "novelty": 0.35,
+        "frontier_coverage": 0.3,
+        "evolvability": 0.15,
+        "trend_alignment": 0.05,
+        "cross_task_generality": 0.1,
+        "implementability": 0.05
+      },
+      "general_purpose": {
+        "cross_task_generality": 0.4,
+        "implementability": 0.2,
+        "trend_alignment": 0.15,
+        "evolvability": 0.1,
+        "frontier_coverage": 0.1,
+        "novelty": 0.05
+      }
+    },
+    "top_k": 3
+  }
+}

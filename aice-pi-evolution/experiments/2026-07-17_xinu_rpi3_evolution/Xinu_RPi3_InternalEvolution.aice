@@ -1,0 +1,265 @@
+// Xinu_RPi3_InternalEvolution.aice  (2026-07-17)
+//
+// 設計空間 GA Round — *起動済み* の Raspberry Pi 3 Xinu の「中身」を進化させる。
+//
+// ★ この Round が rpi5 Round と決定的に違う点: レビュアー rubric を「憶測」ではなく
+//   このセッションで得た *実機実測* に基づいて書く。ゆえに GA の出す champion を、
+//   実測で分かっている事実 (下記) と突き合わせられる。これが本 Round の狙い:
+//   「設計空間 GA の予測 vs 実機実測」。
+//
+// 実機で稼働中 (= 進化の出発点、課題ではない):
+//   ~/projects/xinu-raz/xinu (GitHub yaskodama/xinu-rpi3、branch feat/rpi3-smp-worker-pool):
+//     - BCM2837 / Cortex-A53 x4 / AArch32 (32bit!)、firmware → start.S → C → gwm WM
+//     - WiFi (BCM43455 over Arasan EMMC/SDIO) ad-hoc MANET + AODV メッシュ (10.0.0.1)
+//     - gwm デスクトップ (シェル窓 + BASIC 窓)、AIPL アクター + cc JIT、kexec、RCU、buddy
+//     - 4 コア SMP = worker-pool 型 (core0=OS / core1-3=WFE 計算ワーカー)
+//
+// ★★ このセッションで新たに実装・実測した事実 (rubric の根拠) ★★
+//   [SMP] worker-pool を rpi3 に移植し実機実測:
+//         - 計算律速: dining ×3.99 (ほぼ理想の×4.00)、nqueens n=12 ×3.66、agree=yes
+//         - primes ×2.04 のみ低い = ストライド分割が偶奇と共鳴した負荷偏り
+//         - コア解放は *armstub7 mailbox 3* (0x4000008C + 0x10*core) + SEV。★PSCI ではない
+//         - ロックフリー調停は volatile + dsb のみで成立 (D-cache OFF ゆえ、実機 SCTLR C=0 確認)
+//   [MEM] メモリ書込律速 (fill) は D-cache OFF では *スケールしない* (×0.95〜1.35)。
+//         プール往復コスト実測 7〜11us = 並列化の損益分岐 (これ未満の仕事は逆に遅い、64語 ×0.38)
+//   [CACHE] ★支配変数は SMP 方式ではなく *キャッシュ構成* だった。D-cache を ON にすると:
+//         - メモリ律速が作業セット≤キャッシュで *理想スケール* (64KB ×4.01)、超で帯域律速回帰 (1MB ×1.40)
+//         - 計算の *単一コア* 絶対性能が 8.8 倍 (nqueens n=12 の 1 コアが 167ms→19ms)
+//         - だが D-cache 本番化は *USB DMA に阻まれた*: DWC がヒープ/スタックのバッファを DMA し、
+//           バウンス方式でも全 USB 停止。起動+HDMI は成功。USB が越えられない壁。
+//   [ACTOR] AIPL アクターで 4 コア化が割に合ったのは Worker.compute_nq のみ (1 msg 70us 以上の
+//         純計算・send/print/wait 無し)。bump/ping-pong 等は基準を桁で下回り対象外。
+//   [DRAW] gwm 描画はメモリ律速かつ 1 回が往復コスト以下 → *並列化しない* が正しい判断。
+//
+// 採点は Gemini レビュアー (evaluator=ai_v1)。実機ビルドはしない (設計空間 GA)。
+// champion は別途 ~/projects/xinu-raz/xinu に手実装し、コールドブートで実機投入する。
+
+aice Xinu_RPi3_InternalEvolution {
+  dialect = "aice_evolution_v2";
+
+  task = "起動済みの Raspberry Pi 3 Xinu (BCM2837 / Cortex-A53 x4 / AArch32 32bit、WiFi ad-hoc MANET + AODV メッシュ + gwm WM + AIPL アクター/cc JIT + kexec + RCU + buddy + worker-pool SMP が既に稼働) の内部サブシステムを進化させ、4 コアの並列性能を最大化する.遺伝子は 8 軸 (scheduler / memory_alloc / ipc_primitive / isolation / arch_target / power_mgmt / concurrency_safety / smp_model).★このセッションの実機実測を rubric の根拠とする: worker-pool は計算律速で ×3.99 実証、メモリ律速は D-cache OFF ではスケールせず、D-cache ON でキャッシュ内なら ×4.01 かつ単一コア 8.8 倍だが USB DMA が本番化を阻む、プール往復 7-11us が損益分岐、AIPL は compute_nq のみ 4 コア化が割に合う.評価ゲート: (1) smp_model が worker_pool で A53 x4 を実際に使う (full_smp は AArch32 A53 で core0 専有の WM/mesh/WiFi を壊すリスク) ✅、(2) scheduler + concurrency_safety が AArch32 A53 (armstub7 mailbox 3 でコア解放、MPIDR Aff0、D-cache OFF、LDREX/STREX は Pi3 実機で fault 前例) で実装可能 ✅、(3) memory_alloc + power_mgmt が BCM2837 の現実 (1GB RAM、firmware クロック変動、I-cache ON/D-cache OFF、D-cache ON は USB DMA が壁) と整合 ✅、(4) 既存ライブ機能 (ad-hoc MANET + AODV、gwm WM、AIPL + cc JIT、kexec、RCU、buddy、demand-paging) を regression させない ✅ の 4 段.";
+
+  gene_schema = "../../../aice-evolution-v2/schemas/xinu_kernel.schema.json";
+
+  // ─── MAP-Elites 探索設定 ─────────────────────────────────────
+  // cell 軸 = smp_model: single_core / worker_pool / full_smp の各セルで best 設計を保持
+  // → 「full_smp は worker_pool に勝るか」を直接照らし出す (rpi5 Round では worker_pool 勝ち)。
+  // 完走優先で seed=4 / gen=10。
+  search {
+    algorithm   = "map_elites";
+    cell_axes   = "smp_model";
+    seed_count  = 4;
+    generations = 10;
+    rng_seed    = 42;
+  }
+
+  seed_from {
+    base_kernel       = "/Users/kodamay/projects/xinu-raz/xinu (GitHub yaskodama/xinu-rpi3、branch feat/rpi3-smp-worker-pool、worker-pool SMP + RCU + buddy + WiFi mesh + gwm WM + cc JIT が載った状態)";
+    base_smp          = "worker-pool 型 SMP: core0=OS / core1-3=WFE 計算ワーカー、armstub7 mailbox 3 (0x4000008C + 0x10*core) + SEV でコア解放 (★PSCI ではない、AArch32 32bit)、MPIDR Aff0 (bits1:0) でコア識別、D-cache OFF ゆえ lock-free=volatile+dsb.smp_parallel_sum で分割、dining ×3.99 / nqueens ×3.66 実測.プール往復 7-11us.";
+    base_scheduler    = "priority_aging + RCU (kernel evo Round2 champion 由来)、単一 runqueue、resched は core0 のみ.";
+    base_memory       = "buddy allocator (kernel evo champion) + first-fit getmem/freemem + demand-paging (vm_fault).";
+    base_concurrency  = "RCU (非プリエンプティブ reader) + worker-pool は volatile lock-free.★LDREX/STREX は Pi3 実機で fault 前例あり (disable版に修正済) = D-cache OFF での排他モニタが不安定.";
+    base_ipc          = "AIPL アクター mailbox (sem_mailbox、リングバッファ + 計数セマフォ、8体上限) + cc オンデバイス JIT.";
+    base_power        = "always_on (idle は WFE スピン).firmware がクロックを変動させる (起動直後 1.4GHz→600MHz、比2.33、DVFS 未制御).";
+    base_arch         = "arm_rpi3 (BCM2837、base 0x3F000000、Cortex-A53、GPIO/EMMC/USB DWC).";
+    base_cache        = "★I-cache ON / D-cache OFF (SCTLR C=0 実機確認).D-cache ON は set/way invalidate + SMPEN + FB非キャッシュ再マップで起動可 (8.8倍単一コア高速化) だが USB DMA が本番化の壁.";
+    live_capabilities = "ad-hoc(IBSS) MANET + AODV メッシュ (10.0.0.1)、gwm WM デスクトップ (シェル窓 + BASIC 窓)、AIPL アクター + cc オンデバイス JIT、kexec OS セレクタ、RCU、buddy、demand-paging — すべて absolute 不変条件.";
+    parity_anchor     = "AIPL CE-1..13 + DR-1..13 x 6 runtimes (project_aipl_nextgen_parity).";
+  }
+
+  // ─── 評価タスク = phase 候補 ───────────────────────────────────
+  evaluation_tasks {
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction P — Parallelism / SMP (実測で worker_pool 実証済)
+    // ═══════════════════════════════════════════════════════════
+
+    task P0_WorkerPoolBaseline {
+      spec = "現行 worker-pool (core0=OS / core1-3 計算ワーカー、smp_parallel_sum、armstub7 mailbox 3 解放) を baseline として保持・磨く.実測 dining ×3.99 / nqueens ×3.66.ワーカーへの仕事投入を AIPL par_safe アクター (compute_nq 型、1msg 70us 以上の純計算) へ広げる.smp_model=worker_pool の最小コスト・最高実証経路.";
+      weight = 0.12;
+      acceptance = "3 assertion: (1) cores_online=4、(2) /bench dining が ×3.99 維持、(3) compute_nq アクターが core1-3 に分散し agree=yes.";
+    }
+
+    task P1_LoadBalanceStrideFix {
+      spec = "実測で primes が ×2.04 に沈んだのは、ストライド分割がインデックスの偶奇と共鳴し、コア 0/2 が全て偶数 (即 d=2 で合成数判定、一瞬で終了) を担当したため.ブロック巡回配分に変え、負荷の偏りを解消して ×4 に近づける.静的分割の範囲での改善.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) primes が ×3.5 以上、(2) 各コアの busy 時間の分散が縮小、(3) 答えは agree=yes 維持.";
+    }
+
+    task P2_WorkStealing {
+      spec = "動的ワークスティーリング: 偏った負荷で空いたコアが他コアの仕事を steal.★前提として D-cache ON で LDREX/STREX (排他モニタ) が使えること.D-cache OFF では原子操作が不安定なので、この task は D-cache 本番化 (下記 Cache 方向) に依存する.実現すれば primes の偶奇偏りを根治.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) 偏り負荷で steal 発生、(2) コア使用率の分散縮小、(3) LDREX/STREX の cross-core 正当性 (D-cache ON 前提).";
+    }
+
+    task P3_ParSafeActorDispatch {
+      spec = "AIPL アクターの純計算メッセージ (par_safe = send/print/wait/描画 無し、1msg 70us 以上) を 4 コアに分散.実測で該当したのは Worker.compute_nq のみ.カーネル呼び出しは core0 に残す.描画/WAIT を持つアクターは保守的に par_safe=0.";
+      weight = 0.08;
+      acceptance = "3 assertion: (1) par_safe アクター群が 4 コア並列、(2) 描画アクターは core0 維持で映像不変、(3) メッセージ順序保証.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction Cache — D-cache (本セッションの最大発見: 支配変数)
+    // ═══════════════════════════════════════════════════════════
+
+    task K1_DCacheForCompute {
+      spec = "★本セッション最大の発見: 支配変数は SMP 方式でなく D-cache.D-cache ON で計算の単一コア絶対性能が 8.8 倍 (nqueens 167ms→19ms).set/way invalidate を C=1 の前に + SMPEN (A53 は無いと shareable でも非コヒーレント) + FB 非キャッシュ再マップ、で実機起動・HDMI・4コア agree=yes を確認済.memory_alloc/power_mgmt の選択と結合.";
+      weight = 0.10;
+      acceptance = "3 assertion: (1) D-cache ON で起動 (sctlr C=1)、(2) 計算ベンチが単一コアで大幅高速化、(3) 4コア agree=yes でコヒーレンシ維持.";
+    }
+
+    task K2_DCacheMemoryScaling {
+      spec = "D-cache ON でメモリ律速が作業セット≤キャッシュなら理想スケール (64KB ×4.01)、超で帯域律速回帰 (1MB ×1.40).実 FB はキャッシュ不可なので描画は恩恵外だが、中間バッファでのキャッシュ内合成は 4 コアで加速可能.D-cache OFF では一切スケールしない (×0.95-1.35) のと対照.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) fill 64KB が ×4 近く、(2) 1MB で帯域律速へ回帰、(3) D-cache OFF 比で明確な差.";
+    }
+
+    task K3_USBDMACoherency {
+      spec = "★D-cache 本番化の壁: DWC USB がヒープ (memget 8B境界=ライン共有) とスタック上の局所変数を DMA する.バウンス方式 (全転送を非キャッシュアリーナ経由) + DSB バリア + mmu_init ベイク NC 化を試みたが全 USB 停止.Pi3 は mouse/kbd/ethernet が全て LAN9514 ハブ背後ゆえ一つ壊れると全滅.真因未特定 (実機シリアル精密診断要).D-cache を本番投入するには USB DMA 経路の根本的作り直しが必要.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) D-cache ON でも USB 列挙成功、(2) ethernet が上がり HTTP 応答、(3) mouse/kbd 動作.★現状は全て未達 = 本 task は最難.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction S — Scheduler
+    // ═══════════════════════════════════════════════════════════
+
+    task S1_PriorityAging {
+      spec = "priority_aging (既に実装済、kernel evo champion): ready で待つスレッドの実効優先度を時間で昇格し starvation 防止.現状維持・微調整.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) 低優先度が餓死しない、(2) clkhandler で aging 進行、(3) 高優先度の応答性維持.";
+    }
+
+    task S2_MlfqOrEdf {
+      spec = "mlfq もしくは edf_soft: 対話 (gwm WM/shell) は高優先、計算 (nqueens/AIPL) は低優先に自然分離.★ただし rpi3 はタイマ割り込みが不安定 (clkticks が常に 0、clkcount 直読で回避した実測あり) ので時間ベース scheduler は慎重に.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) 対話レイテンシが計算負荷下でも低い、(2) キュー降格/昇格、(3) タイマ不安定でも一貫.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction C — Concurrency safety
+    // ═══════════════════════════════════════════════════════════
+
+    task C1_RcuReadMostly {
+      spec = "rcu (既に実装済、非プリエンプティブ reader): process table / AODV route table など read-mostly 構造を read 側ロックフリーに.現状維持・拡張.D-cache OFF でも volatile + dsb で成立.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) reader が lock 無し、(2) grace period 後に安全 reclaim、(3) AODV route 更新中も lookup 健全.";
+    }
+
+    task C2_TicketSpinlockDCacheGated {
+      spec = "full_smp / work-stealing 用の cross-core ロック: LDREX/STREX + WFE/SEV で ticket spinlock.★但し Pi3 実機で LDREX/STREX が fault した前例 (D-cache OFF での排他モニタ不安定) がある.D-cache ON なら排他モニタが安定し実現性が上がる = K1 に依存.D-cache OFF のままなら volatile lock-free に留めるのが堅実.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) D-cache ON 前提で 4コア相互排他、(2) fairness、(3) deadlock 無し.D-cache OFF では非現実的.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction M — Memory allocator
+    // ═══════════════════════════════════════════════════════════
+
+    task M1_BuddySlab {
+      spec = "buddy (既に実装済) の維持 + slab: 固定サイズ (スレッド struct / アクター / mailbox) を slab 化.SMP では per-core slab cache で lock contention を消す.demand-paging と共存.";
+      weight = 0.06;
+      acceptance = "3 assertion: (1) alloc/free が速い、(2) per-core cache で contention 減、(3) demand-paging VM と共存.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Direction W — Power management
+    // ═══════════════════════════════════════════════════════════
+
+    task W1_HaltIdleOrDvfs {
+      spec = "halt_idle: idle コアを WFI 停止 (現行 WFE スピンより省電力).dvfs: firmware がクロックを変動 (実測 2.33 比) させているのを、負荷に応じ制御.★rpi3 は firmware mailbox 経由.電力計測手段が無いので効果は定性的.";
+      weight = 0.05;
+      acceptance = "3 assertion: (1) idle コアが WFI で消費低下、(2) タイマ/割込で即復帰、(3) DVFS 時もメッシュ/WM 安定.";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  横断的タスク
+    // ═══════════════════════════════════════════════════════════
+
+    task R_LiveCapabilitiesUnchanged {
+      spec = "ad-hoc MANET + AODV メッシュ (10.0.0.1)、gwm WM (シェル窓 + BASIC 窓)、AIPL アクター + cc JIT、kexec、RCU、buddy、demand-paging が完全に regression-clean.★特に core0 専有の WM 描画・SDIO WiFi (EMMC 共有ゆえ WiFi ON 時のみ SD 動作)・AODV 処理を壊さないこと.full_smp 化はこれらを危険に晒す.ipc_primitive を actor mailbox から動かさない.";
+      weight = 0.12;
+      acceptance = "ライブ機能スモーク: wifi MANET 10.0.0.1、AODV 1hop、gwm デスクトップ、AIPL hello + cc JIT、kexec、rcutest、buddy stat、すべて PASS のまま.";
+    }
+
+    task ImplCost {
+      spec = "champion 実装は ~/projects/xinu-raz/xinu に system/platforms/arm-rpi3/smp.c / system/resched.c / mem/ / apps/ 周辺 ~300..1000 LOC、abclcp-project 側は実験ディレクトリのみ.コールドブートで実機投入 (kernel.img を SD にコピー、config.txt 不変).★D-cache 本番化を選ぶ場合は USB DMA の作り直しコストが跳ね上がる.";
+      weight = 0.05;
+    }
+  }
+
+  // ─── レビュアー (Gemini 進化計算の選択圧、実測に基づく) ───────
+  evaluator = "ai_v1";
+
+  reviewers {
+
+    reviewer R_MeasuredSmpReality {
+      persona = "あなたは R_MeasuredSmpReality を判定するレビュアーです。Raspberry Pi 3 (Cortex-A53 x4、AArch32 32bit) の SMP 設計を、このプロジェクトで得た *実機実測* に照らして採点します。実測事実: worker-pool は計算律速で dining ×3.99・nqueens ×3.66 を出し実証済み。full_smp は AArch32 A53 で core0 専有の WM/WiFi(EMMC共有)/AODV を壊すリスクが高く、しかも LDREX/STREX が Pi3 実機で fault した前例があり cross-core 同期が D-cache OFF では不安定。よって worker_pool が実測に最も裏付けられた選択。スコア基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free or rcu + scheduler=priority_aging or mlfq (= 実証済み worker-pool ×3.99 を磨く、最も現実的)、0.6 = smp_model=full_smp + concurrency_safety=lock_free (= 全コア化の野心だが AArch32 A53 で core0 専有機能を壊すリスク + LDREX 不安定)、0.3 = smp_model=full_smp + concurrency_safety=spinlock (= 粗いロックで頭打ち + 実装困難)、0.1 = smp_model=single_core (= 4 コアを捨てる退化)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで全コア同期は原理的に不可)。半角数字の decimal で答えてください。";
+      weight = 0.28;
+    }
+
+    reviewer R_DCacheDominance {
+      persona = "あなたは R_DCacheDominance を判定するレビュアーです。このセッション最大の発見は「支配変数は SMP 方式ではなく *キャッシュ構成* (D-cache)」でした。実測: D-cache OFF ではメモリ律速が一切スケールしない (×0.95-1.35)。D-cache ON にすると単一コア計算が 8.8 倍高速化し、メモリ律速も作業セット≤キャッシュなら ×4.01 スケール。ゆえに memory_alloc + power_mgmt + concurrency_safety が D-cache を活かす設計かを判定する。ただし D-cache ON は USB DMA (DWC がヒープ/スタックを DMA) が本番化の壁で、バウンス方式でも全 USB が停止した実測がある。スコア基準: 1.0 = memory_alloc=buddy or slab + power_mgmt=halt_idle or dvfs + concurrency_safety=lock_free or rcu (= D-cache と相性が良く、キャッシュ効果を最大化しつつ実装済み基盤に乗る)、0.7 = memory_alloc=buddy + power_mgmt=always_on (= 堅実だが省電力/キャッシュ活用は控えめ)、0.4 = memory_alloc=demand_paged or cow (= MMU 重依存、D-cache と組むと USB DMA 問題が深刻化)、0.1 = memory_alloc=bump (= 原始的、キャッシュ効果を活かせない)、0.0 = concurrency_safety=stm (= ベアメタル Xinu に過大、キャッシュ以前に非現実的)。半角数字の decimal で答えてください。";
+      weight = 0.24;
+    }
+
+    reviewer R_A53Aarch32Impl {
+      persona = "あなたは R_A53Aarch32Impl を判定するレビュアーです。候補の scheduler + concurrency_safety + ipc_primitive + smp_model を、AArch32 (32bit) Cortex-A53 の実機 Xinu で実装する困難度・現実性を判定する。rpi3 の実機事実: コア解放は armstub7 mailbox 3 (0x4000008C) + SEV (★PSCI ではない)、MPIDR Aff0 でコア識別、D-cache OFF、I-cache ON、タイマ割り込みが不安定 (clkticks が 0、clkcount 直読で回避)、LDREX/STREX が fault した前例。低コストで確実に動くほど高得点。基準: 1.0 = smp_model=worker_pool + concurrency_safety=lock_free or rcu + scheduler=priority_aging + ipc_primitive=sem_mailbox (= 既存 worker-pool + volatile lock-free + RCU をそのまま延長、実証済み)、0.6 = smp_model=full_smp + concurrency_safety=spinlock (= LDREX/STREX ticket lock だが Pi3 で fault 前例、D-cache ON が前提で難度高)、0.3 = concurrency_safety=rcu + full_smp (= SMP RCU の grace period 設計が要、難)、0.1 = concurrency_safety=stm or ipc_primitive=tuple_space (= ベアメタルに過大)、0.0 = smp_model=full_smp + concurrency_safety=critical_section (= IRQ マスクで cross-core 排他は不可)。半角数字の decimal で答えてください。";
+      weight = 0.24;
+    }
+
+    reviewer R_LiveCapabilityCompat {
+      persona = "あなたは R_LiveCapabilityCompat を判定するレビュアーです。候補設計が、実機で動いているライブ機能 — ad-hoc(IBSS) MANET + AODV メッシュ (10.0.0.1)、gwm WM デスクトップ (シェル窓 + BASIC 窓)、AIPL アクター + cc オンデバイス JIT、kexec、RCU、buddy、demand-paging — を壊さずに共存できる確率を判定する。★rpi3 固有のリスク: WiFi は EMMC を SD と共有 (WiFi ON 時のみ SD 動作) しており SDIO 割り込みは core0 専有、gwm 描画も core0 専有。full_smp 化はこれらを危険に晒す。重視: (a) ipc_primitive を sem_mailbox (AIPL mailbox) から動かさない、(b) isolation を none/user_kernel_split に留め flat identity map を壊さない、(c) full_smp でも core0 の WM/SDIO/AODV 専有処理が機能継続。スコア基準: 1.0 = ipc=sem_mailbox + isolation=none or user_kernel_split + smp_model=worker_pool (= 純粋追加、ライブ機能ノーリスク)、0.6 = 上記 + smp_model=full_smp (= core0 専有処理の移行コスト大だが理屈上共存可)、0.4 = isolation=capability_token or memory を大きく変更、0.1 = isolation=mmu_per_process or container_like (= MMU 再設計でメッシュ/WM/EMMC の MMIO マップ破壊リスク大)、0.0 = ipc_primitive=tuple_space or capability (= AIPL mailbox 全替えで JIT/メッシュ/アクター全滅)。半角数字の decimal で答えてください。";
+      weight = 0.24;
+    }
+  }
+
+  // ─── アーキテクチャ決定 ──────────────────────────────────────
+  decisions {
+
+    decision target_hardware {
+      primary  = "Raspberry Pi 3 B+ — BCM2837 / Cortex-A53 x4 / AArch32 32bit / 1GB RAM (= 既に Xinu フル稼働中の実機)";
+      smp      = "armstub7 mailbox 3 (0x4000008C + 0x10*core) + SEV でセカンダリ解放 (★PSCI ではない)、MPIDR Aff0 でコア識別、D-cache OFF ゆえ共有は volatile + dsb";
+      mmio     = "base 0x3F000000、Arasan EMMC 0x3F300000 (WiFi と SD 共有)、DWC USB、PL011 UART";
+      deploy   = "コールドブート: kernel.img を /Volumes/XINU に cp (config.txt 不変)";
+      cache    = "I-cache ON / D-cache OFF (SCTLR C=0).D-cache ON は起動可 (8.8倍単一コア) だが USB DMA が本番化の壁";
+    }
+
+    decision evolution_method {
+      kind     = "設計空間 GA (実機ビルドはしない).Gemini レビュアー 4 本で 8 軸遺伝子を採点、MAP-Elites で世代更新.★rubric はこのセッションの実機実測に基づく.";
+      cell_axis = "smp_model (= MAP-Elites のセル軸).";
+      champion_path = "完走後 analyze_lineage.py で champion 抽出 → 実測と突き合わせ (予測 vs 実測) → 必要なら ~/projects/xinu-raz/xinu に手実装.";
+      scope    = "完走優先で seed=4 / gen=10.";
+    }
+
+    decision backward_compat {
+      invariants = "ad-hoc MANET + AODV、gwm WM、AIPL + cc JIT、kexec、RCU、buddy、demand-paging は absolute 不変条件.";
+      ipc_lock   = "ipc_primitive は sem_mailbox 据置.core0 の WM/SDIO(EMMC)/AODV 専有処理を機能継続させる.";
+    }
+  }
+
+  // ─── 実行例 (進化計算の起動コマンド) ─────────────────────────
+  sample_session {
+
+    generate_aipl {
+      cmd  = "cd aice-evolution-v2 && python3 -m src.cli --no-run --abcl -o ../aice-pi-evolution/experiments/2026-07-17_xinu_rpi3_evolution/ ../aice-pi-evolution/experiments/2026-07-17_xinu_rpi3_evolution/Xinu_RPi3_InternalEvolution.aice";
+      output = "Xinu_RPi3_InternalEvolution.abcl (= MAP-Elites orchestrator)";
+      post  = "use_ai 0 -> 1 を 4 reviewer に patch、seed_count/generations 確認";
+    }
+
+    run_evolution {
+      requires = "GEMINI_API_KEY export 済、AIPL_GEMINI_MODEL=gemini-2.5-flash-lite (flash は思考で停滞)、ABCL_AI_FALLBACK_MODELS で 503 対策";
+      cmd      = "AIPL_AI_PROVIDER=gemini AIPL_GEMINI_MODEL=gemini-2.5-flash-lite python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-07-17_xinu_rpi3_evolution/Xinu_RPi3_InternalEvolution.abcl --timeout 1800 --idle-ms 600000";
+      output   = "lineage.json (各個体の 8 軸遺伝子 + score + generation)";
+      duration = "数十分 (seed=4 + gen=10 + 4 reviewers)";
+    }
+
+    analyze {
+      cmd = "python3 aice-pi-evolution/experiments/2026-07-17_xinu_rpi3_evolution/analyze_lineage.py <lineage.json>";
+      output = "champion (max score) の 8 軸遺伝子 + top-N + 世代別ベスト + 軸頻度ヒストグラム";
+    }
+  }
+
+  // ─── 最終目標 ─────────────────────────────────────────────────
+  goal = "設計空間 GA を完走し、Raspberry Pi 3 の Cortex-A53 x4 を活用する champion カーネル設計を得る.★本 Round の独自価値は rubric がこのセッションの *実機実測* に基づくこと: worker-pool ×3.99 実証、D-cache が支配変数 (単一コア 8.8倍) だが USB DMA が本番化の壁、プール往復 7-11us が損益分岐、AIPL は compute_nq のみ 4 コア化が割に合う.完走後、GA の champion を実測で分かっている事実と突き合わせ (設計空間 GA の予測 vs 実機実測)、GA のレビュアー rubric が実測を正しく反映して worker_pool を選ぶか、そして D-cache 軸の重要性を GA が捉えるかを検証する.";
+}

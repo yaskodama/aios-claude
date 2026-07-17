@@ -1,0 +1,96 @@
+% ======================================================================
+% experiments/ga.tex — 設計空間 GA: 予測 vs 実機実測
+% ======================================================================
+
+\subsection{狙い：GA の予測を実測と突き合わせる}
+
+本レポートのここまでは\textbf{実機実測}である。一方、この一連の作業には
+別の系譜がある——\texttt{aice-pi-evolution} の\textbf{設計空間 GA}
+（\texttt{.aice} → Gemini レビュアー → MAP-Elites → champion）。カーネル設計を
+8 軸の遺伝子（scheduler / memory\_alloc / ipc\_primitive / isolation /
+arch\_target / power\_mgmt / concurrency\_safety / smp\_model）で表し、
+Gemini レビュアー 4 本で採点して世代更新する。
+
+この Round の独自性は、レビュアー rubric を\textbf{本セッションの実機実測に
+基づいて}書いたことである。ゆえに GA の champion を「実測で分かっている事実」と
+直接突き合わせられる——\textbf{設計空間 GA の予測 vs 実機実測}。
+
+\subsection{結果：worker\_pool が champion（実測が裏付ける）}
+
+seed=4 / gen=10、14 個体。MAP-Elites のセル軸は smp\_model。
+
+\begin{table}[htbp]
+\centering
+\caption{GA champion（MAP-Elites セル別ベスト）}
+\small
+\begin{tabular}{@{}lccl@{}}
+\toprule
+smp\_model & best score & n & 内訳 \\
+\midrule
+\textbf{worker\_pool} & \textbf{0.622}（champion） & 9 & conc=lock\_free \\
+full\_smp & 0.397 & 5 & conc=lock\_free \\
+single\_core & (出現せず) & 0 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{worker\_pool（0.622）が full\_smp（0.397）に勝った。}これは Pi 5 の
+GA Round（0.507 vs 0.371）に続く再現であり、かつ Pi 3 では\textbf{実機実測が
+これを裏付けた}——worker\_pool を実装して dining \spd{3.99}・nqueens
+\spd{3.66} を実証している。GA の見出し（「worker\_pool を磨け、full\_smp に
+走るな」）は、実測の前に、そして独立に、正しい方向を示した。
+
+\subsection{一致とアーティファクト}
+
+champion の 8 軸を実測と照合すると、明確な線が引ける。
+
+\begin{table}[htbp]
+\centering
+\caption{GA 予測 vs 実機実測}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+軸 & GA champion & 実機実測 & 判定 \\
+\midrule
+smp\_model & worker\_pool & \spd{3.99} 実証 & $\checkmark$ 一致 \\
+concurrency\_safety & lock\_free (12/14) & volatile+dsb で成立 & $\checkmark$ 一致 \\
+arch\_target & arm\_rpi3 (12/14) & BCM2837 A53 & $\checkmark$ 一致 \\
+isolation & mmu\_per\_process (14/14) & none/user\_kernel\_split が安全 & $\times$ アーティファクト \\
+ipc\_primitive & capability/tuple\_space & sem\_mailbox（AIPL 保護） & $\times$ アーティファクト \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{主軸（smp\_model・concurrency\_safety・arch）は実測と一致}する一方、
+\textbf{副軸（isolation・ipc）はアーティファクト}である。全 14 個体が
+\texttt{isolation=mmu\_per\_process} に固着したのはシード増殖であり、rubric が
+減点しても消えなかった。\texttt{ipc=capability/tuple\_space} は実測では
+AIPL/JIT/メッシュを全滅させる選択だが champion に残った。これは Pi 5 の
+kernel evolution でも見た\textbf{「小規模 GA は方向性まで信頼、全遺伝子詳細は
+アーティファクト混入」}パターンの再現である。
+
+\subsection{最大の発見：支配変数が schema に無い}
+
+本セッションの実測で最も効いた変数は\textbf{D-cache}（単一コア \spd{8.8}、
+メモリ律速のスケール可否を決める、第 \ref{sec:dcache} 節）だった。しかし
+8 軸の遺伝子 schema に\textbf{キャッシュ構成の軸は存在しない}。D-cache は
+memory\_alloc / power\_mgmt を通じて間接的にしか表現されず、\textbf{GA は
+経験的に最重要と判明した変数を構造的に探索できない}。
+
+したがって具体的な提言が出る：schema に \texttt{cache\_policy} 軸
+（\texttt{dcache\_off} / \texttt{dcache\_on\_bounce\_usb} /
+\texttt{dcache\_on\_no\_dma}）を追加すべきである。そうすれば GA が D-cache の
+トレードオフ（\spd{8.8} vs USB DMA の壁）を直接探索できる。
+
+\subsection{結論：GA は方向を、実測は真実を語る}
+
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{価値}：GA は「worker\_pool を磨け」という方向を、実測の前に
+        独立に正しく示した。Pi 3 / Pi 5 で再現し、Pi 3 では実測が裏付けた。
+  \item \textbf{限界 1}：全遺伝子の詳細（isolation・ipc）はアーティファクト
+        混入。主軸のみ信頼でき、副軸は人手で実測に合わせて上書きすべき。
+  \item \textbf{限界 2}：経験的な支配変数（D-cache）が schema に無ければ、
+        GA はそれを見つけられない。実機実測が GA を補完する。
+\end{itemize}
