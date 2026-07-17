@@ -1,0 +1,65 @@
+% ======================================================================
+% related_work.tex — 背景と関連研究
+% ======================================================================
+
+Xinu は Douglas Comer が教科書『Operating System Design: The Xinu Approach』の
+ために設計した、単一プロセッサ前提の軽量教育用 OS である。その ARM / MIPS 系
+組込み移植 \textbf{Embedded Xinu} は Marquette 大学の Dennis Brylow のグループが
+主導し、複数大学の OS 教育で使われている。本作業もこの Embedded Xinu の
+Raspberry Pi 3 移植を出発点とする。
+
+\subsection{既存研究：XinuPi3（Marquette、教育目的の対称型 SMP）}
+
+Raspberry Pi 3 の 4 コア化そのものは、Xinu の本家グループが既に発表している。
+\textbf{XinuPi3}\footnote{P. Bansal, R. Latinovich, T. Lazar, P. J. McGee,
+D. Brylow, ``XinuPi3: Teaching Multicore Concepts Using Embedded Xinu,''
+CSERC '17（6th Computer Science Education Research Conference）, Helsinki, 2017.
+\url{https://epublications.marquette.edu/mscs_fac/634/}} は Embedded Xinu を
+Pi 3 へ移植し、\textbf{対称型マルチプロセッシング（full SMP）}を実現した。
+その主眼は\textbf{教育}にあり——「マルチコア概念を、真に並行なハードウェアで
+初学者に教える」ため——コアの起動、\textbf{キャッシュコヒーレンシ}、
+\textbf{コア間相互排他（ロック）}、マルチコアスケジューリングを扱う。
+論文自身が「ベアメタルの教育用 OS でマルチコアを支えるものは他に無い」と述べ、
+その\textbf{存在}と\textbf{教材としての価値}を貢献としている。同グループは
+続けて、Pi 3 を用いた OS 教育・アセンブリでの並列計算教育の実践も報告して
+いる\footnote{P. J. McGee, R. Latinovich, D. Brylow, ``Using Embedded Xinu
+and the Raspberry Pi 3 to Teach Operating Systems,'' IEEE IPDPS Workshops
+(EduPar), 2020.}。
+
+\subsection{本研究との違い}
+
+本レポートの研究は、XinuPi3 と\textbf{目的・方式・貢献のいずれも異なる}。
+
+\begin{table}[htbp]
+\centering
+\caption{XinuPi3（既存）と本研究の違い}
+\small
+\begin{tabularx}{\textwidth}{@{}lXX@{}}
+\toprule
+ & \textbf{XinuPi3（Marquette）} & \textbf{本研究} \\
+\midrule
+目的 & 教育——マルチコア概念を教える教材 & 測定駆動の工学——稼働中の機能豊富な OS の並列性能を、退行させずに最大化 \\
+SMP 方式 & \textbf{対称型（full SMP）} & \textbf{非対称ワーカープール型}。コア 0 は既存 OS を無改変で走らせ、コア 1--3 を計算ワーカーに \\
+キャッシュ & D-cache 有効化＋コヒーレンシ処理 & D-cache は\textbf{意図的に OFF}（volatile+dsb でロックフリー）。その上で「ON にすると何が変わるか」を独立実験（第\ref{sec:dcache}節） \\
+同期 & コア間ロック（相互排他） & \textbf{ロックフリー}。full SMP を採らないので cross-core ロックが不要 \\
+対象カーネル & 教育用の素の Xinu & WiFi ad-hoc メッシュ・WM・AIPL アクター・オンデバイス JIT が\textbf{稼働中で不変条件} \\
+貢献 & マルチコア対応の\textbf{存在}と教材価値 & \textbf{何が速くなり何が速くならないか}の定量的切り分け＋設計方法論 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent
+最も本質的な違いは、\textbf{対称型 SMP か、非対称ワーカープールか}である。
+XinuPi3 は full SMP を教育目標として\textbf{採る}。本研究は、既存ランタイム
+（アクター・ネット・WM）が非リエントラントであるという現実から出発し、
+full SMP は実績ある機能を全面的に作り直すリスクを負うと判断して\textbf{採らない}。
+そしてこの判断が正しいことを、二重に示した——実機実測で worker-pool が計算律速で
+\spd{3.99}（ほぼ理想値）を出すこと（第\ref{sec:rpi3}節）と、設計空間 GA が
+worker\_pool を full\_smp に対する champion として選ぶこと（第\ref{sec:ga}節）で
+ある。XinuPi3 が「4 コアを使えること」を示したのに対し、本研究は
+「4 コアで\textbf{何を}どこまで使うべきか、そして何は使っても無駄か」を測る。
+
+第二の違いは方法論にある。本研究は、(a) 実機での定量測定（計算 vs メモリ律速、
+プール往復の損益分岐、キャッシュ構成の支配性）、(b) D-cache 有効化という制御された
+比較実験、(c) AI レビュアーによる設計空間 GA と実測の照合——という、\textbf{測定と
+探索を軸にした}接近を採る。教育用途を主眼とする既存研究とは、問いの立て方が異なる。
