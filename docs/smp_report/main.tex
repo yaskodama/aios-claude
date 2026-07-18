@@ -106,9 +106,10 @@ D-cache の有効化は Cortex-A53 で set/way invalidate・SMPEN・DMA コヒ�
 要し、とりわけ USB ドライバがスタック上のバッファを DMA する構造が
 最大の障害であることを明らかにした。
 
-Raspberry Pi 3 についての実装と測定を第 \ref{sec:rpi3} 節、D-cache 実験を
-第 \ref{sec:dcache} 節に示す。Raspberry Pi 4 および 5 についても同一の
-枠組みで追記予定である。
+Raspberry Pi 3 の実装と測定を第 \ref{sec:rpi3} 節、D-cache 実験を
+第 \ref{sec:dcache} 節に示す。さらに Raspberry Pi 4（Cortex-A72）でも同一の
+ハーネスで測定し、「計算はスケールし、メモリはスケールしない」という結論が
+微アーキテクチャを超えて一般化することを確認した（第 \ref{sec:cross} 節）。
 \end{abstract}
 
 \tableofcontents
@@ -269,7 +270,7 @@ Raspberry Pi 3 B+ の $1.4\,\mathrm{GHz} \div 600\,\mathrm{MHz} = 2.33$ と
 
 \begin{table}[htbp]
 \centering
-\caption{ボード別 ワーカープール型 SMP の比較（rpi4 / rpi5 は追記予定）}
+\caption{ボード別 ワーカープール型 SMP の比較（rpi5 は追記予定）}
 \label{tab:cross}
 \small
 \begin{tabularx}{\textwidth}{@{}l l l l X@{}}
@@ -280,16 +281,51 @@ CPU        & Cortex-A53 $\times$4 & Cortex-A72 $\times$4 & Cortex-A76 $\times$4 
 実行状態   & AArch32 (32bit)      & AArch64 & AArch64 & Pi 3 のみ 32bit \\
 コア解放   & armstub7 mailbox 3   & spin table & PSCI & 第\ref{sec:rpi3-bringup}項 \\
 D-cache    & OFF                  & OFF & OFF & ロックフリーの前提 \\
-最大速度向上 & \spd{3.99}         & --- & --- & 計算律速 \\
-プール往復 & 7--11\,\textmu s      & --- & --- & 並列化の損益分岐 \\
+計算 \bench{dining} & \spd{3.99}  & \spd{3.99} & --- & 計算律速（公平比較） \\
+メモリ \bench{fill} 1\,MB & \spd{0.9}--\spd{1.35} & \spd{1.40} & --- & メモリ律速（公平比較） \\
+プール往復 & 7--11\,\textmu s      & 4\,\textmu s & --- & 並列化の損益分岐 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
+\subsection{公平な比較の条件：同一の分割方式のみ}
+\label{sec:cross-fair}
+
+Pi 4（A72）でも同一の \route{/bench} ハーネス（同一ワークロード・
+\texttt{agree} 検証・\textmu s タイミング・\texttt{cores} スイープ）で測定した。
+ただし\textbf{全ベンチが比較可能なわけではない}。Pi 3 と Pi 4 は N-Queens と
+素数の\textbf{分割方式が異なる}——Pi 3 は本作業で実装したインターリーブ
+（ストライド）分割、Pi 4 は既存の連続分割である。第 \ref{sec:rpi3-measbug} 項で
+述べたとおり、分割方式は偏った負荷の速度向上を大きく左右する。実際、
+\bench{nqueens} は Pi 3 \spd{3.65} に対し Pi 4 \spd{2.05}——だがこれは
+微アーキの差ではなく、連続分割が N-Queens の中央偏重コストで負荷を偏らせた
+結果である（第 \ref{sec:rpi3-fill} 項の max/avg 1.48 対 1.18 と整合）。
+したがって\textbf{両ボードで分割方式が同一のベンチだけ}が公平な比較となる：
+均一コストの \bench{dining}（両方連続）と \bench{fill}（両方連続）である。
+
+\subsection{知見は微アーキを超えて一般化する}
+
+その 2 つで、本レポートの中心的結論が A53 から A72 へ\textbf{一般化する}ことが
+確認できた。
+
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{計算律速は両ボードで理想的にスケールする。}\bench{dining} の
+        コア数スイープは A53・A72 とも
+        \spd{1.00}/\spd{1.99}/\spd{2.99}/\spd{3.99} と\textbf{同一の完全な直線}を
+        描く。ワーカープール型 SMP による計算の線形スケーリングは、
+        マイクロアーキテクチャに依存しない。
+  \item \textbf{メモリ律速は両ボードでスケールしない。}\bench{fill} は A53 で
+        \spd{0.9}--\spd{1.35}、A72 で全サイズ \spd{1.40} 程度と、どちらも
+        \textbf{平坦}で線形から遠い。D-cache OFF ゆえメモリ書込が RAM 帯域律速に
+        なる現象は、両ボード共通である（A72 の方がわずかに高いのは、より広い
+        メモリサブシステムがコア間の重なりをやや許すためと考えられる）。
+\end{itemize}
+
 \noindent
-Raspberry Pi 4 および 5 についても、本レポートと同一の枠組み
-（同一の \route{/bench} ルート、同一の \texttt{agree} 検証、同一の比による報告）
-で測定し、本節の表と各ボード節に追記する予定である。
+すなわち「計算はスケールし、描画（メモリ）はスケールしない」という Pi 3 の
+結論は、Pi 4 でもそのまま成り立つ。異なるのは絶対速度と細部だけで、
+\textbf{並列化すべき対象を分ける境界は微アーキを超えて同じ}である。
+Raspberry Pi 5（A76）も同一の枠組みで追記予定である。
 
 % =======================================================================
 \section{設計空間 GA：予測 vs 実機実測}
