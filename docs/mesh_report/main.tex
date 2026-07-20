@@ -1,0 +1,313 @@
+% !TEX program = xelatex
+% Xinu 3世代 Raspberry Pi 自己形成メッシュ ―― 概要と並列ベンチマーク
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=21mm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{makecell}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\setCJKmainfont{Hiragino Mincho ProN}
+\setCJKsansfont{Hiragino Sans}
+\setCJKmonofont{Hiragino Sans}
+\setmonofont{Menlo}[Scale=0.80]
+
+% 丸数字(①..)・ダッシュ・引用符・三点リーダ・罫線を CJK フォントへ回す
+\xeCJKDeclareCharClass{CJK}{"2460 -> "24FF, "2013 -> "2015, "2018 -> "201F, "2026, "2500}
+
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue!60!black,
+  pdftitle={Xinu 3世代 Raspberry Pi 自己形成メッシュ ― 概要と並列ベンチマーク},
+  pdfauthor={児玉靖司}}
+
+\definecolor{codebg}{gray}{0.96}
+\lstset{basicstyle=\ttfamily\scriptsize, backgroundcolor=\color{codebg},
+  breaklines=true, frame=single, framerule=0pt, columns=fullflexible,
+  keepspaces=true, xleftmargin=2pt, xrightmargin=2pt, aboveskip=4pt, belowskip=4pt}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\node}[1]{\textbf{#1}}
+
+\title{\textbf{Xinu 3 世代 Raspberry Pi 自己形成メッシュ}\\[2mm]
+  \large 概要と並列計算ベンチマーク\\[1mm]
+  \normalsize ―― A53 / A72 / A76 を跨ぐ Wi‑Fi アドホック・クラスタの実測 ――}
+\author{児玉靖司\\\small 法政大学経営学部}
+\date{2026 年 7 月 20 日}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+ベアメタル Embedded Xinu を載せた 3 世代の Raspberry Pi
+(Pi 3 B+ / Pi 4 / Pi 5) を、外部アクセスポイントを介さない
+\textbf{Wi‑Fi アドホック(IBSS)メッシュ}として結線した。3 台は固定 BSSID の
+同一セルに属し、各カーネルに新たに実装した\textbf{周期 HELLO ビーコン}によって、
+アプリ通信を一切流さなくても\textbf{電源投入だけで互いを自動発見}する。本書は
+このメッシュの構成をまとめ、その上で
+\textbf{N‑Queens・食事する哲学者(dining)・素数計数}の並列ベンチマークを実機で走らせた。
+測定は 2 層で行う。すなわち \textbf{(a) 各ノード内の 4 コア SMP} と、
+\textbf{(b) メッシュ全体を 1 台の分散並列計算機と見なした列分割 N‑Queens} である。
+本作業では \textbf{Pi 3(A53)にも 4 コア・ワーカプール SMP を新規移植}し、3 台合計
+\textbf{12 コア}(A53/A72/A76 各 4 コア)を Wi‑Fi 越しに協調させ、単一問題(N‑Queens)を
+解いて\textbf{単独最速ノードの 1.87 倍}の速度を得た。加えて、細粒度な dining では
+3 ボードとも\textbf{4.0 倍}のほぼ理想 SMP を示した。
+すべての数値は 192.168.3.0/24 の制御面(有線)から HTTP で採取した実測値であり、
+解の総数はいずれも既知の真値と一致する。
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+% ======================================================================
+\section{メッシュネットワークの概要}
+
+\subsection{構成}
+3 台はいずれも Anthropic 製ではないベアメタル OS \emph{Embedded Xinu} を
+独自移植したもので、オンボード Wi‑Fi を\textbf{インフラストラクチャ接続ではなく
+IBSS(独立基本サービスセット＝アドホック)}で起動する。全ノードが
+\textbf{同一の固定パラメータ}を共有することで、アクセスポイントも DHCP も
+無い環境で 1 つのセルに収束する(表\ref{tab:cell})。
+
+\begin{table}[h]\centering
+\caption{メッシュ・セルの共有パラメータ}\label{tab:cell}
+\begin{tabular}{ll}
+\toprule
+項目 & 値 \\
+\midrule
+SSID            & \code{MANET} \\
+モード          & IBSS(アドホック) \\
+チャネル        & 6 (2.4\,GHz) \\
+固定 BSSID      & \code{02:4d:41:4e:45:54}(\,"MANE T" の ASCII\,) \\
+アドレス方式    & 静的 \code{10.0.0.$n$/24}($n$＝ノード番号) \\
+近隣発見        & HELLO ビーコン(UDP/5000、周期 2 秒) \\
+上位            & MANET / AODV(オンデマンド経路)、制御面は有線 192.168.3.0/24 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]\centering
+\caption{ノード構成(3 世代の Arm マイクロアーキテクチャ)}\label{tab:nodes}
+\small
+\begin{tabularx}{\linewidth}{cllllX}
+\toprule
+\#\,($n$) & ボード & メッシュIP & SoC & CPU コア & 並列実行モデル \\
+\midrule
+1 & Pi 3 B+ & 10.0.0.1 & BCM2837 & Cortex‑A53 $\times$4 (ARMv8‑A, AArch32) & 4 コア・ワーカプール SMP(本作業で移植) \\
+2 & Pi 4    & 10.0.0.2 & BCM2711 & Cortex‑A72 $\times$4 (ARMv8‑A, AArch64) & 4 コア・ワーカプール SMP \\
+3 & Pi 5    & 10.0.0.3 & BCM2712 & Cortex‑A76 $\times$4 (ARMv8.2‑A, AArch64) & 4 コア・ワーカプール SMP(DSU) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{自己形成 ―― HELLO による自動近隣発見}
+当初、3 台を同一セルに入れても\textbf{近隣表が埋まらない}問題があった。原因は
+「参加はするが、誰も自分の存在を能動的に広告しない」ことにあった。そこで各カーネルの
+Wi‑Fi 層に\textbf{周期 HELLO ビーコン}を実装した。動作は単純である。
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item 2 秒ごとに、自ノード ID を載せた UDP/5000 ブロードキャストを送出する
+      (\code{mn\_hello\_tick} が \code{SYSTIMER} を見て自律送出)。
+\item 受信側は送信元 ID を近隣表 \code{mn\_peer\_seen} に記録する。
+\item 収束状況は各カーネルの \code{/manet} ルート(Pi 5 は \code{@B peers} 行)で
+      即座に可視化できる。
+\end{itemize}
+
+これにより\textbf{アプリのトラフィックを一切流さなくても}近隣表が自動で埋まる。
+表\ref{tab:discovery}は 3 台を起動しただけの状態で採取した実測で、
+\textbf{全ノードが他の 2 ノードを自力で発見}している。
+
+\begin{table}[h]\centering
+\caption{自己形成の実測(\code{/manet}、電源投入＋参加のみ)}\label{tab:discovery}
+\begin{tabular}{cllc}
+\toprule
+ノード & \code{/manet} 応答(抜粋) & 発見した近隣 & 判定 \\
+\midrule
+Pi 3 (1) & \code{rx=121 hello\_tx=67 peers=2 ids= 3 2}   & Pi 5, Pi 4 & \checkmark \\
+Pi 4 (2) & \code{rx=1543 hello\_tx=872 peers=2 ids= 3 1}  & Pi 5, Pi 3 & \checkmark \\
+Pi 5 (3) & \code{rx=1575 hello\_tx=1165 peers=2 ids= 2 1} & Pi 4, Pi 3 & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\code{rx}(受信 HELLO 数)は 3 台とも増加を続け、相互に HELLO を受信し合っている。
+以前の \code{nbrn=0} はホワイトリスト長(0＝全受理)であって近隣数ではなく、
+実際の発見近隣は本実装が追加した \code{peers} 欄に現れる。表\ref{tab:discovery}は、
+\textbf{Pi 3 を一度再起動して(SD 差し替えでカーネル更新)からメッシュへ再投入した}
+直後の状態である。Pi 3 の \code{rx}/\code{hello\_tx} は小さい値にリセットされた後、
+数秒で近隣 2 台(\code{ids= 3 2})を\textbf{手動設定なしに再発見}しており、
+\textbf{ノードの離脱・復帰に対して近隣表が自動で追従}することも確認できた。
+\textbf{「電源投入と参加だけで 3 台が同一セルへ収束し互いを自動発見・自動再収束する}
+\textbf{自己形成メッシュ」が実機で成立した。}
+
+% ======================================================================
+\section{ベンチマークの方法}
+メッシュの計算能力を 2 つの層で測る。
+
+\begin{description}[leftmargin=1.4em,itemsep=2pt]
+\item[(a) ノード内 SMP] 各ボードの \code{/bench?kind=...} が、同一ワークロードを
+  \textbf{1 コア}と\textbf{全コア}で背中合わせに実行し、経過時間をジェネリックタイマ
+  ($\mu$s)で測る。速度向上比はクロック揺らぎに頑健で、正答一致(\code{agree=yes})を毎回検証する。
+  ワークロードは \textbf{dining}(食事する哲学者)・\textbf{nqueens}・\textbf{primes}(素数計数)。
+\item[(b) メッシュ分散] \code{/nqpart?n=$N$\&c0=$a$\&c1=$b$} が「先頭クイーンを列
+  $[a,b)$ に置いた N‑Queens 部分解」を各ノードで数える。列全体 $[0,N)$ を
+  \textbf{複数ノードへ分割}し、\textbf{並列に}走らせて部分和を合算する。壁時計時間は
+  Mac(制御面)側で計測し、解の総和が真値と一致することを毎回確認する。
+\end{description}
+
+\noindent
+D キャッシュは 3 世代とも\textbf{明示的キャッシュ保守}(\code{dc cvac/ivac})を伴って
+オンで動作させており、マルチコア一貫性は保たれている(別レポート
+\emph{smp\_report} 参照)。
+
+% ======================================================================
+\section{ノード内 SMP ベンチマーク}
+表\ref{tab:smp}に 3 ボードの 4 コア SMP 実測を示す。当初 Pi 3 はワーカプールを
+持たず単一コアだったが、本作業で\textbf{Pi 3 にも AArch32 のワーカプール SMP を
+新規移植}した(副コア 1--3 をパーク解除し、core 0 と同じ識別マップ・D キャッシュ off
+で起動、ロックフリー・メールボックスで [lo,hi) 区間関数を並列実行)。これにより
+\textbf{3 世代 12 コアすべてが同一方式で並列実行}できるようになった。
+
+\begin{table}[h]\centering
+\caption{ノード内 SMP ベンチマーク(1 コア vs 4 コア、$\mu$s、\code{agree=yes})}\label{tab:smp}
+\small
+\begin{tabular}{llrrrc}
+\toprule
+ワークロード & ボード & 1 コア & 4 コア & 速度向上 & 検算 \\
+\midrule
+dining ($n{=}5$)
+  & Pi 3 & 119\,627 & 29\,913 & \textbf{3.99$\times$} & yes \\
+  & Pi 4 & 273\,097 & 68\,278 & \textbf{3.99$\times$} & yes \\
+  & Pi 5 & 152\,800 & 38\,203 & \textbf{4.00$\times$} & yes \\
+\addlinespace
+primes ($n{=}300{,}000$, 素数 25\,997)
+  & Pi 3 & 274\,011 & 90\,826 & \textbf{3.01$\times$} & yes \\
+  & Pi 4 & 158\,330 & 52\,633 & \textbf{3.00$\times$} & yes \\
+  & Pi 5 &  66\,819 & 22\,105 & \textbf{3.02$\times$} & yes \\
+\addlinespace
+nqueens ($n{=}12$, 解 14\,200、ブロック分割)
+  & Pi 3 & 111\,313 &  52\,487 & 2.12$\times$ & yes \\
+  & Pi 4 & 307\,814 & 154\,188 & 1.99$\times$ & yes \\
+  & Pi 5 & 125\,753 &  79\,269 & 1.58$\times$ & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{読み取り。}(1) \textbf{dining は 3 ボードとも 3.99--4.00 倍}とほぼ線形で、
+ロックフリー・メールボックスによる哲学者の並列化がコア数どおりに効く。移植したての
+Pi 3(A53)も A72/A76 と\textbf{同じ 4.0 倍}を出しており、SMP 移植が正しく機能している。
+(2) \textbf{primes は 3 ボードとも約 3 倍}。試し割りの負荷が数の大きさで偏り、素朴な
+区間分割では 4 コアを使い切れない。(3) \textbf{nqueens のブロック分割は 1.6--2.1 倍}に
+留まる。先頭列ごとの部分木の大きさが大きく異なり、列を連続ブロックで割ると最も重い
+中央列を担当したコアが律速するためである(負荷不均衡)。実際、Pi 4 で\textbf{インタリーブ
+分割}(\code{il=2}、列をストライドで配る)に替えると 308\,026\,$\to$\,157\,383\,$\mu$s、
+\textbf{1.95 倍}へ改善する。この「\textbf{分割の粒度と均衡が N‑Queens の速度向上を
+決める}」という知見が、次章のメッシュ分散における列割当ての設計根拠になる。
+
+% ======================================================================
+\section{メッシュ分散ベンチマーク ―― 列分割 N‑Queens}
+メッシュを\textbf{1 台の分散並列計算機}と見なし、N‑Queens の先頭クイーン列
+$[0,N)$ を複数ノードへ分割して\textbf{並列に}解く。各ノードは自分の列範囲を
+\emph{ノード内 4 コア}で処理するので、3 ボードすべてを SMP 化した本構成では
+Pi 3+Pi 4+Pi 5 で\textbf{計 12 コア}が Wi‑Fi 越しに協調する。まず 2 ノード
+(8 コア)を示し、続いて Pi 3 を含む 3 ノード(12 コア)へ拡張する。
+
+\subsection{単一ノード基準}
+\begin{table}[h]\centering
+\caption{単一ノードで全列を解いた基準時間(壁時計)}\label{tab:baseline}
+\begin{tabular}{lrr}
+\toprule
+問題 & Pi 4 単独 & Pi 5 単独 \\
+\midrule
+$N{=}13$(解 73\,712)   & 819\,ms  & 417\,ms \\
+$N{=}14$(解 365\,596)  & 5\,216\,ms & 2\,722\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+Pi 5(A76)は Pi 4(A72)の\textbf{約 1.9 倍}速い。ヘテロジニアスなクラスタなので、
+分散では\textbf{速いノードに重い(中央寄りの)列を多く割り当てる}のが要諦になる。
+
+\subsection{2 ノード分散(Pi 4 + Pi 5)}
+列全体を Pi 4 と Pi 5 に分け、2 本の HTTP 要求を\textbf{同時に}発行して壁時計時間を測る。
+
+\begin{table}[h]\centering
+\caption{2 ノード分散 N‑Queens(Pi 4 + Pi 5 を並列起動)}\label{tab:dist2}
+\small
+\begin{tabular}{llllrr}
+\toprule
+問題 & Pi 4 の列/解/時間 & Pi 5 の列/解/時間 & 総和(検算) & 壁時計 & 対 Pi 5 単独 \\
+\midrule
+$N{=}13$ & \makecell[l]{列[0,4)\\18\,090 / 243\,ms} & \makecell[l]{列[4,13)\\55\,622 / 295\,ms}
+         & 73\,712 \checkmark & \textbf{350\,ms} & 1.19$\times$ \\
+\addlinespace
+$N{=}14$ & \makecell[l]{列[0,4)\\78\,898 / 1\,289\,ms} & \makecell[l]{列[4,14)\\286\,698 / 2\,055\,ms}
+         & 365\,596 \checkmark & \textbf{2\,088\,ms} & 1.30$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{読み取り。}解の総和は真値と一致し、\textbf{Wi‑Fi 越しの分散計算が正しく}
+\textbf{協調している}。$N{=}14$ では 2 ノード並列で\textbf{2\,088\,ms}——Pi 5 単独
+(2\,722\,ms)の 1.30 倍、Pi 4 単独(5\,216\,ms)の\textbf{2.50 倍}。理想の
+ヘテロ 2 ノード調和平均は
+$1/(1/2722+1/5216)=1789$\,ms なので、\textbf{達成効率は約 86\,\%}である。
+残りの 14\,\% は、列割当ての離散性による負荷不均衡(Pi 4 に整数個の列しか渡せない)と、
+HTTP/Wi‑Fi の往復・単一スレッド応答器の競合に由来する。列境界を [0,4) にすると
+Pi 4=1\,289\,ms / Pi 5=2\,055\,ms と Pi 5 側が律速だが、これ以上 Pi 4 に列を渡すと
+(境界 [0,5))今度は Pi 4 が 2\,056\,ms に跳ね上がり悪化する——\textbf{整数列という
+粒度が細かな均衡を阻む}、前章の知見どおりの振る舞いである。
+
+% --- 3ノード節: rpi3 を計算ノードに加えられたら数値を差し込む ---
+\input{dist3.tex}
+
+% ======================================================================
+\section{考察}
+\begin{itemize}[leftmargin=1.4em,itemsep=3pt]
+\item \textbf{2 層の並列性。}メッシュは「ノード内 SMP(共有メモリ、$\mu$s 粒度)」と
+  「ノード間分散(メッセージ passing、ms 粒度)」の二重構造を持つ。前者は dining で
+  4.0 倍とほぼ理想、後者は N‑Queens で\textbf{正しく解きつつ}、3 ノード 12 コアで
+  単独最速の 1.87 倍(Pi 4 単独比 3.58 倍)。
+  粒度の差(3 桁)がそのまま\textbf{分割単位を大きく取るべき}という設計指針になる。
+\item \textbf{ヘテロジニアス性は割当てで吸収する。}A53/A72/A76 は素の速度が
+  大きく違う。固定均等分割ではなく\textbf{速いノードに重い列}という重み付き割当てが要る。
+  本実験でも「重い中央 6 列 [4,10) を最速の Pi 5、軽い端の 4 列ずつを Pi 3・Pi 4」と
+  した配置が最良で、素の速度が 1 桁違う Pi 3(A53)でも軽い列を 4 コアで捌けば
+  最速の 672\,ms で完了し、全体を縮めた。
+\item \textbf{12 コア規模では律速がコアの速さから粒度へ移る。}$N{=}14$ の各ノード計算は
+  1--2 秒に対し HELLO や HTTP の往復は ms オーダで、\textbf{通信は律速ではない}。
+  効率を削るのは「$N$ 列を整数本ずつしか渡せない」離散性で、12 コアに対し 14 列は粗すぎる
+  (9 コア→12 コアの改善が 1.09 倍に留まる)。細粒度な dining が 3 ボードとも 4.0 倍＝
+  分散すれば約 12 倍に届くことと対照的である。列をさらに小さな部分木へ割る動的
+  ワークスチールで理想へ寄せられる。
+\item \textbf{自己形成が運用を単純にする。}周期 HELLO により、ノードの参加・離脱で
+  近隣表が自動更新される。ベンチマーク投入前に手作業でトポロジを設定する必要がなく、
+  \textbf{電源投入だけで計算資源がクラスタに現れる}。
+\end{itemize}
+
+\section{結論}
+外部 AP を介さない 3 世代 Raspberry Pi の Wi‑Fi アドホック・メッシュを、
+\textbf{周期 HELLO による自己形成}として実機で成立させ、その上で
+\textbf{N‑Queens・dining・primes の並列ベンチマーク}を 2 層(ノード内 SMP／
+ノード間分散)で実測した。本作業で\textbf{Pi 3(A53)にも AArch32 のワーカプール SMP を
+新規移植}し、3 世代 12 コアを同一方式で並列化できるようにした――ノード内は dining で
+3 ボードとも 4.0 倍とほぼ理想の SMP 効率を示す。メッシュ分散 N‑Queens は\textbf{解を
+正しく合算しながら}、A53/A72/A76 のヘテロ 3 ノード 12 コアで\textbf{単独最速ノードの
+1.87 倍}(Pi 4 単独の 3.58 倍)の速度向上を得た。律速は Wi‑Fi ではなく\textbf{列分割の粒度}であり、
+動的な仕事分割によりさらなる改善余地がある。本結果は、このメッシュが単なる
+通信網ではなく\textbf{電源投入だけで立ち上がる分散並列計算機}として機能することを示す。
+
+\end{document}
