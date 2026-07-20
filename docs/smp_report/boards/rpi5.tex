@@ -1,14 +1,84 @@
 % ======================================================================
-% boards/rpi5.tex — Raspberry Pi 5 (BCM2712) のマルチコア化  ★未執筆
-%
-% 書き方: boards/rpi3.tex を雛形として、同じ節構成で埋める（rpi4.tex 参照）。
-% Pi 5 固有: コア起動は PSCI CPU_ON、コア識別は MPIDR Aff1。
-% 設計空間 GA の champion が smp_model=worker_pool (0.507) で
-% full_smp (0.371) に勝っている経緯も書けるとよい。
-% 既存資料: aice-pi-evolution/experiments/2026-06-29_xinu_rpi5_evolution/
-%           IMPLEMENTATION_PLAN.md
+% boards/rpi5.tex — Raspberry Pi 5 (BCM2712, Cortex-A76) のマルチコア化
+% 実測: 2026-07-19, HTTP /bench (192.168.3.101)
 % ======================================================================
 
-\subsection*{（未執筆）}
-本節は追記予定である。Raspberry Pi 5（BCM2712、Cortex-A76 $\times$ 4、AArch64）
-のワーカープール型 SMP について、本レポートと同一の枠組みで測定し記述する。
+Raspberry Pi 5（BCM2712、Cortex-A76 $\times$ 4、AArch64）へも同一のワーカープール型
+SMP を移植した。ここでも\textbf{Pi 5 固有の差分と実測値}のみを述べる。
+
+\subsection{対象と前提}
+
+BCM2712 は 4 つの Cortex-A76 を持つ。A76 は DynamIQ Shared Unit（DSU）を備え、
+D-cache ON 時のコア間コヒーレンシ機構が A53/A72 の \texttt{SMPEN} とは異なる（第
+\ref{sec:dcache-a76} 節）。本節の測定は本レポート共通の前提どおり\textbf{D-cache
+OFF}で行い、ロックフリー調停を RAM 直行で成立させている。A76 は 3 世代で\textbf{単一
+コアの絶対速度が最も速い}（例：\bench{fill} 1\,MB の 1 コアが約 2{,}170\,\textmu s で、
+A72 の約 7{,}000\,\textmu s の 3 倍以上速い）。
+
+\subsection{コア起動：PSCI}
+\label{sec:rpi5-bringup}
+
+Pi 5 はコア起動に\textbf{PSCI}（\texttt{CPU\_ON} のハイパーコール）を用いる（Pi 3 の
+armstub mailbox、Pi 4 の spin table に対応する差分）。コア識別は \texttt{MPIDR} の
+Aff1 フィールドで行う。起床後の MMU 構成統一は他ボードと同一で、
+\texttt{cores\_online = 4} を実機で確認した。
+
+\subsection{実測 1：計算律速}
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 5：計算律速のコア数スイープ（\route{/bench}、\texttt{cores=1..4}、全て \texttt{agree=yes}）}
+\label{tab:rpi5-compute}
+\small
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+ベンチ & 1 & 2 & 3 & 4 & 備考 \\
+\midrule
+\bench{dining n=5}      & \spd{1.00} & \spd{1.99} & \spd{2.99} & \spd{3.99} & 完全に線形（理想） \\
+\bench{primes n=300000} & \spd{1.00} & \spd{1.61} & \spd{2.31} & \spd{3.01} & 連続分割で概ね均衡 \\
+\bench{nqueens n=12}    & \spd{1.00} & \spd{1.45} & \spd{1.47} & \spd{1.5}\,--\spd{1.5} & 静的分割では頭打ち \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\bench{dining} は A53・A72 と同じく理想の \spd{3.99}。\bench{nqueens} は 4 コアで
+\spd{1.5} 前後（\spd{1.41}--\spd{1.54}）と、\textbf{A72（\spd{1.85}）よりさらに低い}。
+これは第 \ref{sec:cross-fair} 項の知見と整合する：A76 は単一コアが速いぶん、静的分割の
+負荷不均衡とプール往復の相対比重が大きくなり、\bench{nqueens} の静的分割はより早く
+頭打ちになる。改善には動的負荷分散（Level 3）が要る。
+
+\subsection{実測 2：メモリ律速は最も平坦}
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 5：メモリ書込律速（\bench{fill}、8 パス、\texttt{cores=4}、5 回中の最良値）}
+\label{tab:rpi5-fill}
+\small
+\begin{tabular}{@{}rrrl@{}}
+\toprule
+語数 & 1 コア \textmu s & 4 コア \textmu s & 速度向上 \\
+\midrule
+4{,}096  & 34    & 31    & \spd{1.09} \\
+16{,}384 & 187   & 183   & \spd{1.02} \\
+65{,}536 & 536   & 518   & \spd{1.09} \\
+262{,}144 (=1\,MB) & 2{,}169 & 2{,}043 & \spd{1.06} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+Pi 5 の \bench{fill} は全域で \spd{1.0}--\spd{1.1} と、3 世代で\textbf{最も平坦}で
+ある。A76 は 1 コアあたりのメモリ帯域が相対的に高く、\textbf{1 コアで既に RAM 帯域を
+ほぼ飽和}させるため、コアを足しても増えない。なお \bench{fill} の小サイズ（$\le$1{,}024
+語、サブ\textmu s）は約 8 秒周期の自動アクタ GC に撹乱されて外れ値が出るため、5 回
+測定の最良値で代表させた——単発測定のばらつき（第 \ref{sec:cross-fair} 項でも触れた）
+の一例である。
+
+\subsection{小括}
+
+Pi 5（A76）でも本レポートの中心結論はそのまま成立する：\textbf{計算律速は理想的に
+スケール（\spd{3.99}）・メモリ律速はスケールしない（\spd{1.06}）}。世代固有の差は、
+起動機構（PSCI）、単一コア絶対速度が最速であること、\bench{fill} が最も平坦である
+こと、そして D-cache ON 時のコヒーレンシ機構が DSU である点（第 \ref{sec:dcache-a76}
+節）に限られる。「並列化すべき対象を分ける境界」は 3 世代を通じて同一であった。

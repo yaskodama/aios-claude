@@ -1,0 +1,64 @@
+=== Pi4 (A72) nqueens/primes: CONTIGUOUS vs INTERLEAVE, cores sweep (speedup x100) ===
+nqueens n=12 [contig] : c1=99 c2=160 c3=179 c4=185
+nqueens n=12 [il] : c1=99 c2=159 c3=175 c4=182
+primes n=300000 [contig] : c1=100 c2=161 c3=230 c4=300
+primes n=300000 [il] : c1=100 c2=101 c3=204 c4=202
+
+=== nqueens n=13 contiguous vs interleave (c1..c4) ===
+nqueens n=13 [contig] : c1=99 c2=168 c3=186 c4=193
+nqueens n=13 [il] : c1=100 c2=155 c3=170 c4=175
+
+=== agree check (interleave must still be correct) ===
+SMP bench kind=nqueens split=interleave
+cores_online = 4
+solutions = 14200
+1-core   us  = 275495
+N-core   us  = 150655
+speedup x100 = 182
+agree = yes
+
+=== Pi4 nqueens: SECOND-ROW interleave (il=2, Pi3 fair method), cores sweep ===
+nqueens n=12 [il2 rep1] : c1=100 c2=160 c3=186 c4=202
+nqueens n=12 [il2 rep2] : c1= c2=159 c3=174 c4=180
+nqueens n=12 [il2 rep3] : c1=99 c2=159 c3=174 c4=180
+nqueens n=13 [il2 rep1] : c1=99 c2=160 c3=177 c4=183
+nqueens n=13 [il2 rep2] : c1=99 c2=160 c3=177 c4=183
+nqueens n=13 [il2 rep3] : c1=100 c2=160 c3=177 c4=182
+
+=== correctness + absolute (il2 nqueens n=12 c4) ===
+SMP bench kind=nqueens split=interleave
+cores_online = 4
+solutions = 14200
+1-core   us  = 275484
+N-core   us  = 152205
+speedup x100 = 180
+agree = yes
+
+=== also re-take contiguous nqueens 3x for noise baseline ===
+nqueens n=12 [contig rep1] : c1=100 c2=161 c3=179 c4=185
+nqueens n=12 [contig rep2] : c1=99 c2=160 c3=179 c4=185
+nqueens n=12 [contig rep3] : c1=99 c2=161 c3=179 c4=185
+
+============================================================
+ANALYSIS (2026-07-19) — nqueens split-method experiment on Pi 4 (A72)
+============================================================
+Absolute times (same call, 1c vs Nc):
+  nqueens n=12 contiguous : 1c=315063us 4c=153808us -> x2.04
+  nqueens n=12 il=1 (row1) : 1c=275495us 4c=150655us -> x1.83
+  nqueens n=12 il=2 (row2) : 1c=315337us 4c=157862us -> x1.99
+  nqueens n=13 il=2        : 1c=1721863us 4c=853802us -> x2.01
+  nqueens n=14 il=2        : 1c=10030256us 4c=4902016us -> x2.04
+  => ALL static splits ~x2.0, SCALE-INVARIANT. Classic load imbalance
+     (few atomic heavy subtrees). cores sweep 1.00/1.60/1.77/1.83 (plateau).
+
+primes n=300000:
+  contiguous x3.00 ; interleave(il=1) x2.02 with c2=x1.01 (even/odd resonance)
+  => Pi 4 interleave REPRODUCES Pi 3's stride resonance -> primes comparable.
+
+CONCLUSION: Pi 3 (x3.65) vs Pi 4 (x2.05) nqueens gap is NOT contiguous-vs-
+interleave. It is STATIC split vs DYNAMIC load-balancing. Pi 3's high figure
+came from /api/loadbal/nqueens (least-loaded actor dispatch, Level-3), not the
+static /bench split. Report section sec:cross-fair corrected accordingly.
+
+Kernel with il=1/il=2 benches: md5 4cf1a50a (production + interleave bench,
+now running on the Pi 4). Data: bench_pi4_contiguous.txt + this file.

@@ -1,0 +1,25 @@
+=== Pi4 (A72) CONTIGUOUS split — Amdahl sweep (speedup x100) ===
+dining n=5 :  c1=99  c2=199  c3=300  c4=399
+nqueens n=12 :  c1=99  c2=160  c3=189  c4=204
+primes n=300000 :  c1=99  c2=161  c3=230  c4=300
+
+=== nqueens n=13 (cores sweep) ===
+nqueens n=13 : c1=99 c2=169 c3=197 c4=213
+
+=== fill sweep (1c us / 4c us / speedup x100) ===
+fill n=64 : 1c=3us 4c=7us x100=42
+fill n=256 : 1c=8us 4c=12us x100=66
+fill n=1024 : 1c=28us 4c=35us x100=80
+fill n=4096 : 1c=110us 4c=100us x100=110
+fill n=16384 : 1c=438us 4c=307us x100=142
+fill n=65536 : 1c=1749us 4c=1269us x100=137
+fill n=262144 : 1c=6997us 4c=5050us x100=138
+
+=== null (pool round-trip) ===
+SMP bench kind=null
+cores_online = 4
+chunks = 4
+1-core   us  = 0
+N-core   us  = 5
+speedup x100 = 0
+agree = yes

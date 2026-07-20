@@ -73,7 +73,7 @@
        \large ワーカープール型 SMP の設計と実測\\[1mm]
        \normalsize 何が速くなり、何が速くならないか}
 \author{児玉靖司\\\small 法政大学経営学部\\\small \texttt{yass@hosei.ac.jp}}
-\date{2026年7月16日}
+\date{2026年7月19日}
 
 \begin{document}
 \maketitle
@@ -250,14 +250,14 @@ Raspberry Pi 3 B+ の $1.4\,\mathrm{GHz} \div 600\,\mathrm{MHz} = 2.33$ と
 \input{boards/rpi3}
 
 % =======================================================================
-% ボード追加時はここの コメントを外す。
-% \section{Raspberry Pi 4 (BCM2711)}
-% \label{sec:rpi4}
-% \input{boards/rpi4}
-%
-% \section{Raspberry Pi 5 (BCM2712)}
-% \label{sec:rpi5}
-% \input{boards/rpi5}
+\section{Raspberry Pi 4 (BCM2711)}
+\label{sec:rpi4}
+\input{boards/rpi4}
+
+% =======================================================================
+\section{Raspberry Pi 5 (BCM2712)}
+\label{sec:rpi5}
+\input{boards/rpi5}
 
 % =======================================================================
 \section{実験：D-cache を有効化する（Level 2）}
@@ -282,26 +282,101 @@ CPU        & Cortex-A53 $\times$4 & Cortex-A72 $\times$4 & Cortex-A76 $\times$4 
 コア解放   & armstub7 mailbox 3   & spin table & PSCI & 第\ref{sec:rpi3-bringup}項 \\
 D-cache    & OFF                  & OFF & OFF & ロックフリーの前提 \\
 計算 \bench{dining} & \spd{3.99}  & \spd{3.99} & \spd{3.99} & 計算律速（公平比較） \\
-メモリ \bench{fill} 1\,MB & \spd{0.9}--\spd{1.35} & \spd{1.40} & \spd{1.02} & メモリ律速（公平比較） \\
+メモリ \bench{fill} 1\,MB & \spd{0.9}--\spd{1.35} & \spd{1.38} & \spd{1.06} & メモリ律速（公平比較） \\
 プール往復 & 7--11\,\textmu s      & 4\,\textmu s & 3\,\textmu s & 並列化の損益分岐 \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\subsection{横断表の実測検証（反復測定）}
+\label{sec:cross-verify}
+
+表 \ref{tab:cross} の Pi 4／Pi 5 の値は、単発ではなく\textbf{稼働中の実機で反復測定して
+確認}した（\route{/bench}、2026 年 7 月、Pi 4 = \texttt{192.168.3.100}、
+Pi 5 = \texttt{192.168.3.101}）。
+
+\begin{itemize}[leftmargin=1.6em,noitemsep]
+  \item \textbf{\bench{dining} \spd{3.99} は本物}。5 回測定で Pi 4・Pi 5 とも
+        \texttt{x100} の最小＝中央＝最大が \texttt{399}（完全に安定）。3 世代の
+        \spd{3.99} は偶然の一致ではなく、各ボードで独立に得た実測である。
+  \item \textbf{\bench{fill} 1\,MB}：Pi 4 は 8 回で \spd{1.32}--\spd{1.41}（中央
+        \spd{1.37}）、Pi 5 は \spd{0.99}--\spd{1.34}（中央 \spd{1.06}）。Pi 5 の
+        ばらつきが大きいのは約 8 秒周期の自動アクタ GC の混入で、これも\textbf{単発
+        測定を信じてはいけない}ことの実例である（第 \ref{sec:clock} 項の時計問題と
+        同じ教訓）。
+  \item \textbf{プール往復}：Pi 4 は空ジョブ 4 コア投入を 15 回測って \texttt{4--5}\,
+        \textmu s（実質 4\,\textmu s）、Pi 5 は最小ジョブ（\bench{fill} 1 語）の 4 コア
+        投入で 2\,\textmu s であり、いずれも表の値と整合する。
+  \item \textbf{\bench{primes}}（連続分割）は Pi 4 \spd{3.00}・Pi 5 \spd{3.02} で
+        安定（各 5 回で不動）。ただし分割方式に依存するため横断の主表には載せず、
+        第 \ref{sec:cross-fair} 項で別途扱う。
+\end{itemize}
 
 \subsection{公平な比較の条件：同一の分割方式のみ}
 \label{sec:cross-fair}
 
 Pi 4（A72）・Pi 5（A76）でも同一の \route{/bench} ハーネス（同一ワークロード・
 \texttt{agree} 検証・\textmu s タイミング・\texttt{cores} スイープ）で測定した。
-ただし\textbf{全ベンチが比較可能なわけではない}。Pi 3 と Pi 4/Pi 5 は N-Queens と
-素数の\textbf{分割方式が異なる}——Pi 3 は本作業で実装したインターリーブ
-（ストライド）分割、Pi 4 は既存の連続分割である。第 \ref{sec:rpi3-measbug} 項で
-述べたとおり、分割方式は偏った負荷の速度向上を大きく左右する。実際、
-\bench{nqueens} は Pi 3 \spd{3.65} に対し Pi 4 \spd{2.05}——だがこれは
-微アーキの差ではなく、連続分割が N-Queens の中央偏重コストで負荷を偏らせた
-結果である（第 \ref{sec:rpi3-fill} 項の max/avg 1.48 対 1.18 と整合）。
-したがって\textbf{両ボードで分割方式が同一のベンチだけ}が公平な比較となる：
-均一コストの \bench{dining}（両方連続）と \bench{fill}（両方連続）である。
+ただし\textbf{全ベンチが素朴には比較可能でない}。Pi 3 と Pi 4/Pi 5 は N-Queens と
+素数の\textbf{仕事の配り方が異なっていた}——Pi 3 はストライド／least-loaded で配り、
+Pi 4 は既存の連続分割である。そこで本セッションで、\textbf{配り方を揃える実験}を
+Pi 4 実機で行い、差が「分割方式」で説明できるかを直接検証した。
+
+\subsubsection*{実験：N-Queens は静的分割では揃わない（連続でもインターリーブでも）}
+
+Pi 4 の \route{/bench} に\textbf{インターリーブ分割}（\texttt{?il=1}：第 1 行カラムの
+剰余類）と、Pi 3 と同型の\textbf{第 2 行細粒度インターリーブ}（\texttt{?il=2}：合法な
+(row0,\,row1) 対の剰余類、$\sim n(n{-}3)$ 項）を実装し、同一クロックで測り直した
+（全て \texttt{agree=yes}）。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 4（A72）N-Queens $n{=}12$：静的分割の三方式（4 コア速度向上）}
+\label{tab:pi4-nq-split}
+\small
+\begin{tabular}{@{}lccl@{}}
+\toprule
+分割方式 & 4 コア速度向上 & コア数スイープ(1/2/3/4) & \\
+\midrule
+連続（既存）                 & \spd{2.04} & \spd{1.00}/\spd{1.60}/\spd{1.79}/\spd{1.85} & \\
+第 1 行インターリーブ        & \spd{1.83} & --- & \\
+第 2 行インターリーブ（Pi 3 と同型） & \spd{1.99} & \spd{1.00}/\spd{1.60}/\spd{1.77}/\spd{1.83} & ← 最細の静的分割 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+表 \ref{tab:pi4-nq-split} の結論は明快である：\textbf{分割方式を変えても Pi 4 の
+N-Queens は \spd{2.0} 前後で頭打ち}になる。しかもこれは規模不変で、$n{=}12/13/14$
+のいずれでも第 2 行インターリーブは \spd{1.99}/\spd{2.01}/\spd{2.04} であった
+（$n$ を上げても改善しない）。コア数スイープが \spd{1.60}$\to$\spd{1.77}$\to$\spd{1.83}
+と逓減して平坦化するのは、\textbf{少数の重い部分木が支配し、行単位の静的分割では
+それ以上割れない}——典型的な負荷不均衡である。
+
+したがって、\bench{nqueens} の Pi 3 \spd{3.65} 対 Pi 4 \spd{2.05} という差は
+\textbf{「連続 vs インターリーブ」では説明できない}（連続もインターリーブも第 2 行
+細分も、Pi 4 では等しく \spd{2.0}）。差の真因は\textbf{静的分割 vs 動的ロード
+バランス}である：Pi 3 の高い値は least-loaded に適応配分する動的ディスパッチャ
+（\route{/api/loadbal/nqueens}）由来であり、これは静的分割（本レポートの \route{/bench}）
+とは別階層（Level 3＝動的ワークスティーリング）の機構である。N-Queens は、
+コスト分布が予測不能かつ極端に偏るため、\textbf{静的にはどう配っても揃わず、
+動的負荷分散を要する}——これが実測から得た精緻化である。
+
+\subsubsection*{一方 素数は、分割方式を揃えれば公平に比較できる}
+
+対照的に \bench{primes} は、Pi 4 をインターリーブ（\texttt{?il=1}）にすると
+\textbf{Pi 3 の偶奇共鳴を再現}した——2 コアで \spd{1.01}（コア 0 が全偶数を担当し
+即座に非素数と判定して遊ぶ）、4 コアで \spd{2.02}。連続分割の Pi 4 \spd{3.00} とは
+別物だが、\textbf{Pi 3 と同じストライドにすれば同じ \spd{2.0} 級の共鳴パターンに
+一致}する。すなわち素数は「分割方式を揃えれば公平に比較できる」ベンチである。
+
+\medskip
+\noindent
+まとめると、公平に横断比較できるのは、\textbf{均一コストゆえ静的分割で揃う
+\bench{dining}・\bench{fill}}（両ボード連続）と、\textbf{分割方式を明示的に揃えた
+\bench{primes}}（両ボード・ストライド）である。\bench{nqueens} だけは静的分割の
+射程外（動的負荷分散が要る）であり、静的ハーネスの範囲では公平な数値比較の対象と
+しない。
 
 \subsection{知見は微アーキを超えて一般化する}
 

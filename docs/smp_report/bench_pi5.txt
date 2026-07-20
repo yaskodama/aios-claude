@@ -1,0 +1,27 @@
+=== Pi5 (A76) /bench — Amdahl sweep (speedup x100) ===
+dining n=5 : c1=100 c2=199 c3=299 c4=399
+nqueens n=12 : c1=100 c2=145 c3=147 c4=153
+primes n=300000 : c1=100 c2=161 c3=231 c4=301
+
+=== Pi5 fill sweep (1c/4c us, speedup) ===
+fill n=64 : 1c=2us 4c=4us x100=50
+fill n=256 : 1c=4us 4c=116us x100=3
+fill n=1024 : 1c=11us 4c=1743us x100=0
+fill n=4096 : 1c=34us 4c=31us x100=109
+fill n=16384 : 1c=187us 4c=560us x100=33
+fill n=65536 : 1c=536us 4c=518us x100=103
+fill n=262144 : 1c=2169us 4c=2043us x100=106
+
+=== Pi5 pool round-trip (null) + dining abs (for clock note) ===
+SMP bench kind=nqueens
+cores_online = 4
+solutions = 73712
+1-core   us  = 563823
+N-core   us  = 417767
+speedup x100 = 134
+agree = yes
+--- nqueens n=12 abs ---
+solutions = 14200
+1-core   us  = 125556
+N-core   us  = 79201
+agree = yes

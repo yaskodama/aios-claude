@@ -1,0 +1,97 @@
+Raspberry Pi 4 (BCM2711, Cortex-A72) — D-cache experiment, single-core, HDMI capture
+Same boot, same clock (dining OFF≈ON confirms no clock drift between the two runs).
+cores_online reads 0 in the OFF run because smp_init() had not run yet; the bench
+still runs single-core. Serial is dead (PL2303), net is incoherent with C=1, so the
+results were read off the HDMI console (mmu.c dcache_clean_all flushes the FB).
+
+===== D-cache OFF (SCTLR=0x30d01801, C=0) =====
+  dining        1c=91024us
+  null          1c=0us
+  fill n=4096   1c=45us     (16 KB)
+  fill n=16384  1c=180us    (64 KB)
+  fill n=65536  1c=707us    (256 KB)
+  fill n=262144 1c=2783us   (1 MB)
+
+===== D-cache ON  (SCTLR=0x30d01805, C=1) =====
+  dining        1c=91002us
+  null          1c=0us
+  fill n=4096   1c=40us     (16 KB)
+  fill n=16384  1c=171us    (64 KB)
+  fill n=65536  1c=700us    (256 KB)
+  fill n=262144 1c=2794us   (1 MB)
+
+Single-core speedup (OFF/ON): dining 1.00x, fill16K 1.12x, fill64K 1.05x,
+fill256K 1.01x, fill1M 1.00x.
+
+Key A72 findings:
+- D-cache C=1 enables cleanly (no brick) ONCE HDMI is up first (the FB property
+  mailbox must be coherent -> bring video up with C=0, then flip C=1).
+- SMPEN (CPUECTLR_EL1.SMPEN) cannot be written from EL1 on the A72 with the Pi 4
+  firmware: the MRS/MSR traps to an unset EL2 vector and the core dead-jumps.
+  => multi-core D-cache is impossible without an EL2/firmware change; bringing up
+  the workers under C=1 hangs (their stacks sit in core 0's dirty cache).
+  Ran single-core.
+- Single-core D-cache gain is marginal here and shrinks with working-set size
+  (16KB 1.12x -> 1MB 1.00x); dining (compute-bound) is unchanged. Weaker than the
+  A53 (Pi 3) and A76 (Pi 5, 1.55x @1MB) results.
+
+============================================================
+D-1 FOLLOW-UP (2026-07-19) — nqueens added to the single-core OFF/ON sweep
+Same boot, same clock (dining OFF 91022us ~= ON 91002us).
+============================================================
+D-cache OFF (SCTLR=0x30d01801, C=0):
+  dining        1c=91022us
+  nqueens n=12  1c=189445us
+  fill n=4096   1c=46us
+  fill n=16384  1c=177us
+  fill n=65536  1c=680us
+  fill n=262144 1c=2766us
+D-cache ON  (SCTLR=0x30d01805, C=1):
+  dining        1c=91002us
+  nqueens n=12  1c=12878us
+  fill n=4096   1c=38us
+  fill n=16384  1c=168us
+  fill n=65536  1c=700us
+  fill n=262144 1c=2823us
+
+Single-core D-cache speedup (OFF/ON):
+  dining        x1.00  (compute, tiny working set — no change)
+  nqueens n=12  x14.71 (189445/12878) *** HEADLINE: bigger than A53's x8.8 ***
+  fill 16KB     x1.21 ; fill 64KB x1.05 ; fill 256KB x0.97 ; fill 1MB x0.98
+
+INTERPRETATION: the earlier "A72 D-cache gain is marginal" (fill-only) was
+MISLEADING. D-cache IS highly effective on A72 — for the right access pattern.
+nqueens is recursion-heavy (deep call stack, repeatedly touched): with C=0 every
+stack access hits RAM; with C=1 the hot stack stays in L1 -> x14.7. fill is a
+pure write-only stream that is RAM-bandwidth-bound even when cached, so it barely
+moves (x1.0). The D-cache is genuinely active (nqueens proves it); fill simply is
+not a cache-friendly workload. Compare A53 nqueens x8.8, A72 nqueens x14.7.
+
+============================================================
+D-3 (2026-07-19) — A72 MULTI-CORE D-cache ACHIEVED via explicit cache maintenance
+(no SMPEN). smp.c: clean mailbox+secondary-stack writes to RAM, invalidate before
+cross-core reads (dc cvac/ivac, EL1-legal). Same boot, same clock.
+============================================================
+D-cache OFF (C=0, cores_online=0 -> single-core baseline):
+  dining        1c=91023us
+  nqueens n=12  1c=189458us
+  fill 4096=46 16384=174 65536=684 262144=2828 us
+D-cache ON  (C=1, cores_online=4, MULTI-CORE):
+  dining        1c=91002us  4c=22754us  x100=399  agree=yes   <- x3.99 SCALES, coherent!
+  nqueens n=12  1c=12885us  4c=3362us   x100=383  agree=yes   <- x3.83 SCALES under D-cache
+  null          4c=4us
+  fill 4096  1c=37  4c=29  x1.27
+  fill 16384 1c=160 4c=146 x1.09
+  fill 65536 1c=683 4c=767 x0.89
+  fill 1MB   1c=2792 4c=3177 x0.87   (shared buffer: write-back contention, no gain)
+
+HEADLINE:
+- A72 multi-core D-cache COHERENCY WORKS (dining x3.99, agree=yes) WITHOUT SMPEN,
+  using explicit dc cvac/ivac at the mailbox + secondary-bringup sync points.
+  This BREAKS the earlier "A72 multi-core impossible (SMPEN EL1-inaccessible)".
+- nqueens scales x3.83 under D-cache ON vs only ~x2.0 under D-cache OFF. The OFF
+  x2 cap was NOT purely load imbalance: it was partly RAM stack contention. With
+  C=1 each core's recursion stack is L1-private -> contention gone -> near-linear.
+- nqueens combined: ON 4-core 3362us vs OFF 1-core 189458us = ~x56.
+- fill (shared write-only buffer) does not benefit (x0.87-1.27): memory-bound +
+  write-back contention, as expected.

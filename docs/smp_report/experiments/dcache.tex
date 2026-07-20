@@ -335,3 +335,271 @@ USB が一つ壊れると全滅する。実機シリアルログには
 バウンスという迂回策すら退ける形で、より強く裏付けられた。8.8 倍の単一コア
 高速化という果実は実在するが、それを本番で収穫するには、USB ドライバの
 DMA 経路をより根本的に作り直す必要がある。これは明確に次段階の課題である。
+
+\subsection{ボード横断の追試：Cortex-A76（Pi 5）でも多コア D-cache は成立する}
+\label{sec:dcache-a76}
+
+同じ枠組みを Raspberry Pi 5（Cortex-A76、AArch64、BCM2712）へ移植し、A72 と同じ
+\textbf{明示キャッシュ管理}（\texttt{dc cvac/ivac}、第 \ref{sec:dcache-a72-multi} 項）を
+\texttt{smp.c} に入れて、\textbf{同一ブート内で OFF（単一コア）→ C=1 →
+多コア ON を連続測定}した（\bench{dining} が OFF 95{,}501 対 ON 95{,}501\,\textmu s と
+一致し、同一クロックが保証される）。
+
+\subsubsection*{単一コア：ここでも再帰は跳ね、書込ストリームは動かない}
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 5（Cortex-A76）単一コア、D-cache OFF vs ON（同一ブート・同一クロック）}
+\label{tab:dcache-a76-single}
+\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+ベンチ & 性質 & OFF & ON & 高速化 \\
+\midrule
+\bench{nqueens} $n{=}12$ & 再帰・深いスタック & 109{,}278\,\textmu s & 6{,}988\,\textmu s & \textbf{\spd{15.6}} \\
+\bench{dining}           & 計算・微小作業セット & 95{,}501\,\textmu s & 95{,}501\,\textmu s & \spd{1.00} \\
+\bench{fill} 1\,MB       & 書込ストリーム & 1{,}364\,\textmu s & 1{,}338\,\textmu s & \spd{1.02} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+A76 の単一コア D-cache 像は A72（第 \ref{sec:dcache-a72} 節）と同じ形をしている：
+\bench{nqueens} が \textbf{\spd{15.6}}（3 世代で最大）と跳ね、\bench{fill}（書込
+ストリーム）はほぼ不変である。\textbf{ここで従来の記述を訂正する}：以前は A76 の
+\bench{fill} 1\,MB を「\spd{1.55} 高速」としていたが、それは\textbf{複数ブートを
+混ぜた予備捕捉のクロック差}によるもので、\textbf{同一クロックで測り直すと \spd{1.02}}
+（1{,}364 対 1{,}338\,\textmu s）に過ぎない。fill は D-cache 向きの
+ワークロードではない——という A72 の結論は A76 でも成立する。
+
+\subsubsection*{多コア：明示キャッシュ管理で成立（全 \texttt{agree=yes}）}
+
+以前は A76 の多コア D-cache を「崩れた（\spd{1.0}、予備観測）」と記していた。
+だが A72 で有効だった\textbf{明示キャッシュ管理}（メールボックスと二次コアの
+起動データを \texttt{dc cvac/ivac} で同期）を A76 にも入れると、\textbf{多コアは
+成立した}——全ベンチ \texttt{agree=yes}、\bench{dining} は理想の \spd{3.99}。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 5（A76）多コア D-cache（\texttt{C=1}、明示キャッシュ管理、\texttt{cores\_online=4}）}
+\label{tab:dcache-a76-multi}
+\small
+\begin{tabular}{@{}lcccl@{}}
+\toprule
+ベンチ & 1 コア & 4 コア & 速度向上 & \\
+\midrule
+\bench{dining}        & 95{,}501\,\textmu s & 23{,}878\,\textmu s & \spd{3.99} & \texttt{agree=yes} \\
+\bench{nqueens} $n{=}12$ & 6{,}988\,\textmu s & 1{,}831\,\textmu s & \spd{3.81} & \texttt{agree=yes} \\
+\bench{fill} 16\,KB   & 83\,\textmu s & 29\,\textmu s & \spd{2.86} & キャッシュ内 \\
+\bench{fill} 1\,MB    & 1{,}338\,\textmu s & 1{,}970\,\textmu s & \spd{0.67} & 共有バッファ競合 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+以前の \spd{1.0} は DSU に任せてキャッシュ管理を書かなかったための非コヒーレンシで
+あり、\textbf{ページ shareability の問題というより、明示的な clean/invalidate が
+無かったこと}が主因だった。A76 の DSU は inner-shareable WB を扱うが、本移植の
+ロックフリー・メールボックスを確実にコヒーレントにするには A72 と同じ手当てで
+足りる。\bench{nqueens} は D-cache ON で \spd{3.81} までスケールし（OFF の静的分割
+\spd{1.5} 級から改善——A72 と同じく RAM スタック競合が C=1 で解けた）、単一コア
+\spd{15.6} と合わせて \textbf{OFF 単一コア 109{,}278\,\textmu s → ON 4 コア
+1{,}831\,\textmu s ＝ 約 \spd{59.7}}に達する。一方 \bench{fill} 1\,MB は \spd{0.67}
+と多コアで\textbf{遅くなる}（共有バッファへの書き戻し競合）——「メモリ律速は
+スケールしない」は A76・多コア・D-cache ON でも健在である。
+
+\medskip
+\noindent
+三世代の総括（第 \ref{tab:dcache-crossgen} 表）：\textbf{多コア D-cache は 3 世代とも
+達成可能}だが手段が違う——A53 は \texttt{SMPEN}、A72・A76 は\textbf{明示キャッシュ
+管理という共通の手当て}で成立した。ボードごとにコヒーレンシ管理の微アーキ依存性が
+姿を変える事実は、「キャッシュ OFF なら全アクセスが RAM 直行で自動的にコヒーレント」
+という\textbf{ワーカープール＋D-cache OFF が移植の現実解}という中心的主張（第
+\ref{sec:design} 節）を、むしろ裏づける。D-cache の利得（再帰で \spd{15.6}）は
+本物だが、それを多コアで正しく収穫するにはボード固有の手当てが要る。
+
+\subsection{ボード横断の追試：Cortex-A72（Pi 4）——SMPEN が EL1 から届かない}
+\label{sec:dcache-a72}
+
+同じ \texttt{DCACHE\_EXPERIMENT} 変種を三つ目の微アーキテクチャ、Raspberry Pi 4
+（BCM2711、Cortex-A72、AArch64）へ移植した。A72 は\textbf{位置づけとして A53 と
+A76 の中間}にある——A53（Pi 3）と同じく \texttt{CPUECTLR\_EL1.SMPEN} を持つ一方、
+A76（Pi 5）と同じ「クアッドコア＋共有 L2」構成である。したがって問いは：
+\textbf{A72 の SMPEN は、A53 と同じくコア間コヒーレンシをきれいに与えるか}。
+結論から言えば、A72 では\textbf{そもそも SMPEN に手が届かず}、これが本レポートで
+最も根源的な D-cache 障害として現れた。
+
+\subsubsection*{障害の梯子：HDMI・SMPEN・二次コア}
+
+シリアルアダプタ（Prolific PL2303）が macOS で \texttt{tcsetattr} を受け付けず
+使用不能だったため、A72 では\textbf{結果を HDMI 画面に出して撮影}する経路を採った。
+D-cache ON では画面出力自体が三段の罠を踏み、順に解いた。
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{フレームバッファ・メールボックスの非コヒーレンシ。}
+        \texttt{mmu\_init} で早期に \texttt{C=1} にすると、直後の \texttt{video\_init}
+        が VideoCore へ送る property-mailbox 要求が\textbf{キャッシュに滞留}し、GPU が
+        stale な RAM を読んで FB 確保に失敗——画面は真っ暗のままになる（第
+        \ref{sec:dcache-usb} 項で Pi 3 が踏んだ罠と同一）。対策として D-cache の
+        有効化を\textbf{\texttt{video\_init} の後ろへ遅延}させ、HDMI を \texttt{C=0} で
+        立ち上げてから \texttt{C=1} に切り替える構成にした（加えて \texttt{mbox\_call}
+        に要求のクリーン／応答のインバリデートを挿入）。以後、各段階を画面に印字し
+        \texttt{dc cisw} で FB を RAM へ書き戻すことで、進捗が撮影可能になった。
+
+  \item \textbf{SMPEN が EL1 から書けない（本命）。}
+        Pi 4 のファームウェアはコアを EL2 に落とし、\texttt{boot.S} が EL2$\to$EL1 に
+        遷移させる——カーネルは \textbf{EL1} で走る。ところが A72 では、IMP-DEF の
+        \texttt{CPUECTLR\_EL1}（\texttt{S3\_1\_C15\_C2\_1}）は
+        \texttt{ACTLR\_EL2/EL3.CPUECTLR} が上位 EL で許可されていない限り
+        \textbf{EL1 からアクセスできない}。Pi 4 ファームはこれを許可しないため、
+        \texttt{SMPEN} を立てる \texttt{MRS} が\textbf{未設定の EL2 ベクタ
+        （\texttt{VBAR\_EL2}=0）へトラップし、コアはアドレス 0 へ暴走}する。
+        画面は \texttt{[dcache] enabling C=1} の手前で凍結した。SMPEN 抜きでは
+        \texttt{C=1} にしても\textbf{コア間コヒーレンシが成立しない}。
+
+  \item \textbf{二次コアの起動窓（Pi 3 と同じ罠）。}
+        SMPEN を諦めて \texttt{C=1} だけにすると有効化自体は\textbf{通った}
+        （\texttt{SCTLR}=\texttt{0x30d01805}、bit 2 立ち、brick なし）。だが今度は
+        \texttt{smp\_init} が停止した。\texttt{C=1} のコア 0 が二次コアのスタック
+        ポインタと解放語を書いても\textbf{ダーティ・キャッシュに留まり}、キャッシュ
+        OFF で起動する二次コアは stale な RAM を読んで死ぬ（第 \ref{sec:dcache-usb}
+        項の罠と同型）。SMPEN が無い以上コヒーレンシは本質的に張れないので、
+        本追試は\textbf{単一コアで}測ることにした（\texttt{smp\_init} を早期リターン）。
+\end{enumerate}
+
+\noindent
+まとめると、\textbf{A72 の多コア D-cache は、A76 のような属性設定の不備ではなく、
+「SMPEN に EL1 から触れない」というより下層（例外レベル／ファームウェア）の壁で
+塞がれている}。これを越えるには \texttt{boot.S} の EL2 区間で SMPEN を書く（あるいは
+ファーム側で \texttt{ACTLR} を開ける）改修が要り、本実験の範囲外である。
+
+\subsubsection*{単一コア：D-cache ON の利得はワークロード依存（再帰で \spd{14.7}、書込ストリームで \spd{1.0}）}
+
+単一コアで \texttt{C=0} と \texttt{C=1} を\textbf{同一ブート内で連続測定}した
+（ファームのクロック・ランプによる誤差を避けるため）。\bench{dining} の絶対時間が
+両者で 91{,}022 対 91{,}002\,\textmu s と\textbf{ほぼ一致}することが、この 2 回が
+\textbf{同一クロックで走った}動かぬ証拠である（クロックが変われば計算律速の
+\bench{dining} が真っ先にずれる）。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 4（Cortex-A72）単一コア、D-cache OFF vs ON（同一ブート・同一クロック）}
+\label{tab:dcache-a72-single}
+\small
+\begin{tabular}{@{}llccc@{}}
+\toprule
+ワークロード & 性質 & OFF & ON & 高速化 \\
+\midrule
+\bench{nqueens} $n{=}12$ & 再帰・深いスタック & 189{,}445\,\textmu s & 12{,}878\,\textmu s & \textbf{\spd{14.7}} \\
+\bench{dining}           & 計算・微小作業セット & 91{,}022\,\textmu s & 91{,}002\,\textmu s & \spd{1.00} \\
+\bench{fill} 4{,}096 (16\,KB)   & 書込ストリーム & 46\,\textmu s   & 38\,\textmu s   & \spd{1.21} \\
+\bench{fill} 16{,}384 (64\,KB)  & 書込ストリーム & 177\,\textmu s  & 168\,\textmu s  & \spd{1.05} \\
+\bench{fill} 65{,}536 (256\,KB) & 書込ストリーム & 680\,\textmu s  & 700\,\textmu s  & \spd{0.97} \\
+\bench{fill} 262{,}144 (1\,MB)  & 書込ストリーム & 2{,}766\,\textmu s & 2{,}823\,\textmu s & \spd{0.98} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+表 \ref{tab:dcache-a72-single} の結論は、\textbf{A72 の単一コア D-cache 利得は
+アクセスパターンに強く依存し、適合するワークロードでは絶大}という点である。
+\bench{nqueens}（再帰バックトラック）は D-cache ON で\textbf{\spd{14.7}}——A53（Pi 3）の
+\bench{nqueens} \spd{8.8}（第 \ref{sec:dcache-result} 項）をも上回る。深い呼び出し
+スタックを何度も舐める処理は、\texttt{C=0} では毎回 RAM に往復するが、\texttt{C=1} では
+ホットなスタックが L1 に載り切るためである。一方 \bench{dining} は作業セットが
+レジスタ／微小で不変、\bench{fill} は\textbf{書き込み専用のストリーム}で書き戻し帯域が
+律速のため \spd{1.0} 前後に留まる（write-allocate 型 WB でも純書込は伸びない）。
+
+\medskip\noindent
+\textbf{これは重要な訂正でもある}：\bench{fill} だけを見れば「A72 の D-cache 利得は
+乏しい（\spd{1.1}）」と誤読しかねないが、\bench{nqueens} \spd{14.7} が\textbf{D-cache は
+確かに効いている}ことを証明する。fill が伸びないのはキャッシュが働いていないからでは
+なく、\textbf{fill がキャッシュ向きのワークロードでないから}である。D-cache の価値は
+「入れれば一律に速い」ではなく、\textbf{再帰・局所参照の多い処理でこそ跳ねる}——という
+のが A72 実測の教訓である。
+
+\subsubsection*{多コア：SMPEN 無しでも明示キャッシュ管理で成立}
+\label{sec:dcache-a72-multi}
+
+上の「障害の梯子」では、SMPEN が EL1 から立てられず\texttt{C=1} 下の多コアを
+諦めた。だが\textbf{SMPEN は本質ではなかった}——必要なのはコア間の\textbf{コヒーレンシ}
+であって、その手段は SMPEN によるハードウェア自動スヌープに限らない。そこで、
+ロックフリー・ジョブメールボックスと二次コアのブリングアップ・データ（スタック
+ポインタ・解放語・online フラグ）の各同期点に、\textbf{明示的なキャッシュ管理}を
+挿入した：書いたら \texttt{dc cvac} で RAM へ排出、読む前に \texttt{dc ivac} で無効化
+（いずれも EL1 で合法・トラップしない）。これは \texttt{system/smp.c} に閉じた変更で、
+CPUECTLR にも EL2 にも触れない。
+
+結果、\texttt{C=1} のまま\textbf{全 4 コアが起動し（\texttt{cores\_online = 4}）、
+コヒーレンシも保たれた}（全ベンチ \texttt{agree=yes}）。
+
+\begin{table}[htbp]
+\centering
+\caption{Pi 4（A72）多コア D-cache（\texttt{C=1}、明示キャッシュ管理、同一ブート）}
+\label{tab:dcache-a72-multi}
+\small
+\begin{tabular}{@{}lcccl@{}}
+\toprule
+ベンチ & 1 コア & 4 コア & 4 コア速度向上 & \\
+\midrule
+\bench{dining}        & 91{,}002\,\textmu s & 22{,}754\,\textmu s & \spd{3.99} & 完全スケール・\texttt{agree=yes} \\
+\bench{nqueens} $n{=}12$ & 12{,}885\,\textmu s & 3{,}362\,\textmu s & \spd{3.83} & \texttt{agree=yes} \\
+\bench{fill} 1\,MB    & 2{,}792\,\textmu s & 3{,}177\,\textmu s & \spd{0.87} & 共有バッファ＝書戻し競合 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{これは二重に重要な結果である}。第一に、\bench{dining} \spd{3.99}
+（\texttt{agree=yes}）は、\textbf{A72 の多コア D-cache コヒーレンシが SMPEN 無しでも
+成立する}ことを示す——「A72 は多コアの入口で塞がれた」という上の結論は、
+\textbf{ハードウェア自動コヒーレンシ}に限れば正しいが、\textbf{ソフトウェアの
+明示キャッシュ管理}で越えられた。第二に、\bench{nqueens} が \textbf{D-cache ON では
+\spd{3.83} までスケール}した点である——D-cache \textbf{OFF} の \spd{2.0}（第
+\ref{sec:cross-fair} 項）とは大きく違う。すなわち\textbf{OFF での \spd{2.0} 頭打ちは
+負荷不均衡だけが原因ではなく、深い再帰スタックの RAM 競合も効いていた}：\texttt{C=1}
+では各コアのスタックが L1 に私有化されコア間競合が消えるため、静的分割でも
+ほぼ線形に伸びる。\bench{nqueens} の総合利得は、D-cache ON・4 コアの 3{,}362\,\textmu s
+対 D-cache OFF・単一コアの 189{,}458\,\textmu s で\textbf{約 \spd{56}}に達する。
+一方 \bench{fill}（共有の書込専用バッファ）は \spd{0.87} と\textbf{むしろ遅く}、
+複数コアが同一バッファへ書くと write-back 競合が生じる——「メモリ律速はスケール
+しない」は D-cache ON・多コアでも（別機序で）健在である。
+
+\subsubsection*{三世代の総合：D-cache は「入れれば速い」ではない}
+
+三つの微アーキテクチャで、D-cache ON はそれぞれ\textbf{異なる壁}を見せた。
+
+\begin{table}[htbp]
+\centering
+\caption{D-cache ON の世代横断まとめ}
+\label{tab:dcache-crossgen}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & A53 / Pi 3 & A72 / Pi 4 & A76 / Pi 5 \\
+\midrule
+コヒーレンシ機構 & \texttt{SMPEN}(EL1可) & \texttt{SMPEN}(EL1不可) & DSU \\
+多コア D-cache   & 成立（\bench{dining} \spd{3.99}） & \textbf{成立}（明示キャッシュ管理） & \textbf{成立}（明示キャッシュ管理） \\
+単一コア \bench{nq} & 大 \spd{8.8} & 大 \spd{14.7} & \textbf{大 \spd{15.6}} \\
+多コア \bench{nq} & \spd{3.65}(SMPEN) & \spd{3.83}(dc cvac/ivac) & \spd{3.81}(dc cvac/ivac) \\
+\bench{dining} 多コア & \spd{3.99} & \spd{3.99} & \spd{3.99} \\
+最後の壁         & USB DMA の出自 & USB DMA（本番化） & 共有バッファ書戻し（\bench{fill}） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{三世代とも多コア D-cache は達成できた}——A53 は \texttt{SMPEN}、A72 と A76 は
+\textbf{明示的なキャッシュ管理（\texttt{dc cvac/ivac}）という共通の手当て}で成立させた
+（いずれも \bench{dining} \spd{3.99}・全 \texttt{agree=yes}）。当初 A72 は「SMPEN が
+EL1 から届かず不成立」、A76 は「DSU 任せで \spd{1.0}」と見えたが、どちらも真因は
+\textbf{ロックフリー・メールボックスにソフトウェアの clean/invalidate を書かなかった
+こと}であり、同一の手当てで解けた。ただし\textbf{手段はボード世代ごとに異なる下層の
+約束事に依存する}（A53=SMPEN の有無、A72=EL1 特権、A76=DSU/shareability）。この事実は
+「キャッシュ OFF なら全アクセスが RAM 直行で\textbf{自動的にコヒーレント}」という
+\textbf{ワーカープール＋D-cache OFF が移植の現実解である}という本レポートの中心的主張
+（第 \ref{sec:design} 節）を、三世代分の独立した証拠で\textbf{むしろ強く裏づける}：
+D-cache の利得（単一コア \bench{nq} は A72 \spd{14.7}／A76 \spd{15.6}、多コアと掛けて
+\spd{56}--\spd{60}）は本物だが、それを多コアで正しく収穫するには世代ごとに異なる下層の
+約束事を履行せねばならず、その工数とリスクが「まず D-cache OFF で正しく動かす」判断を
+裏打ちする。

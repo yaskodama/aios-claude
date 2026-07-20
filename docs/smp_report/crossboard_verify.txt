@@ -1,0 +1,11 @@
+Cross-board table (tab:cross) live re-verification — 2026-07-19, HTTP /bench
+Pi4=192.168.3.100 (A72), Pi5=192.168.3.101 (A76). Repeated runs, speedup x100.
+
+dining n=5 cores=4:  Pi4 min/med/max=399/399/399 (5) ; Pi5 399/399/399 (5)   -> x3.99 rock-solid both
+primes n=300000 c4:  Pi4 300/300/300 (5)            ; Pi5 302/302/302 (5)   -> x3.00 / x3.02 stable
+fill 1MB c4:         Pi4 132/137/141 (8)            ; Pi5 99/106/134 (8)    -> x1.37 / x1.06 (Pi5 GC spread)
+pool round-trip (null, N-core us): Pi4 4/4/5 (15) -> ~4us ; Pi5 null unsupported, fill n=1 c4 -> 2us (~2-3us)
+
+Conclusion: tab:cross Pi4/Pi5 entries confirmed. dining x3.99 is a genuine, stable
+per-board measurement (not assumed). fill 1MB Pi4 x1.38 / Pi5 x1.06. pool 4us / ~3us.
+Pi5 fill has ~±0.2 spread from the 8s auto actor GC (best-of-N used in tab:rpi5-fill).
