@@ -16,6 +16,8 @@
 \usepackage{listings}
 \usepackage{hyperref}
 \usepackage{graphicx}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
 
 \setCJKmainfont{Hiragino Mincho ProN}
 \setCJKsansfont{Hiragino Sans}
@@ -214,6 +216,30 @@ Pi 3(A53)も A72/A76 と\textbf{同じ 4.0 倍}を出しており、SMP 移植�
 分割}(\code{il=2}、列をストライドで配る)に替えると 308\,026\,$\to$\,157\,383\,$\mu$s、
 \textbf{1.95 倍}へ改善する。この「\textbf{分割の粒度と均衡が N‑Queens の速度向上を
 決める}」という知見が、次章のメッシュ分散における列割当ての設計根拠になる。
+
+\begin{figure}[h]\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth, height=5.4cm,
+  ybar, bar width=8pt, enlarge x limits=0.25,
+  ymin=0, ymax=4.3, ytick={0,1,2,3,4},
+  ylabel={速度向上(1 コア比)}, ylabel style={font=\small},
+  symbolic x coords={dining, primes, nqueens},
+  xtick=data, tick label style={font=\small},
+  legend style={at={(0.5,-0.18)}, anchor=north, legend columns=3, font=\small},
+  nodes near coords, nodes near coords style={font=\tiny, /pgf/number format/fixed, /pgf/number format/precision=2},
+  every node near coord/.append style={rotate=90, anchor=west},
+]
+\addplot coordinates {(dining,3.99) (primes,3.01) (nqueens,2.12)};
+\addplot coordinates {(dining,3.99) (primes,3.00) (nqueens,1.99)};
+\addplot coordinates {(dining,4.00) (primes,3.02) (nqueens,1.58)};
+\draw[dashed,gray] (axis cs:dining,4) -- (axis cs:nqueens,4) node[right,black,font=\tiny]{理想 4$\times$};
+\legend{Pi 3 (A53), Pi 4 (A72), Pi 5 (A76)}
+\end{axis}
+\end{tikzpicture}
+\caption{ノード内 4 コア SMP 速度向上(3 ボード)。dining は 3 世代とも理想の 4$\times$に到達、
+nqueens はブロック分割の負荷不均衡で 1.6--2.1$\times$。}\label{fig:smp}
+\end{figure}
 
 % ======================================================================
 \section{メッシュ分散ベンチマーク ―― 列分割 N‑Queens}

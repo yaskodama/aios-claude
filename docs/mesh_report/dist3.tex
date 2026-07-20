@@ -56,6 +56,28 @@ Pi 4 単独の\textbf{3.58 倍}。解の総和も真値に一致する。一方�
 次の(より重い)列を渡すと今度は Pi 3 が律速に回るため、これ以上詰められない。
 \textbf{12 コア規模では、律速が「コアの速さ」から「タスクの粒度」へ移る}のである。
 
+\begin{figure}[h]\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.94\linewidth, height=5.2cm,
+  xbar, bar width=11pt, xmin=0, xmax=5600,
+  xlabel={壁時計(ms)、$N{=}14$、解 365\,596}, xlabel style={font=\small},
+  symbolic y coords={{12コア(3×4)},{9コア(4+4+1)},{8コア(4+4)},{Pi5 単独(4)},{Pi4 単独(4)}},
+  ytick=data, tick label style={font=\small},
+  nodes near coords, nodes near coords style={font=\tiny},
+  every node near coord/.append style={anchor=west},
+  enlarge y limits=0.16,
+]
+\addplot coordinates {(5216,{Pi4 単独(4)}) (2722,{Pi5 単独(4)}) (2088,{8コア(4+4)}) (1585,{9コア(4+4+1)}) (1458,{12コア(3×4)})};
+\draw[dashed,red!70!black] (axis cs:1172,{Pi4 単独(4)}) -- (axis cs:1172,{12コア(3×4)})
+  node[above,black,font=\tiny,rotate=90,anchor=south east]{ヘテロ理想 1172};
+\end{axis}
+\end{tikzpicture}
+\caption{メッシュ分散 N‑Queens($N{=}14$)の構成別・壁時計。台数を増やすほど短縮し、
+12 コアで 1\,458\,ms(Pi 5 単独の 1.87$\times$)。赤破線は 3 台の処理能力から定まる
+ヘテロ理想(1\,172\,ms)で、実測はその約 80\,\%。}\label{fig:scale}
+\end{figure}
+
 \subsection{なぜ 1.87 倍で頭打ちなのか ―― 容量比と粒度ロス}
 基準の「Pi 5 単独」は\textbf{すでに 4 コア並列}(A76$\times$4、2\,722\,ms)である。
 したがって 1.87 倍とは\textbf{「12 コアが最速ボードの 4 コアの 1.87 倍」}という意味で、
