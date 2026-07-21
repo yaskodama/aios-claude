@@ -74,9 +74,11 @@ BUILTIN_EFFECTS: "dict[str, set]" = {
     # Anything not in this dict is considered effect-free.
 }
 # ---- Yahboom DOFBOT 実機デバイス + TinyML の効果 ----
-# Arm_serial_servo_write が唯一の駆動権限(mut)。servo_read / camera_grab は計測
-# のみなので効果なし。tinyml_infer はローカル推論なので {ai} だけを持ち、
-# ai_call 系の {ai, net} と違って「機外へ何も出さない」ことを型で示せる。
+# Arm_serial_servo_write が唯一の駆動権限。効果は mut ではなく act ---
+# 「外部世界へ作用する」を「自分の状態を書く」から分けてある(aipl_dofbot.py の
+# 注記参照)。servo_read / camera_grab は計測のみなので効果なし。tinyml_infer は
+# ローカル推論なので {ai} だけを持ち、ai_call 系の {ai, net} と違って
+# 「機外へ何も出さない」ことを型で示せる。
 try:
     from aipl_dofbot import EFFECTS as _DOFBOT_EFFECTS
     BUILTIN_EFFECTS.update(_DOFBOT_EFFECTS)

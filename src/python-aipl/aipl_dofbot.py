@@ -179,7 +179,7 @@ def b_belt_drive(args, frame, interp):
     """dofbot_belt_drive(cmd) -> int  —— コンベアを駆動する。
 
     cmd: 1=前進（次の部品をストッパまで送る） / 2=排出（ストッパを開けて流す）
-         0=停止。作業セルのアクチュエータなので効果は {mut}。
+         0=停止。作業セルのアクチュエータなので効果は {act}。
     """
     cmd = int(args[0]) if args else 0
     st = interp.__dict__.setdefault("_dofbot_belt", {"cmd": 0, "n": 0})
@@ -318,12 +318,24 @@ BUILTINS = {
 }
 
 # 効果推論用。aipl_typeck.BUILTIN_EFFECTS へマージされる。
+#
+# act と mut を分ける理由:
+#   mut は「自分の状態を書く」、act は「外部世界へ作用する」。
+#   両方を mut にまとめていたので ServoMotor(サーボを回す) と ShelfActor(自分の
+#   在庫表を書くだけ) がどちらも !{mut,net} になり、効果集合から区別できなかった。
+#   分けると配置と複製の規則が効果から機械的に導ける:
+#     act を持つ → その機器に繋がったノードに限定、同時に厳密に 1 つだけ
+#                  (二重駆動は物理的に危険)
+#     mut のみ   → どこでも可、複製も可(各複製が自分の状態を持つ)
+#   フェイルオーバは act の排他移譲として定義できる。
 EFFECTS = {
-    "Arm_serial_servo_write":  {"mut"},
-    "Arm_serial_servo_write6": {"mut"},
+    "Arm_serial_servo_write":  {"act"},   # 実機バスサーボの駆動 = 唯一の駆動権限
+    "Arm_serial_servo_write6": {"act"},
     "Arm_serial_servo_read":   set(),
-    "dofbot_servo_writes":     set(),
-    "dofbot_belt_drive":       {"mut"},   # コンベアも作業セルのアクチュエータ
+    "dofbot_servo_writes":     set(),     # 発行済み指令数を返すカウンタ。駆動しない
+                                          # (名前が紛らわしい: "servo を write" ではなく
+                                          #  "servo write の回数")
+    "dofbot_belt_drive":       {"act"},   # コンベアも作業セルのアクチュエータ
     "dofbot_camera_grab":      set(),
     "dofbot_camera_truth":     set(),
     "tinyml_load":             {"fs"},
