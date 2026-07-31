@@ -53,9 +53,9 @@ runtime.scheduleAllActors();
 await new Promise(r => setTimeout(r, 1500));
 EOF
 
-printf "[Phase 1] CE-10 effect inference (effects_demo.abcl)\n"
+printf "[Phase 1] CE-10 effect inference (effects_demo.aipl)\n"
 EFF_OUT="$TMPDIR/effects.out"
-node "$RUNNER" "$ROOT" "$HERE/effects_demo.abcl" > "$EFF_OUT" 2>&1
+node "$RUNNER" "$ROOT" "$HERE/effects_demo.aipl" > "$EFF_OUT" 2>&1
 EFF_JSON="$(grep '^EFFECTS=' "$EFF_OUT" | sed 's/^EFFECTS=//')"
 if echo "$EFF_JSON" | grep -q '"FileLog":{[^}]*"write":"fs,mut"'; then ok "FileLog.write : fs,mut"
 else bad "FileLog.write : fs,mut" "$EFF_JSON"; fi
@@ -66,9 +66,9 @@ else bad "AIReporter.summarise : ai,mut" "$EFF_JSON"; fi
 if echo "$EFF_JSON" | grep -q '"Pure":{"add":"pure"'; then ok "Pure.add : pure"
 else bad "Pure.add : pure" "$EFF_JSON"; fi
 
-printf "[Phase 2] DR-11 saga (saga_demo.abcl)\n"
+printf "[Phase 2] DR-11 saga (saga_demo.aipl)\n"
 SAGA_LOG="$TMPDIR/saga.ndjson"
-AIPL_DIST_LOG_FILE="$SAGA_LOG" node "$RUNNER" "$ROOT" "$HERE/saga_demo.abcl" > "$TMPDIR/saga.out" 2>&1
+AIPL_DIST_LOG_FILE="$SAGA_LOG" node "$RUNNER" "$ROOT" "$HERE/saga_demo.aipl" > "$TMPDIR/saga.out" 2>&1
 if grep -q '"event":"saga_started"' "$SAGA_LOG"; then ok "saga_started emitted"
 else bad "saga_started emitted" "log=$SAGA_LOG"; fi
 if grep -q '"event":"saga_finished"' "$SAGA_LOG"; then ok "saga_finished (happy path)"

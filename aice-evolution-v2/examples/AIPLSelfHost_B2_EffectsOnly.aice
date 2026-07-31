@@ -3,7 +3,7 @@
 // Narrowed slice of AIPLSelfHost_B_PhaseChase.aice that scores
 // candidates ONLY against the Phase 12 task (effect-set propagation
 // + completeness check), assuming Level B-1's type checker is in
-// place.  Companion to aipl-self-host/level-b2/typeck.abcl.
+// place.  Companion to aipl-self-host/level-b2/typeck.aipl.
 
 aice AIPLSelfHost_B2_EffectsOnly {
   dialect = "aice_evolution_v2";

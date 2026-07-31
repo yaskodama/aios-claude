@@ -22,13 +22,13 @@
 //   (3) aipl_runtime.Scheduler.wait_idle defaults to
 //       idle_ms=120 / timeout_s=2.0.  Real-provider AI calls and
 //       long select{} timeouts can blow past 2 seconds; the
-//       script-mode entrypoint (aipl_main.py -f file.abcl) returns
+//       script-mode entrypoint (aipl_main.py -f file.aipl) returns
 //       with messages still in flight.  OCaml's fix added a busy
 //       flag toggled around eval_stmt + 100ms stable window + 5s cap.
 //
 // Goal of this evolution: pick a (reply-routing × quiesce-strategy)
 // pair that mirrors OCaml semantics while leaving the 38 existing
-// src/python-aipl/samples*.abcl programs unaffected.
+// src/python-aipl/samples*.aipl programs unaffected.
 
 aice AIPL_Python_SendSelectAlignment {
   dialect = "aice_evolution_v2";
@@ -46,7 +46,7 @@ aice AIPL_Python_SendSelectAlignment {
       spec = "aipl_main.py -f script.bat で `send d.run(...)` が top-level の唯一の文の場合、Driver.run() の本体 (内部の select を含む) が完走してから main() が return すること。現状 wait_idle(timeout_s=2.0) で AI 呼び出しを伴うケースが切られる。";
     }
     task BackwardCompatAllSamples {
-      spec = "src/python-aipl/samples/*.abcl (33 件) + src/python-aipl/samples-ai/*.abcl (5 件) の出力が修正前と byte-equivalent (provider noise を正規化後)。新規に [send] no-such-actor 等のエラーが出ないこと。";
+      spec = "src/python-aipl/samples/*.aipl (33 件) + src/python-aipl/samples-ai/*.aipl (5 件) の出力が修正前と byte-equivalent (provider noise を正規化後)。新規に [send] no-such-actor 等のエラーが出ないこと。";
     }
     task AiCallSendSelectMock {
       spec = "ABCL_AI_PROVIDER=mock で OCaml 側に既にある now / future+await / send+select の 3 つのデモを Python 移植版で実行し、3 つとも mock reply を観測できること。";

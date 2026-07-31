@@ -153,7 +153,7 @@ done
 
 ### 3.5 AIPL 全 sample (33 件) 回帰
 
-`src/python-aipl/samples/*.abcl` 全 33 件で:
+`src/python-aipl/samples/*.aipl` 全 33 件で:
 - Traceback なし
 - parse error なし
 

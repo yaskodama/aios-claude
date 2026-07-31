@@ -1,4 +1,4 @@
-"""Load an .abcl program into the bounded model checker.
+"""Load an .aipl program into the bounded model checker.
 
 The runtime AIPL is too large to model-check in full; this loader
 covers a *focused subset* sufficient for actor-deadlock analysis:
@@ -18,7 +18,7 @@ Top-level globals build the initial World:
   send target.method(args);           -> world.send(target, method, *args)
 
 Run:
-  python3 aipl_modelcheck_load.py samples-mc/Philosophers.abcl
+  python3 aipl_modelcheck_load.py samples-mc/Philosophers.aipl
 """
 
 from __future__ import annotations
@@ -241,7 +241,7 @@ def _make_actor_class(class_decl: ClassDecl, parser_globals=None):
 
 
 # ===================================================================
-# Entry point — load an .abcl program into a (World init, classes).
+# Entry point — load an .aipl program into a (World init, classes).
 # ===================================================================
 
 def load_program(abcl_path: str):
@@ -299,7 +299,7 @@ def _eval_const(expr) -> Any:
 # CLI
 
 def main():
-    ap = argparse.ArgumentParser(description="Load an .abcl program and model-check it")
+    ap = argparse.ArgumentParser(description="Load an .aipl program and model-check it")
     ap.add_argument("source")
     ap.add_argument("--depth", type=int, default=2000)
     ap.add_argument("--check", choices=["deadlock"], default="deadlock",

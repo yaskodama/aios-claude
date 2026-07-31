@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 # run.sh — drive a Level B-1 sample through the AIPL-side type checker.
 #
-# Each sample includes the typeck.abcl module by concatenation, then
+# Each sample includes the typeck.aipl module by concatenation, then
 # defines a Driver actor that builds a typed AST and calls
 # tc_check_program(prog).  The driver prints each issue.
 #
 # Usage:
-#   bash run.sh samples/SampleClean.abcl
-#   bash run.sh samples/SampleArityViolation.abcl
+#   bash run.sh samples/SampleClean.aipl
+#   bash run.sh samples/SampleArityViolation.aipl
 
 set -u
 cd "$(dirname "$0")"
 
-SAMPLE="${1:?usage: $0 samples/<File>.abcl}"
-NAME=$(basename "$SAMPLE" .abcl)
+SAMPLE="${1:?usage: $0 samples/<File>.aipl}"
+NAME=$(basename "$SAMPLE" .aipl)
 OUT_LOG="out/${NAME}.log"
-TMP="/tmp/_lvB_${NAME}.abcl"
+TMP="/tmp/_lvB_${NAME}.aipl"
 
 mkdir -p out
 
-cat typeck.abcl "$SAMPLE" > "$TMP"
+cat typeck.aipl "$SAMPLE" > "$TMP"
 
 PYTHONRECURSIONLIMIT_HACK="
 import sys; sys.setrecursionlimit(20000)

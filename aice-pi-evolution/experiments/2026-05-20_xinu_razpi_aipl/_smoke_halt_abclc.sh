@@ -8,7 +8,7 @@
 #
 # Acceptance (5 assertions):
 #   (1) xsh halt still works after the refactor (semihosting SYS_EXIT)
-#   (2) abclc accepts a seed .abcl and writes the corresponding .c
+#   (2) abclc accepts a seed .aipl and writes the corresponding .c
 #   (3) cc compiles that .c into a.out (runs ccCompile chain)
 #   (4) running the a.out produces output
 #   (5) System halted line + QEMU rc=0
@@ -27,7 +27,7 @@ LOG=/tmp/_halt_abclc.qemu.log
   sleep 2
   printf '\n'
   printf 'ls /home/abclcp/abclc\n';                              sleep 0.5
-  printf 'abclc /home/abclcp/abclc/PingPong.abcl\n';             sleep 2.0
+  printf 'abclc /home/abclcp/abclc/PingPong.aipl\n';             sleep 2.0
   printf 'ls /home/abclcp/abclc\n';                              sleep 0.5
   # `abclc` chains through to cc internally — check the a.out exists.
   printf 'ls\n';                                                 sleep 0.4
@@ -50,7 +50,7 @@ else
 fi
 
 echo "  -- assertion (2) abclc produced .c output --"
-# After running `abclc PingPong.abcl`, the directory listing should
+# After running `abclc PingPong.aipl`, the directory listing should
 # show PingPong.c.  The abclc command itself also prints a status.
 if grep -aE 'PingPong\.c|wrote.*\.c|abclc:.*ok' "$LOG" >/dev/null; then
   PASS=$((PASS+1)); echo "  PASS (2) abclc wrote .c"
@@ -62,7 +62,7 @@ fi
 
 echo "  -- assertion (3) cc produced a.out --"
 # The 2nd ls in /home/abclcp/abclc should list PingPong (the binary)
-# next to PingPong.abcl + PingPong.c.
+# next to PingPong.aipl + PingPong.c.
 if grep -aE '^PingPong[[:space:]]*$|PingPong$' "$LOG" >/dev/null; then
   PASS=$((PASS+1)); echo "  PASS (3) PingPong a.out present in listing"
 else

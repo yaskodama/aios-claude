@@ -8,7 +8,7 @@ record-tagged ASTs.
 ## Layout
 
 ```
-metacircular.abcl    — the evaluator (functions only, no actor)
+metacircular.aipl    — the evaluator (functions only, no actor)
 run.sh               — concats metacircular + a sample, runs through the host
 samples/             — AST programs to feed the evaluator
 out/                 — captured stdout per sample run
@@ -36,13 +36,13 @@ A "program" is `{funcs: [(name, {params, body})…], main: [stmt…]}`.
 
 ```sh
 cd aipl-self-host/level-a
-bash run.sh samples/SampleHelloMin.abcl
-bash run.sh samples/SampleArith.abcl
-bash run.sh samples/SampleControl.abcl
-bash run.sh samples/SampleFib.abcl
+bash run.sh samples/SampleHelloMin.aipl
+bash run.sh samples/SampleArith.aipl
+bash run.sh samples/SampleControl.aipl
+bash run.sh samples/SampleFib.aipl
 ```
 
-Each invocation concatenates `metacircular.abcl` + the sample into
+Each invocation concatenates `metacircular.aipl` + the sample into
 a tmpfile and runs it through the host's Python AIPL interpreter
 with `sys.setrecursionlimit(20000)` (the metacircular eval stacks
 multiple AIPL frames per host frame so the default 1000 isn't enough).

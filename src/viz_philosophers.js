@@ -40,7 +40,7 @@
   }
 
   // Fork i sits between philosopher i and philosopher (i+1)%N
-  // (matches viz_philosophers.abcl: P0 uses fork0 & fork4, P1 uses fork0 & fork1, ...).
+  // (matches viz_philosophers.aipl: P0 uses fork0 & fork4, P1 uses fork0 & fork1, ...).
   const forkPos = [];
   for (let i = 0; i < N; i++) {
     const a = philoPos[i], b = philoPos[(i + 1) % N];
@@ -262,7 +262,7 @@
 
   async function loadSource() {
     try {
-      const r = await fetch("/viz_philosophers.abcl");
+      const r = await fetch("/viz_philosophers.aipl");
       if (r.ok) srcText.textContent = await r.text();
       else srcText.textContent = "(failed to load: " + r.status + ")";
     } catch (e) {
@@ -297,7 +297,7 @@
     statusBox.textContent = "display reset";
   }
 
-  btnLoad   .addEventListener("click", () => runRepl("load src/viz_philosophers.abcl"));
+  btnLoad   .addEventListener("click", () => runRepl("load src/viz_philosophers.aipl"));
   btnCompile.addEventListener("click", () => runRepl("compile"));
   btnStart  .addEventListener("click", () => runRepl("send table.start();"));
   btnStop   .addEventListener("click", () => runRepl("send table.stop();"));

@@ -4,10 +4,10 @@
 // type-checker / interpreter all running inside Node.
 //
 // Endpoints (mirror the OCaml gateway's JSON shape where they overlap):
-//   POST /api/typecheck  { source: "<.abcl>" }
+//   POST /api/typecheck  { source: "<.aipl>" }
 //       => { ok, errors[], warnings[],
 //            classes: { <C>: { fields:{}, methods:{} } } }
-//   POST /api/run        { source: "<.abcl>",
+//   POST /api/run        { source: "<.aipl>",
 //                          timeoutMs?: number,
 //                          typecheck?: boolean }   // default true; false skips
 //       => { ok, stdout, errors[] }

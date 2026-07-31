@@ -1,0 +1,36 @@
+// TcpEchoClientXinu.aipl
+// N1 demo: AIPL actor connects to a host TCP echo server, sends a
+// payload, reads the reply, then closes.
+//
+// Host endpoint: 10.0.2.2 is QEMU SLIRP's view of the host gateway.
+// The smoke (_smoke_n1.sh) starts a Python echo server on the host
+// at port 9999 before launching QEMU; this AIPL program connects
+// out via the smc91c111 NIC.
+
+class Net {
+  var fd = 0;
+
+  method init() {
+    var ok = net_init(10);          // DHCP, 10 sec timeout
+    if (ok == 1) {
+      // 10.0.2.2 = QEMU SLIRP host gateway; port is the hostfwd from
+      // _smoke_n1.sh (-netdev user,...,hostfwd=tcp::49199-:49199).
+      fd = net_connect(10, 0, 2, 2, 49199);
+      if (fd >= 0) {
+        send self.tx();
+      }
+    }
+  }
+
+  method tx() {
+    net_send(fd, "hello-from-aipl\n");
+    send self.rx();
+  }
+
+  method rx() {
+    net_recv(fd, 64);
+    net_close(fd);
+  }
+}
+
+var n = new Net();

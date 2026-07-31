@@ -22,7 +22,7 @@ services:
       dockerfile: docker/cross/Dockerfile.python
     image: aipl-python:cross
     container_name: pyserver
-    command: ["/app/samples-remote/python_server.abcl"]
+    command: ["/app/samples-remote/python_server.aipl"]
     networks: [aipl-net]
     ports: ["8080:8080"]
     healthcheck:
@@ -38,12 +38,12 @@ services:
       dockerfile: docker/cross/Dockerfile.ocaml
     image: aipl-ocaml:cross
     container_name: ocserver
-    command: ["/app/samples-remote/ocaml_server.abcl"]
+    command: ["/app/samples-remote/ocaml_server.aipl"]
     networks: [aipl-net]
 
   pydriver:
     image: aipl-python:cross
-    command: ["/app/samples-remote/python_driver.abcl"]
+    command: ["/app/samples-remote/python_driver.aipl"]
     networks: [aipl-net]
     depends_on:
       pyserver:
@@ -53,7 +53,7 @@ services:
 
   ocdriver:
     image: aipl-ocaml:cross
-    command: ["/app/samples-remote/ocaml_driver.abcl"]
+    command: ["/app/samples-remote/ocaml_driver.aipl"]
     environment:
       AIPL_KEEPALIVE: "0"
     networks: [aipl-net]

@@ -1,2 +1,2 @@
-load abclc/Philosophers5_trace.abcl
+load abclc/Philosophers5_trace.aipl
 compile

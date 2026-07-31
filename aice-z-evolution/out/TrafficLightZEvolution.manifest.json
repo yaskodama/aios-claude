@@ -2,7 +2,7 @@
   "name": "TrafficLightZEvolution",
   "runtime": "ocaml_abcl_cplus",
   "input": "aice-z-evolution/examples/TrafficLightZEvolution.aice",
-  "abcl": "aice-z-evolution/out/TrafficLightZEvolution.abcl",
+  "abcl": "aice-z-evolution/out/TrafficLightZEvolution.aipl",
   "report": "aice-z-evolution/out/TrafficLightZEvolution.report.md",
   "target_language": "ABCL",
   "checks": [

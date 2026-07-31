@@ -48,7 +48,7 @@ aice AIPL_PyI_NextGen {
   evaluation_tasks {
     // ── 型推論軸 (CE-10〜13) ──
     task EffectTypeInference {
-      spec = "メソッドが `ai_call` / `read_file` / `write_file` / `send target.x(...)` / `now target.x(...)` を呼ぶと、推論される型に effect row `{ai, fs, net}` などが付く。明示宣言 `effect [ai, fs]` で制限可。Phase 12 `Effects.abcl` の静的解析を HM に統合。";
+      spec = "メソッドが `ai_call` / `read_file` / `write_file` / `send target.x(...)` / `now target.x(...)` を呼ぶと、推論される型に effect row `{ai, fs, net}` などが付く。明示宣言 `effect [ai, fs]` で制限可。Phase 12 `Effects.aipl` の静的解析を HM に統合。";
     }
     task CapabilityTypes {
       spec = "`Cap<AI>` / `Cap<FS>` / `Cap<Net>` を first-class 型として保持し、対応する primitive はその capability を引数で受けないと呼び出せない (deny-by-default)。`grant`/`revoke` プリミティブで実行時にスコープ制御。capability の派生は静的 inference で追跡。";
@@ -74,7 +74,7 @@ aice AIPL_PyI_NextGen {
     }
     // ── cross-cutting / 共通評価 ──
     task BackwardCompatExisting {
-      spec = "src/python-aipl/samples/*.abcl (33 件) + src/python-aipl/samples-ai/*.abcl (5 件 + 新規 _send_reply_demo 4 件) が全て byte-equivalent (provider noise を正規化後) で動作。CE-1〜9 / DR-1〜9 の挙動も変化なし。";
+      spec = "src/python-aipl/samples/*.aipl (33 件) + src/python-aipl/samples-ai/*.aipl (5 件 + 新規 _send_reply_demo 4 件) が全て byte-equivalent (provider noise を正規化後) で動作。CE-1〜9 / DR-1〜9 の挙動も変化なし。";
     }
     task OCamlPortability {
       spec = "提案された機能を OCaml AIPL に横展開する難度。Py-I の HM (`aipl_inference.py`) と Z3 backend は OCaml の `infer.ml` + `refinement.ml` に対応物あり。effect / capability / CRDT は OCaml にも実装可能か (Phase O-equivalent パスを描けるか) を評価。";

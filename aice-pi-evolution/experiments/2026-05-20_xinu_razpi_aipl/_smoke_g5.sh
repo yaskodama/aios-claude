@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # G5 smoke — image bitmap blit on PL110.
 #
-# Sample: abclc/ImageBlitXinu.abcl
+# Sample: abclc/ImageBlitXinu.aipl
 #   Painter calls fb_image_solid(16,16,16,16, 0x0000FF) then builds a
 #   4x4 red/green checkerboard via array_new + array_set, blits it
 #   with fb_image at (80,80).  Counts are printed back via v_print.
@@ -28,7 +28,7 @@ dune build src/aipl2c.exe >/tmp/_g5_build.log 2>&1 || {
 src=ImageBlitXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_g5_${src}.c --xinu --max-msgs 0 \
     > /tmp/_g5_${src}.aipl2c.log 2>&1
 [ -f /tmp/_g5_${src}.c ] || {

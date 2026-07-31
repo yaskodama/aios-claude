@@ -3,10 +3,10 @@ set -u
 cd "$(dirname "$0")"
 
 declare -a SAMPLES=(
-  "SampleOwnedClean.abcl        0"
-  "SamplePrivateRead.abcl       1"
-  "SampleExternalWrite.abcl     2"
-  "SampleSelfConsistency.abcl   2"
+  "SampleOwnedClean.aipl        0"
+  "SamplePrivateRead.aipl       1"
+  "SampleExternalWrite.aipl     2"
+  "SampleSelfConsistency.aipl   2"
 )
 
 pass=0; fail=0
@@ -14,7 +14,7 @@ for entry in "${SAMPLES[@]}"; do
   set -- $entry
   sample="$1"; expected="$2"
   bash run.sh "samples/$sample" >/dev/null 2>&1
-  log="out/${sample%.abcl}.log"
+  log="out/${sample%.aipl}.log"
   actual=$(grep -E '^issues=' "$log" | sed 's/issues=//')
   if [ "$actual" = "$expected" ]; then
     pass=$((pass+1))

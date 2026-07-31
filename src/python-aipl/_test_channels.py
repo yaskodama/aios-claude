@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_channels() -> None:
-    out = _run("Channels.abcl")
+    out = _run("Channels.aipl")
 
     # typeof shows element type + capacity.
     assert "typeof(ch1) = channel[string, cap=4]" in out
@@ -40,7 +40,7 @@ def test_channels() -> None:
     # Pipeline: 1..5 squared.
     for sq in (1, 4, 9, 16, 25):
         assert f"squared: {sq}" in out, f"missing pipeline output: {sq}"
-    print("OK  Channels.abcl")
+    print("OK  Channels.aipl")
 
 
 if __name__ == "__main__":

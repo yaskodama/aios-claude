@@ -8,7 +8,7 @@ run_check() {
   local sample="$1"
   shift
   bash run.sh "samples/$sample" >/dev/null 2>&1
-  local log="out/${sample%.abcl}.log"
+  local log="out/${sample%.aipl}.log"
   for line in "$@"; do
     if ! grep -qx "$line" "$log"; then
       printf "  FAIL  %-32s missing line '%s'\n" "$sample" "$line"
@@ -21,12 +21,12 @@ run_check() {
 
 pass=0; fail=0
 
-run_check SampleCounter.abcl           1 2 3                 && pass=$((pass+1)) || fail=$((fail+1))
-run_check SamplePingPong.abcl          3 2 1                 && pass=$((pass+1)) || fail=$((fail+1))
-run_check SampleSelfSend.abcl          1 2 3 4 5             && pass=$((pass+1)) || fail=$((fail+1))
-run_check SampleMethodArgs.abcl        7 36 30               && pass=$((pass+1)) || fail=$((fail+1))
-run_check SampleProducerConsumer.abcl  1 3 6 10              && pass=$((pass+1)) || fail=$((fail+1))
-run_check SampleWorkerPool.abcl        104 209 325           && pass=$((pass+1)) || fail=$((fail+1))
+run_check SampleCounter.aipl           1 2 3                 && pass=$((pass+1)) || fail=$((fail+1))
+run_check SamplePingPong.aipl          3 2 1                 && pass=$((pass+1)) || fail=$((fail+1))
+run_check SampleSelfSend.aipl          1 2 3 4 5             && pass=$((pass+1)) || fail=$((fail+1))
+run_check SampleMethodArgs.aipl        7 36 30               && pass=$((pass+1)) || fail=$((fail+1))
+run_check SampleProducerConsumer.aipl  1 3 6 10              && pass=$((pass+1)) || fail=$((fail+1))
+run_check SampleWorkerPool.aipl        104 209 325           && pass=$((pass+1)) || fail=$((fail+1))
 
 echo
 echo "Level C-2 scheduler samples: $pass pass / $fail fail"

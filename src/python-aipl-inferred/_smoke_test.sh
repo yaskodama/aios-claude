@@ -17,26 +17,26 @@ SAMPLES_DIR=../python-aipl/samples
 
 # A representative subset of samples — exercises all language features.
 samples=(
-  Hello.abcl
-  Counter.abcl
-  PingPong.abcl
-  Tuples.abcl
-  Records.abcl
-  Arrays.abcl
-  MultiDimArrays.abcl
-  Functions.abcl
-  Effects.abcl
-  Channels.abcl
-  Linear.abcl
-  Owned.abcl
-  Transient.abcl
-  Dynamic.abcl
-  MethodPatch.abcl
-  Signatures.abcl
-  Phase17_StructuredConc.abcl
-  NowFuture.abcl
-  Philosophers.abcl
-  BoundedBuffer.abcl
+  Hello.aipl
+  Counter.aipl
+  PingPong.aipl
+  Tuples.aipl
+  Records.aipl
+  Arrays.aipl
+  MultiDimArrays.aipl
+  Functions.aipl
+  Effects.aipl
+  Channels.aipl
+  Linear.aipl
+  Owned.aipl
+  Transient.aipl
+  Dynamic.aipl
+  MethodPatch.aipl
+  Signatures.aipl
+  Phase17_StructuredConc.aipl
+  NowFuture.aipl
+  Philosophers.aipl
+  BoundedBuffer.aipl
 )
 
 pass=0; fail=0; total=0

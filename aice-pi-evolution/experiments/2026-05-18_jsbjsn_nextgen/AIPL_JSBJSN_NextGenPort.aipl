@@ -4,7 +4,7 @@
 // -> dump lineage as JSON for the Python report pipeline.
 //
 // Run:
-//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_JSBJSN_NextGenPort.abcl
+//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_JSBJSN_NextGenPort.aipl
 //
 // Reviewers compute deterministic scores in Phase 5. Setting use_ai=1
 // (Phase 6) makes them call ai_call_with_system per scoring request.
@@ -751,7 +751,7 @@ class Coordinator {
       // crash-recovery: flush lineage every generation so silent SDK
       // hangs (cf. Pi_Phase1_OpenSearch v3 attempt 2026-05-16) do not
       // lose the partial result.  Cost: one fs write per generation.
-      var ckpt_n = now lineage.dump("out/AIPL_JSBJSN_NextGenPort.abcl_lineage.json");
+      var ckpt_n = now lineage.dump("out/AIPL_JSBJSN_NextGenPort.aipl_lineage.json");
       print("[ckpt gen=" + gen + "] flushed " + ckpt_n + " individuals");
       gen = gen + 1;
     }
@@ -759,8 +759,8 @@ class Coordinator {
     print("[done] cells filled: " + (now elite.size()));
     print(now elite.best_summary(5));
 
-    var n = now lineage.dump("out/AIPL_JSBJSN_NextGenPort.abcl_lineage.json");
-    print("[lineage] wrote " + n + " individuals to out/AIPL_JSBJSN_NextGenPort.abcl_lineage.json");
+    var n = now lineage.dump("out/AIPL_JSBJSN_NextGenPort.aipl_lineage.json");
+    print("[lineage] wrote " + n + " individuals to out/AIPL_JSBJSN_NextGenPort.aipl_lineage.json");
   }
 }
 
@@ -778,7 +778,7 @@ var profiles = new TaskProfiles();
 var rev1 = new Reviewer("JSBFeasibility", "あなたは JS-Browser 実装可能性レビュアーです。Web Worker / OPFS / IndexedDB / postMessage / BroadcastChannel の制約下で 8 機能を src/browser-abcl/src/*.js (~2575 LOC) に追加できるか評価。z3-wasm bundle vs skip の trade-off も加味。1.0 = ≤700 行で実装可、0.7 = ≤1000 行、0.3 = ≤1400 行 + 機能の一部 deferred、0.0 = ブラウザ環境で本質的に不可。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev2 = new Reviewer("JSNFeasibility", "あなたは JS-Node 実装可能性レビュアーです。Node.js の full POSIX + worker_threads + child_process API なら Py-I と 1:1 マッピング近い。src/node-aipl-server/server.mjs (338 LOC) を中心に 8 機能を追加できるか評価。1.0 = ≤600 行で実装可、0.7 = ≤900 行、0.3 = ≤1200 行、0.0 = node 環境で本質的に不可。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev3 = new Reviewer("BackwardCompatJSBJSN", "あなたは JS 後方互換性レビュアーです。既存 src/browser-abcl/_smoke_test.sh + _smoke_pptr.mjs (headless Chrome) と src/node-aipl-server/_smoke_test.sh の samples が無変更で動作するか。新機能は全て opt-in (URL クエリ / env var / config) で発火。1.0 = 完全 opt-in、0.7 = 1-2 例で軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。", 0, 0.16666666666666666, util, digits);
-var rev4 = new Reviewer("FourWayParity", "あなたは 4-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。", 0, 0.16666666666666666, util, digits);
+var rev4 = new Reviewer("FourWayParity", "あなたは 4-way 整合性レビュアーです。同一 .aipl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev5 = new Reviewer("JSIdiomaticity", "あなたは JS イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を JS で書き直す妥当性。Map / async-mutex / AsyncLocalStorage (Node) / WeakMap / postMessage (Browser)。CRDT は Plain Object + JSON-merge が JS 流。Saga は async/await + try/catch が自然。1.0 = JS idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = JS 的でない。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev6 = new Reviewer("ImplCostEstimateJSBJSN", "あなたは JS 実装コスト見積もりレビュアーです。Py-I (~700 LOC) + OCaml (~795 LOC) + C (~880 LOC) の実績を踏まえ、JS-B (~1100 行) + JS-N (~1000 行) が現実的か。1.0 = ≤1900 行合計、0.7 = ≤2200 行、0.3 = ≤2500 行、0.0 = >2500 行。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var eval_actor = new Evaluator(rev1, rev2, rev3, rev4, rev5, rev6);

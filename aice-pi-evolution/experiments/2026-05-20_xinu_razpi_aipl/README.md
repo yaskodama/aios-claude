@@ -8,7 +8,7 @@
 | 項目 | パス |
 |---|---|
 | codegen | `src/aipl2c.ml --xinu` + `src/c_translator.ml:gen_program_xinu` (3283 行) |
-| サンプル | `abclc/{Rotate4LinesXinu, Philosophers5Xinu, BoundedBufferXinu}.abcl` |
+| サンプル | `abclc/{Rotate4LinesXinu, Philosophers5Xinu, BoundedBufferXinu}.aipl` |
 | 起動 sh | `run_{r4l, p5, bb, pingpong}_xinu.sh` |
 | Xinu 本体 | `/Users/kodamay/projects/xinu-raz/xinu` (別 git, arm-qemu + PL110 LCD + PL050 mouse + WM) |
 
@@ -79,7 +79,7 @@ implementation_order に従って 1 phase = 1 commit で進める.
 各 phase 完了後の checklist:
 
 ```
-1. aipl2c --xinu --no-typecheck で .abcl → C 変換が通る
+1. aipl2c --xinu --no-typecheck で .aipl → C 変換が通る
 2. Xinu kernel が link 成功 (xinu.elf 生成)
 3. QEMU -nographic で xsh$ プロンプトまで到達
 4. phase 固有の assertion が green

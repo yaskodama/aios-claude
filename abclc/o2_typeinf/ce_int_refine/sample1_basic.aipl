@@ -1,0 +1,33 @@
+// Phase O-2.b: vacuously-false refinement (Z3 unsat) demo.
+//
+// Two methods declare refinements with contradictory predicates that
+// no Int can satisfy.  Running with `AIPL_REFINE_CHECK=1` causes the
+// type checker to print a `[refine warning] vacuously-false ...`
+// line for each (Z3-detected UNSAT).  Without the env var the
+// behaviour is identical to plain AIPL — the program parses and runs
+// untouched.
+//
+// Inspect via:
+//   echo '' | AIPL_REFINE_CHECK=1 \
+//     ./_build/default/src/repl_thread.exe -f abclc/WhereVacuous.aipl
+//
+// The type-check pass is invoked through `repl_thread.exe -f` (it
+// emits warnings to stderr).  Compare with the silent default run.
+
+class Vacuous {
+  // Empty interval: every Int fails this.
+  method bad_range(k: int where k >= 5 and k <= 3) -> int {
+    return k;
+  }
+  // Contradictory equality: a single Int cannot equal both 1 and 2.
+  method bad_eq(n: int where n == 1 and n == 2) -> int {
+    return n;
+  }
+  // Healthy refinement (no warning): 0..100 inclusive.
+  method ok_range(m: int where m >= 0 and m <= 100) -> int {
+    return m * 2;
+  }
+}
+
+var v = new Vacuous();
+print("ok");

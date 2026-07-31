@@ -13,8 +13,8 @@ docker network: aipl-net
   └─ ocserver:8080   (aipl-ocaml:cross  — exposes Calc actor)
 
 drivers (run as one-shot containers on the same network):
-  ├─ python_driver.abcl  (Python -> pyserver + ocserver)
-  └─ ocaml_driver.abcl   (OCaml  -> ocserver + pyserver)
+  ├─ python_driver.aipl  (Python -> pyserver + ocserver)
+  └─ ocaml_driver.aipl   (OCaml  -> ocserver + pyserver)
 ```
 
 Both servers and both drivers use **the same wire format**
@@ -31,10 +31,10 @@ are byte-compatible.
 | `Dockerfile.ocaml`            | OCaml AIPL container (multi-stage: opam build + Debian-slim runtime with libsdl2-2.0-0) |
 | `ocaml_run.sh`                | Wrapper that drives `repl_thread.exe -f` so the gateway thread keeps serving after `compile` |
 | `run-cross.sh`                | Orchestration script (build / up / down) — replaces `docker compose` |
-| `samples/python_server.abcl`  | Python server: Counter (tick / get / add) on :8080 |
-| `samples/ocaml_server.abcl`   | OCaml server: Calc (add / square / bump) on :8080 |
-| `samples/python_driver.abcl`  | Python driver: 7 cross-language remote calls |
-| `samples/ocaml_driver.abcl`   | OCaml driver: 5 cross-language remote calls |
+| `samples/python_server.aipl`  | Python server: Counter (tick / get / add) on :8080 |
+| `samples/ocaml_server.aipl`   | OCaml server: Calc (add / square / bump) on :8080 |
+| `samples/python_driver.aipl`  | Python driver: 7 cross-language remote calls |
+| `samples/ocaml_driver.aipl`   | OCaml driver: 5 cross-language remote calls |
 
 ## Run
 

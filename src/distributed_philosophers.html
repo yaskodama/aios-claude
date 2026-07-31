@@ -367,7 +367,7 @@
 
     async function loadSource() {
       if (abclSource) return abclSource;
-      const r = await fetch("/distributed_philosophers_browser.abcl");
+      const r = await fetch("/distributed_philosophers_browser.aipl");
       abclSource = await r.text();
       return abclSource;
     }
@@ -585,7 +585,7 @@
     document.getElementById("btnShowSrc").addEventListener("click", async () => {
       const src = await loadSource();
       logDiv.innerHTML = "";
-      rawAppend("// ---- distributed_philosophers_browser.abcl ----");
+      rawAppend("// ---- distributed_philosophers_browser.aipl ----");
       rawAppend(src);
     });
 

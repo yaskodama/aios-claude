@@ -20,7 +20,7 @@ dune build src/aipl2c.exe >/tmp/_r1_build.log 2>&1 || {
 PASS=0; FAIL=0
 for src in Rotate4LinesXinu Philosophers5Xinu BoundedBufferXinu; do
   echo "=== $src ==="
-  ./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+  ./_build/default/src/aipl2c.exe abclc/${src}.aipl \
       -o /tmp/_r1_${src}.c --xinu --max-msgs 0 \
       > /tmp/_r1_${src}.aipl2c.log 2>&1
   if [ ! -f /tmp/_r1_${src}.c ]; then

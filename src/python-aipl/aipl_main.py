@@ -1,7 +1,7 @@
 """CLI entry point for the Python AIPL interpreter.
 
 Usage:
-    python3 abcl_main.py program.abcl [--timeout 5.0] [--idle-ms 120]
+    python3 abcl_main.py program.aipl [--timeout 5.0] [--idle-ms 120]
 """
 
 import argparse
@@ -18,7 +18,7 @@ from aipl_interp import Interpreter
 def main():
     ap = argparse.ArgumentParser(prog="python-abcl")
     ap.add_argument("source", nargs="?",
-                    help="path to a .abcl file (omit to start an interactive REPL)")
+                    help="path to a .aipl file (omit to start an interactive REPL)")
     ap.add_argument("--timeout", type=float, default=5.0,
                     help="max seconds to wait for actors to drain (default 5.0)")
     ap.add_argument("--idle-ms", type=int, default=120,

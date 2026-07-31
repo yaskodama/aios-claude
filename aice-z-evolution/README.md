@@ -1,7 +1,7 @@
 # AICE Z Evolution Translator
 
 This directory is isolated from the existing project files. It adds an
-extended `.aice` format and a standalone translator that emits `.abcl`.
+extended `.aice` format and a standalone translator that emits `.aipl`.
 
 Pipeline:
 
@@ -32,6 +32,6 @@ python3 aice-z-evolution/aice_z_translator.py \
 
 Generated files:
 
-- `out/ReceptionWorkflowZEvolution.abcl`
+- `out/ReceptionWorkflowZEvolution.aipl`
 - `out/ReceptionWorkflowZEvolution.report.md`
 - `out/ReceptionWorkflowZEvolution.manifest.json`

@@ -54,7 +54,7 @@ api_case "error: parse failure"       '{"source":"not valid abcl"}'             
 api_case "error: missing source"      '{"source":""}'                                                     "false"
 
 # Sample-file tests — reuse browser-abcl's known-good samples
-SAMPLES=(bounded_buffer.abcl philosophers.abcl rotate4lines.abcl drone_simulator.abcl)
+SAMPLES=(bounded_buffer.aipl philosophers.aipl rotate4lines.aipl drone_simulator.aipl)
 echo "[Phase 2] /api/typecheck on browser-abcl samples"
 for s in "${SAMPLES[@]}"; do
   total=$((total + 1))

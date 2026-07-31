@@ -15,7 +15,7 @@ N1 部分, R_BackwardCompat を達成し、その後の追加トラックとし�
 - readline + 32 entry 循環 history (Ctrl-P/N + 矢印 + ESC sequence)
 - WM halt 共通化 (SYS_EXIT で QEMU + Cocoa クリーン終了)
 - in-Xinu memfs (XFS on RAMDISK0) + shell utilities (ls/pwd/cd/mkdir/cat/cp)
-- in-Xinu make (cwd の `.c/.abcl` から Makefile 自動生成 + cc/abclc + run)
+- in-Xinu make (cwd の `.c/.aipl` から Makefile 自動生成 + cc/abclc + run)
 
 加えて Kernel Evolution Round 1 が S1 PriorityAging / S2 MLFQ /
 S3 DeadlineHints / S4 IdlePower / Sec1 StackCanaries まで完了済.
@@ -72,7 +72,7 @@ sed -i.bak -E 's/(new Reviewer\("R_[^"]+", "[^"]+"), 0, (0\.[0-9]+, util, digits
 AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py \
   aice-pi-evolution/experiments/2026-05-21_xinu_aipl_round2/AIPL_XinuRazPi_Round2.aipl \
   --timeout 2400 --idle-ms 600000
-# 出力: out/AIPL_XinuRazPi_Round2.abcl_lineage.json
+# 出力: out/AIPL_XinuRazPi_Round2.aipl_lineage.json
 ```
 
 ## ファイル
@@ -83,7 +83,7 @@ AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py \
 | `AIPL_XinuRazPi_Round2.ga.json` | 中間 IR (mock 用、gen=30/seed=8) |
 | `AIPL_XinuRazPi_Round2_ai.ga.json` | AI 用 IR メタデータ (gen=15/seed=12/rng=7) |
 | `AIPL_XinuRazPi_Round2.aipl` | MAP-Elites orchestrator (gen=10/seed=6、use_ai=1) |
-| `out/` | 進化計算結果 (`*.abcl_lineage.json` 等、未作成) |
+| `out/` | 進化計算結果 (`*.aipl_lineage.json` 等、未作成) |
 | `_smoke_*.sh` | phase 別の smoke (未作成、各 phase 完了時に追加) |
 
 ## 不変条件 (各 phase 完了時 PASS 必須)
@@ -98,7 +98,7 @@ AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py \
 ## 各 phase 完了後の checklist
 
 ```
-1. aipl2c --xinu で .abcl → C 変換が通る
+1. aipl2c --xinu で .aipl → C 変換が通る
 2. Xinu kernel が link 成功 (xinu.elf 生成)
 3. QEMU -nographic で xsh$ プロンプトまで到達
 4. phase 固有の assertion が green

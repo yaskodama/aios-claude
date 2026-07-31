@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # P4 smoke — Scheduling Visualizer (LCD bar-chart + CSV trace).
 #
-# Sample: abclc/SchedVizXinu.abcl
+# Sample: abclc/SchedVizXinu.aipl
 #   Controller spawns 3 priority-classed Workers (hi/md/lo) and calls
 #   sched_viz_start(300) so a background Xinu thread emits a CSV
 #   line + draws the 4-bar chart every 300 ms.
@@ -26,7 +26,7 @@ dune build src/aipl2c.exe >/tmp/_p4_build.log 2>&1 || {
 src=SchedVizXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_p4_${src}.c --xinu --max-msgs 0 \
     > /tmp/_p4_${src}.aipl2c.log 2>&1
 [ -f /tmp/_p4_${src}.c ] || {

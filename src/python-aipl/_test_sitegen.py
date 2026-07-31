@@ -26,7 +26,7 @@ def _run(sample: str) -> str:
 
 
 def test_sitegen() -> None:
-    out = _run("SiteGen.abcl")
+    out = _run("SiteGen.aipl")
 
     # typeof results showcased in the run
     assert "typeof(logo)             = image(64x64, RGBA)" in out
@@ -64,7 +64,7 @@ def test_sitegen() -> None:
     assert manifest["post_count"] == 3
     assert manifest["logo"]["width"] == 64
     assert manifest["logo"]["height"] == 64
-    print("OK  SiteGen.abcl")
+    print("OK  SiteGen.aipl")
 
 
 if __name__ == "__main__":

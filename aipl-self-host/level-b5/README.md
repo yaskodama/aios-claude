@@ -59,10 +59,10 @@ decls are present, which is exactly the case for B-1…B-4 samples.
 
 ```sh
 cd aipl-self-host/level-b5
-bash run.sh   samples/SampleOwnedClean.abcl
-bash run.sh   samples/SamplePrivateRead.abcl
-bash run.sh   samples/SampleExternalWrite.abcl
-bash run.sh   samples/SampleSelfConsistency.abcl
+bash run.sh   samples/SampleOwnedClean.aipl
+bash run.sh   samples/SamplePrivateRead.aipl
+bash run.sh   samples/SampleExternalWrite.aipl
+bash run.sh   samples/SampleSelfConsistency.aipl
 
 bash smoke.sh
 ```
@@ -70,10 +70,10 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleOwnedClean.abcl            issues=0
-PASS  SamplePrivateRead.abcl           issues=1
-PASS  SampleExternalWrite.abcl         issues=2
-PASS  SampleSelfConsistency.abcl       issues=2
+PASS  SampleOwnedClean.aipl            issues=0
+PASS  SamplePrivateRead.aipl           issues=1
+PASS  SampleExternalWrite.aipl         issues=2
+PASS  SampleSelfConsistency.aipl       issues=2
 Level B-5 owned samples: 4 pass / 0 fail
 ```
 

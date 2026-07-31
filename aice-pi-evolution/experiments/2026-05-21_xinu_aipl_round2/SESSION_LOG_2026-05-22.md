@@ -93,7 +93,7 @@ Both pushed.
 - `xinu-raz/apps/abcl_xinu_wait.c` (NEW): implements
   `b_wait(n_args, args)` by reading ms from `args[0]` and calling
   Xinu kernel `sleep(ms)`.  Both V_INT and V_FLOAT supported.
-- Used in `DiningPhilosophersDistXinu_NoMain.abcl::fork_denied`
+- Used in `DiningPhilosophersDistXinu_NoMain.aipl::fork_denied`
   for 20 ms retry backoff.  Eliminated the 800K msg/sec native-
   speed retry runaway that was overflowing the kernel mailbox.
 
@@ -101,9 +101,9 @@ Both pushed.
 
 | Variant       | PC side                                 | Xinu side                                 | Status |
 |---------------|-----------------------------------------|-------------------------------------------|--------|
-| Python legacy | `host_diners.py`                         | `DiningPhilosophersDistXinu.abcl` (auto-spawn) | ✅ stable |
-| Pure-AIPL static | `host_diners.abcl` (remote() / uart1://) | same                                      | ✅ stable, P1=167 P2=515 P3=103 attempts (100 meals each) |
-| Bootstrap (LOAD + SPAWN) | `host_diners_bootstrap.abcl`     | `DiningPhilosophersDistXinu_NoMain.abcl` (classes only, empty actor table at boot) | 🟡 P3/P2/Xinu reliable, P1 racy under smc91c111 AUTO_RELEASE bug |
+| Python legacy | `host_diners.py`                         | `DiningPhilosophersDistXinu.aipl` (auto-spawn) | ✅ stable |
+| Pure-AIPL static | `host_diners.aipl` (remote() / uart1://) | same                                      | ✅ stable, P1=167 P2=515 P3=103 attempts (100 meals each) |
+| Bootstrap (LOAD + SPAWN) | `host_diners_bootstrap.aipl`     | `DiningPhilosophersDistXinu_NoMain.aipl` (classes only, empty actor table at boot) | 🟡 P3/P2/Xinu reliable, P1 racy under smc91c111 AUTO_RELEASE bug |
 
 ### H. Smoke sweep — all 7 categories green
 
@@ -116,8 +116,8 @@ Both pushed.
 | 3  | `host_rpc_demo.py`                     | ✅ 9/9 |
 | 4  | `_diag_http_direct.sh` (Xinu HTTP)     | ✅ HTML + JSON serve OK |
 | 5  | `host_diners.py`                       | ✅ 3 PC + 2 Xinu |
-| 6  | `host_diners.abcl` (static, 100 meals) | ✅ all 5 |
-| 7  | `host_diners_bootstrap.abcl`           | ✅ 2 PC + 2 Xinu reliable, P1 racy |
+| 6  | `host_diners.aipl` (static, 100 meals) | ✅ all 5 |
+| 7  | `host_diners_bootstrap.aipl`           | ✅ 2 PC + 2 Xinu reliable, P1 racy |
 
 ## Commit timeline (newest first)
 
@@ -145,14 +145,14 @@ Both pushed.
 |-----------|--------------------------------------------------------------------------|
 | `daf5e34` | NEXT_SESSION: wait(ms) builtin + smc91c111 AUTO_RELEASE follow-up        |
 | `0244fc2` | c_translator + diners: AIPL wait(ms) builtin lands on Xinu codegen       |
-| `ffc45b2` | host_diners_bootstrap.abcl: leave Xinu philos idle for kernel stability  |
-| `5f6d74d` | host_diners_bootstrap.abcl: pass forks as ref:N for V_OBJ tagging        |
+| `ffc45b2` | host_diners_bootstrap.aipl: leave Xinu philos idle for kernel stability  |
+| `5f6d74d` | host_diners_bootstrap.aipl: pass forks as ref:N for V_OBJ tagging        |
 | `0bc3cda` | aipl-diners: runtime-bootstrap variant (host LOAD + SPAWN)               |
 | `d408f77` | aipl-diners: bump meals back to 100                                      |
 | `d43a2ae` | aipl-remote uart1: drain LIST's tail lines + FIFO lock for fairness      |
 | `93566fe` | aipl-diners: pure-AIPL 5-philosopher demo                                |
 | `80f4f1a` | aipl-diners: 20 meals per philosopher                                    |
-| `c569bc9` | aipl-diners: remote() over Xinu UART1 + .abcl extension + 100 meals      |
+| `c569bc9` | aipl-diners: remote() over Xinu UART1 + .aipl extension + 100 meals      |
 | `ac3b5d9` | smoke_n1: accept abcl_net_autoinit warm-up path for assertion (1)        |
 | `c72247c` | aipl-xinu Round 2: NEXT_SESSION.md handoff                               |
 | `667c044` | aipl-xinu Round 2: SMOKE_SWEEP_2026-05-22 — all 7 green                  |
@@ -240,7 +240,7 @@ While any diners launcher runs, browse to
 | File                              | What                                                |
 |-----------------------------------|-----------------------------------------------------|
 | `project_xinu_razpi_aipl.md`     | Round 2 completion + wait(ms) + smc91c111 follow-up |
-| `feedback_aipl_extension.md`     | `.aipl` → `.abcl` (corrected this session)          |
+| `feedback_aipl_extension.md`     | `.aipl` → `.aipl` (corrected this session)          |
 | `feedback_aipl_pyi_quirks.md`    | NEW — 5 Py-I gotchas                                |
 | `reference_xinu_uart1_rpc.md`    | NEW — 8 RPC opcodes + uart1:// translation table    |
 | `MEMORY.md`                       | Index updated                                        |

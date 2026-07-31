@@ -5,12 +5,12 @@
 現代的なシンタックスとマルチランタイム（OCaml ネイティブ／ブラウザ JS／C）で
 再実装した言語です。本マニュアルは言語仕様の概要と、付属サンプルの解説をまとめます。
 
-> 後方互換のため、ファイル拡張子 \`.abcl\`、Python ランタイムのモジュール名
+> 後方互換のため、ファイル拡張子 \`.aipl\`、Python ランタイムのモジュール名
 > (\`aipl_main.py\` 等)、環境変数 \`ABCL_AI_PROVIDER\` などは旧称のまま維持しています。
 
 - 対象バージョン: 本リポジトリ (`abclcp-project`) 同梱の OCaml REPL 実装
 - 主要ソース: `src/lexer.mll`, `src/parser.mly`, `src/eval_thread.ml`
-- サンプル群: `abclc/*.abcl`, `src/*.abcl`
+- サンプル群: `abclc/*.aipl`, `src/*.aipl`
 
 ---
 
@@ -77,7 +77,7 @@ make js         # ブラウザ用パーサ再生成
 ### 2.2 サンプル実行
 
 ```bash
-make run-hello             # abclc/Hello.abcl
+make run-hello             # abclc/Hello.aipl
 make run-philosophers      # 5哲学者
 make run-rotate4           # SDL 描画デモ
 ./run_bounded_buffer.sh    # 有界バッファ
@@ -87,7 +87,7 @@ make run-rotate4           # SDL 描画デモ
 任意のソースを直接食わせるには：
 
 ```bash
-_build/default/src/repl_thread.exe abclc/Hello.abcl
+_build/default/src/repl_thread.exe abclc/Hello.aipl
 ```
 
 ### 2.3 ブラウザ実行
@@ -306,7 +306,7 @@ send remote("localhost:8080", "fork2").take(0);
 - 第1引数: ホストとポート（OCaml 側 `web_listen` で待ち受ける）
 - 第2引数: 相手プロセス内のアクター名
 
-ブラウザ側のサンプル `distributed_philosophers_browser.abcl` では、
+ブラウザ側のサンプル `distributed_philosophers_browser.aipl` では、
 `fork2` などの変数に `"@fork2"` という文字列を入れておき、
 ランタイムが `@` 始まりを見て自動で HTTP に流します（`send` の解釈拡張）。
 
@@ -411,10 +411,10 @@ class Counter {
 
 ```sh
 # CLI で事前検査 (issue を stderr へ)
-python3 aipl_main.py --type-check program.abcl
+python3 aipl_main.py --type-check program.aipl
 
 # 厳格モード — issue があれば exit 2 で停止
-python3 aipl_main.py --type-check --strict program.abcl
+python3 aipl_main.py --type-check --strict program.aipl
 
 # プログラム内から呼ぶ
 var issues = type_check();      // array[string] of issue messages
@@ -428,7 +428,7 @@ function add(a: int, b: int) -> int { ... }
 typeof(add)   → "function(a:int, b:int) -> int"  // annotation 由来
 ```
 
-サンプル: `src/python-aipl/samples/Typecheck.abcl`
+サンプル: `src/python-aipl/samples/Typecheck.aipl`
 
 #### Phase 11b の追加検査 (call-site)
 
@@ -457,7 +457,7 @@ now c.tick("nope");                  // ✗ method arg
 var n: int = now c.get();            // ✓ method return inferred from -> int
 ```
 
-サンプル: `src/python-aipl/samples/Typecheck11b.abcl`
+サンプル: `src/python-aipl/samples/Typecheck11b.aipl`
 
 #### Phase 11c: Union 型 + シンプル generics
 
@@ -487,7 +487,7 @@ head(42);                         // ✗ array[T] が必要、int を渡され�
 generics は **per-call binding**: 各呼び出しで T が新たに束縛される。引数間で
 T が複数回現れた場合 (例: `pair(a: T, b: T)`) は **同一の型でなければならない**。
 
-サンプル: `src/python-aipl/samples/Typecheck11c.abcl`
+サンプル: `src/python-aipl/samples/Typecheck11c.aipl`
 
 #### Phase 11d: 制御フロー感応 (`typeof`-based narrowing)
 
@@ -539,7 +539,7 @@ class Demo {
 型に強化されたので、`array[int]` (長さ未指定) と `array[int, N]` (長さ指定)
 の双方向で互換性が判定される。
 
-サンプル: `src/python-aipl/samples/Typecheck11de.abcl`
+サンプル: `src/python-aipl/samples/Typecheck11de.aipl`
 
 ### 4.7p Phase 16 — Transient cast at any-boundary
 
@@ -551,8 +551,8 @@ Phase 16 では,Soundness Report で優先度 #1 と挙げられていた
 **有効化**: `--transient` フラグ.
 
 ```sh
-python3 aipl_main.py samples/Transient.abcl              # 通常実行
-python3 aipl_main.py samples/Transient.abcl --transient  # ランタイム検査入り
+python3 aipl_main.py samples/Transient.aipl              # 通常実行
+python3 aipl_main.py samples/Transient.aipl --transient  # ランタイム検査入り
 ```
 
 **検査箇所**: 注釈付きの 3 つの境界に runtime check を挿入する.
@@ -582,8 +582,8 @@ var n: int = ai_call("...");           // ✗ ai_call 戻り値は string
 必要なときだけ強い保証を得られる設計.
 
 サンプル:
-- `samples/Transient.abcl` (clean)
-- `samples/Transient_violation.abcl` (`--transient` 時のみエラー)
+- `samples/Transient.aipl` (clean)
+- `samples/Transient_violation.aipl` (`--transient` 時のみエラー)
 
 ### 4.7o Phase 15 — symbol_owned (アクターフィールドのカプセル化)
 
@@ -622,8 +622,8 @@ class Bandit {
 - レコード型 (匿名 `{...}` データ) は引き続き自由に read/write 可能 ―
   Phase 15 はアクターのみを対象。
 
-サンプル: `src/python-aipl/samples/Owned.abcl` (clean)、
-`samples/Owned_violations.abcl` (3 件の意図的違反を出す)。
+サンプル: `src/python-aipl/samples/Owned.aipl` (clean)、
+`samples/Owned_violations.aipl` (3 件の意図的違反を出す)。
 
 ### 4.7n Phase 14 — Linear / 借用型 (use-after-move 検出)
 
@@ -671,7 +671,7 @@ function ok_branch(name: string, prefer_close: int) -> int {
 `var x: int = some_linear_int_var;` は型としては OK だが、
 moved 検査でエラーになる場合あり。
 
-サンプル: `src/python-aipl/samples/Linear.abcl`
+サンプル: `src/python-aipl/samples/Linear.aipl`
 
 ### 4.7m Phase 13 — CSP チャネル
 
@@ -702,7 +702,7 @@ var pick = select_recv([ch1, ch2, ch3], 50);       // tuple(int idx, any v)
 読み書きできる (CSP の中心モデル)。`channel_send` と `channel_recv` は
 受け取り側の actor が処理を進める間も待機する。
 
-サンプル: `src/python-aipl/samples/Channels.abcl`
+サンプル: `src/python-aipl/samples/Channels.aipl`
 (producer/consumer + select + コンパイル時生成パイプライン)
 
 ### 4.7l Phase 12 — Capability ベース効果系
@@ -738,7 +738,7 @@ function bad(path: string) -> string !{fs} {
 **Gradual**: `!{...}` 注釈を **書かない** 関数は検査スキップ
 (既存コード破壊回避)。書いた関数だけ厳密に検査される。
 
-サンプル: `src/python-aipl/samples/Effects.abcl`
+サンプル: `src/python-aipl/samples/Effects.aipl`
 
 ### 4.7j AI アクター — 自動起動・now / future 対応 (Python ランタイム)
 
@@ -789,7 +789,7 @@ print(await(fa)); print(await(fb));
 | `future AI.ask("x")` | `future` |
 | `now AI.see("x", img)` | `string` |
 
-サンプル: `src/python-aipl/samples/AIActor.abcl`
+サンプル: `src/python-aipl/samples/AIActor.aipl`
 
 ### 4.7h AI 呼び出し — プロバイダ指定とマルチモーダル (Python ランタイム)
 
@@ -828,7 +828,7 @@ ai_call_image_with_system(2, "be brief",
 raw `bytes`、`{ path: "x.png" }` レコードのいずれも受け付ける。MIME は PNG/
 JPEG/GIF/WebP の magic bytes から自動判定。
 
-サンプル: `src/python-aipl/samples/MultiProvider.abcl`
+サンプル: `src/python-aipl/samples/MultiProvider.aipl`
 
 ### 4.7g アプリ／Web サイト生成系 — ファイル / 画像 / ディレクトリ / JSON (Python ランタイム)
 
@@ -873,7 +873,7 @@ class SiteGen {
 }
 ```
 
-サンプル: `src/python-aipl/samples/SiteGen.abcl`
+サンプル: `src/python-aipl/samples/SiteGen.aipl`
 (HTML + CSS + 動的生成 PNG ロゴ + JSON manifest を 100% AIPL で出力)
 
 ### 4.7f 動的メソッド注入 / 削除 (Python ランタイム)
@@ -902,7 +902,7 @@ var _ = now g.shout("Alice");            // [g1] HEY!! Alice
 remove_method("Greeter", "shout");
 ```
 
-サンプル: `src/python-aipl/samples/MethodPatch.abcl`
+サンプル: `src/python-aipl/samples/MethodPatch.aipl`
 
 > メモ: メソッドはアクターの非同期メールボックスに乗るため、`send a.m()`
 > の連発と `add_method` を交互にすると **タイミング順序が崩れます** (全
@@ -936,7 +936,7 @@ typeof(image_pixel(img, 0, 0))             → "tuple(int, int, int, int)"
 typeof(json_stringify({a:1}, 2))           → "string"
 ```
 
-サンプル: `src/python-aipl/samples/Signatures.abcl`
+サンプル: `src/python-aipl/samples/Signatures.aipl`
 
 ### 4.7e ユーザー定義関数 (Python ランタイム)
 
@@ -978,7 +978,7 @@ typeof(describe)
    → "function(x:float | int | string) -> string"
 ```
 
-サンプル: `src/python-aipl/samples/Functions.abcl`
+サンプル: `src/python-aipl/samples/Functions.aipl`
 
 ### 4.7d 組型 (タプル, Python ランタイム)
 
@@ -1002,7 +1002,7 @@ typeof((42,))            → "tuple(int)"
 配列との違い: 配列は同一型・可変長 (長さは型に含まれない)、
 組型は位置別型・不変・**長さが型に含まれる**。
 
-サンプル: `src/python-aipl/samples/Tuples.abcl`
+サンプル: `src/python-aipl/samples/Tuples.aipl`
 
 ### 4.7c レコード型 (Python ランタイム)
 
@@ -1036,7 +1036,7 @@ class Profile {
 }
 ```
 
-サンプル: `src/python-aipl/samples/Records.abcl`
+サンプル: `src/python-aipl/samples/Records.aipl`
 
 ### 4.7b 配列リテラルとインデックス記法 (Python ランタイム)
 
@@ -1069,8 +1069,8 @@ var pad[R][R + 1] = -1;                   // ローカル変数+式
 ```
 
 `var x[N];` はクラスのフィールド宣言にもメソッドのローカル変数にも使える。
-詳細は `src/python-aipl/samples/Arrays.abcl` (1次元) と
-`samples/MultiDimArrays.abcl` (多次元) 参照。
+詳細は `src/python-aipl/samples/Arrays.aipl` (1次元) と
+`samples/MultiDimArrays.aipl` (多次元) 参照。
 
 ### 4.8 動的コンパイル & 動的アクター生成 (Python ランタイム拡張)
 
@@ -1080,8 +1080,8 @@ var pad[R][R + 1] = -1;                   // ローカル変数+式
 | `spawn(name, args...)` | 文字列で指定したクラス名 (静的に書かれたクラス、もしくは `compile` 経由で登録されたクラス) のインスタンスをアクターとして生成。`init(args...)` も呼ぶ |
 
 これにより **メッセージ受信を契機にアクターを動的生成する factory** が
-書ける。サンプルは `src/python-aipl/samples/Dynamic.abcl` と
-`samples/DynamicWorkerPool.abcl` 参照。
+書ける。サンプルは `src/python-aipl/samples/Dynamic.aipl` と
+`samples/DynamicWorkerPool.aipl` 参照。
 
 ```
 class Factory {
@@ -1102,7 +1102,7 @@ send greeter.hi("world");
 
 ### 5.1 Hello — 最小サンプル
 
-`abclc/Hello.abcl`
+`abclc/Hello.aipl`
 
 ```
 class Hello {
@@ -1140,7 +1140,7 @@ make run-hello
 
 ### 5.2 Counter — 自己メッセージとフィールド
 
-`abclc/counter.abcl`
+`abclc/counter.aipl`
 
 ```
 class Counter {
@@ -1167,7 +1167,7 @@ send c2.inc();
 
 ### 5.3 PingPong — 二者間メッセージ往復
 
-`abclc/PingPong.abcl`
+`abclc/PingPong.aipl`
 
 ```
 class Pinger {
@@ -1197,7 +1197,7 @@ var ponger = new Ponger();
 
 ### 5.4 Become — 振る舞いの動的入れ替え
 
-`abclc/become.abcl`
+`abclc/become.aipl`
 
 ```
 class A {
@@ -1225,7 +1225,7 @@ send x.ping();   // A.ping
 
 ### 5.5 BoundedBuffer — 生産者・消費者問題
 
-`abclc/bounded_buffer.abcl` （抜粋）
+`abclc/bounded_buffer.aipl` （抜粋）
 
 ```
 class Buffer {
@@ -1269,7 +1269,7 @@ class Buffer {
 
 ### 5.6 Philosophers — 食事する哲学者
 
-`abclc/philosophers.abcl` （抜粋）
+`abclc/philosophers.aipl` （抜粋）
 
 ```
 object Fork {
@@ -1301,11 +1301,11 @@ object Philosopher {
 ```
 
 > 注: 上記の旧構文（`object`/`int`/`send X m` のスペース構文）は古いサンプル
-> 用に互換が残されています。新しいサンプル（`Philosophers5.abcl` 等）は
+> 用に互換が残されています。新しいサンプル（`Philosophers5.aipl` 等）は
 > `class` ベースで書かれており、こちらが推奨スタイルです。
 
 **学べること**: 5 つのアクター間の対称デッドロック、ハンドオフによる
-回避手法、SDL 版（`Philosophers5.abcl`）ではビジュアライズも可能。
+回避手法、SDL 版（`Philosophers5.aipl`）ではビジュアライズも可能。
 
 実行：
 
@@ -1316,7 +1316,7 @@ make run-philosophers     # コンソール
 
 ### 5.7 Rotate4Lines — SDL 描画とタイマー
 
-`abclc/Rotate4Lines.abcl`
+`abclc/Rotate4Lines.aipl`
 
 ```
 class Line {
@@ -1360,7 +1360,7 @@ send li1.rotate(); send li2.rotate(); send li3.rotate(); send li4.rotate();
 
 ### 5.8 WebCalc — HTTP ゲートウェイと `select`
 
-`src/web_calc1.abcl`
+`src/web_calc1.aipl`
 
 ```
 class Calc {

@@ -3,7 +3,7 @@
 #
 # Verifies:
 #   1. Pure-AIPL pipeline (lexer + parser + eval) runs each
-#      level-z/samples/*LevelZ.abcl and emits a "[level-z] done"
+#      level-z/samples/*LevelZ.aipl and emits a "[level-z] done"
 #      marker plus the expected stdout.
 #   2. IO bridge sample executes under the host with capability
 #      checks (advisory mode) and again under AIPL_CAP_STRICT=1
@@ -33,24 +33,24 @@ echo "[Phase 1] AIPL-side lexer + parser + eval"
 
 run_lvz() {
   local sample="$1" name
-  name=$(basename "$sample" .abcl)
+  name=$(basename "$sample" .aipl)
   local log="$HERE/out/${name}.log"
   python3 "$HERE/bootstrap.py" "$sample" > "$log" 2>&1
   echo "$log"
 }
 
 # Hello
-log=$(run_lvz "$HERE/samples/HelloLevelZ.abcl")
+log=$(run_lvz "$HERE/samples/HelloLevelZ.aipl")
 check_contains "HelloLevelZ"  "$log" "Hello from Level Z"
 check_contains "HelloLevelZ"  "$log" "[level-z] done"
 
 # Arith
-log=$(run_lvz "$HERE/samples/ArithLevelZ.abcl")
+log=$(run_lvz "$HERE/samples/ArithLevelZ.aipl")
 check_contains "ArithLevelZ"  "$log" "45"
 check_contains "ArithLevelZ"  "$log" "[level-z] done"
 
 # Loop
-log=$(run_lvz "$HERE/samples/LoopLevelZ.abcl")
+log=$(run_lvz "$HERE/samples/LoopLevelZ.aipl")
 check_contains "LoopLevelZ"   "$log" "10"
 check_contains "LoopLevelZ"   "$log" "[level-z] done"
 
@@ -59,15 +59,15 @@ echo
 echo "[Phase 2] IoBridge + capability gating"
 
 IO_LOG="$HERE/out/IoBridge.log"
-cat "$HERE/io_bridge.abcl" "$HERE/samples/SampleIoBridge.abcl" > /tmp/_lvZ_iobridge.abcl
+cat "$HERE/io_bridge.aipl" "$HERE/samples/SampleIoBridge.aipl" > /tmp/_lvZ_iobridge.aipl
 AIPL_AI_PROVIDER=mock python3 "$HERE/../../src/python-aipl/aipl_main.py" \
-    /tmp/_lvZ_iobridge.abcl > "$IO_LOG" 2>&1
+    /tmp/_lvZ_iobridge.aipl > "$IO_LOG" 2>&1
 check_contains "IoBridge"     "$IO_LOG" "[io] write done"
 check_contains "IoBridge"     "$IO_LOG" "[io] read = hello self-host"
 check_contains "IoBridge"     "$IO_LOG" "[io] ai_simple ="
 
 STRICT_LOG="$HERE/out/IoBridgeStrict.log"
-cat > /tmp/_lvZ_strict.abcl <<'EOF'
+cat > /tmp/_lvZ_strict.aipl <<'EOF'
 class IoBridge {
   method read(path) {
     check_capability("fs");
@@ -80,7 +80,7 @@ var s = now io.read("/tmp/levelz_io_demo.txt");
 print("[strict] should not reach: " + s);
 EOF
 AIPL_CAP_STRICT=1 AIPL_AI_PROVIDER=mock python3 "$HERE/../../src/python-aipl/aipl_main.py" \
-    /tmp/_lvZ_strict.abcl > "$STRICT_LOG" 2>&1
+    /tmp/_lvZ_strict.aipl > "$STRICT_LOG" 2>&1
 check_contains "IoBridgeStrict" "$STRICT_LOG" "capability denied"
 
 echo

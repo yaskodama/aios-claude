@@ -1,0 +1,44 @@
+// FbPrimitivesXinu.aipl
+// G1 demo: framebuffer drawing primitives on PL110.
+//
+// Painter draws one of each of the 3 required primitives in two
+// passes — the first crisp (AA off), the second feathered (AA on).
+// Each call also emits a serial marker [aipl] fb_<primitive> … which
+// _smoke_g1.sh checks against the spec:
+//   (1) 3 種 (circle / triangle / rrect) markers appear on serial
+//   (2) the color= field reports the full 24-bit value passed in
+//   (3) fb_aa toggle observable — two passes with aa=0 then aa=1
+
+class Painter {
+  // colour constants packed as 0xRRGGBB ints — AIPL has no hex
+  // literals so we build them from 2^24 / 2^16 / 2^8 components.
+  var red   = 0;
+  var green = 0;
+  var blue  = 0;
+  var aa    = 0;
+
+  method init() {
+    // 0xFF0000 = 16711680, 0x00FF00 = 65280, 0x0000FF = 255
+    red   = 16711680;
+    green = 65280;
+    blue  = 255;
+    send self.paint_crisp();
+  }
+
+  method paint_crisp() {
+    fb_set_aa(0);
+    fb_circle(120, 120, 40, red);
+    fb_triangle(220, 80, 280, 80, 250, 160, green);
+    fb_rrect(320, 80, 100, 80, 16, blue);
+    send self.paint_aa();
+  }
+
+  method paint_aa() {
+    fb_set_aa(1);
+    fb_circle(120, 220, 40, red);
+    fb_triangle(220, 200, 280, 200, 250, 280, green);
+    fb_rrect(320, 200, 100, 80, 16, blue);
+  }
+}
+
+var p = new Painter();

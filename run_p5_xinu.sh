@@ -1,5 +1,5 @@
 #!/bin/sh
-# Philosophers5Xinu.abcl を Xinu (arm-qemu) 上で動かす。
+# Philosophers5Xinu.aipl を Xinu (arm-qemu) 上で動かす。
 set -e
 cd "$(dirname "$0")"
 
@@ -7,7 +7,7 @@ XINU=/Users/kodamay/projects/xinu-raz/xinu
 COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-
 
 dune build src/aipl2c.exe
-./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.abcl \
+./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.aipl \
     -o /tmp/p5_xinu.c --xinu --max-msgs 0
 cp /tmp/p5_xinu.c "$XINU/apps/abcl_program.c"
 

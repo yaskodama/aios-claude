@@ -1,2 +1,2 @@
-load sample1_basic_width.abcl
+load sample1_basic_width.aipl
 compile

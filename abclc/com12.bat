@@ -1,2 +1,2 @@
-load Hello.abcl
+load Hello.aipl
 compile

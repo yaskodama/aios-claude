@@ -338,9 +338,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     w.document.getElementById("btnLoad").addEventListener("click", () => {
-      consoleOut.textContent += ">>> load web_calc1.abcl\n";
+      consoleOut.textContent += ">>> load web_calc1.aipl\n";
       consoleOut.scrollTop = consoleOut.scrollHeight;
-      runReplCommand("load web_calc1.abcl", consoleOut);
+      runReplCommand("load web_calc1.aipl", consoleOut);
     });
 
     w.document.getElementById("btnCompile").addEventListener("click", () => {

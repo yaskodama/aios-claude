@@ -1,2 +1,2 @@
-load sample1_success.abcl
+load sample1_success.aipl
 compile

@@ -1,0 +1,117 @@
+// DiningPhilosophersDistXinu.aipl
+// Distributed dining philosophers across host PC + Xinu, over UART1.
+//
+// Forks F0..F4  — Xinu AIPL actors (ids 0..4).
+// Philosophers  — P1, P2, P3 on host (Python threads);
+//                 P4, P5 on Xinu (AIPL actors ids 5, 6).
+//
+// Communication topology:
+//   PC philosophers use the UART1 RPC channel — SEND fork.acquire(pid)
+//     then QUERY the fork's `holder` field to see if they won.
+//   Xinu philosophers use AIPL message passing — Fork.acquire calls
+//     back via `send sender.fork_granted(pid)` / fork_denied(pid).
+//     When the caller is a PC RPC (sender=-1), abcl_enqueue silently
+//     drops the callback — which is what we want, because PC polls
+//     instead.
+//
+// Deadlock avoidance: each philosopher acquires its LOWER-numbered
+// fork first (classical resource hierarchy).
+//
+//     P1 (PC):  low=F0  high=F4
+//     P2 (PC):  low=F0  high=F1
+//     P3 (PC):  low=F1  high=F2
+//     P4 (X):   low=F2  high=F3
+//     P5 (X):   low=F3  high=F4
+//
+// Each philosopher eats 100 times then stops.  Eat marker:
+//   60000 + 100 * pid + meal_idx
+// (meal_idx ranges 0..99, so per-philosopher marker stays within
+// a 100-wide bucket: P4 -> 60400..60499, P5 -> 60500..60599.)
+// Done marker: 70000 + pid  (e.g. P4 -> 70004, P5 -> 70005).
+
+class Fork {
+  var holder = 0;     // 0 = free; >= 1 = pid currently holding
+
+  method acquire(pid) {
+    if (holder == 0) {
+      holder = pid;
+      send sender.fork_granted(pid);
+    } else {
+      send sender.fork_denied(pid);
+    }
+  }
+
+  method release(pid) {
+    if (holder == pid) {
+      holder = 0;
+    }
+  }
+}
+
+class Philosopher {
+  var my_id     = 0;
+  var f_low     = nil;
+  var f_high    = nil;
+  var meals     = 100;
+  var meal_idx  = 0;
+  var state     = 0;   // 0 = idle, 1 = have_low, 2 = eating-in-progress
+
+  method init(id_arg, lo, hi) {
+    my_id    = id_arg;
+    f_low    = lo;
+    f_high   = hi;
+    meals    = 100;
+    meal_idx = 0;
+    state    = 0;
+    send self.try_eat();
+  }
+
+  method try_eat() {
+    if (meals == 0) {
+      print(70000 + my_id);
+    } else {
+      send f_low.acquire(my_id);
+    }
+  }
+
+  method fork_granted(pid) {
+    if (state == 0) {
+      state = 1;
+      send f_high.acquire(my_id);
+    } else {
+      // state == 1 -> we already had low; this grant is for high.
+      // Marker range: 60000 + 100*pid + meal_idx
+      //   P4 (my_id=4) : 60400..60419 (20 meals)
+      //   P5 (my_id=5) : 60500..60519 (20 meals)
+      print(60000 + 100 * my_id + meal_idx);
+      meal_idx = meal_idx + 1;
+      meals    = meals    - 1;
+      send f_high.release(my_id);
+      send f_low.release(my_id);
+      state = 0;
+      send self.try_eat();
+    }
+  }
+
+  method fork_denied(pid) {
+    if (state == 1) {
+      // got low but couldn't get high — release low, retry.
+      send f_low.release(my_id);
+      state = 0;
+    }
+    send self.try_eat();
+  }
+}
+
+// Five forks at actor ids 0..4 (top-level new order = actor id).
+var f0 = new Fork();
+var f1 = new Fork();
+var f2 = new Fork();
+var f3 = new Fork();
+var f4 = new Fork();
+
+// Two Xinu philosophers (actor ids 5 and 6).
+//   P4 between F2 (low) and F3 (high)
+//   P5 between F3 (low) and F4 (high)
+var p4 = new Philosopher(4, f2, f3);
+var p5 = new Philosopher(5, f3, f4);

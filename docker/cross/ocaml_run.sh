@@ -5,9 +5,9 @@
 # and the REPL would `exit Thread.Exit` on EOF.
 set -u
 
-ABCL="${1:-/app/samples-remote/ocaml_server.abcl}"
+ABCL="${1:-/app/samples-remote/ocaml_server.aipl}"
 
-# Place the REPL drive script in the same directory as the .abcl so
+# Place the REPL drive script in the same directory as the .aipl so
 # that the REPL's `cwd ->` chdir lands where the source lives, and a
 # bare `load <basename>` resolves correctly.
 SCRIPT_DIR=$(dirname "$ABCL")

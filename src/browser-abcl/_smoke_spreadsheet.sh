@@ -2,7 +2,7 @@
 # Phase 4 spreadsheet UI smoke runner (node-side).
 #
 # The actual HTML page (spreadsheet.html) needs a browser to render
-# the canvas.  This script runs spreadsheet.abcl through the shared
+# the canvas.  This script runs spreadsheet.aipl through the shared
 # JS runtime in Node and verifies the runtime's sheetState is
 # populated correctly (9 cells + selection on C3).
 #
@@ -26,7 +26,7 @@ const tc  = await import(SRC + "/typecheck.js");
 const rt  = await import(SRC + "/runtime.js");
 const parser = require(SRC + "/parser/parser.js").parser;
 parser.yy = ast;
-const src = fs.readFileSync("$HERE/spreadsheet.abcl", "utf8");
+const src = fs.readFileSync("$HERE/spreadsheet.aipl", "utf8");
 const tree = parser.parse(src);
 tc.runTypeCheck(tree);
 const runtime = new rt.Runtime(()=>{});
@@ -63,7 +63,7 @@ check_contains() {
   fi
 }
 
-echo "[Phase 4] spreadsheet.abcl renders sheetState"
+echo "[Phase 4] spreadsheet.aipl renders sheetState"
 check_contains "rows (G4: 10)" "rows=10"
 check_contains "cols (G4: 8)"  "cols=8"
 check_contains "9 cells"       "cells=9"

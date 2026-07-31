@@ -2,7 +2,7 @@
 
 ブートストラップの **最上位レベル**.下位の Level C (lexer + parser + eval) を
 1 つのドライバに統合し、ホスト Python は **18 行の bootstrap loader** だけに縮退.
-さらに `io_bridge.abcl` で fs / ai / net プリミティブを CE-11 capability check
+さらに `io_bridge.aipl` で fs / ai / net プリミティブを CE-11 capability check
 ごしに再エクスポートし、self-host された AIPL コードが capability 境界を越えて
 ホスト権限にアクセスする経路を確立.
 
@@ -10,13 +10,13 @@
 
 ```
 bootstrap.py       — 18-line Python loader (≤20 lines per spec)
-driver_head.abcl   — Bootstrap actor (tokenize → parse → eval を順に呼ぶ)
-io_bridge.abcl     — IoBridge actor (capability-checked fs/ai/net)
+driver_head.aipl   — Bootstrap actor (tokenize → parse → eval を順に呼ぶ)
+io_bridge.aipl     — IoBridge actor (capability-checked fs/ai/net)
 samples/
-  HelloLevelZ.abcl    — hello world + 算術
-  ArithLevelZ.abcl    — 算術 + if/else
-  LoopLevelZ.abcl     — while ループ + accumulate
-  SampleIoBridge.abcl — IoBridge を介した fs/ai 呼出 (host-level)
+  HelloLevelZ.aipl    — hello world + 算術
+  ArithLevelZ.aipl    — 算術 + if/else
+  LoopLevelZ.aipl     — while ループ + accumulate
+  SampleIoBridge.aipl — IoBridge を介した fs/ai 呼出 (host-level)
 smoke.sh           — 4 sample × 10 アサーション
 out/               — sample 実行ログ
 ```
@@ -24,7 +24,7 @@ out/               — sample 実行ログ
 ## 起動の流れ
 
 ```sh
-$ python3 bootstrap.py samples/HelloLevelZ.abcl
+$ python3 bootstrap.py samples/HelloLevelZ.aipl
 [level-z] lex   : 18 tokens
 [level-z] parse : 3 stmts
 [level-z] eval  :
@@ -36,17 +36,17 @@ Hello from Level Z
 `bootstrap.py` 内部:
 
 1. `sys.argv[1]` の AIPL ソースを読む
-2. `../level-c/{lexer,parser,eval}.abcl` を concat
-3. `driver_head.abcl` を append (Bootstrap actor 定義)
+2. `../level-c/{lexer,parser,eval}.aipl` を concat
+3. `driver_head.aipl` を append (Bootstrap actor 定義)
 4. trailer (`var __USER_SRC = read_file("..."); var __B = new Bootstrap(); send __B.run(__USER_SRC);`) を append
-5. 結合済みファイルを `/tmp/_aipl_level_z.abcl` に保存
+5. 結合済みファイルを `/tmp/_aipl_level_z.aipl` に保存
 6. ホスト AIPL に渡して実行
 
 ステップ 2-4 はファイル連結だけ.分析 / 解釈は一切ホスト側で行わない.
 
 ## IO bridge — capability 境界の実物
 
-`io_bridge.abcl` は 6 メソッドを公開:
+`io_bridge.aipl` は 6 メソッドを公開:
 
 | メソッド | 必要 cap | ホスト primitive |
 |---|---|---|
@@ -64,9 +64,9 @@ Hello from Level Z
 - 既定の advisory モード + grant 無し → `cap_violation` を NDJSON ログに記録し、
   メソッド本体は続行 (CE-11 仕様通り)
 
-注: `io_bridge.abcl` は **ホスト AIPL** から直接 source 読込される
+注: `io_bridge.aipl` は **ホスト AIPL** から直接 source 読込される
 (Level Z パーサは class 構文を解さないため self-hosted 側からは呼べない).
-self-host を class 構文まで広げるなら `level-c/parser.abcl` の拡張が必要.
+self-host を class 構文まで広げるなら `level-c/parser.aipl` の拡張が必要.
 
 ## smoke
 

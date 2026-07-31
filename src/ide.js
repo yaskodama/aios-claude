@@ -99,7 +99,7 @@
   els.btnSend.addEventListener("click", sendCurrent);
 
   els.btnLoadFile.addEventListener("click", () => {
-    const f = prompt("読み込むファイル名 (例: viz_philosophers.abcl):");
+    const f = prompt("読み込むファイル名 (例: viz_philosophers.aipl):");
     if (!f) return;
     runRepl("load " + f.trim());
   });
@@ -289,7 +289,7 @@
   function commandForFile(path) {
     const lower = path.toLowerCase();
     if (lower.endsWith(".bat"))  return "script " + path;
-    if (lower.endsWith(".abcl")) return "load " + path;
+    if (lower.endsWith(".aipl")) return "load " + path;
     return null;  // unknown extension: don't do anything automatic
   }
 

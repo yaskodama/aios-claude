@@ -1,2 +1,2 @@
-load counter.abcl
+load counter.aipl
 compile

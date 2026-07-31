@@ -1,4 +1,4 @@
-"""Re-score the 76-individual lineage produced by the AIPL .abcl
+"""Re-score the 76-individual lineage produced by the AIPL .aipl
 orchestrator using the Python design_estimator + 3 reviewers, and
 identify the top feasible candidate (corpus_size_class=10KB so we
 can train it locally without downloading anything).
@@ -20,7 +20,7 @@ from reviewers import review_all
 
 
 REPO = HERE.parent
-LINEAGE = REPO / "aice-evolution-v2/examples/out/LocalGenAIScaledEvolutionJP.abcl_lineage.json"
+LINEAGE = REPO / "aice-evolution-v2/examples/out/LocalGenAIScaledEvolutionJP.aipl_lineage.json"
 
 
 # Map lineage axis values to the genome dict the design_estimator expects.
@@ -96,7 +96,7 @@ def main():
         print("first run:")
         print("  cd aice-evolution-v2/examples && mkdir -p out && \\")
         print("    AIPL_AI_PROVIDER=mock python3 ../../src/python-aipl/aipl_main.py \\")
-        print("    LocalGenAIScaledEvolutionJP.abcl")
+        print("    LocalGenAIScaledEvolutionJP.aipl")
         sys.exit(1)
 
     individuals = json.loads(LINEAGE.read_text(encoding="utf-8"))

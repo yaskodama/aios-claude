@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_multi_dim_arrays() -> None:
-    out = _run("MultiDimArrays.abcl")
+    out = _run("MultiDimArrays.aipl")
 
     # 1) 2D local array `var pad[R][C] = 7;` with R=3, C=6, diagonal updates
     assert "Pad 3x6 (default 7)" in out
@@ -51,18 +51,18 @@ def test_multi_dim_arrays() -> None:
     assert "layer 0 row 0: 100 -1 -1 -1" in out
     assert "layer 0 row 2: -1 42 -1 -1" in out
     assert "layer 1 row 2: -1 -1 -1 999" in out
-    print("OK  MultiDimArrays.abcl")
+    print("OK  MultiDimArrays.aipl")
 
 
 def test_single_dim_still_works() -> None:
-    """Make sure the single-dim Arrays.abcl from the prior turn still passes
+    """Make sure the single-dim Arrays.aipl from the prior turn still passes
     after the multi-dim refactor (regression check)."""
-    out = _run("Arrays.abcl")
+    out = _run("Arrays.aipl")
     assert "workers[0] = alice" in out
     assert "sum = 53" in out
     assert "bucket[3] = 3" in out
     assert "label[2] = Wed" in out
-    print("OK  Arrays.abcl (regression)")
+    print("OK  Arrays.aipl (regression)")
 
 
 if __name__ == "__main__":

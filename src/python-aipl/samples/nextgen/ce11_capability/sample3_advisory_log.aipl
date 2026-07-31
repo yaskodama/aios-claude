@@ -1,0 +1,11 @@
+// CE-11 / sample 3 — non-strict (advisory) mode logs cap_violation.
+//
+// Run without AIPL_CAP_STRICT (or with AIPL_CAP_STRICT=0):
+//   AIPL_DIST_LOG_FILE=/tmp/ce11.ndjson python3 aipl_main.py \
+//     samples/nextgen/ce11_capability/sample3_advisory_log.aipl
+// Then inspect cat /tmp/ce11.ndjson for cap_violation events.
+
+grant_cap("ai");
+check_capability("ai");    // ok
+check_capability("fs");    // advisory: logs cap_violation, returns true
+print("[ce11/3] both check_capability calls returned " + has_cap("ai"));

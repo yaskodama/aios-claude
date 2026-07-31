@@ -87,7 +87,7 @@
       },
       {
         "name": "PyIOCamlParityC",
-        "persona": "あなたは 3-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
+        "persona": "あなたは 3-way 整合性レビュアーです。同一 .aipl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
         "weight": 0.16666666666666666
       },
       {

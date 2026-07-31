@@ -1,2 +1,2 @@
-load sample1_gcounter.abcl
+load sample1_gcounter.aipl
 compile

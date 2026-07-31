@@ -9,15 +9,15 @@ construction, evaluation logic) lives in pure AIPL.
 ## Components
 
 ```
-lexer.abcl    — character predicates, scanning helpers, `tokenize(src)`.
-parser.abcl   — recursive-descent parser; `parse_program(tokens) -> {funcs, main}`.
-eval.abcl     — Level A's evaluator carried over (env / binop / If / While).
+lexer.aipl    — character predicates, scanning helpers, `tokenize(src)`.
+parser.aipl   — recursive-descent parser; `parse_program(tokens) -> {funcs, main}`.
+eval.aipl     — Level A's evaluator carried over (env / binop / If / While).
 run.sh        — concats lexer + parser + eval + sample, runs through host AIPL.
 samples/      — full-pipeline programs.
 out/          — captured output.
 ```
 
-## Supported AIPL subset (parsable by parser.abcl)
+## Supported AIPL subset (parsable by parser.aipl)
 
 ```
 program  := stmt*
@@ -42,7 +42,7 @@ Operators: `+ - * /  ==  != < > <= >=`.  Comments: `// to EOL`.
 
 - **function decls** in the parsed source (the parser ingests
   top-level statements only; function calls in user code resolve to
-  Call AST nodes which `eval.abcl` does not dispatch).
+  Call AST nodes which `eval.aipl` does not dispatch).
 - **classes / records / tuples / arrays** — out of scope for the
   Level C demo, but achievable by extending the same pattern.
 - **AIPL scheduler** (mailboxes, futures) — see "Self-host scope"
@@ -52,9 +52,9 @@ Operators: `+ - * /  ==  != < > <= >=`.  Comments: `// to EOL`.
 
 ```sh
 cd aipl-self-host/level-c
-bash run.sh   samples/SampleLexer.abcl
-bash run.sh   samples/SamplePipeline.abcl
-bash run.sh   samples/SampleWhile.abcl
+bash run.sh   samples/SampleLexer.aipl
+bash run.sh   samples/SamplePipeline.aipl
+bash run.sh   samples/SampleWhile.aipl
 
 bash smoke.sh
 ```
@@ -62,9 +62,9 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleLexer.abcl               found 'token count = 26'
-PASS  SamplePipeline.abcl            found '13'
-PASS  SampleWhile.abcl               found '10'
+PASS  SampleLexer.aipl               found 'token count = 26'
+PASS  SamplePipeline.aipl            found '13'
+PASS  SampleWhile.aipl               found '10'
 Level C samples: 3 pass / 0 fail
 ```
 
@@ -76,10 +76,10 @@ implementation realises:
 
 | layer        | location |
 | ---          | ---      |
-| **lexer**    | AIPL (lexer.abcl)            |
-| **parser**   | AIPL (parser.abcl)           |
-| **AST**      | AIPL records (constructed by parser.abcl) |
-| **evaluator**| AIPL (eval.abcl)             |
+| **lexer**    | AIPL (lexer.aipl)            |
+| **parser**   | AIPL (parser.aipl)           |
+| **AST**      | AIPL records (constructed by parser.aipl) |
+| **evaluator**| AIPL (eval.aipl)             |
 | typeck         | AIPL (Level B-1…B-5)        |
 | effect/linear/owned checks | AIPL (Level B-2…B-5) |
 | actor scheduler        | host (Python — running the AIPL `function`s themselves) |
@@ -101,11 +101,11 @@ later.
      source string                                      AIPL
           │   "var x = 3; var y = x*x+4; print(y);"    function
           ↓
-   lexer.abcl::tokenize    → [{kind,val,pos}, ...]
+   lexer.aipl::tokenize    → [{kind,val,pos}, ...]
           ↓
-   parser.abcl::parse_program  → {funcs:[], main:[ast,...]}
+   parser.aipl::parse_program  → {funcs:[], main:[ast,...]}
           ↓
-   eval.abcl::run_program       → prints values
+   eval.aipl::run_program       → prints values
 ```
 
 Each box is pure-AIPL.  The diagram itself fits inside one host

@@ -24,7 +24,7 @@
 #   (4*) net_recv: serial shows the echoed payload back
 #   * = currently dependent on the upstream TCP/smc91c111 fix.
 #
-# Sample: abclc/TcpEchoClientXinu.abcl, built with -DAIPL_AUTOSTART
+# Sample: abclc/TcpEchoClientXinu.aipl, built with -DAIPL_AUTOSTART
 # so aipl_main runs immediately and exercises the four builtins in
 # sequence (init -> connect -> tx -> rx -> close).
 set -u
@@ -37,7 +37,7 @@ ECHO_PORT=49199
 dune build src/aipl2c.exe >/tmp/_n1_build.log 2>&1 || {
   echo "FAIL: dune build aipl2c"; tail /tmp/_n1_build.log; exit 1; }
 
-./_build/default/src/aipl2c.exe abclc/TcpEchoClientXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/TcpEchoClientXinu.aipl \
     -o /tmp/_n1_TcpEchoClientXinu.c --xinu --max-msgs 0 \
     > /tmp/_n1_aipl2c.log 2>&1
 [ -f /tmp/_n1_TcpEchoClientXinu.c ] || {

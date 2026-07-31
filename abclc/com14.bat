@@ -1,3 +1,3 @@
-load AA.abcl
+load AA.aipl
 compile
 send h.greet();

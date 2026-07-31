@@ -5,7 +5,7 @@
 #   "5 assertion: CE-1..13 のうち 3 個以上が Xinu で動く、
 #    DR-1..13 のうち 3 個以上が同様、parity matrix の Xinu 列が ≥ 6/13"
 #
-# Strategy: pick one representative .abcl from each of the 7 spec-named
+# Strategy: pick one representative .aipl from each of the 7 spec-named
 # feature dirs (ce_10, ce_11, ce_12, dr_10, dr_11, dr_12, dr_13), boot
 # each as the AIPL_AUTOSTART program, look for a clean run (no panic +
 # at least one [abcl] or method-print marker observed).  Passing 6 or
@@ -18,19 +18,19 @@ COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-
 dune build src/aipl2c.exe >/tmp/_f3_build.log 2>&1 || {
   echo "FAIL: dune build"; tail /tmp/_f3_build.log; exit 1; }
 
-# Each entry: <label>:<.abcl path>:<HAS_ACTOR>
+# Each entry: <label>:<.aipl path>:<HAS_ACTOR>
 # HAS_ACTOR=1 means the sample instantiates an actor with `new`, so a
 # runtime dispatch marker is expected.  HAS_ACTOR=0 means the sample is
 # a pure type/effect-inference check; codegen + link is the proof.
 SAMPLES=(
-    "ce_10:abclc/o2_typeinf/ce_10_effects/sample1_pure_vs_ai.abcl:0"
-    "ce_11:abclc/o2_typeinf/ce_11_capability/sample1_grant_revoke.abcl:1"
-    "ce_12:abclc/o2_typeinf/ce_12_refinement_unify/sample3_satisfiable.abcl:0"
-    "ce_int_refine:abclc/o2_typeinf/ce_int_refine/sample1_basic.abcl:1"
-    "ce_where:abclc/o2_typeinf/ce_where/sample1_basic.abcl:1"
-    "dr_10:abclc/o1_distributed/dr_10_crdt/sample1_gcounter.abcl:1"
-    "dr_12:abclc/o1_distributed/dr_12_multi_region/sample1_primary_hit.abcl:1"
-    "dr_13:abclc/o1_distributed/dr_13_pool/sample1_create_destroy.abcl:1"
+    "ce_10:abclc/o2_typeinf/ce_10_effects/sample1_pure_vs_ai.aipl:0"
+    "ce_11:abclc/o2_typeinf/ce_11_capability/sample1_grant_revoke.aipl:1"
+    "ce_12:abclc/o2_typeinf/ce_12_refinement_unify/sample3_satisfiable.aipl:0"
+    "ce_int_refine:abclc/o2_typeinf/ce_int_refine/sample1_basic.aipl:1"
+    "ce_where:abclc/o2_typeinf/ce_where/sample1_basic.aipl:1"
+    "dr_10:abclc/o1_distributed/dr_10_crdt/sample1_gcounter.aipl:1"
+    "dr_12:abclc/o1_distributed/dr_12_multi_region/sample1_primary_hit.aipl:1"
+    "dr_13:abclc/o1_distributed/dr_13_pool/sample1_create_destroy.aipl:1"
 )
 
 PASS=0; FAIL=0

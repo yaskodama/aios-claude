@@ -1,0 +1,13 @@
+// DR-12 / sample 1 — primary region hit (no failover needed).
+//
+// Run with:
+//   AIPL_REGION=us-east-1 \
+//   AIPL_REGION_FAILOVER="us-east-1,eu-west-1" \
+//   AIPL_ROUTE_REGION_us-east-1="Greeter:fast" \
+//     python3 aipl_main.py samples/nextgen/dr12_region/sample1_primary_hit.aipl
+
+print("[dr12/1] current_region   = " + current_region());
+print("[dr12/1] chain            = " + region_chain());
+print("[dr12/1] regions_avail    = " + regions_available());
+print("[dr12/1] route Greeter    = " + route_for_region("Greeter", "us-east-1"));
+print("[dr12/1] failover Greeter = " + failover_region("Greeter"));

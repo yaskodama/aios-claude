@@ -62,7 +62,7 @@ def main():
         "state_dict": result["model_state"],
         "holdout_ppl": result["holdout_ppl"],
         "params": result["params"],
-        "source": "AIPL lineage I10 (LocalGenAIScaledEvolutionJP.abcl)",
+        "source": "AIPL lineage I10 (LocalGenAIScaledEvolutionJP.aipl)",
     }, ckpt)
     print(f"saved → {ckpt}")
 

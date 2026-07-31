@@ -330,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     w.document.getElementById("btnLoad").addEventListener("click", () => {
-      runReplCommand("load web_calc1.abcl", consoleOut);
+      runReplCommand("load web_calc1.aipl", consoleOut);
     });
     w.document.getElementById("btnCompile").addEventListener("click", () => {
       runReplCommand("compile", consoleOut);

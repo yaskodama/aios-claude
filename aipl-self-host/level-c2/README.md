@@ -9,7 +9,7 @@ demo Driver.
 ## What's in here
 
 ```
-scheduler.abcl    — actor / sched_*  primitives + actor-aware evaluator
+scheduler.aipl    — actor / sched_*  primitives + actor-aware evaluator
                      (eval_expr_actor / eval_stmt_actor / sched_step / sched_run).
 run.sh            — concats scheduler + sample, runs through host AIPL.
 samples/          — programs that hand-build actors + drive them.
@@ -49,8 +49,8 @@ is carried over from Level C.
 
 ```sh
 cd aipl-self-host/level-c2
-bash run.sh   samples/SampleCounter.abcl
-bash run.sh   samples/SamplePingPong.abcl
+bash run.sh   samples/SampleCounter.aipl
+bash run.sh   samples/SamplePingPong.aipl
 
 bash smoke.sh
 ```
@@ -59,29 +59,29 @@ bash smoke.sh
 
 | sample                       | what it exercises                                  | expected output |
 | ---                          | ---                                                | --- |
-| `SampleCounter.abcl`         | single actor, 3 enqueued ticks                     | `1, 2, 3`            |
-| `SamplePingPong.abcl`        | 2 actors mutually sending                          | `3, 2, 1`            |
-| `SampleSelfSend.abcl`        | actor self-sends until limit                       | `1, 2, 3, 4, 5`      |
-| `SampleMethodArgs.abcl`      | methods with parameters (`add(a,b)`, `square(x)`)  | `7, 36, 30`          |
-| `SampleProducerConsumer.abcl`| Producer self-sends + emits `put(i)` to Consumer   | `1, 3, 6, 10`        |
-| `SampleWorkerPool.abcl`      | Coordinator fans out to 3 workers                  | `104, 209, 325`      |
+| `SampleCounter.aipl`         | single actor, 3 enqueued ticks                     | `1, 2, 3`            |
+| `SamplePingPong.aipl`        | 2 actors mutually sending                          | `3, 2, 1`            |
+| `SampleSelfSend.aipl`        | actor self-sends until limit                       | `1, 2, 3, 4, 5`      |
+| `SampleMethodArgs.aipl`      | methods with parameters (`add(a,b)`, `square(x)`)  | `7, 36, 30`          |
+| `SampleProducerConsumer.aipl`| Producer self-sends + emits `put(i)` to Consumer   | `1, 3, 6, 10`        |
+| `SampleWorkerPool.aipl`      | Coordinator fans out to 3 workers                  | `104, 209, 325`      |
 
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleCounter.abcl
-PASS  SamplePingPong.abcl
-PASS  SampleSelfSend.abcl
-PASS  SampleMethodArgs.abcl
-PASS  SampleProducerConsumer.abcl
-PASS  SampleWorkerPool.abcl
+PASS  SampleCounter.aipl
+PASS  SamplePingPong.aipl
+PASS  SampleSelfSend.aipl
+PASS  SampleMethodArgs.aipl
+PASS  SampleProducerConsumer.aipl
+PASS  SampleWorkerPool.aipl
 Level C-2 scheduler samples: 6 pass / 0 fail
 ```
 
 Both samples run **purely on the AIPL-side scheduler** — the host
 Python AIPL contributes only the literal interpreter for the
 `function` declarations; the actor mailbox, dispatch, and method
-invocation logic all live in `scheduler.abcl`.
+invocation logic all live in `scheduler.aipl`.
 
 ## What this proves
 

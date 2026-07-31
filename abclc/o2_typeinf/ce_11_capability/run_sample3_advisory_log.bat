@@ -1,2 +1,2 @@
-load sample3_advisory_log.abcl
+load sample3_advisory_log.aipl
 compile

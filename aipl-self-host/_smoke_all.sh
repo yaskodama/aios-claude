@@ -15,8 +15,8 @@ echo "[level-a] running 4 samples ..."
 cd "$HERE/level-a"
 mkdir -p out
 a_pass=0; a_fail=0
-for s in samples/*.abcl; do
-  name=$(basename "$s" .abcl)
+for s in samples/*.aipl; do
+  name=$(basename "$s" .aipl)
   bash run.sh "$s" >/dev/null 2>&1
   if grep -q "expected" "out/$name.log" 2>/dev/null; then
     a_pass=$((a_pass+1))

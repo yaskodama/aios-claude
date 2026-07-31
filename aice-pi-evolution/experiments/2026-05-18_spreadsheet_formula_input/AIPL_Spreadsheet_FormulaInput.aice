@@ -2,7 +2,7 @@
 //
 // Round 1-3 で WebSpreadsheet MVP の design+impl が確定し、
 // Phase 4 で 3x3 sheet が browser 内で render される所まで到達.
-// しかし現状は formulas が `spreadsheet.abcl` に hardcoded されており、
+// しかし現状は formulas が `spreadsheet.aipl` に hardcoded されており、
 // ユーザは画面から数式を入力できない.
 //
 // Round 4 (本仕様) は **runtime formula input** を導入する設計
@@ -44,10 +44,10 @@ aice AIPL_Spreadsheet_FormulaInput {
     }
     // ── P 軸: parse 場所 ──
     task P1_BrowserParser {
-      spec = "browser-abcl の `spreadsheet.abcl` 内に PA4 LevelCPort parser を inline 配置.parse + eval 全て client-side、JS-N 不要.オフライン可能.見積もり parser 自体 ~250 LOC, integration 50 LOC.";
+      spec = "browser-abcl の `spreadsheet.aipl` 内に PA4 LevelCPort parser を inline 配置.parse + eval 全て client-side、JS-N 不要.オフライン可能.見積もり parser 自体 ~250 LOC, integration 50 LOC.";
     }
     task P2_ServerParseEval {
-      spec = "JS-N (node-aipl-server) に POST /api/spreadsheet/eval を生やし、formula string を渡すと AST + 評価値を返す.既存 Py-I の StringFormulaSheet.abcl の parser を再利用、browser 側は thin.見積もり server 50 LOC, client 30 LOC.";
+      spec = "JS-N (node-aipl-server) に POST /api/spreadsheet/eval を生やし、formula string を渡すと AST + 評価値を返す.既存 Py-I の StringFormulaSheet.aipl の parser を再利用、browser 側は thin.見積もり server 50 LOC, client 30 LOC.";
     }
     task P3_HybridLexClientParseServer {
       spec = "client で lex (高速), server で parse + eval.余計な round-trip があるが、unparseable な input を早期検出可能.見積もり 200 LOC.";

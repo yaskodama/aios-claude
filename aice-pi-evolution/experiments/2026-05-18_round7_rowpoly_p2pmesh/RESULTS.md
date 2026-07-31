@@ -65,7 +65,7 @@ CE-16 V1 と DR-17 W1 を Py-I → OCaml 順に実装:
 2. **CE-16 V1 (OCaml `src/types.ml` + `infer.ml`)**
    - `TRecord` 同形式に拡張
    - unify, prune, instantiate, string_of_ty に tail 対応 (~30 LOC each)
-   - 既存 record-aware tests (RecordStructural.abcl) で regression check
+   - 既存 record-aware tests (RecordStructural.aipl) で regression check
    - 見積もり 200 LOC
 
 3. **DR-17 W1 (Plumtree, `aipl_dist.py`)**

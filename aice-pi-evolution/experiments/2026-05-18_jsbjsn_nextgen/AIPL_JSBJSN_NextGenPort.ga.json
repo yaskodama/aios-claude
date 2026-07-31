@@ -95,7 +95,7 @@
       },
       {
         "name": "FourWayParity",
-        "persona": "あなたは 4-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
+        "persona": "あなたは 4-way 整合性レビュアーです。同一 .aipl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。",
         "weight": 0.16666666666666666
       },
       {

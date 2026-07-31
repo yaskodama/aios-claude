@@ -70,9 +70,9 @@ python3 -m src.cli --no-run --abcl \
     -o ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/ \
     ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aice
 
-# (3) .abcl -> .aipl リネーム + use_ai=0 → 1 patch
+# (3) .aipl -> .aipl リネーム + use_ai=0 → 1 patch
 cd ..
-mv aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.abcl \
+mv aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl \
    aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl
 python3 -c "
 import re
@@ -88,7 +88,7 @@ AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py \
     aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl \
     --timeout 1800 --idle-ms 600000
 
-# (5) 結果は out/Xinu_KernelEvolution_Round1.abcl_lineage.json に
+# (5) 結果は out/Xinu_KernelEvolution_Round1.aipl_lineage.json に
 ```
 
 ## 既存資産との関係

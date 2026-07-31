@@ -97,8 +97,8 @@ F3 ✅
 # build
 dune build src/aipl2c.exe
 
-# .abcl → C → Xinu → QEMU (非 GUI)
-./_build/default/src/aipl2c.exe abclc/<sample>.abcl \
+# .aipl → C → Xinu → QEMU (非 GUI)
+./_build/default/src/aipl2c.exe abclc/<sample>.aipl \
     -o /tmp/x.c --xinu --max-msgs 30
 cp /tmp/x.c /Users/kodamay/projects/xinu-raz/xinu/apps/abcl_program.c
 ( cd /Users/kodamay/projects/xinu-raz/xinu/compile &&

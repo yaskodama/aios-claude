@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         sub_argv = [inp, "-o", str(out)]
         if args.ai:
             sub_argv.append("--ai")
-        if args.abcl:
+        if args.aipl:
             sub_argv.append("--abcl")
         print(f"\n=== batch: running {inp} ===")
         rc = cli_main(sub_argv)

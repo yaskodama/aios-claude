@@ -1,0 +1,33 @@
+// DR-4 / sample 2 — atomic save under concurrent updates.
+//
+// Three actors rapid-fire mutate the same counter via send.  The
+// save path is atomic-rename (write to temp file, then rename(2)
+// onto the canonical name), so a third reader process always sees
+// a complete JSON file — never a torn write.  The .aipl source is
+// the workload; verification is done at the filesystem layer
+// (e.g., `python -c 'import json; json.load(open(...))'` in CI).
+//
+// Run:
+//   rm -rf /tmp/ck2; mkdir /tmp/ck2
+//   AIPL_DIST_ENABLE=1 AIPL_DIST_CHECKPOINT_DIR=/tmp/ck2 \
+//   AIPL_DIST_LOG_FILE=/tmp/ck2.ndjson \
+//   dune exec src/repl_thread.exe -- -f run.bat
+//   jq -e . /tmp/ck2/Counter_*.json   # all files parse as valid JSON
+
+class Counter {
+  var count = 0;
+  method add(n: int) {
+    count = count + n;
+    print(count);
+  }
+}
+
+var c1 = new Counter();
+var c2 = new Counter();
+var c3 = new Counter();
+send c1.add(1);
+send c2.add(10);
+send c3.add(100);
+send c1.add(1);
+send c2.add(10);
+send c3.add(100);

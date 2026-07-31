@@ -15,15 +15,15 @@ fi
 TMPROOT=$(mktemp -d /tmp/aipl-pl-smoke.XXXXXX)
 trap "rm -rf '$TMPROOT'" EXIT
 
-GOOD=(Hello.abcl counter.abcl)
-EXPECTED_FAIL=(PingPong.abcl)
+GOOD=(Hello.aipl counter.aipl)
+EXPECTED_FAIL=(PingPong.aipl)
 
 pass=0; fail=0; total=0; xfail=0
 
 check_good() {
   local f="$1"
   total=$((total + 1))
-  local name="${f%.abcl}"
+  local name="${f%.aipl}"
   local pl="$TMPROOT/$name.pl"
   if ! "$ABCL2C" "abclc/$f" -o "$pl" --prolog > /dev/null 2>&1; then
     fail=$((fail + 1)); printf '  FAIL  %s  (aipl2c)\n' "$f"; return
@@ -41,7 +41,7 @@ check_good() {
 check_xfail() {
   local f="$1"
   total=$((total + 1))
-  local name="${f%.abcl}"
+  local name="${f%.aipl}"
   local pl="$TMPROOT/$name.pl"
   "$ABCL2C" "abclc/$f" -o "$pl" --prolog > /dev/null 2>&1
   local out

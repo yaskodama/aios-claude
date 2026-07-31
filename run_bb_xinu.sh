@@ -1,5 +1,5 @@
 #!/bin/sh
-# BoundedBufferXinu.abcl を Xinu (arm-qemu) 上で動かす。
+# BoundedBufferXinu.aipl を Xinu (arm-qemu) 上で動かす。
 set -e
 cd "$(dirname "$0")"
 
@@ -7,7 +7,7 @@ XINU=/Users/kodamay/projects/xinu-raz/xinu
 COMPILER_ROOT=/opt/homebrew/bin/arm-none-eabi-
 
 dune build src/aipl2c.exe
-./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.aipl \
     -o /tmp/bb_xinu.c --xinu --max-msgs 0
 cp /tmp/bb_xinu.c "$XINU/apps/abcl_program.c"
 

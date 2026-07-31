@@ -1,0 +1,33 @@
+// (3b) SEND + SELECT — Erlang-style mailbox receive (post-select-stmt).
+//
+// After the `select { case method(args) -> { ... } timeout NNN -> { ... } }`
+// statement was added to Python AIPL, the OCaml-style explicit
+// receive shape works identically:
+//
+//   ABCL_AI_PROVIDER=mock python3 src/python-aipl/aipl_main.py \
+//     src/python-aipl/samples-ai/_send_reply_demo/send_select_style.aipl
+
+class Worker {
+  method ask(q) {
+    var r = ai_call(q);
+    reply(r);
+  }
+}
+
+class Driver {
+  method run(q) {
+    var w = new Worker();
+    send w.ask(q);
+    select {
+      case reply(r) -> {
+        print("[select] got: " + r);
+      }
+      timeout 10000 -> {
+        print("[select] timeout");
+      }
+    }
+  }
+}
+
+var d = new Driver();
+send d.run("hello via send/select");

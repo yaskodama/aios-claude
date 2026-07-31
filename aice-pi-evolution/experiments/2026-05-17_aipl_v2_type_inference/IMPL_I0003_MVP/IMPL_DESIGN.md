@@ -51,7 +51,7 @@
   | `AIPL_ROUTE` | actor 名 → ノードルーティング (未来用、MVP では parse のみ) | unset |
 
 - `AIPL_DIST_ENABLE != 1` のときは **絶対に何もしない** (import するだけで副作用なし)
-- 既存サンプル 33 .abcl + 21 .aipl は env なしで PASS する必要あり (= 既存テストの回帰なし)
+- 既存サンプル 33 .aipl + 21 .aipl は env なしで PASS する必要あり (= 既存テストの回帰なし)
 
 ## 4. ファイル配置
 
@@ -167,7 +167,7 @@ MVP では「呼んだら効く」API。AIPL ランタイムへの自動統合�
 
 | 観点 | 検証 |
 |---|---|
-| 既存 .abcl 33 件 | env なしで PASS |
+| 既存 .aipl 33 件 | env なしで PASS |
 | 既存 .aipl 21 件 | env なしで PASS |
 | --check 全 PASS (= type/infer) | 影響なし |
 | `AIPL_DIST_ENABLE=0` (default) | aipl_dist の import で副作用ゼロ |
@@ -178,7 +178,7 @@ MVP では「呼んだら効く」API。AIPL ランタイムへの自動統合�
 - [ ] `src/python-aipl/aipl_dist.py` 〜400 LOC
 - [ ] I-1〜I-4 各々の最小サンプル (.aipl 4 件)
 - [ ] tests/test_aipl_dist.py の小テスト集
-- [ ] 既存 33 .abcl + 21 .aipl の回帰 100% PASS
+- [ ] 既存 33 .aipl + 21 .aipl の回帰 100% PASS
 - [ ] IMPL_RUN_REPORT.md に実装内容と LOC + 走行ログ
 
 ## 8. 含意 / 残課題

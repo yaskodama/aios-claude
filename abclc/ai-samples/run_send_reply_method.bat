@@ -1,2 +1,2 @@
-load SendReplyMethod.abcl
+load SendReplyMethod.aipl
 compile

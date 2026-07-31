@@ -1,6 +1,6 @@
 """Phase 5: smoke-test the AIPL codegen output (parse-only).
 
-We verify the generated `.abcl` contains the expected actor classes
+We verify the generated `.aipl` contains the expected actor classes
 and bootstrap statements. Running it through the AIPL runtime is
 covered by a manual command in the README — that takes ~30s and
 needs the Python AIPL runtime alongside this directory."""

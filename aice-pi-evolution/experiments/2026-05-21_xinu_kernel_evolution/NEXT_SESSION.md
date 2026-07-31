@@ -33,8 +33,8 @@ seed=6 gen=20 で 1 回実行したが Gemini API timeout で lineage 未生成
 | Item | commit | 内容 |
 |---|---|---|
 | Xinu RPC dispatcher | `976c313` (xinu-raz) | UART1 (PL011 @ 0x101F2000) を `-serial tcp:127.0.0.1:5555` で expose、`rpc_dispatcher_main` thread が PING/SEND/QUERY/LIST 処理 |
-| AIPL side | `be36abe` | abclc/RemoteRpcDemoXinu.abcl (Counter + Greeter)、host_rpc_demo.{sh,py} |
-| Diners distributed | `d1d8eae` | abclc/DiningPhilosophersDistXinu.abcl (5 Fork + 2 Philosopher) + host_diners.py |
+| AIPL side | `be36abe` | abclc/RemoteRpcDemoXinu.aipl (Counter + Greeter)、host_rpc_demo.{sh,py} |
+| Diners distributed | `d1d8eae` | abclc/DiningPhilosophersDistXinu.aipl (5 Fork + 2 Philosopher) + host_diners.py |
 | Dynamic compile | `0baaa26` (xinu-raz) + `d2bf864` | RPC に LOAD/COMPILE/RUN 追加、in-kernel `abclcTranslate + ccCompile + aoutRun` を駆動 |
 | **Pure-AIPL host** | `4823978` | `tcp_*` 5 builtin を Py-I に追加、`host_diners_dynamic.aipl` (162 行) — Python script なしで AIPL のみで host を駆動 |
 | Re-generated artifacts | `12255db` | `.aipl` の seed=6/gen=20 patch + Xinu kernel evolution の生成 .aipl |
@@ -61,9 +61,9 @@ roll-back。
 ```
 /Users/kodamay/ocaml-app/abclcp-project/                ← abclcp-project (origin: aios-claude.git)
 ├── abclc/
-│   ├── DiningPhilosophersDistXinu.abcl                    ← Fork×5 + Philosopher×2 (10 meals each)
-│   ├── RemoteRpcDemoXinu.abcl                              ← Counter + Greeter
-│   ├── DeadlineDemoXinu.abcl                               ← S3 demo (Urgent vs Hoarder)
+│   ├── DiningPhilosophersDistXinu.aipl                    ← Fork×5 + Philosopher×2 (10 meals each)
+│   ├── RemoteRpcDemoXinu.aipl                              ← Counter + Greeter
+│   ├── DeadlineDemoXinu.aipl                               ← S3 demo (Urgent vs Hoarder)
 │   └── (既存 R/P/F/G samples)
 ├── src/
 │   ├── c_translator.ml                                     ← --xinu codegen + runtime accessors
@@ -146,7 +146,7 @@ bash aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/_smoke_s3_de
 ```sh
 # まず DiningPhilosophers を baked-in した kernel.elf にしたい場合:
 cd /Users/kodamay/ocaml-app/abclcp-project
-./_build/default/src/aipl2c.exe abclc/DiningPhilosophersDistXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/DiningPhilosophersDistXinu.aipl \
     -o /tmp/dp.c --xinu --max-msgs 0
 cp /tmp/dp.c /Users/kodamay/projects/xinu-raz/xinu/apps/abcl_program.c
 ( cd /Users/kodamay/projects/xinu-raz/xinu/compile \
@@ -201,9 +201,9 @@ cd /Users/kodamay/ocaml-app/abclcp-project/aice-evolution-v2
 python3 -m src.cli --no-run --abcl \
     -o ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/ \
     ../aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aice
-# →  .abcl が出る → .aipl にリネーム → use_ai 0→1 patch (python regex)
+# →  .aipl が出る → .aipl にリネーム → use_ai 0→1 patch (python regex)
 cd ..
-mv aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.abcl \
+mv aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl \
    aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl
 python3 -c "
 import re

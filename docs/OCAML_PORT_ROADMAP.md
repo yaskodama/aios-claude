@@ -87,7 +87,7 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
   `refine_pred` 型 (RpInt / RpFloat / RpVar / RpUnary / RpBinop / RpParen) 追加
 - `infer.ml` の `ty_of_type_expr_with_tbl` で `TyERefined (base, _)` を
   base にlower (predicate AST は捨てる; Z3 接続は O-2.b)
-- `abclc/WhereClause.abcl` で parse + script execution 確認
+- `abclc/WhereClause.aipl` で parse + script execution 確認
 - 既存 71 abclc サンプル 71/71 PASS
 - `aipl_dist` smoke 8/8 PASS
 
@@ -113,7 +113,7 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
   vacuously-false refinement: ...` を出力、Z3 不在時 silent fallback)
 - 単体テスト 6 個追加 (test_aipl_dist 内: SAT/UNSAT/OR+NOT/free-vars/
   non-Int defer/string_of_pred) → 14/14 PASS
-- `abclc/WhereVacuous.abcl` サンプル + driver `src/test_refine_check.ml`
+- `abclc/WhereVacuous.aipl` サンプル + driver `src/test_refine_check.ml`
 - 既存 72 abclc サンプル全 PASS
 
 実測 LOC: 約 250 行 (推定 300-500 内).
@@ -136,7 +136,7 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
   `TFloat` で代用; Z3 の Real は有理数体なので意味的に正しい)
 - `infer.ml` の hook はそのまま (base_ty 経由で自動的に Real 路に流れる)
 - 単体テスト 4 個追加: Real SAT/UNSAT/mixed-int-lit/real-division → 18/18 PASS
-- サンプル `abclc/WhereVacuousReal.abcl` (unit, bad_window, bad_self, half)
+- サンプル `abclc/WhereVacuousReal.aipl` (unit, bad_window, bad_self, half)
 - 既存 abclc 72 回帰 → 73/73 PASS
 
 実測 LOC: 約 90 行 (推定 100-200 内).
@@ -169,7 +169,7 @@ DR-8 の TLS-based parent inference は **Phase O-1.5** で追加完了。
   shape mismatch / count mismatch / unsorted-fields / field-type
   mismatch すべて 10/10 PASS.
 - 既存 abclc 74 + aipl_dist 18 完全無回帰.
-- サンプル `abclc/RecordStructural.abcl`.
+- サンプル `abclc/RecordStructural.aipl`.
 
 実測 LOC: 約 30 行 (推定 100-200 から大幅減).
 発見: O-2.e の真の修正は **parameter annotation の尊重** という
@@ -189,7 +189,7 @@ O-2.d の延長線上にある修正で、O-2.d と一体だった可能性も�
 - main 関数の冒頭で `check_mode` が立っていれば actor runtime を
   立ち上げる前に `Stdlib.exit` する分岐を追加。
 - 検証: 既存 75 abclc + 18 aipl_dist + 10 O-2d/e inference テストすべて
-  PASS。`--check abclc/WhereVacuous.abcl` + `AIPL_REFINE_CHECK=1`
+  PASS。`--check abclc/WhereVacuous.aipl` + `AIPL_REFINE_CHECK=1`
   で 2 vacuously-false warning が stderr に出る。
 - bad な type-check サンプルで `--strict` exit code 3 確認。
 

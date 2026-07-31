@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # S3_DeadlineHints smoke — kernel evolution Round 1.
 #
-# Boots Xinu with abclc/DeadlineDemoXinu.abcl baked in.  The sample
+# Boots Xinu with abclc/DeadlineDemoXinu.aipl baked in.  The sample
 # launches a priority-high "Hoarder" that wants to spin 30 times in
 # a row, plus a priority-low "Urgent" actor that prints `90042`.
 # Before sending either, AIPL calls `set_deadline(u, 50)` so Urgent
@@ -32,7 +32,7 @@ dune build src/aipl2c.exe >/tmp/_s3_build.log 2>&1 || {
 src=DeadlineDemoXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_s3_${src}.c --xinu --max-msgs 0 \
     > /tmp/_s3_${src}.aipl2c.log 2>&1
 [ -f /tmp/_s3_${src}.c ] || {

@@ -1,0 +1,37 @@
+// Phase O-2.c: Real / float refinement (Z3 Real theory) demo.
+//
+// Same shape as WhereVacuous.aipl but with `float where ...` instead
+// of `int where ...`.  With `AIPL_REFINE_CHECK=1` the type-checker
+// renders the predicate as SMT-LIB 2 over the Real sort and reports
+// vacuously-false ones.
+//
+// SMT-LIB literal handling:
+//   - `0.0`, `1.0`, `0.5`, etc. become decimal literals.
+//   - bare integer literals (`0`, `1`) auto-promote in a Real context.
+//   - `/` is real division (not integer `div`).
+//
+// Run via the typecheck driver:
+//   dune exec src/test_refine_check.exe       # uses a small bundled program
+// or wire `AIPL_REFINE_CHECK=1` into a `web_gateway` /api/typecheck call.
+
+class Reals {
+  // OK: 0 < x < 1.
+  method unit(x: float where x > 0.0 and x < 1.0) -> float {
+    return x;
+  }
+  // UNSAT: x > 1 and x < 0.5 has no real solution.
+  method bad_window(y: float where y > 1.0 and y < 0.5) -> float {
+    return y;
+  }
+  // UNSAT: y > y + 1 is vacuously false for every real (and every int).
+  method bad_self(z: float where z > z + 1.0) -> float {
+    return z;
+  }
+  // OK: y / 2 == 0.5 admits y = 1.0.  Tests SMT real-division.
+  method half(y: float where y / 2.0 == 0.5) -> float {
+    return y;
+  }
+}
+
+var r = new Reals();
+print("ok");

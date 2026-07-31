@@ -11,12 +11,12 @@ coordination.
 
 ```
 +------------------+    HTTP / JSON     +-------------------+
-| coordinator.abcl |  ----------------> | solver.abcl       |
+| coordinator.aipl |  ----------------> | solver.aipl       |
 | (Python)         |  <---------------- |   ai_call(...)    |
 |                  |                    |   (Gemini)        |
 |                  |                    +-------------------+
 |                  |    HTTP / JSON     +-------------------+
-|                  |  ----------------> | verifier.abcl     |
+|                  |  ----------------> | verifier.aipl     |
 |                  |  <---------------- |   ai_call(...)    |
 |                  |                    |   (Claude / GPT)  |
 +------------------+                    +-------------------+
@@ -42,7 +42,7 @@ without a translation shim.
 /usr/bin/python3 -m pip install --user -r src/python-aipl/requirements.txt
 
 # 2. run a sample
-/usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples/Hello.abcl
+/usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples/Hello.aipl
 
 # 3. or open the REPL
 /usr/bin/python3 src/python-aipl/aipl_main.py
@@ -55,9 +55,9 @@ abcl> :exit
 To call an AI provider, set one of the keys before running:
 
 ```sh
-GEMINI_API_KEY=...    src/python-aipl/aipl_main.py samples-ai/AIChainReal.abcl
-ANTHROPIC_API_KEY=... src/python-aipl/aipl_main.py samples-ai/AIChainReal.abcl
-OPENAI_API_KEY=...    src/python-aipl/aipl_main.py samples-ai/AIChainReal.abcl
+GEMINI_API_KEY=...    src/python-aipl/aipl_main.py samples-ai/AIChainReal.aipl
+ANTHROPIC_API_KEY=... src/python-aipl/aipl_main.py samples-ai/AIChainReal.aipl
+OPENAI_API_KEY=...    src/python-aipl/aipl_main.py samples-ai/AIChainReal.aipl
 ```
 
 `ABCL_AI_PROVIDER=mock` runs every `ai_call` against a built-in mock
@@ -96,22 +96,22 @@ different on each.
 
 ```sh
 # Terminal 1
-GEMINI_API_KEY=...   /usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/solver.abcl
+GEMINI_API_KEY=...   /usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/solver.aipl
 # Terminal 2
-ANTHROPIC_API_KEY=.. /usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/verifier.abcl
+ANTHROPIC_API_KEY=.. /usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/verifier.aipl
 # Terminal 3
-/usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/coordinator.abcl
+/usr/bin/python3 src/python-aipl/aipl_main.py src/python-aipl/samples-remote/coordinator.aipl
 ```
 
 Same pattern works with an OCaml worker — `web_listen(8080)` on
 the OCaml side and the Python coordinator can `remote_now` into
-it.  See `abclc/samples-remote/client.abcl` for the OCaml-side
+it.  See `abclc/samples-remote/client.aipl` for the OCaml-side
 view.
 
 ## Live dashboard
 
 ```sh
-/usr/bin/python3 src/python-aipl/aipl_main.py --dashboard 8800 samples-ai/Budgeted.abcl
+/usr/bin/python3 src/python-aipl/aipl_main.py --dashboard 8800 samples-ai/Budgeted.aipl
 ```
 
 Open <http://127.0.0.1:8800/> for the live counters, observed
@@ -145,7 +145,7 @@ Dist  : 8/8     (3-node distributed mock)
     integration) for hang-resilience and rate control
 - Builtin reference: [BUILTINS.md](BUILTINS.md)
 - Sample index: `samples/` and `samples-ai/` and `samples-remote/`
-  under `src/python-aipl/`; `abclc/*.abcl` and `abclc/ai-samples/`,
+  under `src/python-aipl/`; `abclc/*.aipl` and `abclc/ai-samples/`,
   `abclc/samples-remote/` for the OCaml side
 
 ## Related

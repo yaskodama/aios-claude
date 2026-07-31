@@ -56,7 +56,7 @@ def translate(source: str, target: str, max_msgs: int, typecheck: bool) -> dict:
         return {"ok": False, "src": "", "log": f"unknown target: {target}"}
     flag, ext, label = TARGETS[target]
     WORK.mkdir(parents=True, exist_ok=True)
-    abcl = WORK / "prog.abcl"
+    abcl = WORK / "prog.aipl"
     out = WORK / f"prog.{ext}"
     abcl.write_text(source, encoding="utf-8")
     if out.exists():

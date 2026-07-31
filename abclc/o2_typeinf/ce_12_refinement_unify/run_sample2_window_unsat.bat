@@ -1,2 +1,2 @@
-load sample2_window_unsat.abcl
+load sample2_window_unsat.aipl
 compile

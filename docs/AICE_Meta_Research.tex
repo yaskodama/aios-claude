@@ -101,7 +101,7 @@ Environment),および AICE 上の AI エージェント記述言語
 Genetic Algorithm)} を一級の戦略プリミティブとして組み込んだ.具体的には,
 ユーザは問題を高水準 DSL である \code{.aice} ファイルに記述し,それを
 生成 AI が中間表現 \code{.ga.json} に変換する.AIPL コード生成器が
-さらに \code{.abcl} (AIPL 実行プログラム) を出力し,アクター並列実行系
+さらに \code{.aipl} (AIPL 実行プログラム) を出力し,アクター並列実行系
 で評価される.このパイプライン全体を本稿は \textbf{AICE Meta Pipeline}
 と呼ぶ.我々は MAP-Elites を内蔵した参照実装 \code{aice-evolution-v2}
 で本パイプラインの自己ホスト性を実証し,Phase 9 (5 軸予測) 〜
@@ -155,7 +155,7 @@ LLM への問合せを GA の評価関数 (fitness) として活用すれば,
 \begin{tikzpicture}[node distance=4mm and 7mm, every node/.style={font=\small}]
   \node[draw, rounded corners, fill=blue!10] (aice) {\code{problem.aice}};
   \node[draw, rounded corners, right=of aice, fill=orange!10] (ga) {\code{problem.ga.json}};
-  \node[draw, rounded corners, right=of ga, fill=green!10] (abcl) {\code{problem.abcl}};
+  \node[draw, rounded corners, right=of ga, fill=green!10] (abcl) {\code{problem.aipl}};
   \node[draw, rounded corners, right=of abcl, fill=red!10] (run) {\code{run}};
   \node[draw, rounded corners, right=of run, fill=yellow!15] (out) {結果 + lineage};
 
@@ -168,7 +168,7 @@ LLM への問合せを GA の評価関数 (fitness) として活用すれば,
 
 論文の構成: \S\ref{sec:bg} で背景,\S\ref{sec:aice} で AICE と AIPL の
 位置付け,\S\ref{sec:pipeline} で \code{.aice} $\to$ \code{.ga.json}
-$\to$ \code{.abcl} の三段パイプライン,\S\ref{sec:examples} で具体例,
+$\to$ \code{.aipl} の三段パイプライン,\S\ref{sec:examples} で具体例,
 \S\ref{sec:eval} で評価,\S\ref{sec:related} で関連研究,
 \S\ref{sec:disc} で考察,\S\ref{sec:conc} で結論.
 
@@ -278,11 +278,11 @@ GA エンジンが各世代の各候補を `now reviewer.review(candidate)` で
   \item[Stage 2.] \textbf{\code{.ga.json} への lowering}: 戦略宣言を
     GA の中間表現 (gene schema,operators,fitness, ranking) に変換.
     Phase 4 で実装,LLM を補助的に使う.
-  \item[Stage 3.] \textbf{\code{.abcl} への codegen}: GA 評価ループ全体
+  \item[Stage 3.] \textbf{\code{.aipl} への codegen}: GA 評価ループ全体
     を AIPL のアクター並列プログラムとして合成.Phase 5 で実装.
 \end{description}
 
-生成された \code{.abcl} を AIPL ランタイム (Python / OCaml / 各種 codegen)
+生成された \code{.aipl} を AIPL ランタイム (Python / OCaml / 各種 codegen)
 で実行すれば,集団進化・LLM 評価・ランキングが一気通貫で走る.
 
 \subsection{\code{.aice} DSL: 問題定義の高水準記述}
@@ -373,7 +373,7 @@ aice NextLanguagePrediction {
 \code{.ga.json} は LLM の介入無しに完全に決定的に評価可能であるため,
 再現性のあるベンチマークとして単独で使える.
 
-\subsection{\code{.abcl} への codegen: AIPL オーケストレータ生成}
+\subsection{\code{.aipl} への codegen: AIPL オーケストレータ生成}
 
 \code{.ga.json} から AIPL コード生成器 (\code{src/aipl\_codegen.py}) が
 オーケストレータプログラムを合成する.以下は生成された AIPL の構造

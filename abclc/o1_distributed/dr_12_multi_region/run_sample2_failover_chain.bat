@@ -1,2 +1,2 @@
-load sample2_failover_chain.abcl
+load sample2_failover_chain.aipl
 compile

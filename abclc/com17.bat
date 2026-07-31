@@ -1,2 +1,2 @@
-load web_calc.abcl
+load web_calc.aipl
 compile

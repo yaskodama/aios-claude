@@ -111,7 +111,7 @@ source surveys.
 
 \section*{Sample programs}
 
-Number of \texttt{.abcl} sample programs reachable by each runtime
+Number of \texttt{.aipl} sample programs reachable by each runtime
 (core directory + AI integration + remote-actor demos):
 
 \begin{tabularx}{\linewidth}{l C C C C C C C}
@@ -135,7 +135,7 @@ Cross-cutting / not tied to a specific runtime:
   \item \texttt{docker/cross/samples/}: 4 cross-language interop samples
 \end{itemize}
 
-Note that the C runtime processes the same \texttt{.abcl} files as
+Note that the C runtime processes the same \texttt{.aipl} files as
 OCaml via \texttt{aipl2c}; of the 66 reachable samples, 48 currently
 pass the \texttt{aipl2c} smoke test (the remaining 9 in \texttt{abclc/}
 have pre-existing type ambiguities surfaced by our hard-fail policy).
@@ -239,15 +239,15 @@ python-aipl-inferred; \textbf{OCaml}~=~OCaml REPL (\texttt{abclc});
 \textsuperscript{b} \small Py-A / Py-I は Pillow 経由で PNG / JPEG / GIF / WebP を判定して読み書き。\\
 \textsuperscript{c} \small OCaml / JS-O / JS-B / JS-N は純ランタイムの PPM (P6) バックエンド (RGBA メモリ表現、保存時はアルファ破棄)。PNG は外部ライブラリが必要。\\
 \textsuperscript{f} \small Python \texttt{select \{ case ... \}} 文は commit \texttt{9aaf371} (2026-05-18) で追加された (\texttt{grammar.lark}, \texttt{aipl\_ast.SelectStmt}, \texttt{aipl\_parser.\_Builder.select\_*}, \texttt{aipl\_interp.\_do\_select})。OCaml \texttt{parser.mly} の select\_cases / select\_pat / select\_timeout と同じ shape / semantics。チャネルベースの \texttt{select\_recv(...)} は Python では別ビルトインとして引き続き利用可能。\\
-\textsuperscript{g} \small 29e / 29f は send-and-receive の 2 つの等価 shape。reply-on-send routing (commits \texttt{590e3aa} OCaml / \texttt{dd9d604} Python) のおかげで、\texttt{Worker.reply(r)} は受信側 mailbox に \texttt{reply(r)} メッセージとして配送される。(e) は通常メソッド定義 \texttt{method reply(r) \{...\}}、(f) は明示 \texttt{select \{ case reply(r) -> ... \}}。C ランタイムは reply slot 自体無いため \No。サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) と \texttt{src/python-aipl/samples-ai/\_send\_reply\_demo/*.abcl}。\\
+\textsuperscript{g} \small 29e / 29f は send-and-receive の 2 つの等価 shape。reply-on-send routing (commits \texttt{590e3aa} OCaml / \texttt{dd9d604} Python) のおかげで、\texttt{Worker.reply(r)} は受信側 mailbox に \texttt{reply(r)} メッセージとして配送される。(e) は通常メソッド定義 \texttt{method reply(r) \{...\}}、(f) は明示 \texttt{select \{ case reply(r) -> ... \}}。C ランタイムは reply slot 自体無いため \No。サンプル: \texttt{abclc/ai-samples/SendReplyMethod.aipl} (OCaml \texttt{cbec37c}) と \texttt{src/python-aipl/samples-ai/\_send\_reply\_demo/*.aipl}。\\
 \textsuperscript{h} \small CE-10 effect type inference: inference walk (\texttt{aipl\_inference.\_collect\_effects\_from\_ast}) accumulates side-effect categories from every primitive call site, using the \texttt{BUILTIN\_EFFECTS} table maintained in \texttt{aipl\_typeck.py} (Phase 12 system, 43 primitives covering fs / ai+net / mut). \texttt{InferenceResult.effects} (inferred) と \texttt{declared\_effects} (from \texttt{!\{eff1, eff2\}} clause) を render し、\texttt{declared} が \texttt{inferred} を被覆しないとき \texttt{$\Warning$ inferred but not declared} を表示。2026-05-18 MAP-Elites \texttt{AIPL\_PyI\_NextGen.aice} で reviewer 0.70 で 1 位。\\
-\textsuperscript{i} \small DR-13 auto-scaling actor pool: hysteresis-driven 動的 actor プール。 4 prims \texttt{pool\_create(cls, min, max, target\_qlen[, name])} / \texttt{pool\_pick} / \texttt{pool\_size} / \texttt{pool\_destroy} で構成。\texttt{pool\_pick} 毎に平均 qlen を判定し \texttt{> 2*target} なら spawn (size $<$ max)、\texttt{< target/2} なら retire (size $>$ min)。\texttt{AIPL\_DIST\_ENABLE=1} でのみ動作。イベント \texttt{pool\_created} / \texttt{pool\_scale\_up} / \texttt{pool\_scale\_down} / \texttt{pool\_destroyed} は既存の structured-log NDJSON に流れる。サンプル: \texttt{src/python-aipl/samples/AutoScalingPool.abcl}。MAP-Elites reviewer 0.67 で distribution 軸 1 位。\\
-\textsuperscript{j} \small CE-11 capability types: Phase-12 静的 effect system に乗っかった runtime capability tracking。スレッド毎に held caps の set (TLS) を持ち \texttt{AIPL\_CAP\_GRANT="fs,ai,net,mut"} で起動時 seed。5 prims: \texttt{grant\_cap} / \texttt{revoke\_cap} / \texttt{has\_cap} / \texttt{current\_caps} / \texttt{check\_capability(name | names)}。Cap 名は BUILTIN\_EFFECTS の effect tag と同一語彙 (\texttt{fs} / \texttt{ai} / \texttt{net} / \texttt{mut})。Advisory 既定 (\texttt{cap\_violation} log)、\texttt{AIPL\_CAP\_STRICT=1} で \texttt{CapabilityError} 強制 raise。サンプル: \texttt{src/python-aipl/samples/CapabilityTypes.abcl}。round-2 MAP-Elites reviewer avg 0.430 で type 軸 1 位 (top elite I0012 で 0.73)。\\
-\textsuperscript{k} \small DR-10 CRDT actor state: G-Counter (grow-only, per-replica max merge) / OR-Set (observed-remove, UUID add-tags) / LWW-Register (last-writer-wins, ts + replica-id tiebreak) の 3 古典的 CRDT を plain dict として実装し \texttt{save\_actor\_state} / \texttt{restore\_actor\_state} round-trip を温存。15 prims (各型 4-6 個 + \texttt{crdt\_replicate(name, value)} hook)。Replica id は \texttt{AIPL\_DIST\_REPLICA\_ID} (default hostname)。\texttt{crdt\_replicate} は deployment-layer replicator 向けのイベントを log、peer fan-out 自体は将来の multi-region driver (DR-12) に分離。サンプル: \texttt{src/python-aipl/samples/CRDTState.abcl}。round-2 MAP-Elites reviewer avg 0.410 で distribution 軸 2 位。\\
-\textsuperscript{l} \small DR-12 multi-region failover: DR-1 route table の region-aware 拡張。各ノードは \texttt{AIPL\_REGION=<name>} (default \texttt{local}) を持ち、ルートテーブルは \texttt{AIPL\_ROUTE\_REGION\_<name>="Actor:tag,..."} で region 毎に持つ。Primary region で actor が見つからないとき、\texttt{AIPL\_REGION\_FAILOVER="us-east-1,eu-west-1,ap-1"} を順に walk して該当 region を探す。\texttt{region\_failover} (cross-region hit) / \texttt{region\_failover\_failed} (chain 終了) を log。5 prims: \texttt{current\_region}, \texttt{region\_chain}, \texttt{route\_for\_region(actor[, region])}, \texttt{failover\_region(actor[, primary])}, \texttt{regions\_available}。サンプル: \texttt{src/python-aipl/samples/MultiRegionFailover.abcl}。round-2 MAP-Elites reviewer avg 0.405 で distribution 軸 3 位 (top elite I0012 で 0.70)。\\
-\textsuperscript{o} \small CE-12 refinement unification: HM の \texttt{unify} は従来 refinement 述語を drop して post-hoc \texttt{\_check\_refinements} で end-of-pass に Z3 sweep を回していた。CE-12 は両側 \texttt{TRefined} の unify 時、\texttt{AIPL\_REFINE\_UNIFY=1} 設定下で Z3 に \texttt{P\_actual} $\land \neg$ \texttt{P\_expected} の UNSAT を問い (subset 関係 \texttt{P\_actual} $\Rightarrow$ \texttt{P\_expected} 成立)、不成立なら \texttt{UnifyError} を直ちに raise (post-hoc を待たず call site で early flag)。Env var 未設定なら従来挙動と互換 (drop refinement)。サンプル: \texttt{src/python-aipl/samples/RefinementUnification.abcl}。round-2 MAP-Elites reviewer avg 0.383 で 8 機能中 8 位 (Py-I 8 機能全完了)。\\
-\textsuperscript{n} \small CE-13 record width subtyping: \texttt{aipl\_inference.unify} の record arm は従来 \texttt{TRecord} のフィールド集合完全一致を要求していたが、CE-13 で intersection-based に緩和。両側に出現するフィールドのみ pairwise unify (depth subtyping 維持)、片側のみのフィールドは無視 (width subtyping)、完全 disjoint なら従来通り fail。Unannotated record param の principal-type 挙動は維持 (アクセスされた union がパラメータ TVar の制約として累積)。サンプル: \texttt{src/python-aipl/samples/RecordSubtyping.abcl}。round-2 MAP-Elites reviewer avg 0.400 で残り type 軸候補のうち 1 位 (CE-11 以降)。\\
-\textsuperscript{m} \small DR-11 saga orchestration: 補償アクション・オーケストレーションを新規 top-level 文として導入。\texttt{grammar.lark} に \texttt{saga\_stmt: "saga" "\{" saga\_step+ "\}"} と \texttt{saga\_step: "step" saga\_block "compensate" saga\_block} を追加 (saga\_block は明示的非終端で transformer が 2 つの Block 子を確実に取得)。\texttt{aipl\_ast.SagaStmt / SagaStep} + \texttt{aipl\_interp.\_do\_saga}。forward は各 step.body を順実行、失敗時は completed step の compensate を LIFO で実行してから例外を re-raise (actor 標準 error path + IQ quarantine が発火)。8 events: \texttt{saga\_started} / \texttt{saga\_step\_complete} / \texttt{saga\_step\_failed} / \texttt{saga\_compensated} / \texttt{saga\_compensate\_failed} / \texttt{saga\_finished} / \texttt{saga\_aborted}。サンプル: \texttt{src/python-aipl/samples/SagaOrchestration.abcl}。round-2 MAP-Elites reviewer avg 0.406 で残り分散候補の中で 1 位。
+\textsuperscript{i} \small DR-13 auto-scaling actor pool: hysteresis-driven 動的 actor プール。 4 prims \texttt{pool\_create(cls, min, max, target\_qlen[, name])} / \texttt{pool\_pick} / \texttt{pool\_size} / \texttt{pool\_destroy} で構成。\texttt{pool\_pick} 毎に平均 qlen を判定し \texttt{> 2*target} なら spawn (size $<$ max)、\texttt{< target/2} なら retire (size $>$ min)。\texttt{AIPL\_DIST\_ENABLE=1} でのみ動作。イベント \texttt{pool\_created} / \texttt{pool\_scale\_up} / \texttt{pool\_scale\_down} / \texttt{pool\_destroyed} は既存の structured-log NDJSON に流れる。サンプル: \texttt{src/python-aipl/samples/AutoScalingPool.aipl}。MAP-Elites reviewer 0.67 で distribution 軸 1 位。\\
+\textsuperscript{j} \small CE-11 capability types: Phase-12 静的 effect system に乗っかった runtime capability tracking。スレッド毎に held caps の set (TLS) を持ち \texttt{AIPL\_CAP\_GRANT="fs,ai,net,mut"} で起動時 seed。5 prims: \texttt{grant\_cap} / \texttt{revoke\_cap} / \texttt{has\_cap} / \texttt{current\_caps} / \texttt{check\_capability(name | names)}。Cap 名は BUILTIN\_EFFECTS の effect tag と同一語彙 (\texttt{fs} / \texttt{ai} / \texttt{net} / \texttt{mut})。Advisory 既定 (\texttt{cap\_violation} log)、\texttt{AIPL\_CAP\_STRICT=1} で \texttt{CapabilityError} 強制 raise。サンプル: \texttt{src/python-aipl/samples/CapabilityTypes.aipl}。round-2 MAP-Elites reviewer avg 0.430 で type 軸 1 位 (top elite I0012 で 0.73)。\\
+\textsuperscript{k} \small DR-10 CRDT actor state: G-Counter (grow-only, per-replica max merge) / OR-Set (observed-remove, UUID add-tags) / LWW-Register (last-writer-wins, ts + replica-id tiebreak) の 3 古典的 CRDT を plain dict として実装し \texttt{save\_actor\_state} / \texttt{restore\_actor\_state} round-trip を温存。15 prims (各型 4-6 個 + \texttt{crdt\_replicate(name, value)} hook)。Replica id は \texttt{AIPL\_DIST\_REPLICA\_ID} (default hostname)。\texttt{crdt\_replicate} は deployment-layer replicator 向けのイベントを log、peer fan-out 自体は将来の multi-region driver (DR-12) に分離。サンプル: \texttt{src/python-aipl/samples/CRDTState.aipl}。round-2 MAP-Elites reviewer avg 0.410 で distribution 軸 2 位。\\
+\textsuperscript{l} \small DR-12 multi-region failover: DR-1 route table の region-aware 拡張。各ノードは \texttt{AIPL\_REGION=<name>} (default \texttt{local}) を持ち、ルートテーブルは \texttt{AIPL\_ROUTE\_REGION\_<name>="Actor:tag,..."} で region 毎に持つ。Primary region で actor が見つからないとき、\texttt{AIPL\_REGION\_FAILOVER="us-east-1,eu-west-1,ap-1"} を順に walk して該当 region を探す。\texttt{region\_failover} (cross-region hit) / \texttt{region\_failover\_failed} (chain 終了) を log。5 prims: \texttt{current\_region}, \texttt{region\_chain}, \texttt{route\_for\_region(actor[, region])}, \texttt{failover\_region(actor[, primary])}, \texttt{regions\_available}。サンプル: \texttt{src/python-aipl/samples/MultiRegionFailover.aipl}。round-2 MAP-Elites reviewer avg 0.405 で distribution 軸 3 位 (top elite I0012 で 0.70)。\\
+\textsuperscript{o} \small CE-12 refinement unification: HM の \texttt{unify} は従来 refinement 述語を drop して post-hoc \texttt{\_check\_refinements} で end-of-pass に Z3 sweep を回していた。CE-12 は両側 \texttt{TRefined} の unify 時、\texttt{AIPL\_REFINE\_UNIFY=1} 設定下で Z3 に \texttt{P\_actual} $\land \neg$ \texttt{P\_expected} の UNSAT を問い (subset 関係 \texttt{P\_actual} $\Rightarrow$ \texttt{P\_expected} 成立)、不成立なら \texttt{UnifyError} を直ちに raise (post-hoc を待たず call site で early flag)。Env var 未設定なら従来挙動と互換 (drop refinement)。サンプル: \texttt{src/python-aipl/samples/RefinementUnification.aipl}。round-2 MAP-Elites reviewer avg 0.383 で 8 機能中 8 位 (Py-I 8 機能全完了)。\\
+\textsuperscript{n} \small CE-13 record width subtyping: \texttt{aipl\_inference.unify} の record arm は従来 \texttt{TRecord} のフィールド集合完全一致を要求していたが、CE-13 で intersection-based に緩和。両側に出現するフィールドのみ pairwise unify (depth subtyping 維持)、片側のみのフィールドは無視 (width subtyping)、完全 disjoint なら従来通り fail。Unannotated record param の principal-type 挙動は維持 (アクセスされた union がパラメータ TVar の制約として累積)。サンプル: \texttt{src/python-aipl/samples/RecordSubtyping.aipl}。round-2 MAP-Elites reviewer avg 0.400 で残り type 軸候補のうち 1 位 (CE-11 以降)。\\
+\textsuperscript{m} \small DR-11 saga orchestration: 補償アクション・オーケストレーションを新規 top-level 文として導入。\texttt{grammar.lark} に \texttt{saga\_stmt: "saga" "\{" saga\_step+ "\}"} と \texttt{saga\_step: "step" saga\_block "compensate" saga\_block} を追加 (saga\_block は明示的非終端で transformer が 2 つの Block 子を確実に取得)。\texttt{aipl\_ast.SagaStmt / SagaStep} + \texttt{aipl\_interp.\_do\_saga}。forward は各 step.body を順実行、失敗時は completed step の compensate を LIFO で実行してから例外を re-raise (actor 標準 error path + IQ quarantine が発火)。8 events: \texttt{saga\_started} / \texttt{saga\_step\_complete} / \texttt{saga\_step\_failed} / \texttt{saga\_compensated} / \texttt{saga\_compensate\_failed} / \texttt{saga\_finished} / \texttt{saga\_aborted}。サンプル: \texttt{src/python-aipl/samples/SagaOrchestration.aipl}。round-2 MAP-Elites reviewer avg 0.406 で残り分散候補の中で 1 位。
 
 \section*{Type system}
 
@@ -344,7 +344,7 @@ Py-I (\texttt{python-aipl-inferred/}) は依然 trace-based HM のままで,
 parsing 達成.\texttt{lexer.mll} に \texttt{where}/\texttt{and}/\texttt{or}/\texttt{not} キーワード,
 \texttt{parser.mly} に \texttt{type\_expr WHERE refine\_or} 規則,
 \texttt{ast.ml} に \texttt{TyERefined of type\_expr * refine\_pred} を追加.
-サンプル: \texttt{abclc/WhereClause.abcl}.
+サンプル: \texttt{abclc/WhereClause.aipl}.
 
 \noindent\textsuperscript{**} CE-1 / CE-6 / CE-9: OCaml は Phase O-2.b
 (2026-05-18) で SMT-LIB 2 + z3 CLI バックエンドを実装,
@@ -354,7 +354,7 @@ Phase O-2.c (同日) で Real 理論にも対応.
 に流す.\texttt{AIPL\_REFINE\_CHECK=1} で typecheck pass が
 vacuously-false な refinement に \texttt{[refine warning]} を吐く.
 z3 不在時は \texttt{Deferred} で graceful fallback.
-サンプル: \texttt{abclc/WhereVacuous.abcl} (Int), \texttt{abclc/WhereVacuousReal.abcl} (Real).
+サンプル: \texttt{abclc/WhereVacuous.aipl} (Int), \texttt{abclc/WhereVacuousReal.aipl} (Real).
 
 \smallskip
 \noindent\textsuperscript{\#} CE-2 / CE-4: OCaml は Phase O-2.d (2026-05-18) で
@@ -372,7 +372,7 @@ record structural typing を完成.\texttt{Types.unify} の \texttt{TRecord}
 無視していたため cross-class 呼出しで shape 不一致が silent だった.
 parameter annotation を尊重するよう修正後,\texttt{method f(p:\{a:int,b:int\})}
 に shape 不一致の record literal を渡すと count / label / field-type
-の全てで type error.サンプル: \texttt{abclc/RecordStructural.abcl}.
+の全てで type error.サンプル: \texttt{abclc/RecordStructural.aipl}.
 
 \smallskip
 \noindent\textsuperscript{\$} CE-7 / CE-8: OCaml は Phase O-2.f
@@ -477,12 +477,12 @@ Fix & 内容 & OCaml & Python (型推論) & LOC \\
 \begin{itemize}
 \item \textbf{(e)} user-defined \texttt{method reply(r) \{ ... \}} —
   Erlang プロセス風,actor loop が自動 dispatch.
-  サンプル: \texttt{abclc/ai-samples/SendReplyMethod.abcl} (OCaml \texttt{cbec37c}) /
-  \texttt{samples-ai/\_send\_reply\_demo/send\_reply\_style.abcl} (Python).
+  サンプル: \texttt{abclc/ai-samples/SendReplyMethod.aipl} (OCaml \texttt{cbec37c}) /
+  \texttt{samples-ai/\_send\_reply\_demo/send\_reply\_style.aipl} (Python).
 \item \textbf{(f)} \texttt{select \{ case reply(r) -> ... \}} —
   OTP / Erlang receive 風.
-  サンプル: \texttt{\_ai\_call\_styles/send\_select\_style.abcl} (OCaml) /
-  \texttt{samples-ai/\_send\_reply\_demo/send\_select\_style.abcl} (Python).
+  サンプル: \texttt{\_ai\_call\_styles/send\_select\_style.aipl} (OCaml) /
+  \texttt{samples-ai/\_send\_reply\_demo/send\_select\_style.aipl} (Python).
 \end{itemize}
 
 \noindent 両ランタイムに 4 形態 (now / future+await / send+reply-method
@@ -507,16 +507,16 @@ AIPL を AIPL 自身で書く 10 層ブートストラップ.進化計算で探�
 \toprule
 \textbf{Level} & \textbf{役割} & \textbf{主要ファイル} & \textbf{samples} & \textbf{smoke} \\
 \midrule
-\textbf{C}     & lexer + parser + eval pipeline & \texttt{lexer/parser/eval.abcl} & 3  & \Yes \\
-\textbf{C-2}   & actor scheduler                 & \texttt{scheduler.abcl}        & 6  & \Yes \\
-\textbf{C-3}   & scheduler + now/future          & \texttt{scheduler.abcl}        & 1  & \Yes \\
-\textbf{B-1}   & Phase 11 type check             & \texttt{typeck.abcl}           & 6  & \Yes \\
-\textbf{B-2}   & Phase 12 effects                & \texttt{typeck.abcl}           & 4  & \Yes \\
-\textbf{B-3}   & Phase 13 channels               & \texttt{typeck.abcl}           & 5  & \Yes \\
-\textbf{B-4}   & Phase 14 linear                 & \texttt{typeck.abcl}           & 4  & \Yes \\
-\textbf{B-5}   & Phase 15 owned                  & \texttt{typeck.abcl}           & 4  & \Yes \\
-\textbf{A}     & metacircular eval               & \texttt{metacircular.abcl}     & 4  & \Yes \\
-\textbf{Z}     & \textbf{integrated full self-host} & \texttt{driver\_head.abcl} + \texttt{io\_bridge.abcl} + \texttt{bootstrap.py} (\textbf{18 lines}) & 4 & \Yes \textbf{(10/10)} \\
+\textbf{C}     & lexer + parser + eval pipeline & \texttt{lexer/parser/eval.aipl} & 3  & \Yes \\
+\textbf{C-2}   & actor scheduler                 & \texttt{scheduler.aipl}        & 6  & \Yes \\
+\textbf{C-3}   & scheduler + now/future          & \texttt{scheduler.aipl}        & 1  & \Yes \\
+\textbf{B-1}   & Phase 11 type check             & \texttt{typeck.aipl}           & 6  & \Yes \\
+\textbf{B-2}   & Phase 12 effects                & \texttt{typeck.aipl}           & 4  & \Yes \\
+\textbf{B-3}   & Phase 13 channels               & \texttt{typeck.aipl}           & 5  & \Yes \\
+\textbf{B-4}   & Phase 14 linear                 & \texttt{typeck.aipl}           & 4  & \Yes \\
+\textbf{B-5}   & Phase 15 owned                  & \texttt{typeck.aipl}           & 4  & \Yes \\
+\textbf{A}     & metacircular eval               & \texttt{metacircular.aipl}     & 4  & \Yes \\
+\textbf{Z}     & \textbf{integrated full self-host} & \texttt{driver\_head.aipl} + \texttt{io\_bridge.aipl} + \texttt{bootstrap.py} (\textbf{18 lines}) & 4 & \Yes \textbf{(10/10)} \\
 \midrule
 \textbf{total} & 10 levels                        & 9 AIPL modules (\textasciitilde 1500 LOC) + 18 lines Python & \textbf{41} & \textbf{47/47} \\
 \bottomrule
@@ -524,13 +524,13 @@ AIPL を AIPL 自身で書く 10 層ブートストラップ.進化計算で探�
 \end{center}
 
 \textbf{Level Z = self-host complete}.  \texttt{bootstrap.py} は 18 行
-(\texttt{.aice} 仕様の $\le$20 行制約内) でユーザ \texttt{.abcl} を読み、
-\texttt{level-c/lexer.abcl} + \texttt{parser.abcl} + \texttt{eval.abcl} +
-\texttt{driver\_head.abcl} を連結してホスト AIPL に渡すだけ.構文解析と
+(\texttt{.aice} 仕様の $\le$20 行制約内) でユーザ \texttt{.aipl} を読み、
+\texttt{level-c/lexer.aipl} + \texttt{parser.aipl} + \texttt{eval.aipl} +
+\texttt{driver\_head.aipl} を連結してホスト AIPL に渡すだけ.構文解析と
 評価は全て AIPL 側で完結.ホスト Python に残るのは AIPL ランタイム本体
 (組込みプリミティブ + スケジューラ) と 18 行の loader のみ.
 
-\texttt{io\_bridge.abcl} は fs / ai / net プリミティブを CE-11
+\texttt{io\_bridge.aipl} は fs / ai / net プリミティブを CE-11
 capability check ごしに再エクスポートし、ホスト権限と self-hosted
 コードの間に capability 境界を確立.smoke は \texttt{AIPL\_CAP\_STRICT=1}
 下で missing-grant が \texttt{capability denied} で停止することも検証.
@@ -638,7 +638,7 @@ I/O in one actor stalls the whole runtime.
 The AIPL programming model (\texttt{send} / \texttt{now} /
 \texttt{future} / \texttt{await}) is preserved across all three
 tiers --- the choice of target picks a point on the cost/scale
-curve without changing the program text.  The same \texttt{.abcl}
+curve without changing the program text.  The same \texttt{.aipl}
 file:
 \begin{itemize}[leftmargin=*,itemsep=0pt]
   \item runs $\sim$1000 actors fine on Python / OCaml / C
@@ -686,7 +686,7 @@ Runtime features match Python (annotated) exactly because the
 interpreter is shared.  The trade is on the static side: the Phase
 11+ annotation-driven checks are replaced with a Hindley-Milner
 inference pass.  Inferred types cross-verified against OCaml: on
-shared samples (\texttt{Hello.abcl}, \texttt{counter.abcl}) the two
+shared samples (\texttt{Hello.aipl}, \texttt{counter.aipl}) the two
 runtimes produce identical type schemes.
 
 \subsection*{OCaml --- feature parity with Python on the core}
@@ -699,7 +699,7 @@ After the OCaml feature catch-up, the runtime supports
 \textbf{records \& tuples}, \textbf{sized arrays}
 (\texttt{var x[N][M]}), and \textbf{text/image file I/O} (PPM
 backend for images).  Phase 11+ effect / linear / owned / transient
-features still only exist as \texttt{.abcl} design-document samples
+features still only exist as \texttt{.aipl} design-document samples
 \textemdash{} not statically enforced.  Solid \texttt{become} /
 \texttt{select} / WebSocket (built into \texttt{web\_gateway.ml})
 and HTTP remote actor calls (\texttt{send}\,/\,\texttt{now}\,/\,\texttt{future},
@@ -767,8 +767,8 @@ parse time.
 
 \section*{Type inference cross-verification}
 
-For shared samples (\texttt{abclc/Hello.abcl},
-\texttt{abclc/counter.abcl}), the three HM-based runtimes
+For shared samples (\texttt{abclc/Hello.aipl},
+\texttt{abclc/counter.aipl}), the three HM-based runtimes
 (\textbf{OCaml}, \textbf{Python-inferred}, \textbf{C}) produce
 identical inferred types:
 
@@ -857,6 +857,6 @@ For source pointers, run \texttt{grep} against the files listed in
 each runtime's source column.
 
 \bigskip
-\noindent\textit{Last regenerated: 2026-05-18 (after \textbf{Self-host bootstrap Level Z completed}: 10-level chain wraps up with \texttt{aipl-self-host/level-z/} --- an 18-line Python \texttt{bootstrap.py} + AIPL-side \texttt{driver\_head.abcl} + CE-11 capability-checked \texttt{io\_bridge.abcl} + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in \texttt{aipl2c --check}, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = \textbf{103 next-gen / self-host assertions all PASS}.)}
+\noindent\textit{Last regenerated: 2026-05-18 (after \textbf{Self-host bootstrap Level Z completed}: 10-level chain wraps up with \texttt{aipl-self-host/level-z/} --- an 18-line Python \texttt{bootstrap.py} + AIPL-side \texttt{driver\_head.aipl} + CE-11 capability-checked \texttt{io\_bridge.aipl} + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in \texttt{aipl2c --check}, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = \textbf{103 next-gen / self-host assertions all PASS}.)}
 
 \end{document}

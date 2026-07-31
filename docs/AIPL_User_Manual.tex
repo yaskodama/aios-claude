@@ -83,12 +83,12 @@
 再実装した言語である. 本マニュアルは言語仕様の概要と,付属サンプルの解説,組込み関数の
 リファレンスをまとめる.
 \par\vspace{4pt}
-{\small 後方互換のため,ファイル拡張子 \texttt{.abcl},Python ランタイムのモジュール名
+{\small 後方互換のため,ファイル拡張子 \texttt{.aipl},Python ランタイムのモジュール名
 (\texttt{aipl\_main.py} 等),環境変数 \texttt{ABCL\_AI\_PROVIDER} などは旧称のまま維持している.}
 \par\vspace{4pt}
 \textbf{対象バージョン}: 本リポジトリ (\texttt{abclcp-project}) 同梱の OCaml REPL 実装\\
 \textbf{主要ソース}: \texttt{src/lexer.mll}, \texttt{src/parser.mly}, \texttt{src/eval\_thread.ml}\\
-\textbf{サンプル群}: \texttt{abclc/*.abcl}, \texttt{src/*.abcl}
+\textbf{サンプル群}: \texttt{abclc/*.aipl}, \texttt{src/*.aipl}
 \end{abstract}
 
 \tableofcontents
@@ -130,7 +130,7 @@ make js         # ブラウザ用パーサ再生成
 \subsection{サンプル実行}
 
 \begin{lstlisting}[language=shell]
-make run-hello             # abclc/Hello.abcl
+make run-hello             # abclc/Hello.aipl
 make run-philosophers      # 5 哲学者
 make run-rotate4           # SDL 描画デモ
 ./run_bounded_buffer.sh    # 有界バッファ
@@ -140,7 +140,7 @@ make run-rotate4           # SDL 描画デモ
 任意のソースを直接食わせるには:
 
 \begin{lstlisting}[language=shell]
-_build/default/src/repl_thread.exe abclc/Hello.abcl
+_build/default/src/repl_thread.exe abclc/Hello.aipl
 \end{lstlisting}
 
 \subsection{ブラウザ実行}
@@ -582,7 +582,7 @@ send ai.ask("fire and forget");          // past 型,戻り値不要
 
 \subsection{Hello --- 最小サンプル}
 
-\texttt{abclc/Hello.abcl}
+\texttt{abclc/Hello.aipl}
 
 \begin{lstlisting}
 class Hello {
@@ -618,7 +618,7 @@ make run-hello
 
 \subsection{Counter --- 自己メッセージとフィールド}
 
-\texttt{abclc/counter.abcl}
+\texttt{abclc/counter.aipl}
 
 \begin{lstlisting}
 class Counter {
@@ -645,7 +645,7 @@ send c2.inc();
 
 \subsection{PingPong --- 二者間メッセージ往復}
 
-\texttt{abclc/PingPong.abcl}
+\texttt{abclc/PingPong.aipl}
 
 \begin{lstlisting}
 class Pinger {
@@ -675,7 +675,7 @@ var ponger = new Ponger();
 
 \subsection{Become --- 振る舞いの動的入れ替え}
 
-\texttt{abclc/become.abcl}
+\texttt{abclc/become.aipl}
 
 \begin{lstlisting}
 class A {
@@ -703,7 +703,7 @@ send x.ping();   // A.ping
 
 \subsection{Records --- レコード型}
 
-\texttt{abclc/Records.abcl} (OCaml ランタイムで追加された新機能)
+\texttt{abclc/Records.aipl} (OCaml ランタイムで追加された新機能)
 
 \begin{lstlisting}
 var alice = {name: "alice", age: 30};
@@ -723,7 +723,7 @@ HM 推論はラベル名とフィールド型を完全に保持し,\texttt{unify
 
 \subsection{Tuples --- 組型}
 
-\texttt{abclc/Tuples.abcl}
+\texttt{abclc/Tuples.aipl}
 
 \begin{lstlisting}
 var t = (1, "two", 3.5);
@@ -740,7 +740,7 @@ print("pair[1] = " + pair[1]);
 
 \subsection{BoundedBuffer --- 生産者・消費者問題}
 
-\texttt{abclc/bounded\_buffer.abcl} (抜粋)
+\texttt{abclc/bounded\_buffer.aipl} (抜粋)
 
 \begin{lstlisting}
 class Buffer {
@@ -780,9 +780,9 @@ class Buffer {
 
 \subsection{Philosophers --- 食事する哲学者}
 
-\texttt{abclc/Philosophers5.abcl} (5 哲学者).
+\texttt{abclc/Philosophers5.aipl} (5 哲学者).
 5 つのアクター間の対称デッドロックを,ハンドオフによって回避する古典問題.
-SDL 版 (\texttt{Philosophers5Gui.abcl}) ではビジュアライズも可能.
+SDL 版 (\texttt{Philosophers5Gui.aipl}) ではビジュアライズも可能.
 
 \begin{lstlisting}[language=shell]
 make run-philosophers     # コンソール
@@ -791,7 +791,7 @@ make run-philosophers     # コンソール
 
 \subsection{Rotate4Lines --- SDL 描画とタイマー}
 
-\texttt{abclc/Rotate4Lines.abcl}
+\texttt{abclc/Rotate4Lines.aipl}
 
 \begin{lstlisting}
 class Line {
@@ -835,7 +835,7 @@ send li1.rotate(); send li2.rotate(); send li3.rotate(); send li4.rotate();
 
 \subsection{WebCalc --- HTTP ゲートウェイと \texttt{select}}
 
-\texttt{src/web\_calc1.abcl}
+\texttt{src/web\_calc1.aipl}
 
 \begin{lstlisting}
 class Calc {
@@ -1197,7 +1197,7 @@ DR-13 auto-scaling pool & 自動 (\texttt{pool\_create(cls, min, max, target\_ql
 \subsection{CE-10 effect 推論の出力例}
 
 \begin{lstlisting}[language=]
-$ aipl2c --check effects_demo.abcl
+$ aipl2c --check effects_demo.aipl
 === inferred method effects ===
 [class_method_effects]
 class AIReporter
@@ -1219,10 +1219,10 @@ JS-N は \texttt{POST /api/typecheck} の JSON で
 \begin{lstlisting}[language=]
 export AIPL_CAP_GRANT="fs,ai"
 export AIPL_CAP_STRICT=1
-aipl2c run.abcl && cc run.c -o run && ./run
+aipl2c run.aipl && cc run.c -o run && ./run
 \end{lstlisting}
 
-\noindent \texttt{run.abcl} 側では:
+\noindent \texttt{run.aipl} 側では:
 
 \begin{lstlisting}
 class Worker {

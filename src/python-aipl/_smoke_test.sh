@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test every .abcl program under samples/ by running it through
+# Smoke-test every .aipl program under samples/ by running it through
 # the Python interpreter with a wall-clock timeout.  A run is PASS if
 # (a) no Python traceback appears in the output and (b) a "[parse
 # error]" was not reported.
@@ -31,9 +31,9 @@ fi
 
 pass=0; fail=0
 declare -a FAILS
-for f in samples/*.abcl; do
+for f in samples/*.aipl; do
   [ -e "$f" ] || continue
-  name=$(basename "$f" .abcl)
+  name=$(basename "$f" .aipl)
   log="$LOGDIR/${name}.log"
   "$PY" aipl_main.py --timeout "$TIMEOUT" "$f" >"$log" 2>&1
   rc=$?
@@ -77,9 +77,9 @@ if [ "$WITH_AI" = "1" ]; then
     echo "    -> $PY -m pip install --user google-genai"
     ai_skip=1
   else
-    for f in samples-ai/*.abcl; do
+    for f in samples-ai/*.aipl; do
       [ -e "$f" ] || continue
-      name=$(basename "$f" .abcl)
+      name=$(basename "$f" .aipl)
       log="$LOGDIR/${name}.log"
       "$PY" aipl_main.py --timeout "$AI_TIMEOUT" "$f" >"$log" 2>&1
       rc=$?

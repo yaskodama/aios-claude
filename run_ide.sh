@@ -12,7 +12,7 @@
 
 cd "$(dirname "$0")"
 
-# Port is defined in src/ide_boot.abcl (web_listen(...)). Edit that file if
+# Port is defined in src/ide_boot.aipl (web_listen(...)). Edit that file if
 # you want a different port.
 PORT=8080
 
@@ -36,9 +36,9 @@ if pgrep -f repl_thread.exe > /dev/null; then
   sleep 1
 fi
 
-# REPL-level script: src/ide_boot.bat contains `load ide_boot.abcl` +
+# REPL-level script: src/ide_boot.bat contains `load ide_boot.aipl` +
 # `compile`, and the REPL's `script` command now chdirs into the .bat's
 # directory while it runs — so those relative paths resolve from src/.
 echo "[run] launching AIPL IDE"
-echo "[run] open http://localhost:${PORT}/ide  (port is fixed in src/ide_boot.abcl)"
+echo "[run] open http://localhost:${PORT}/ide  (port is fixed in src/ide_boot.aipl)"
 exec ./_build/default/src/repl_thread.exe -f src/ide_boot.bat

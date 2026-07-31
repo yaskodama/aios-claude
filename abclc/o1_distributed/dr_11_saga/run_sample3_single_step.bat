@@ -1,2 +1,2 @@
-load sample3_single_step.abcl
+load sample3_single_step.aipl
 compile

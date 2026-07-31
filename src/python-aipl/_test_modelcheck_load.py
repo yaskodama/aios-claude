@@ -1,4 +1,4 @@
-"""Smoke test: load .abcl files into the model checker and verify
+"""Smoke test: load .aipl files into the model checker and verify
 the deadlock vs no-deadlock contrast holds."""
 
 import os
@@ -29,7 +29,7 @@ def _all_phils_done(state) -> bool:
 
 
 def test_twolock_deadlock_detected():
-    init, _ = load_program(os.path.join(HERE, "samples-mc/TwoLockDeadlock.abcl"))
+    init, _ = load_program(os.path.join(HERE, "samples-mc/TwoLockDeadlock.aipl"))
     mc = ModelChecker(init, depth=500)
     res = mc.check_deadlock_free(is_terminal=_all_phils_done)
     assert not res.ok, "TwoLockDeadlock should violate"
@@ -38,7 +38,7 @@ def test_twolock_deadlock_detected():
 
 
 def test_twolock_ordered_clean():
-    init, _ = load_program(os.path.join(HERE, "samples-mc/TwoLockOrdered.abcl"))
+    init, _ = load_program(os.path.join(HERE, "samples-mc/TwoLockOrdered.aipl"))
     mc = ModelChecker(init, depth=500)
     res = mc.check_deadlock_free(is_terminal=_all_phils_done)
     assert res.ok, f"TwoLockOrdered should be clean, got {res.deadlocks!r}"
@@ -50,7 +50,7 @@ def test_counterpair_finishes():
     self-ticks.  No deadlock under the all-mailboxes-empty=stuck
     rule (the conservative default), since every empty-mailbox
     state IS the natural halt."""
-    init, _ = load_program(os.path.join(HERE, "samples-mc/CounterPair.abcl"))
+    init, _ = load_program(os.path.join(HERE, "samples-mc/CounterPair.aipl"))
     mc = ModelChecker(init, depth=200)
     # Without a domain-specific is_terminal, any halt looks like a
     # deadlock — but the explored state count proves the program

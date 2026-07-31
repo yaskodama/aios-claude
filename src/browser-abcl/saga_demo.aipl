@@ -1,0 +1,52 @@
+// saga_demo.aipl — DR-11 saga orchestration sample for JS-B / JS-N.
+//
+// Two-step booking flow: reserve a seat, then charge the card.  If
+// the second step fails the first step's compensate fires (LIFO).
+// NDJSON event sequence:
+//   saga_started → saga_step_complete{0}
+//   saga_step_failed{1} → saga_compensated{0} → saga_aborted
+// Set AIPL_DIST_LOG_FILE=/path to capture the events.
+
+class Booking {
+  var seats = 3;
+  var charges = 0;
+
+  method reserve(n) {
+    seats = seats - n;
+    print("[booking] reserved " + n + ", seats now " + seats);
+  }
+  method release(n) {
+    seats = seats + n;
+    print("[booking] released " + n + ", seats now " + seats);
+  }
+  method charge(amt) {
+    charges = charges + amt;
+    print("[booking] charged " + amt + ", total " + charges);
+  }
+}
+
+class Flow {
+  method runOk(b) {
+    saga {
+      step       { send b.reserve(2); }
+      compensate { send b.release(2); }
+      step       { send b.charge(100); }
+      compensate { print("[booking] refund 100 (not triggered)"); }
+    }
+    print("[flow] runOk done");
+  }
+  method runFail(b) {
+    saga {
+      step       { send b.reserve(1); }
+      compensate { send b.release(1); }
+      step       { var c = read_file("/dev/null/nope"); }
+      compensate { print("[booking] refund nothing (step never ran)"); }
+    }
+    print("[flow] unreachable");
+  }
+}
+
+var b = new Booking();
+var f = new Flow();
+send f.runOk(b);
+send f.runFail(b);

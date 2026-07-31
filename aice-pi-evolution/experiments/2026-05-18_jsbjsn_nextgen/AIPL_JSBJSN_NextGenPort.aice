@@ -89,7 +89,7 @@ aice AIPL_JSBJSN_NextGenPort {
       spec = "src/browser-abcl/_smoke_test.sh + src/browser-abcl/_smoke_pptr.mjs (headless Chrome 経由) + src/node-aipl-server/_smoke_test.sh の既存 sample が無変更で動作。新機能は全て opt-in (URL クエリ / env var)。";
     }
     task FourWayParityJSBJSN {
-      spec = "同一の .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出す。DR-* は構造化ログ JSON のイベント名 + フィールド が等価。CE-* は --check / --infer 出力 が等価。Phase O での 18/18 mirror の 8-feature 版。";
+      spec = "同一の .aipl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出す。DR-* は構造化ログ JSON のイベント名 + フィールド が等価。CE-* は --check / --infer 出力 が等価。Phase O での 18/18 mirror の 8-feature 版。";
     }
     task ImplCostBudgetJSBJSN {
       spec = "JS-B 合計 ≤ 1100 行 (Py-I 700 + JS overhead +25-30% + Web Worker workaround で +ボーナス)、JS-N 合計 ≤ 1000 行 (Py-I/Node API がほぼ 1:1 マッピング)。両方合わせて ≤ 2100 行。";
@@ -134,7 +134,7 @@ aice AIPL_JSBJSN_NextGenPort {
       persona = "あなたは JS 後方互換性レビュアーです。既存 src/browser-abcl/_smoke_test.sh + _smoke_pptr.mjs (headless Chrome) と src/node-aipl-server/_smoke_test.sh の samples が無変更で動作するか。新機能は全て opt-in (URL クエリ / env var / config) で発火。1.0 = 完全 opt-in、0.7 = 1-2 例で軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
     }
     reviewer FourWayParity {
-      persona = "あなたは 4-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+      persona = "あなたは 4-way 整合性レビュアーです。同一 .aipl が Py-I / OCaml / JS-B / JS-N で同じ観測結果を出すか。CE-* は --check 出力 + effects 表示、DR-* は構造化ログ JSON イベント名 + フィールド。Phase O での 18/18 mirror が前例。JS-B は browser 制約で fs / cap_grant 等が opt-out になりうる。1.0 = 完全一致、0.7 = log 形式違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
     }
     reviewer JSIdiomaticity {
       persona = "あなたは JS イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を JS で書き直す妥当性。Map / async-mutex / AsyncLocalStorage (Node) / WeakMap / postMessage (Browser)。CRDT は Plain Object + JSON-merge が JS 流。Saga は async/await + try/catch が自然。1.0 = JS idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = JS 的でない。1 行で返答。";

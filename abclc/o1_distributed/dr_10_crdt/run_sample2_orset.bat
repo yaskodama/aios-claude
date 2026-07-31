@@ -1,2 +1,2 @@
-load sample2_orset.abcl
+load sample2_orset.aipl
 compile

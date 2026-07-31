@@ -2,7 +2,7 @@
 # WebSpreadsheet round 3 smoke runner.
 #
 # Currently exercises:
-#   - HelloSheet.abcl  : 3x3 sheet with AST-formula eval (no parser yet)
+#   - HelloSheet.aipl  : 3x3 sheet with AST-formula eval (no parser yet)
 #
 # Each subsequent commit in the round-3 implementation phase adds
 # one more sample (formula parser, cell actors, persistence, …).
@@ -35,7 +35,7 @@ check_contains() {
 # ── Phase 0: HelloSheet ──────────────────────────────────────
 echo "[Phase 0] HelloSheet (AST-formula eval)"
 HELLO_LOG="$LOGDIR/HelloSheet.log"
-timeout 20 python3 aipl_main.py samples/spreadsheet/HelloSheet.abcl > "$HELLO_LOG" 2>&1
+timeout 20 python3 aipl_main.py samples/spreadsheet/HelloSheet.aipl > "$HELLO_LOG" 2>&1
 
 check_contains "HelloSheet"  "$HELLO_LOG" "A1 = 10"
 check_contains "HelloSheet"  "$HELLO_LOG" "C1 = 30"        # A1 + B1
@@ -47,7 +47,7 @@ check_contains "HelloSheet"  "$HELLO_LOG" "C3 = 1330"      # SUM(...)
 echo
 echo "[Phase 1] StringFormulaSheet (lex + parse + eval)"
 SFS_LOG="$LOGDIR/StringFormulaSheet.log"
-timeout 20 python3 aipl_main.py samples/spreadsheet/StringFormulaSheet.abcl > "$SFS_LOG" 2>&1
+timeout 20 python3 aipl_main.py samples/spreadsheet/StringFormulaSheet.aipl > "$SFS_LOG" 2>&1
 
 check_contains "StringFormula" "$SFS_LOG" "A1 = 10"
 check_contains "StringFormula" "$SFS_LOG" "C1 = 30"        # parsed "A1+B1"
@@ -58,7 +58,7 @@ check_contains "StringFormula" "$SFS_LOG" "C3 = 1330"      # parsed "SUM(...)"
 echo
 echo "[Phase 2] ActorSheet (cell actors + actor eval)"
 AS_LOG="$LOGDIR/ActorSheet.log"
-timeout 25 python3 aipl_main.py samples/spreadsheet/ActorSheet.abcl > "$AS_LOG" 2>&1
+timeout 25 python3 aipl_main.py samples/spreadsheet/ActorSheet.aipl > "$AS_LOG" 2>&1
 
 check_contains "ActorSheet"    "$AS_LOG" "A1 = 10"
 check_contains "ActorSheet"    "$AS_LOG" "C1 = 30"          # cell-to-cell now
@@ -70,7 +70,7 @@ check_contains "ActorSheet"    "$AS_LOG" "=== done ==="
 echo
 echo "[Phase 3] PersistedSheet (save / load round-trip)"
 PS_LOG="$LOGDIR/PersistedSheet.log"
-timeout 25 python3 aipl_main.py samples/spreadsheet/PersistedSheet.abcl > "$PS_LOG" 2>&1
+timeout 25 python3 aipl_main.py samples/spreadsheet/PersistedSheet.aipl > "$PS_LOG" 2>&1
 
 check_contains "PersistedSheet" "$PS_LOG" "=== original ==="
 check_contains "PersistedSheet" "$PS_LOG" "[save] /tmp/_persisted_sheet.txt"
@@ -88,7 +88,7 @@ fi
 echo
 echo "[Phase 5.0] GSheetsCore12 (SUM/AVG/MIN/MAX/COUNT/IF/POWER/MOD/...)"
 GS_LOG="$LOGDIR/GSheetsCore12.log"
-timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsCore12.abcl > "$GS_LOG" 2>&1
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsCore12.aipl > "$GS_LOG" 2>&1
 
 check_contains "GSheetsCore12" "$GS_LOG" "B1 = 150"      # SUM(A1..A5)
 check_contains "GSheetsCore12" "$GS_LOG" "B2 = 30"       # AVG(A1..A5)
@@ -107,7 +107,7 @@ check_contains "GSheetsCore12" "$GS_LOG" "D1 = 100"      # AVG(B1=150, B4=50)
 echo
 echo "[Phase 5.1] GSheetsRanges (A1:B10 + \$A\$1 absolute)"
 GR_LOG="$LOGDIR/GSheetsRanges.log"
-timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsRanges.abcl > "$GR_LOG" 2>&1
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsRanges.aipl > "$GR_LOG" 2>&1
 
 check_contains "GSheetsRanges" "$GR_LOG" "F1 = 15"       # SUM(A1:E1) row 1
 check_contains "GSheetsRanges" "$GR_LOG" "F2 = 55"       # SUM(A1:A5) col A
@@ -124,7 +124,7 @@ check_contains "GSheetsRanges" "$GR_LOG" "G5 = 310"      # 325 - 15
 echo
 echo "[Phase 5.2] GSheetsVirtualized (100x5 logical / 5x5 viewport)"
 GV_LOG="$LOGDIR/GSheetsVirtualized.log"
-timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsVirtualized.abcl > "$GV_LOG" 2>&1
+timeout 25 python3 aipl_main.py samples/spreadsheet/GSheetsVirtualized.aipl > "$GV_LOG" 2>&1
 
 check_contains "GSheetsVirt"   "$GV_LOG" "rows 0..4 : live=25  spawn=25  retire=0"
 check_contains "GSheetsVirt"   "$GV_LOG" "A1 (in vp) = 1"

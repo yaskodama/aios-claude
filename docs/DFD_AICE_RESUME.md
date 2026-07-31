@@ -27,12 +27,12 @@ DFD（Data Flow Diagram）で書かれた仕様を入力に、
 |---|---|
 | **DFD 用 CFG**（自前のメタ言語の文法定義） | `abclc/ai-samples/dfd_meta.bnf` |
 | **DFD インスタンス**（受付業務の仕様） | `abclc/ai-samples/reception.dfd` |
-| **abcl 合成器**（R1〜R6 評価器） | `abclc/ai-samples/SynthesizeFromDFD.abcl` |
+| **abcl 合成器**（R1〜R6 評価器） | `abclc/ai-samples/SynthesizeFromDFD.aipl` |
 | **進化計算ログ**（手動シミュレートの GA トレース） | `dfd_reception_synth.log` |
 | **合成された Python プログラム** | `dfd_reception_synth.py` （スモーク 3/3 通過） |
 | **AICE メタファイル**（nodes セクションのみ） | `abclc/ai-samples/reception.aice` |
 
-並行して、別件で `EvolveLanguagesGA.abcl` の prompt 改善も完了:
+並行して、別件で `EvolveLanguagesGA.aipl` の prompt 改善も完了:
 - 改善前ログ: `gemini-1st.log`（出力途中切れ・フォーマット混在等あり）
 - 改善内容: prompt に OUTPUT FORMAT 強制、persona 厳格化（OCaml↔Haskell の取り違え防止 等）
 - 改善後ログ: 未生成（API キーが立った端末で `--gemini` 再実行待ち）
@@ -85,7 +85,7 @@ DFD（Data Flow Diagram）で書かれた仕様を入力に、
    `reception.dfd` の各要素 → AICE のどのセクションのどの非終端から派生するか、機械的な対応表を作って文法的に閉じていることを示す。
 
 4. **合成器の入力切り替え検討**
-   `SynthesizeFromDFD.abcl` を `reception.dfd` ではなく `reception.aice` 経由で読めるようにするか検討。原則として **DFD 仕様（reception.dfd）が one-source-of-truth** で、AICE はそれを実装トポロジに射影したもの、という整理が綺麗。
+   `SynthesizeFromDFD.aipl` を `reception.dfd` ではなく `reception.aice` 経由で読めるようにするか検討。原則として **DFD 仕様（reception.dfd）が one-source-of-truth** で、AICE はそれを実装トポロジに射影したもの、という整理が綺麗。
 
 ---
 
@@ -97,7 +97,7 @@ DFD（Data Flow Diagram）で書かれた仕様を入力に、
 ```bash
 cd /Users/kodamay/ocaml-app/abclcp-evolve
 GEMINI_API_KEY=... \
-  printf 'load abclc/ai-samples/SynthesizeFromDFD.abcl\ncompile\nquit\n' \
+  printf 'load abclc/ai-samples/SynthesizeFromDFD.aipl\ncompile\nquit\n' \
   | ABCL_AI_PROVIDER=gemini \
     /Users/kodamay/ocaml-app/abclcp-project/_build/default/src/repl_thread.exe \
   | tee dfd_reception_synth.gemini.log
@@ -117,7 +117,7 @@ cd /Users/kodamay/ocaml-app/abclcp-project && dune build
   - `aice_meta.bnf`（予定）: 実装トポロジ・メモリ・名前空間・進化計算パラメータを記述する CFG（ユーザ提示）
 - **合成戦略は固定**: bottom-up + per-node GA + balanced-DFD check（R1〜R6）
 - **Composer は子コードを逐語使用**: 合成過程で子を書き換えない、という不変条件が品質安定の核
-- **per-node GA 変種**: brevity / clarity / defensive の 3 系統（`SynthesizeFromDFD.abcl` の `GAProc`, `GAStore` で実装）
+- **per-node GA 変種**: brevity / clarity / defensive の 3 系統（`SynthesizeFromDFD.aipl` の `GAProc`, `GAStore` で実装）
 - **balance check は AI ジャッジ**: 軽量な textual check。記号的検査に置き換える余地あり。
 
 ---

@@ -6,7 +6,7 @@ runtime modules (parser, interpreter, AI, remote, dashboard) are
 imported from `../python-aipl/` — only the type checker differs.
 
 Usage:
-    python3 aipl_main.py program.abcl
+    python3 aipl_main.py program.aipl
         [--no-typecheck] [--dump-types]
         [--timeout 2.0] [--idle-ms 120]
         [--dashboard PORT]
@@ -36,7 +36,7 @@ def main():
         description="Python AIPL with full Hindley-Milner type inference "
                     "(annotations on var/method/function are ignored).")
     ap.add_argument("source", nargs="?",
-                    help="path to a .abcl file (omit to start an interactive REPL)")
+                    help="path to a .aipl file (omit to start an interactive REPL)")
     ap.add_argument("--timeout", type=float, default=2.0,
                     help="max seconds to wait for actors to drain (default 2.0)")
     ap.add_argument("--idle-ms", type=int, default=120,

@@ -128,7 +128,7 @@ remote-actor デモが収録されている.
 
 [aipl_dist (AIPL v2 Distributed runtime, Phase E後)]
    AIPL_DIST_ENABLE=1 で 8 opt-in 機能を重ね合わせ
-   既存 .aipl / .abcl は無改変
+   既存 .aipl / .aipl は無改変
 \end{lstlisting}
 
 % ============================================================
@@ -142,13 +142,13 @@ Python ランタイムの主要 Phase と対応サンプル:
 \toprule
 phase & feature & source / sample \\
 \midrule
-11a--e & typed annotations / unions / generics / length-arrays & \texttt{Typecheck*.abcl} \\
-12 & capability effects \texttt{!\{fs,ai,net,mut\}} & \texttt{Effects.abcl} \\
-13 & CSP channels & \texttt{Channels.abcl} \\
-14 & linear / use-after-move & \texttt{Linear.abcl} \\
-15 & owned (\texttt{pub} field visibility) & \texttt{Owned.abcl} \\
-16 & transient cast at any-boundary & \texttt{Transient.abcl} \\
-17 & structured concurrency (\texttt{scope \{ future ... \}}) & \texttt{Phase17\_StructuredConc.abcl} \\
+11a--e & typed annotations / unions / generics / length-arrays & \texttt{Typecheck*.aipl} \\
+12 & capability effects \texttt{!\{fs,ai,net,mut\}} & \texttt{Effects.aipl} \\
+13 & CSP channels & \texttt{Channels.aipl} \\
+14 & linear / use-after-move & \texttt{Linear.aipl} \\
+15 & owned (\texttt{pub} field visibility) & \texttt{Owned.aipl} \\
+16 & transient cast at any-boundary & \texttt{Transient.aipl} \\
+17 & structured concurrency (\texttt{scope \{ future ... \}}) & \texttt{Phase17\_StructuredConc.aipl} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -224,7 +224,7 @@ C-3 & + \texttt{now} / Reply 同期返信 & 1/1 \\
 \end{tabular}
 \end{center}
 
-各 Level B-N の検査器は \texttt{SampleSelfConsistency.abcl} で
+各 Level B-N の検査器は \texttt{SampleSelfConsistency.aipl} で
 自身にも適用済 — phase monotonicity を実証.
 
 % ============================================================
@@ -361,7 +361,7 @@ abclcp-project/
       aipl_interp.py          interp (+ I-5/I-6 hooks)
       aipl_runtime.py         actor runtime (+ IQ/IM hooks)
     browser-abcl/             browser-side runtime
-  abclc/                      OCaml-side .abcl samples
+  abclc/                      OCaml-side .aipl samples
   aice-evolution-v2/          next-gen-axis predictor
     examples/*.aice           GA specs
     src/                      GA implementation
@@ -384,7 +384,7 @@ abclcp-project/
 \begin{itemize}\setlength{\itemsep}{0pt}
 \item OCaml runtime: 52/52 sample tests (REPL + aipl2c + cc/SDL2)
 \item Browser JS: 7/7 syntax + 4/4 parse
-\item Python runtime: 33/33 \texttt{.abcl} + 21/21 \texttt{.aipl} (Phase A-G)
+\item Python runtime: 33/33 \texttt{.aipl} + 21/21 \texttt{.aipl} (Phase A-G)
 \item Distributed cross-language: 8/8 (3-node mock)
 \item Self-host: 37/37 (Level A $\to$ C-3)
 \item \texttt{aipl\_dist} 単体テスト: 27/27

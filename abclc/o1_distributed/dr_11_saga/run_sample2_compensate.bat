@@ -1,2 +1,2 @@
-load sample2_compensate.abcl
+load sample2_compensate.aipl
 compile

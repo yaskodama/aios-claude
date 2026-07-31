@@ -4,7 +4,7 @@
 # What this validates today (xinu-raz untouched while
 # Xinu_KernelEvolution_Round1 is in progress on that tree):
 #
-#   A1. AIPL source `abclc/ClusterPingPongXinu.abcl` type-checks under
+#   A1. AIPL source `abclc/ClusterPingPongXinu.aipl` type-checks under
 #       the OCaml HM inferer (`aipl2c --check`).
 #   A2. The same source compiles to Xinu C (`aipl2c --xinu`) and the
 #       generated .c contains extern declarations for the three new
@@ -29,7 +29,7 @@ set -u
 cd "$(dirname "$0")/../../.."   # → abclcp-project root
 
 PROJ=$(pwd)
-SAMPLE=$PROJ/abclc/ClusterPingPongXinu.abcl
+SAMPLE=$PROJ/abclc/ClusterPingPongXinu.aipl
 GEN_C=/tmp/cluster_pingpong.c
 BRIDGE=$PROJ/aice-pi-evolution/experiments/2026-05-21_xinu_cluster/cluster_bridge.py
 BRIDGE_TEST=$PROJ/aice-pi-evolution/experiments/2026-05-21_xinu_cluster/_test_bridge.py
@@ -51,12 +51,12 @@ fi
 sect "A1" "aipl2c --check on $SAMPLE"
 if ./_build/default/src/aipl2c.exe "$SAMPLE" --check >/tmp/n3_check.log 2>&1; then
   if grep -q "type error" /tmp/n3_check.log; then
-    bad "ClusterPingPongXinu.abcl typechecks" "type error in /tmp/n3_check.log"
+    bad "ClusterPingPongXinu.aipl typechecks" "type error in /tmp/n3_check.log"
   else
-    ok "ClusterPingPongXinu.abcl typechecks"
+    ok "ClusterPingPongXinu.aipl typechecks"
   fi
 else
-  bad "ClusterPingPongXinu.abcl typechecks" "see /tmp/n3_check.log"
+  bad "ClusterPingPongXinu.aipl typechecks" "see /tmp/n3_check.log"
 fi
 
 # ── A2: Xinu C generation ───────────────────────────────────────

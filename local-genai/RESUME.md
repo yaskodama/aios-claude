@@ -52,7 +52,7 @@ origin/main と同期済み (push 済み)。
 
 - `local-genai/` — 実体 (corpus, candidates, evolve, chat, checkpoint)
 - `aice-z-evolution/` — v1 .aice (stages/mutations 直線進化)
-- `aice-evolution-v2/` — v2 .aice + .ga.json + AIPL .abcl (MAP-Elites)
+- `aice-evolution-v2/` — v2 .aice + .ga.json + AIPL .aipl (MAP-Elites)
 
 ## チャンピオン (現状最強モデル)
 
@@ -408,14 +408,14 @@ local-genai/.venv/bin/python local-genai/train_stage2.py --corpus 100KB --device
 
 オプション: `--corpus 10KB` で tiny_corpus.txt に戻す、 `--device mps` で MPS。
 
-### 5. AIPL .abcl で MAP-Elites を回す
+### 5. AIPL .aipl で MAP-Elites を回す
 
 ```sh
 cd aice-evolution-v2/examples
 mkdir -p out
 AIPL_AI_PROVIDER=mock /opt/homebrew/bin/python3.13 \
-  ../../src/python-aipl/aipl_main.py LocalGenAIScaledEvolutionJP.abcl
-# → out/LocalGenAIScaledEvolutionJP.abcl_lineage.json (76 個体)
+  ../../src/python-aipl/aipl_main.py LocalGenAIScaledEvolutionJP.aipl
+# → out/LocalGenAIScaledEvolutionJP.aipl_lineage.json (76 個体)
 ```
 
 ### 6. lineage を実スコアラで再採点
@@ -433,7 +433,7 @@ local-genai/.venv/bin/python local-genai/train_evolved.py --corpus 100KB
 # → out/evolved_transformer.pt
 ```
 
-## .aice → .abcl 再生成
+## .aice → .aipl 再生成
 
 v1 形式 (stages 直線):
 
@@ -807,10 +807,10 @@ import torch
 ckpt = torch.load('local-genai/out/charrnn_winner.pt', weights_only=False, map_location='cpu')
 print('name:', ckpt['name'], 'ppl:', ckpt['holdout_ppl'], 'params:', ckpt['params'])"
 
-# AIPL .abcl が動くか (mock)
+# AIPL .aipl が動くか (mock)
 cd aice-evolution-v2/examples && mkdir -p out && \
   AIPL_AI_PROVIDER=mock python3 ../../src/python-aipl/aipl_main.py \
-    LocalGenAIScaledEvolutionJP.abcl 2>&1 | tail -5
+    LocalGenAIScaledEvolutionJP.aipl 2>&1 | tail -5
 ```
 
 ## 参照ドキュメント

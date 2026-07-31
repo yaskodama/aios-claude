@@ -157,7 +157,7 @@ function quick(id, cmd) {
   });
 }
 
-quick("btnLoad",    "load src/web_philosophers.abcl");
+quick("btnLoad",    "load src/web_philosophers.aipl");
 quick("btnCompile", "compile");
 quick("btnStart",   "send table.start();");
 quick("btnP0",      "send p0.start();");

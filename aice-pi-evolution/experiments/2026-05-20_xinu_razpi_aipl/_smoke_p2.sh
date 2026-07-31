@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # P2 smoke — verify AIPL priority(high|normal|low) maps to Xinu prio.
 #
-# Sample: abclc/Priority3Xinu.abcl
+# Sample: abclc/Priority3Xinu.aipl
 #   - HiWorker priority(high)   -> prio 30
 #   - MdWorker (default normal) -> prio 20
 #   - LoWorker priority(low)    -> prio 10
@@ -28,7 +28,7 @@ dune build src/aipl2c.exe >/tmp/_p2_build.log 2>&1 || {
 
 src=Priority3Xinu
 echo "=== $src ==="
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_p2_${src}.c --xinu --max-msgs 0 \
     > /tmp/_p2_${src}.aipl2c.log 2>&1
 [ -f /tmp/_p2_${src}.c ] || {

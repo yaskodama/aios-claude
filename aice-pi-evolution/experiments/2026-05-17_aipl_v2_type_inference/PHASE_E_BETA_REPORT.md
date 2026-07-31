@@ -138,7 +138,7 @@ $PY $AIPL samples/feature_d_actorfields/sample3_conflict.aipl --infer
 
 | Suite | 結果 |
 |---|---|
-| `src/python-aipl/samples/*.abcl` (33 件) | 33/33 PASS |
+| `src/python-aipl/samples/*.aipl` (33 件) | 33/33 PASS |
 | `samples/feature_a_hm/*.aipl` (3 件) | 全 `0 unify, 0 refinement` |
 | `samples/feature_b_crossclass/*.aipl` (3 件) | 全 `0 unify, 0 refinement` |
 | `samples/feature_c_refinement/*.aipl` (3 件) | 9/9 期待通り (SAT 5 / UNSAT 4 / Mixed 4+2) |

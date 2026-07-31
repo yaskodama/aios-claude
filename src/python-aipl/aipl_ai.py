@@ -11,7 +11,7 @@ auto-dispatches to whichever provider has its key in the environment:
 When more than one is set, set `ABCL_AI_PROVIDER=gemini|anthropic|openai`
 to pick explicitly.  SDKs are imported lazily so the module is still
 importable on a machine with none installed; the error only surfaces
-when an .abcl program actually invokes ai_call().
+when an .aipl program actually invokes ai_call().
 
 AI-OS governance knobs (env vars, all optional):
 
@@ -855,7 +855,7 @@ def _do_claude(
         "messages": [{"role": "user", "content": user_content}],
     }
     if system is not None:
-        # Anthropic prompt caching: prefix match.  See Reviewer.abcl
+        # Anthropic prompt caching: prefix match.  See Reviewer.aipl
         # for the specialist-actor pattern.
         kwargs["system"] = [
             {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}

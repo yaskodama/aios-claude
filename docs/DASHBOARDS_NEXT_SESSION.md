@@ -19,23 +19,23 @@ AIPL の各ランタイム（Py-I / OCaml / JS-server / JS-browser / C）に「�
 ```sh
 cd /Users/kodamay/ocaml-app/abclcp-project
 python3 src/python-aipl/aipl_main.py --dashboard 8899 \
-  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl
+  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.aipl
 # → http://127.0.0.1:8899/actors
 ```
 - プログラム選択（local_diners / dine_dynamic / mac_diners / ring_demo / **bounded_buffer**）+ Start/Suspend/Resume/End、アクター表、コンソール、可視化。
-- **bounded_buffer.abcl**（容量20・2P/2C・速度スライダー `/api/speed`）は **commit 済み (`ef3caff`)**。詳細は `aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/NEXT_SESSION.md`。
+- **bounded_buffer.aipl**（容量20・2P/2C・速度スライダー `/api/speed`）は **commit 済み (`ef3caff`)**。詳細は `aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/NEXT_SESSION.md`。
 
 ### 2. OCaml web gateway — port 8080
 ```sh
 cd /Users/kodamay/ocaml-app/abclcp-project && dune build
-{ printf 'load src/gateway_launch.abcl\ncompile\n'; sleep 1000000; } | _build/default/src/repl_thread.exe
+{ printf 'load src/gateway_launch.aipl\ncompile\n'; sleep 1000000; } | _build/default/src/repl_thread.exe
 # → http://localhost:8080/dashboard
 ```
 - ★`repl_thread.exe -f file` の `script` は **load 相当で実行しない**。top-level（`web_listen`）を走らせるには `load`→`compile` を stdin で送る。`sleep` で stdin を開いたままにしてプロセス（web スレッド）を存続させる。
 - 機能: プログラム選択（Dining Philosophers / Bounded buffer cap20+速度バー / Ping-Pong / Counter / Hello）、Load&Run / Start / Stop / **Reset**、アクター表（`/api/actors`）、コンソール（`/api/log`、キーは `next`）、**有限バッファ可視化**（コンソール出力をパースして FIFO 再構成）、**ソース表示**（`/api/source?file=`）、**速度スライダー**（`send p0.set_speed(ms)` を `/api/repl` 送信）。
 - ★**C/P 矢印**: ユーザ指摘で `gateway_dashboard.js` の `flowArrow` 始終点を反転済み（**視覚確認は未取得**。元は producer→buffer→consumer の右向き）。違っていれば戻す。
 - ★OCaml アクターは停止フラグ無しの `while true` ループ → 強制終了不可。`reset` は actor_table をクリアするが実行中スレッドは送信先消失で静止（有限デモは実用上クリーン）。切替前に Stop 推奨。
-- 関連ファイル（**未コミット**）: `src/gateway_dashboard.html` / `src/gateway_dashboard.js` / `src/gateway_launch.abcl`、ランタイム改修 `src/web_gateway.ml`（routes: `/dashboard`, `/gateway_dashboard.js`, `/api/source`）/ `src/repl_thread.ml`（`reset`/`clear` コマンド実装）/ `src/eval_thread.ml`（`clear_actor_table` / `clear_web_logs`）。例題 `abclc/bounded_buffer20.abcl` / `abclc/PingPongDemo.abcl`。
+- 関連ファイル（**未コミット**）: `src/gateway_dashboard.html` / `src/gateway_dashboard.js` / `src/gateway_launch.aipl`、ランタイム改修 `src/web_gateway.ml`（routes: `/dashboard`, `/gateway_dashboard.js`, `/api/source`）/ `src/repl_thread.ml`（`reset`/`clear` コマンド実装）/ `src/eval_thread.ml`（`clear_actor_table` / `clear_web_logs`）。例題 `abclc/bounded_buffer20.aipl` / `abclc/PingPongDemo.aipl`。
 
 ### 3. 進化計算パイプライン — port 8700
 ```sh
@@ -91,9 +91,9 @@ cd /Users/kodamay/ocaml-app/abclcp-project
 dune build
 # 1) Py-I
 python3 src/python-aipl/aipl_main.py --dashboard 8899 \
-  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl >/tmp/d_pyi.log 2>&1 &
+  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.aipl >/tmp/d_pyi.log 2>&1 &
 # 2) OCaml gateway
-{ printf 'load src/gateway_launch.abcl\ncompile\n'; sleep 1000000; } | _build/default/src/repl_thread.exe >/tmp/d_ocaml.log 2>&1 &
+{ printf 'load src/gateway_launch.aipl\ncompile\n'; sleep 1000000; } | _build/default/src/repl_thread.exe >/tmp/d_ocaml.log 2>&1 &
 # 3) Evolution
 ( cd aice-evolution-v2 && python3 evolution_dashboard.py >/tmp/d_evo.log 2>&1 & )
 # 4) JS Node
@@ -108,8 +108,8 @@ URL: 8899/actors · 8080/dashboard · 8700/ · 8090/ · 8765/ · 8095/
 
 ## コミット状況
 - 本セッションのダッシュボード一式は `817cb65` で **commit & push 済み**
-  （web_gateway/repl_thread/eval_thread.ml、gateway_dashboard.{html,js}、gateway_launch.abcl、
+  （web_gateway/repl_thread/eval_thread.ml、gateway_dashboard.{html,js}、gateway_launch.aipl、
   c_dashboard.py、node-aipl-server/server.mjs、evolution_dashboard.py、
-  bounded_buffer20.abcl、PingPongDemo.abcl、本ハンドオフ）。
+  bounded_buffer20.aipl、PingPongDemo.aipl、本ハンドオフ）。
 - **未コミットのまま**: `src/python-aipl/aipl_ai.py`（温存・触らない）。`out/c_dashboard/` は生成物（無視）。
 - 未確認事項: OCaml バッファ可視化の C/P 矢印向き（反転済みだが視覚未確認。違えば `gateway_dashboard.js` の `flowArrow` 引数順を戻す）。

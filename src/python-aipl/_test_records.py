@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_records() -> None:
-    out = _run("Records.abcl")
+    out = _run("Records.aipl")
 
     # 1) Local record literal access
     assert "alice.name  = Alice" in out
@@ -50,7 +50,7 @@ def test_records() -> None:
     assert "nested.outer.inner.leaf = 42" in out
     assert "typeof(stats)  = record{hits:int, misses:int}" in out
     assert "typeof(nested) = record{outer:record{inner:record{leaf:int}}}" in out
-    print("OK  Records.abcl")
+    print("OK  Records.aipl")
 
 
 if __name__ == "__main__":

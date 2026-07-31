@@ -276,7 +276,7 @@
     import { Interpreter } from "/src/interpreter.js";
     import { lwwWins, newClientId } from "/src/lww.js";
 
-    const ABCL_SOURCE = await (await fetch("/spreadsheet.abcl")).text();
+    const ABCL_SOURCE = await (await fetch("/spreadsheet.aipl")).text();
 
     const canvas      = document.getElementById("canvas");
     const logDiv      = document.getElementById("log");
@@ -346,7 +346,7 @@
     };
 
     // ─── JS-side formula evaluator (Round 6: + range + text/date) ─
-    // Mirrors GSheetsCore12.abcl + GSheetsRanges.abcl from Py-I,
+    // Mirrors GSheetsCore12.aipl + GSheetsRanges.aipl from Py-I,
     // plus a Sheets-like text/date layer not yet ported to Py-I.
     // Supports:
     //   literals (INT, STR "..."), refs (A1, $A$1)
@@ -481,7 +481,7 @@
     }
 
     // ─── R3 range-cell helpers (A1:B10 expansion) ───────────────
-    // Matches Py-I GSheetsRanges.abcl's id_to_pair / pair_to_id.
+    // Matches Py-I GSheetsRanges.aipl's id_to_pair / pair_to_id.
     // G5: Excel-style base-26 column letters (A..Z, AA..AZ, BA..BZ…).
     // 0-based internally; "A"=0, "Z"=25, "AA"=26, "BH"=59.
     function colToLetters(col) {

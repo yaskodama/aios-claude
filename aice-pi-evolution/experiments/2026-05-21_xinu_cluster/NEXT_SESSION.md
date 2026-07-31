@@ -15,7 +15,7 @@
 ## 1. 今セッションで完了したこと
 
 ### 1-A. dining philosophers meals 3→10 (`bcab5ed`)
-- `abclc/DiningPhilosophersDistXinu.abcl`: `meals = 10`
+- `abclc/DiningPhilosophersDistXinu.aipl`: `meals = 10`
 - `aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/host_diners.py`:
   - `MEALS_PER_PHILOSOPHER` を env 変数 `MEALS` で上書き可 (default 10)
   - `DINERS_TIMEOUT` env で join timeout 上書き可 (default 300s)
@@ -37,7 +37,7 @@ OCaml `src/infer.ml` パリティの完全 HM に書き換え。
 ### 1-C. N3 multi-Pi cluster Phase A — host 側 (`4a509c5`)
 
 **完成した host 側**:
-- `abclc/ClusterPingPongXinu.abcl` — Pinger / Ponger / Bootstrap
+- `abclc/ClusterPingPongXinu.aipl` — Pinger / Ponger / Bootstrap
 - `aice-pi-evolution/experiments/2026-05-21_xinu_cluster/`:
   - `cluster_bridge.py` — N node の host router (XSEND → SEND 書換)
   - `_test_bridge.py` — fake-QEMU で routing 7 assertion (no Xinu)
@@ -144,7 +144,7 @@ bash src/node-aipl-server/_smoke_test.sh               # 14/14
 # Py-I
 bash src/python-aipl/_smoke_test.sh                    # 40/40 runtime
 # HM cleanness 検査
-for f in src/python-aipl/samples/*.abcl; do
+for f in src/python-aipl/samples/*.aipl; do
   python3.13 src/python-aipl/aipl_main.py --infer "$f" 2>&1 | tail -1
 done
 
@@ -160,7 +160,7 @@ python3 aice-pi-evolution/experiments/2026-05-21_xinu_cluster/_test_bridge.py  #
 # 分散哲学者
 # (ターミナル A) QEMU 起動 (cd ocaml-app/abclcp-project)
 dune build src/aipl2c.exe
-./_build/default/src/aipl2c.exe abclc/DiningPhilosophersDistXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/DiningPhilosophersDistXinu.aipl \
     -o /tmp/dpd.c --xinu --max-msgs 0
 cp /tmp/dpd.c /Users/kodamay/projects/xinu-raz/xinu/apps/abcl_program.c
 ( cd /Users/kodamay/projects/xinu-raz/xinu/compile && \
@@ -189,7 +189,7 @@ python3 host_diners.py    # MEALS=20 etc で長くも回せる
 
 彼らの `untouched`:
 - `abclcp-project/src/*` (aipl2c)
-- `abclcp-project/abclc/*Xinu.abcl`
+- `abclcp-project/abclc/*Xinu.aipl`
 - `browser-abcl / spreadsheet / drone-sim`
 
 私の N3 cluster の `apps/abcl_xinu_cluster.c` は **彼らの primary scope の外** (apps/ は untouched 領域) なので land しても衝突しない.ただし `apps/Makerules` への 1 行追加だけは additive merge.
@@ -213,7 +213,7 @@ JS-B/JS-N の `infer.js` には 2 つの gradual escape (sentinel widening + con
 
 ```
 #8.  [pending]   [DEFERRED] N3-A1: cluster.c in xinu-raz (post kernel-evo)
-#9.  [completed] N3-A2: ClusterPingPongXinu.abcl sample
+#9.  [completed] N3-A2: ClusterPingPongXinu.aipl sample
 #10. [completed] N3-A3: cluster_bridge.py host router
 #11. [completed] N3-A4: _smoke_n3.sh gate
 ```

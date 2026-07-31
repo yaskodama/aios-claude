@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# R_BackwardCompat smoke — every abclc/*.abcl typechecks under the
+# R_BackwardCompat smoke — every abclc/*.aipl typechecks under the
 # current typing_env / c_translator after R0..G5 + F1/F2 work.
 #
 # The cross-cutting "R" constraint of Round 1's design said:
 #   "既存 71 sample 全 --check 通過の再走査"
 #
 # This script:
-#   (1) runs aipl2c --check  on every abclc/*.abcl              (TYPECHECK)
-#   (2) runs aipl2c --xinu   on every abclc/*.abcl              (XINU CODEGEN)
+#   (1) runs aipl2c --check  on every abclc/*.aipl              (TYPECHECK)
+#   (2) runs aipl2c --xinu   on every abclc/*.aipl              (XINU CODEGEN)
 #   (3) reports counts and per-failure file so future sessions
 #       can spot regressions immediately.
 #
@@ -28,19 +28,19 @@ dune build src/aipl2c.exe >/tmp/_bc_build.log 2>&1 || {
   echo "FAIL: dune build"; tail /tmp/_bc_build.log; exit 1; }
 
 KNOWN_XINU_FAILS=(
-  abclc/Arrays.abcl
-  abclc/DynamicWorkerPool.abcl
-  abclc/Functions.abcl
-  abclc/Generics.abcl
-  abclc/Phase11_TypedCounter.abcl
-  abclc/Phase12_EffectsLog.abcl
-  abclc/Phase13_Channels.abcl
-  abclc/Phase14_Linear.abcl
-  abclc/Phase15_Owned.abcl
-  abclc/Records.abcl
-  abclc/RemoteClient.abcl
-  abclc/Tuples.abcl
-  abclc/TypedDemo.abcl
+  abclc/Arrays.aipl
+  abclc/DynamicWorkerPool.aipl
+  abclc/Functions.aipl
+  abclc/Generics.aipl
+  abclc/Phase11_TypedCounter.aipl
+  abclc/Phase12_EffectsLog.aipl
+  abclc/Phase13_Channels.aipl
+  abclc/Phase14_Linear.aipl
+  abclc/Phase15_Owned.aipl
+  abclc/Records.aipl
+  abclc/RemoteClient.aipl
+  abclc/Tuples.aipl
+  abclc/TypedDemo.aipl
 )
 
 PASS=0; FAIL=0
@@ -48,7 +48,7 @@ PASS=0; FAIL=0
 # (1) --check: must be 100%.
 echo "=== R_BackwardCompat: aipl2c --check ==="
 ck_pass=0; ck_fail=0; ck_fail_list=""
-for f in abclc/*.abcl; do
+for f in abclc/*.aipl; do
   if "$EXE" "$f" --check >/dev/null 2>&1; then
     ck_pass=$((ck_pass+1))
   else
@@ -70,7 +70,7 @@ fi
 echo
 echo "=== R_BackwardCompat: aipl2c --xinu ==="
 xn_pass=0; xn_fail=0; xn_new_fail=""
-for f in abclc/*.abcl; do
+for f in abclc/*.aipl; do
   if "$EXE" "$f" --xinu -o /tmp/_bc_xinu.c --max-msgs 0 >/dev/null 2>&1; then
     xn_pass=$((xn_pass+1))
   else

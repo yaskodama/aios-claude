@@ -14,7 +14,7 @@ QEMU の `-serial tcp:` 機能を使ったテキスト行プロトコルで
 - `out/AIPL_XinuRazPi_RemoteRPC.ga.json` — `.aice` の lower 結果
   (parser に通った確認用)
 - (TBD) `host_rpc_demo.sh` / `host_rpc_demo.py` / `_smoke_*.sh` /
-  `abclc/RemoteRpcDemoXinu.abcl` — 各 phase 実装で追加。
+  `abclc/RemoteRpcDemoXinu.aipl` — 各 phase 実装で追加。
 
 ## パイプライン
 
@@ -59,7 +59,7 @@ LF 終端のテキスト行。1 行 = 1 命令 / 1 応答。
 
 引数は decimal int のみ (Phase H2 では文字列引数を保留)。
 
-## サンプル `RemoteRpcDemoXinu.abcl`
+## サンプル `RemoteRpcDemoXinu.aipl`
 
 H4 で生成する AIPL 側のサンプル。起動時は actor 数 0。
 

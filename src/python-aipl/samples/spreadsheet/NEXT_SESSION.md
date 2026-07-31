@@ -16,7 +16,7 @@
 
 - **URL**: `http://localhost:3000/spreadsheet.html` (api: `:8090`)
 - **メインファイル**: `src/browser-abcl/spreadsheet.html` (~4100 行、ほぼ全機能)
-- **AIPL ホスト**: `src/browser-abcl/spreadsheet.abcl` (Cell actor 9 個 + Bus + View)
+- **AIPL ホスト**: `src/browser-abcl/spreadsheet.aipl` (Cell actor 9 個 + Bus + View)
 - **AIPL runtime**: `src/browser-abcl/src/runtime.js` (canvas 描画 + spreadsheet 用 builtin)
 - **API/WS サーバ**: `src/node-aipl-server/server.mjs` (`/api/sheet/<id>/{save,load}` + `/ws`)
 - **永続データ**: `/tmp/aipl_sheets/<sheet_id>.json` (P4 auto-save + manual Save)
@@ -48,7 +48,7 @@ open http://localhost:3000/spreadsheet.html
 │  │   cellNotes  / cellLocked   / cellNames                   │   │
 │  └────────────────────────────────────────────────────────────┘   │
 │                                                                     │
-│  ┌─ AIPL Interpreter (src/runtime.js + spreadsheet.abcl) ────┐   │
+│  ┌─ AIPL Interpreter (src/runtime.js + spreadsheet.aipl) ────┐   │
 │  │   Cell × 9 actors → Bus → View → canvas builtins           │   │
 │  │   sheet_init / sheet_cell / sheet_select / sheet_select_   │   │
 │  │   range / sheet_cell_bg / sheet_cell_note / sheet_peer_    │   │
@@ -235,7 +235,7 @@ open http://localhost:3000/spreadsheet.html
 ```
 src/browser-abcl/
 ├── spreadsheet.html          # メイン (~4100 行) — UI + 数式評価 + ws
-├── spreadsheet.abcl          # AIPL Cell actor (9 セルの初期データ)
+├── spreadsheet.aipl          # AIPL Cell actor (9 セルの初期データ)
 ├── src/
 │   ├── runtime.js            # canvas 描画 + spreadsheet 用 builtin
 │   ├── lww.js                # lwwWins / newClientId
@@ -267,7 +267,7 @@ aice-pi-evolution/experiments/2026-05-19_round7_formula_prefix_multisheet/
    ピアが Sheet2 を見ている状態で受信した frame は無条件で active sheet に
    書き込まれる.→ 同じシート名にいる時のみ完全同期.
 
-2. **AIPL Cell actor は初期 9 個のみ**.spreadsheet.abcl の 9 個の
+2. **AIPL Cell actor は初期 9 個のみ**.spreadsheet.aipl の 9 個の
    ハードコード Cell が動くだけで、UI からの追加・編集は JS 側 cellValues
    経由 (AIPL のセルアクター数は変動しない).
 
@@ -441,7 +441,7 @@ d470dc1 C3: WebSocket realtime collab between browsers
 
 ## 重要メモ
 
-- AIPL 拡張子は `.aipl` (`.abcl` ではない) — 過去の混同に注意 (`feedback_aipl_extension.md`)
+- AIPL 拡張子は `.aipl` (`.aipl` ではない) — 過去の混同に注意 (`feedback_aipl_extension.md`)
 - `.aice` は YAML ではなく C 風 DSL、`//` で行コメント (`feedback_aice_dsl_syntax.md`)
 - 数式は `=` 必須 (EQ 以降の規約) — 平文文字列 "A1+B1" は数値 0 ではなく文字列 "A1+B1" になる
 - 各セルの ws 配信は `wsApplyingRemote=true` 内では発火しない (エコー防止)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # F1 smoke — local-node distributed-checkpoint phase 1.
 #
-# Sample: abclc/DistCheckpointXinu.abcl
+# Sample: abclc/DistCheckpointXinu.aipl
 #   Bank saves "v1" snapshot, mutates balance/score/owner, restores
 #   "v1", then misses a tag and clears.  Tagged digests verify each
 #   step.
@@ -26,7 +26,7 @@ dune build src/aipl2c.exe >/tmp/_f1_build.log 2>&1 || {
 src=DistCheckpointXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_f1_${src}.c --xinu --max-msgs 0 \
     > /tmp/_f1_${src}.aipl2c.log 2>&1
 [ -f /tmp/_f1_${src}.c ] || {

@@ -23,10 +23,10 @@
 
 | Phase | 内容 | サンプル | 状態 |
 |---|---|---|---|
-| 0 | AST-formula eval (parser なし) | `HelloSheet.abcl` | ✅ 5 assertion |
-| 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.abcl` | ✅ 4 assertion |
-| 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.abcl` | ✅ 5 assertion |
-| 3 | P3 persistence (save/load) | `PersistedSheet.abcl` | ✅ 5 assertion |
+| 0 | AST-formula eval (parser なし) | `HelloSheet.aipl` | ✅ 5 assertion |
+| 1 | PA4 formula parser (`A1`, `+`, `SUM(...)`) | `StringFormulaSheet.aipl` | ✅ 4 assertion |
+| 2 | CA4 cell actors + FE4 ActorEval | `ActorSheet.aipl` | ✅ 5 assertion |
+| 3 | P3 persistence (save/load) | `PersistedSheet.aipl` | ✅ 5 assertion |
 | 4 | R3 renderer + IT2 event bus | `src/browser-abcl/spreadsheet.{html,abcl}` | ✅ 8 assertion |
 
 ## Round 5 (Google Sheets parity build-out)
@@ -36,9 +36,9 @@
 
 | Phase | 内容 | サンプル | 状態 |
 |---|---|---|---|
-| 5.0 | F2 Core12 functions (12 新関数) | `GSheetsCore12.abcl` | ✅ 12 assertion |
-| 5.1 | R3 Ranges + Absolute (`A1:B10`, `$A$1`) | `GSheetsRanges.abcl` | ✅ 10 assertion |
-| 5.2 | G3 VirtualizedInfinite (viewport spawn) | `GSheetsVirtualized.abcl` | ✅ 10 assertion |
+| 5.0 | F2 Core12 functions (12 新関数) | `GSheetsCore12.aipl` | ✅ 12 assertion |
+| 5.1 | R3 Ranges + Absolute (`A1:B10`, `$A$1`) | `GSheetsRanges.aipl` | ✅ 10 assertion |
+| 5.2 | G3 VirtualizedInfinite (viewport spawn) | `GSheetsVirtualized.aipl` | ✅ 10 assertion |
 | 5.3 | E1 FormulaBar (DOM input) | `src/browser-abcl/spreadsheet.html` | ✅ (browser-only, smoke unchanged) |
 | 5.4 | C2 ServerFile (JS-N /api/sheet/...) | `src/node-aipl-server/server.mjs` + `spreadsheet.html` | ✅ 4 server smoke |
 | 5.5 | U2 Toolbar + Undo (DR-11 saga 流用) | `src/browser-abcl/spreadsheet.html` + `runtime.js` cell-replace fix | ✅ |
@@ -46,7 +46,7 @@
 | C4  | DR-10 LWW per cell (Lamport ts + originId tiebreak) | `src/browser-abcl/src/lww.js` + `_smoke_lww.{mjs,sh}` | ✅ 10 assertion |
 | U5  | Mouse-drag range selection + range highlight overlay | `src/browser-abcl/spreadsheet.html` + `runtime.js` sheet_select_range | ✅ (Puppeteer drag A1→B2 verified) |
 | U7  | Keyboard nav (arrows / Tab / Enter↓ / Delete / Escape) | `src/browser-abcl/spreadsheet.html` selection-vs-editing mode | ✅ 7 assertion |
-| G4  | Dynamic grid: default 10×8 + 📐 Resize (preserves cells) | `src/browser-abcl/spreadsheet.abcl` + `spreadsheet.html` | ✅ 7 assertion |
+| G4  | Dynamic grid: default 10×8 + 📐 Resize (preserves cells) | `src/browser-abcl/spreadsheet.aipl` + `spreadsheet.html` | ✅ 7 assertion |
 | U8  | Clipboard: Cmd/Ctrl + C / V / X over range or cell (undo-aware) | `src/browser-abcl/spreadsheet.html` | ✅ 8 assertion |
 | F5  | 20 new functions: AVERAGE/MEDIAN/SQRT/INT/SIGN/EXP/LN/LOG10/PI/STDEV/VAR/LARGE/SMALL/AND/OR/NOT/COUNTIF/SUMIF/AVERAGEIF/IFERROR/WEEKDAY | `src/browser-abcl/spreadsheet.html` evalAst | ✅ 27 assertion |
 | Y2  | Chart kinds: bar (existing) / line / pie via type selector | `src/browser-abcl/spreadsheet.html` renderChart split | ✅ 4 assertion |

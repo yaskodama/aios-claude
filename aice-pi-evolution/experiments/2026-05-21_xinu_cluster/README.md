@@ -26,7 +26,7 @@ The host bridge sits between those ports, parsing
 `XSEND <dst_node> <actor> <method> [arg]` and rewriting to
 `SEND <actor> <method> [arg]` on the destination node.
 
-Same `.abcl` source on every node — runtime branch on
+Same `.aipl` source on every node — runtime branch on
 `cluster_node_id()` (compile-time `-DNODE_ID=n` macro baked into each
 ELF) decides whether to instantiate Pinger or Ponger.
 
@@ -34,7 +34,7 @@ ELF) decides whether to instantiate Pinger or Ponger.
 
 | Path | Purpose | Status |
 |------|---------|--------|
-| `abclc/ClusterPingPongXinu.abcl` | AIPL source for the 2-node demo. Branches on `cluster_node_id()`. | ✅ landed |
+| `abclc/ClusterPingPongXinu.aipl` | AIPL source for the 2-node demo. Branches on `cluster_node_id()`. | ✅ landed |
 | `cluster_bridge.py` | Host router. Connects to N nodes, forwards `XSEND` lines. Pure Python stdlib. | ✅ landed |
 | `_test_bridge.py` | Unit test for the bridge. Stands up two fake QEMU TCP servers and drives 7 routing assertions. | ✅ 7/7 PASS |
 | `_smoke_n3.sh` | Host-side smoke gate. Runs `aipl2c --check`, `aipl2c --xinu`, `_test_bridge.py`. | ✅ 5/5 PASS |
@@ -91,7 +91,7 @@ These touch only `apps/` (= kernel evo's untouched set) and `apps/Makerules` (si
 
 # 2) Build twice (one ELF per node)
 for n in 0 1; do
-  ./_build/default/src/aipl2c.exe abclc/ClusterPingPongXinu.abcl \
+  ./_build/default/src/aipl2c.exe abclc/ClusterPingPongXinu.aipl \
       -o /tmp/cluster_n${n}.c --xinu --max-msgs 0
   cp /tmp/cluster_n${n}.c /Users/kodamay/projects/xinu-raz/xinu/apps/abcl_program.c
   ( cd /Users/kodamay/projects/xinu-raz/xinu/compile && \

@@ -11,16 +11,16 @@
 
 | Level | 役割 | 主要ファイル | サンプル |
 |---|---|---|---|
-| **C**     | 字句解析 + 構文解析 + eval パイプライン | `lexer.abcl` (185) + `parser.abcl` (318) + `eval.abcl` (101) | 3 |
-| **C-2**   | アクタースケジューラ (Phase 11+) | `scheduler.abcl` | 6 |
-| **C-3**   | スケジューラ + now/future | `scheduler.abcl` | 1 |
-| **B-1**   | Phase 11 型検査 | `typeck.abcl` | 6 |
-| **B-2**   | Phase 12 効果検査 | `typeck.abcl` | 4 |
-| **B-3**   | Phase 13 チャネル検査 | `typeck.abcl` | 5 |
-| **B-4**   | Phase 14 linear 検査 | `typeck.abcl` | 4 |
-| **B-5**   | Phase 15 owned 検査 | `typeck.abcl` | 4 |
-| **A**     | メタサーキュラ評価器 | `metacircular.abcl` (216) | 4 |
-| **Z**     | **統合: Level C + IO bridge + 最小 bootstrap** | `driver_head.abcl` + `io_bridge.abcl` + `bootstrap.py` (18) | 4 |
+| **C**     | 字句解析 + 構文解析 + eval パイプライン | `lexer.aipl` (185) + `parser.aipl` (318) + `eval.aipl` (101) | 3 |
+| **C-2**   | アクタースケジューラ (Phase 11+) | `scheduler.aipl` | 6 |
+| **C-3**   | スケジューラ + now/future | `scheduler.aipl` | 1 |
+| **B-1**   | Phase 11 型検査 | `typeck.aipl` | 6 |
+| **B-2**   | Phase 12 効果検査 | `typeck.aipl` | 4 |
+| **B-3**   | Phase 13 チャネル検査 | `typeck.aipl` | 5 |
+| **B-4**   | Phase 14 linear 検査 | `typeck.aipl` | 4 |
+| **B-5**   | Phase 15 owned 検査 | `typeck.aipl` | 4 |
+| **A**     | メタサーキュラ評価器 | `metacircular.aipl` (216) | 4 |
+| **Z**     | **統合: Level C + IO bridge + 最小 bootstrap** | `driver_head.aipl` + `io_bridge.aipl` + `bootstrap.py` (18) | 4 |
 
 合計 **37 サンプル全 PASS** (各 level の `smoke.sh` で確認可能).
 
@@ -28,8 +28,8 @@
 
 `bootstrap.py` は **18 行** (.aice 仕様の ≤20 行制約内) で、
 
-1. ユーザの `.abcl` ファイルを読み
-2. `level-c/lexer.abcl` + `parser.abcl` + `eval.abcl` + `driver_head.abcl` を連結
+1. ユーザの `.aipl` ファイルを読み
+2. `level-c/lexer.aipl` + `parser.aipl` + `eval.aipl` + `driver_head.aipl` を連結
 3. ホスト AIPL に渡す
 
 …だけ.この時点で **構文解析と評価は全て AIPL 側で完結** している.
@@ -40,7 +40,7 @@
   書いているが、ホスト側のスケジューラに「乗る」設計)
 - bootstrap.py 自体 (18 行)
 
-のみ.IO bridge (`io_bridge.abcl`) はそのうち AI / FS / NET プリミティブを
+のみ.IO bridge (`io_bridge.aipl`) はそのうち AI / FS / NET プリミティブを
 **CE-11 capability check ごし** に再エクスポートするので、ホスト権限と
 ユーザコードの間に capability 境界が立つ.
 
@@ -82,7 +82,7 @@ total: 47 / 47
 
 ## AIPL の構文サブセット (level-z bootstrap 経由で動くもの)
 
-`level-c/parser.abcl` がサポートする最小サブセット:
+`level-c/parser.aipl` がサポートする最小サブセット:
 
 ```
 program  := stmt*
@@ -102,9 +102,9 @@ primary  := INT | STR | IDENT ("(" args? ")")? | "(" expr ")"
 ```
 
 クラス / アクター / select / saga / generic / linear / owned 等の
-上位機能はホスト AIPL のみで扱う (`io_bridge.abcl` のように
+上位機能はホスト AIPL のみで扱う (`io_bridge.aipl` のように
 ホスト側スクリプトとして書く).self-host サブセットを広げるなら
-`level-c/parser.abcl` を拡張するか、別レイヤとして `level-c4` 等を
+`level-c/parser.aipl` を拡張するか、別レイヤとして `level-c4` 等を
 追加する.
 
 ## 進化計算による設計の経緯

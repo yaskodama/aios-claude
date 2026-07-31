@@ -1,4 +1,0 @@
-// gateway_launch.abcl — bring up the AIPL web gateway with no demo loaded,
-// so the dashboard's program selector starts from a clean slate.
-web_listen(8080);
-print("AIPL OCaml dashboard ready — open http://localhost:8080/dashboard");

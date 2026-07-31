@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_functions() -> None:
-    out = _run("Functions.abcl")
+    out = _run("Functions.aipl")
 
     # 1) Plain calls
     assert "add(3, 4)   = 7" in out
@@ -41,7 +41,7 @@ def test_functions() -> None:
     # 4) In-class function used by a method, calling a sibling in-class function
     assert "[StatActor] count=3 avg=49.333333333333336" in out
     assert "avg from actor = 49.333333333333336" in out
-    print("OK  Functions.abcl")
+    print("OK  Functions.aipl")
 
 
 if __name__ == "__main__":

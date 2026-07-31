@@ -100,19 +100,19 @@ aipl2c~+~xinu-raz~+~QEMU の各層は単体では動作するが、
 reject していた}ことを確認した.
 
 \begin{lstlisting}[language=,caption={3 サンプルでの拒否メッセージ (要約)}]
-$ ./_build/default/src/aipl2c.exe abclc/Rotate4LinesXinu.abcl \
+$ ./_build/default/src/aipl2c.exe abclc/Rotate4LinesXinu.aipl \
       --xinu --max-msgs 0
 class Spinner
   init : (int * float * float * float * int * int * int) -> 'a
   tick : () -> 'a
 [Type error] line 18, col 5: type mismatch        <-- speed = sp;
 
-$ ./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.abcl \
+$ ./_build/default/src/aipl2c.exe abclc/Philosophers5Xinu.aipl \
       --xinu --max-msgs 0
 [Type error] line 68, col 16: send target is not actor: int
                                                   <-- send left_fork.request(idx)
 
-$ ./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.abcl \
+$ ./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.aipl \
       --xinu --max-msgs 0
 [Type error] line 81, col 7: type mismatch        <-- counter = 110 - slider * 10
 \end{lstlisting}
@@ -123,16 +123,16 @@ $ ./_build/default/src/aipl2c.exe abclc/BoundedBufferXinu.abcl \
 \subsection{予備調査で発覚した深層不具合}
 
 3 ファイルの内容自体を修正しようとして、まず\textbf{ 既存の
-\texttt{abclc/TypedDemo.abcl} で同じ事象}が起きていることに気付いた:
+\texttt{abclc/TypedDemo.aipl} で同じ事象}が起きていることに気付いた:
 
-\begin{lstlisting}[language=,caption={TypedDemo.abcl ですら type-check に失敗}]
-$ ./_build/default/src/aipl2c.exe abclc/TypedDemo.abcl --check
+\begin{lstlisting}[language=,caption={TypedDemo.aipl ですら type-check に失敗}]
+$ ./_build/default/src/aipl2c.exe abclc/TypedDemo.aipl --check
 class Counter
   bump : (int) -> int
 [Type error] line 37, col 13: unbound variable: count
 \end{lstlisting}
 
-\texttt{TypedDemo.abcl} は\texttt{ var count: int = 0;} という\textbf{
+\texttt{TypedDemo.aipl} は\texttt{ var count: int = 0;} という\textbf{
 型注釈付きフィールド}を持ち、 \texttt{bump} メソッドがその \texttt{count}
 を参照する.この pattern は AIPL の Phase~11+ で導入された
 \texttt{TypedVarDecl} を用いており、ここがエラーの \emph{真の発生源}
@@ -224,7 +224,7 @@ prelude に overload が無く reject されていた.
 \end{lstlisting}
 
 宣言型を field の scheme として登録し、initializer は\texttt{ unify} で
-追加チェックする.これで\texttt{ TypedDemo.abcl} を始めとした既存の
+追加チェックする.これで\texttt{ TypedDemo.aipl} を始めとした既存の
 typed-field サンプルも自然に通る.
 
 \subsection{修正 2 — aipl2c が \texttt{normalize\_program} を経由}
@@ -277,7 +277,7 @@ List.iter add_mxr2 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
 入れた.いずれもセマンティクス変更は無く、AIPL の typed-field 構文
 \texttt{var name: T = init;} を用いた\textbf{ ドキュメント的な追加}である.
 
-\subsection{Rotate4LinesXinu.abcl}
+\subsection{Rotate4LinesXinu.aipl}
 
 \paragraph{変更点} (1) フィールド全てに型注釈を付与、
 (2) \texttt{Spinner.init} の \texttt{sp: float, mx: float, my: float} を
@@ -286,7 +286,7 @@ List.iter add_mxr2 [ ">"; "<"; "<="; ">="; "=="; "!=" ];
 (3) \texttt{Controller} のフィールド \texttt{s1..s4} を
 空文字列ではなく \texttt{any} 注釈の整数 0 で初期化.
 
-\begin{lstlisting}[language=abcl,caption={Rotate4LinesXinu.abcl 主な差分}]
+\begin{lstlisting}[language=abcl,caption={Rotate4LinesXinu.aipl 主な差分}]
 class Spinner {
   var idx: int = 0;
   var angle: float = 0.;
@@ -312,7 +312,7 @@ class Controller {
 }
 \end{lstlisting}
 
-\subsection{Philosophers5Xinu.abcl}
+\subsection{Philosophers5Xinu.aipl}
 
 \paragraph{変更点}
 \texttt{Fork.idx/held/holder} を \texttt{int} に明示、
@@ -320,7 +320,7 @@ class Controller {
 right\_fork} を \texttt{: any} 注釈、
 \texttt{Controller} の \texttt{p0..p4, f0..f4} を \texttt{: any}.
 
-\begin{lstlisting}[language=abcl,caption={Philosophers5Xinu.abcl actor 参照フィールド}]
+\begin{lstlisting}[language=abcl,caption={Philosophers5Xinu.aipl actor 参照フィールド}]
 class Philosopher {
   var idx: int       = 0;
   var state: int     = 0;
@@ -342,7 +342,7 @@ class Controller {
 }
 \end{lstlisting}
 
-\subsection{BoundedBufferXinu.abcl}
+\subsection{BoundedBufferXinu.aipl}
 
 \paragraph{変更点}
 \texttt{Buffer.capacity/count} を \texttt{int} 明示、
@@ -351,7 +351,7 @@ class Controller {
 (actor 参照 \texttt{new Buffer(20)} を保持するため)、
 \texttt{Controller} の \texttt{buf, p0..p2, c0..c2} を \texttt{: any}.
 
-\begin{lstlisting}[language=abcl,caption={BoundedBufferXinu.abcl Producer のフィールド}]
+\begin{lstlisting}[language=abcl,caption={BoundedBufferXinu.aipl Producer のフィールド}]
 class Producer {
   var idx: int     = 0;
   var state: int   = 0;
@@ -418,7 +418,7 @@ P1 (actor=Xinu thread)      & 12 & 12 PASS / 0 FAIL \\
 (\texttt{Counter}, \texttt{PingPong}, \texttt{TypedDemo}, \texttt{Hello},
  \texttt{Generics}, \texttt{Philosophers5}, \texttt{Phase15\_Owned},
  \texttt{bounded\_buffer}) も全件 PASS で、特に\texttt{
-TypedDemo.abcl} 自体が R0 修正によって\textbf{ 初めて型検査を
+TypedDemo.aipl} 自体が R0 修正によって\textbf{ 初めて型検査を
 通るようになった}.
 
 \subsection{コミット履歴}

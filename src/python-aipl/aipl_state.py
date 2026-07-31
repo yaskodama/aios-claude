@@ -2,7 +2,7 @@
 
 When ABCL_NODE_STATE_FILE is set, the interpreter (a) loads any
 matching actor fields from that JSON file just after spawning each
-actor, and (b) writes a snapshot every time a .abcl program calls
+actor, and (b) writes a snapshot every time a .aipl program calls
 the `save_state()` builtin.  The file format is
 
   {"actors": {"<actor_name>": {"<field>": <value>, ...}}}

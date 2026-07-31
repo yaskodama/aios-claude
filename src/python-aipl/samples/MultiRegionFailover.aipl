@@ -1,0 +1,49 @@
+// DR-12 — multi-region failover.
+//
+// Geo-aware actor placement layered on the DR-1 route table.  Each
+// node belongs to a region (AIPL_REGION); the route table is
+// extended to per-region entries:
+//
+//   AIPL_ROUTE_REGION_us-east-1="Greeter:fast,Bench:slow"
+//   AIPL_ROUTE_REGION_eu-west-1="Greeter:fast"
+//
+// `route_for_region(actor[, region])` consults the region-scoped
+// table first; `failover_region(actor[, primary])` walks the chain
+// AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-1" looking for the
+// first region that knows about the actor.
+//
+// Run with all three regions configured:
+//   AIPL_DIST_ENABLE=1 \
+//   AIPL_REGION=us-east-1 \
+//   AIPL_REGION_FAILOVER="us-east-1,eu-west-1,ap-1" \
+//   AIPL_ROUTE_REGION_us-east-1="Greeter:fast" \
+//   AIPL_ROUTE_REGION_eu-west-1="Greeter:fast,Logger:slow" \
+//   AIPL_ROUTE_REGION_ap-1="Bench:cold" \
+//   AIPL_DIST_LOG_FILE=/tmp/region.ndjson \
+//   python3 src/python-aipl/aipl_main.py samples/MultiRegionFailover.aipl
+//
+//   jq -r '.event' /tmp/region.ndjson | sort | uniq -c
+//   # expect: region_failover, region_failover_failed events
+
+class Demo {
+  method run() {
+    print("[demo] starting at region " + current_region());
+    print("[demo] failover chain: " + region_chain());
+    print("[demo] regions available: " + regions_available());
+
+    // Greeter is in the primary region → no failover.
+    print("[demo] failover Greeter -> " + failover_region("Greeter"));
+
+    // Logger is only in eu-west-1 → primary lookup misses, fails over.
+    print("[demo] failover Logger -> " + failover_region("Logger"));
+
+    // Bench is only in ap-1 → two-step failover.
+    print("[demo] failover Bench -> " + failover_region("Bench"));
+
+    // No actor by this name anywhere → chain exhausted, returns "".
+    print("[demo] failover NoSuch -> '" + failover_region("NoSuch") + "'");
+  }
+}
+
+var d = new Demo();
+send d.run();

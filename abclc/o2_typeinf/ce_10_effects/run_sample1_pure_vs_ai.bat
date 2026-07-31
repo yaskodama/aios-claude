@@ -1,2 +1,2 @@
-load sample1_pure_vs_ai.abcl
+load sample1_pure_vs_ai.aipl
 compile

@@ -1,0 +1,61 @@
+// ImageBlitXinu.aipl
+// G5 demo: image bitmap blit on PL110.
+//
+// Painter exercises both G5 surfaces:
+//   (1) fb_image_solid(x,y,w,h,c24)   — flat colour bitmap
+//   (2) fb_image(x,y,w,h,arr)          — packed 0xRRGGBB int array
+//
+// For (2) the painter builds a 4x4 checkerboard via array_new +
+// array_set, alternating 0xFF0000 (red) and 0x00FF00 (green).  Then
+// calls fb_image to blit it at (80,80).  Smoke verifies:
+//   * fb_image_solid marker present, painted = w*h = 256
+//   * fb_image       marker present, painted = 16, clipped = 0,
+//                    24-bit colour round-trip implicit via array data
+//   * print()s show painted counts so the AIPL ↔ extern return value
+//     also round-trips
+//
+// 4x4 checkerboard layout (row-major, 16 cells):
+//   R G R G
+//   G R G R
+//   R G R G
+//   G R G R
+
+class Painter {
+  var red    = 0;
+  var green  = 0;
+  var blue   = 0;
+
+  method init() {
+    red   = 16711680;     // 0xFF0000
+    green = 65280;        // 0x00FF00
+    blue  = 255;          // 0x0000FF
+
+    // (1) solid 16x16 blue square at (16, 16)
+    var solid_painted = fb_image_solid(16, 16, 16, 16, blue);
+    print(solid_painted);                          // 256
+
+    // (2) build a 4x4 checkerboard array, then blit at (80, 80)
+    var arr = array_new(16, 0);
+    var i = 0;
+    while (i < 16) do {
+      // Cell parity = (i % 4 + i / 4) % 2.  0 = red, 1 = green.
+      var col_i = i;
+      var col_mod = col_i;
+      while (col_mod >= 4) do { col_mod = col_mod - 4; }
+      var row_i = (i - col_mod) / 4;
+      var parity = (col_mod + row_i);
+      while (parity >= 2) do { parity = parity - 2; }
+      if (parity == 0) {
+        array_set(arr, i, red);
+      } else {
+        array_set(arr, i, green);
+      }
+      i = i + 1;
+    }
+    var blit_painted = fb_image(80, 80, 4, 4, arr);
+    print(blit_painted);                           // 16
+    array_free(arr);
+  }
+}
+
+var p = new Painter();

@@ -50,7 +50,7 @@ $ python3 IMPL_I0003_MVP/tests/test_aipl_dist.py
 
 | Suite | 件数 | PASS | FAIL |
 |---|---:|---:|---:|
-| `src/python-aipl/samples/*.abcl` | 33 | **33** | 0 |
+| `src/python-aipl/samples/*.aipl` | 33 | **33** | 0 |
 | `samples/feature_*/*.aipl` | 21 | **21** | 0 |
 | **合計** | **54** | **54** | **0** |
 
@@ -130,7 +130,7 @@ POSIX 原子的 (write tmp + rename)。actor 名はファイル名にサニタ�
 | 既存 `src/python-aipl/*.py` の変更 | **0 行** (新規 `aipl_dist.py` 追加のみ) |
 | `AIPL_DIST_ENABLE` unset での挙動 | 全 public 関数が **no-op** (テスト で検証) |
 | `import aipl_dist` のみで副作用 | **ゼロ** (テストで検証) |
-| 既存 33 .abcl + 21 .aipl 回帰 | **54/54 PASS** |
+| 既存 33 .aipl + 21 .aipl 回帰 | **54/54 PASS** |
 | 既存テスト (`tests/test_aipl_dist.py` 以外) との衝突 | なし (新規ファイルのみ) |
 
 仕様 `must_not_change_aipl_semantics: true` / `must_be_opt_in: true` を完全準拠。
@@ -171,7 +171,7 @@ I0003 MVP はここで一旦完了。本番 production に投入する前に I-5
 |---|---|
 | Run 2 で発見された I0003 設計を MVP 実装 | ✅ 310 LOC / 4 piece |
 | 単体テスト 15 個 (全機能 + 境界条件) | ✅ 15/15 PASS |
-| 既存 33 .abcl + 21 .aipl 回帰 | ✅ 54/54 PASS |
+| 既存 33 .aipl + 21 .aipl 回帰 | ✅ 54/54 PASS |
 | 既存ファイル 1 行も無改変 | ✅ 達成 |
 | sample 4 件で動作実演 | ✅ 完了 |
 | 設計上限 ~400 LOC 内 | ✅ 310 LOC |

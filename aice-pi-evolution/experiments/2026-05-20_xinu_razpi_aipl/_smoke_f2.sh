@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # F2 smoke — Last-Writer-Wins cell semantics.
 #
-# Sample: abclc/LwwCellsXinu.abcl
+# Sample: abclc/LwwCellsXinu.aipl
 #   Sheet exercises every LWW invariant — newer-wins, older-rejected,
 #   strict-greater (ties rejected), multi-key isolation, monotonic
 #   tick, clear.
@@ -28,7 +28,7 @@ dune build src/aipl2c.exe >/tmp/_f2_build.log 2>&1 || {
 src=LwwCellsXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_f2_${src}.c --xinu --max-msgs 0 \
     > /tmp/_f2_${src}.aipl2c.log 2>&1
 [ -f /tmp/_f2_${src}.c ] || {

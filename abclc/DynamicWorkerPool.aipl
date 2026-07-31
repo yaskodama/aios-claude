@@ -1,0 +1,98 @@
+// Worker pool driven by dynamic compile + spawn + future/await
+// (OCaml runtime).
+//
+//   Manager.run(n_workers)
+//     - on first call compiles the Worker class
+//     - spawns n_workers worker actors
+//     - dispatches a built-in job batch round-robin via `future`
+//     - collects results via `await`, returns the sum via reply
+//
+// Mirrors src/python-aipl/samples/DynamicWorkerPool.aipl, minus the
+// Phase 11+ type annotations / `pub` which the OCaml runtime doesn't
+// implement yet.  We keep job construction *inside* the manager
+// because the OCaml send_message pipeline serialises arguments via
+// expr_of_value, which currently stringifies arrays; building the
+// batch on the receiver side avoids that round trip.
+class Manager {
+  var workers = array_empty();
+  var n_workers = 0;
+  var compiled = 0;
+
+  method init() {
+    if (compiled == 0) {
+      var src =
+        "class Worker {\n" +
+        "  var id = 0;\n" +
+        "  method init(my_id) { id = my_id; }\n" +
+        "  method square(x) {\n" +
+        "    var r = x * x;\n" +
+        "    print(\"  [worker \" + id + \"] square(\" + x + \") = \" + r);\n" +
+        "    reply(r);\n" +
+        "  }\n" +
+        "}\n";
+      compile(src);
+      compiled = 1;
+    }
+  }
+
+  method ensure_workers(n) {
+    var i = 0;
+    while (i < n) do {
+      var w_name = "worker_" + i;
+      workers = array_push(workers, spawn("Worker", w_name, i));
+      i = i + 1;
+    }
+    n_workers = n;
+    print("[manager] " + n + " workers ready");
+    reply(n);
+  }
+
+  method run() {
+    // Job batch is constructed locally (see header note).
+    var jobs = array_empty();
+    jobs = array_push(jobs, 2);
+    jobs = array_push(jobs, 3);
+    jobs = array_push(jobs, 5);
+    jobs = array_push(jobs, 7);
+    jobs = array_push(jobs, 11);
+
+    // Round-robin dispatch via `future`, then collect via `await`.
+    var futures = array_empty();
+    var njobs = array_len(jobs);
+    var i = 0;
+    var j = 0;
+    while (i < njobs) do {
+      var x = array_get(jobs, i);
+      var w = array_get(workers, j);
+      var f = future w.square(x);
+      futures = array_push(futures, f);
+      i = i + 1;
+      j = j + 1;
+      if (j >= n_workers) {
+        j = 0;
+      }
+    }
+
+    // float accumulator avoids the (int, TAny) overload trap in
+    // pick_overload — see typing_env.ml for the resolution order.
+    var sum = 0.;
+    var k = 0;
+    var nf = array_len(futures);
+    while (k < nf) do {
+      var v = await(array_get(futures, k));
+      sum = sum + v;
+      k = k + 1;
+    }
+    print("[manager] sum of squares = " + sum);
+    reply(sum);
+  }
+}
+
+var mgr = new Manager();
+// `now` is used for both calls so that ensure_workers fully completes
+// (workers spawned, n_workers stored) before run() starts dispatching.
+// `send` at top-level is queued via the REPL's pending_global_sends and
+// would not have fired before the blocking `now mgr.run()` below.
+var ready = now mgr.ensure_workers(3);
+var total = now mgr.run();
+print("=== final result: " + total + " ===");

@@ -27,9 +27,9 @@ regression count = 0.
 
    |              | Xinu side                                 | PC side                  | mode        |
    |--------------|-------------------------------------------|--------------------------|-------------|
-   | Python legacy| DiningPhilosophersDistXinu.abcl (auto)    | host_diners.py           | UART1 raw   |
-   | AIPL static  | DiningPhilosophersDistXinu.abcl (auto)    | host_diners.abcl         | remote() / uart1:// |
-   | AIPL bootstrap | DiningPhilosophersDistXinu_NoMain.abcl  | host_diners_bootstrap.abcl | LOAD + SPAWN |
+   | Python legacy| DiningPhilosophersDistXinu.aipl (auto)    | host_diners.py           | UART1 raw   |
+   | AIPL static  | DiningPhilosophersDistXinu.aipl (auto)    | host_diners.aipl         | remote() / uart1:// |
+   | AIPL bootstrap | DiningPhilosophersDistXinu_NoMain.aipl  | host_diners_bootstrap.aipl | LOAD + SPAWN |
 
 3. **UART1 RPC opcodes**:
    ```
@@ -78,7 +78,7 @@ see the live Xinu actor table.
   `bf00977`).  c_translator mangles `wait` → `b_wait` to avoid the
   Xinu-kernel `wait(semaphore)` collision.  `apps/abcl_xinu_wait.c`
   implements it as a thin `sleep(ms)` wrapper.  Used in
-  `abclc/DiningPhilosophersDistXinu_NoMain.abcl::fork_denied` for a
+  `abclc/DiningPhilosophersDistXinu_NoMain.aipl::fork_denied` for a
   20-ms retry backoff (was an unbounded native-speed retry loop).
 
 - **`SPAWN ref:N`** (xinu-raz `499a27b`) — tokens prefixed with
@@ -128,7 +128,7 @@ on a long-running QEMU; see follow-up #1 below.
      lands.
 
 5. **Round 2 Gemini evolution** — gen 2 of 15 captured in
-   `out/AIPL_XinuRazPi_Round2.abcl_lineage.json`.  Best individual
+   `out/AIPL_XinuRazPi_Round2.aipl_lineage.json`.  Best individual
    is `I2: Functional + ADT + actor_messages + capability +
    borrow_check @ 0.471`.  Pull more generations next time the
    GEMINI_API_KEY is fresh.
@@ -153,16 +153,16 @@ aice-pi-evolution/experiments/2026-05-21_xinu_aipl_round2/
    run_diners_bootstrap.sh            (LOAD + SPAWN launcher)
 
 abclc/
-   DiningPhilosophersDistXinu.abcl         (static variant — top-level new)
-   DiningPhilosophersDistXinu_NoMain.abcl  (bootstrap variant — classes only)
-   NetInitOnlyXinu.abcl                    (minimal NIC-up sample)
-   TcpEchoClientXinu.abcl                  (N1 sample)
-   RemoteRpcDemoXinu.abcl                  (host_rpc_demo.py target)
+   DiningPhilosophersDistXinu.aipl         (static variant — top-level new)
+   DiningPhilosophersDistXinu_NoMain.aipl  (bootstrap variant — classes only)
+   NetInitOnlyXinu.aipl                    (minimal NIC-up sample)
+   TcpEchoClientXinu.aipl                  (N1 sample)
+   RemoteRpcDemoXinu.aipl                  (host_rpc_demo.py target)
 
 aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/
    host_diners.py                          (Python legacy)
-   host_diners.abcl                        (pure-AIPL static)
-   host_diners_bootstrap.abcl              (LOAD + SPAWN)
+   host_diners.aipl                        (pure-AIPL static)
+   host_diners_bootstrap.aipl              (LOAD + SPAWN)
    host_diners_dynamic.{py,aipl}           (older LOAD/COMPILE/RUN demo)
    host_rpc_demo.{py,sh}                   (smoke #3)
 
@@ -188,7 +188,7 @@ xinu/compile/platforms/arm-qemu/xinu.conf  (NTCP = 16)
 
 - **`send remote(...).M(args)` is OCaml-only** in the AIPL grammar.
   The Py-I parser doesn't recognise that form.  Use `remote_call(...)`
-  / `remote_now(...)` as the equivalent in `.abcl` files run by
+  / `remote_now(...)` as the equivalent in `.aipl` files run by
   `aipl_main.py`.
 
 - **CPython `threading.Lock()` is unfair** under GIL contention.

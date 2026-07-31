@@ -20,7 +20,7 @@ def _run(sample: str, *extra_args: str) -> tuple[str, str, int]:
 
 
 def test_typecheck_via_builtin() -> None:
-    out, _, rc = _run("Typecheck.abcl")
+    out, _, rc = _run("Typecheck.aipl")
     assert rc == 0, f"unexpected exit: {rc}"
     # Trace+annotation-driven signatures
     assert "typeof(add)       = function(a:int, b:int) -> int" in out
@@ -40,11 +40,11 @@ def test_typecheck_via_builtin() -> None:
     # Well-typed code still executes.
     assert "add(3, 4)   = 7" in out
     assert "counter.get = 2" in out
-    print("OK  Typecheck.abcl (via type_check() builtin)")
+    print("OK  Typecheck.aipl (via type_check() builtin)")
 
 
 def test_cli_typecheck_flag() -> None:
-    out, err, rc = _run("Typecheck.abcl", "--type-check")
+    out, err, rc = _run("Typecheck.aipl", "--type-check")
     for needle in (
         "function bad_return: return type mismatch",
         "function bad_param: call to function `greet` arg `name` mismatch",
@@ -61,7 +61,7 @@ def test_cli_typecheck_flag() -> None:
 
 
 def test_cli_strict_aborts() -> None:
-    out, err, rc = _run("Typecheck.abcl", "--type-check", "--strict")
+    out, err, rc = _run("Typecheck.aipl", "--type-check", "--strict")
     assert rc == 2, f"expected exit 2 in --strict, got {rc}"
     assert "[type] 6 issue(s)" in err
     assert "add(3, 4)" not in out
@@ -69,7 +69,7 @@ def test_cli_strict_aborts() -> None:
 
 
 def test_phase_11c_unions_generics() -> None:
-    out, _, rc = _run("Typecheck11c.abcl")
+    out, _, rc = _run("Typecheck11c.aipl")
     assert rc == 0
     # Generics work at runtime: id returns the input, pair returns tuple, head returns first.
     assert "id(42)    = 42" in out
@@ -88,11 +88,11 @@ def test_phase_11c_unions_generics() -> None:
         "`var bad_union` initializer mismatch  (expected int | string, got float)",
     ):
         assert needle in out, f"missing 11c detection: {needle}"
-    print("OK  Typecheck11c.abcl")
+    print("OK  Typecheck11c.aipl")
 
 
 def test_phase_12_effects() -> None:
-    out, _, rc = _run("Effects.abcl")
+    out, _, rc = _run("Effects.aipl")
     assert rc == 0
     # Well-annotated calls run.
     assert "classify     = [mock] reply" in out
@@ -106,11 +106,11 @@ def test_phase_12_effects() -> None:
         "function bad_indirect: effect set incomplete — declared {∅} but uses {ai, fs, net}; missing: {ai, fs, net}",
     ):
         assert needle in out, f"missing 12 detection: {needle}"
-    print("OK  Effects.abcl")
+    print("OK  Effects.aipl")
 
 
 def test_phase_11de_narrowing_and_lengths() -> None:
-    out, _, rc = _run("Typecheck11de.abcl")
+    out, _, rc = _run("Typecheck11de.aipl")
     assert rc == 0
     # 11d narrowing — well-typed under both branches
     assert "describe(42)  = int: 43" in out
@@ -126,11 +126,11 @@ def test_phase_11de_narrowing_and_lengths() -> None:
         "`counts = ...` mismatch  (expected array[int, 3], got array[int, 2])",
     ):
         assert needle in out, f"missing: {needle}"
-    print("OK  Typecheck11de.abcl")
+    print("OK  Typecheck11de.aipl")
 
 
 def test_phase_11b_callsite() -> None:
-    out, _, rc = _run("Typecheck11b.abcl")
+    out, _, rc = _run("Typecheck11b.aipl")
     assert rc == 0
     # Each of the 6 intentional bugs is caught.
     assert "type_check() found 6 issue(s):" in out
@@ -147,7 +147,7 @@ def test_phase_11b_callsite() -> None:
     # NOTE: at runtime `count` was poisoned by `now c.tick("nope")` which
     # mutated count to a string ("15" + "nope"), so the *runtime* typeof
     # actually reports `string` — a great demo of why the static check helps.
-    print("OK  Typecheck11b.abcl")
+    print("OK  Typecheck11b.aipl")
 
 
 if __name__ == "__main__":

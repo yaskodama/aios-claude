@@ -160,7 +160,7 @@ field 型 (`path : Str`, `w : Writer`, `label : Str`) と record 型 (`rec : {se
 
 | Suite | PASS |
 |---|---|
-| `src/python-aipl/samples/*.abcl` (33 件) | 33/33 |
+| `src/python-aipl/samples/*.aipl` (33 件) | 33/33 |
 | `feature_{a..f}` (18 件) | 18/18 |
 | `feature_g_integration` (3 件) | 3/3 |
 

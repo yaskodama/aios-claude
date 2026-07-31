@@ -6,7 +6,7 @@ Phase 9 の `open_axes=true` ではスキーマ自体が探索中に成長しま
 > **言語名について**: 本プロジェクトのアクター並列言語は **AIPL**
 > (Actor-based Intelligent Parallel Language; 旧称 AIPL) と呼びます。
 > 実装内部のモジュール名 (`aipl_*.py`)・ファイル拡張子
-> (`.abcl`)・環境変数 (`ABCL_AI_PROVIDER`) は後方互換のため維持。
+> (`.aipl`)・環境変数 (`ABCL_AI_PROVIDER`) は後方互換のため維持。
 
 ## 何ができるか (現時点)
 
@@ -42,7 +42,7 @@ cd aice-evolution-v2
 
 # 生成された AIPL プログラムを Python AIPL ランタイムで実行
 ABCL_AI_PROVIDER=mock /usr/bin/python3 ../src/python-aipl/aipl_main.py \
-    --timeout 60 out/NextLanguagePrediction.abcl
+    --timeout 60 out/NextLanguagePrediction.aipl
 
 # Phase 6: 実 LLM 化 (mock provider なら課金なし)
 ABCL_AI_PROVIDER=mock /usr/bin/python3 -m src.cli \
@@ -168,7 +168,7 @@ aice <Name> {
 
 ## AIPL オーケストレータ (Phase 5)
 
-`--abcl` で `out/<Name>.abcl` を生成します。アクター構成:
+`--abcl` で `out/<Name>.aipl` を生成します。アクター構成:
 
 ```
 Coordinator

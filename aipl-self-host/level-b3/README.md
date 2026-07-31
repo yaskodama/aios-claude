@@ -45,11 +45,11 @@ The channel rules are added at one specific site (Call branch in
 
 ```sh
 cd aipl-self-host/level-b3
-bash run.sh   samples/SampleChannelClean.abcl
-bash run.sh   samples/SampleChannelSendMismatch.abcl
-bash run.sh   samples/SampleChannelRecvMismatch.abcl
-bash run.sh   samples/SampleChannelTryRecv.abcl
-bash run.sh   samples/SampleSelfConsistency.abcl
+bash run.sh   samples/SampleChannelClean.aipl
+bash run.sh   samples/SampleChannelSendMismatch.aipl
+bash run.sh   samples/SampleChannelRecvMismatch.aipl
+bash run.sh   samples/SampleChannelTryRecv.aipl
+bash run.sh   samples/SampleSelfConsistency.aipl
 
 bash smoke.sh
 ```
@@ -57,11 +57,11 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleChannelClean.abcl          issues=0
-PASS  SampleChannelSendMismatch.abcl   issues=1
-PASS  SampleChannelRecvMismatch.abcl   issues=1
-PASS  SampleChannelTryRecv.abcl        issues=0
-PASS  SampleSelfConsistency.abcl       issues=1
+PASS  SampleChannelClean.aipl          issues=0
+PASS  SampleChannelSendMismatch.aipl   issues=1
+PASS  SampleChannelRecvMismatch.aipl   issues=1
+PASS  SampleChannelTryRecv.aipl        issues=0
+PASS  SampleSelfConsistency.aipl       issues=1
 Level B-3 channel samples: 5 pass / 0 fail
 ```
 

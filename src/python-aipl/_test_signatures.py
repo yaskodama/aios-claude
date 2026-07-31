@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_signatures() -> None:
-    out = _run("Signatures.abcl")
+    out = _run("Signatures.aipl")
 
     # Static builtin signatures
     assert "typeof(read_bytes)       = function(path:string) -> array[int]" in out
@@ -56,7 +56,7 @@ def test_signatures() -> None:
     assert "typeof(image_pixel(img,0,0))    = tuple(int, int, int, int)" in out
     assert "typeof(json_stringify({a:1, b:[2,3]}, 2)) = string" in out
     assert "typeof(ai_call(2,\"hi\"))             = string" in out
-    print("OK  Signatures.abcl")
+    print("OK  Signatures.aipl")
 
 
 if __name__ == "__main__":

@@ -15,22 +15,22 @@ syntax differs.
 
 | OCaml sample (this dir)            | Python AIPL equivalent (current spec)                | Phase 11+ feature illustrated |
 | ---                                | ---                                                   | --- |
-| `Hello.abcl`                       | `samples/Hello.abcl`                                  | typed `var count: int`, `init(n: int)` |
-| `counter.abcl`                     | `samples/Counter.abcl`                                | typed field, transient-cast clean |
-| `PingPong.abcl`                    | `samples/PingPong.abcl`                               | typed `init(n: int)`, actor refs |
-| `bounded_buffer.abcl`              | `samples/BoundedBuffer.abcl`                          | `pub var size: int` (Phase 15), typed init |
-| `Philosophers5.abcl`               | `samples/Philosophers.abcl`                           | typed `init(my_id: int, l, r, n: int)`, `pub var meals` |
-| `philosophers.abcl`                | `samples/Philosophers.abcl`                           | same |
-| `Phase11_TypedCounter.abcl`        | `samples/Counter.abcl`                                | already current |
-| `Phase12_EffectsLog.abcl`          | `samples/Effects.abcl`                                | `!{fs, net, ai, mut}` declarations |
-| `Phase13_Channels.abcl`            | `samples/Channels.abcl`                               | `channel(N, "T")`, `channel_send`, `channel_recv` |
-| `Phase14_Linear.abcl`              | `samples/Linear.abcl`                                 | `linear T` use-after-move |
-| `Phase15_Owned.abcl`               | `samples/Owned.abcl`                                  | `pub` field modifier |
-| `web_calc.abcl`                    | `samples-remote/server.abcl`                          | `web_listen`, `web_expose`, remote actor |
-| `ai-samples/AIHello.abcl`          | `samples-ai/CooperativeNowFuture.abcl` (similar pattern) | typed AI calls |
-| `ai-samples/CooperativeNowFuture.abcl` | `samples-ai/CooperativeNowFuture.abcl`            | typed AI calls + `!{ai, net}` |
-| `ai-samples/RemoteCalcServer.abcl` | `samples-remote/server.abcl`                          | typed remote server |
-| `ai-samples/RemoteCalcClient.abcl` | `samples-remote/client.abcl`                          | typed remote client |
+| `Hello.aipl`                       | `samples/Hello.aipl`                                  | typed `var count: int`, `init(n: int)` |
+| `counter.aipl`                     | `samples/Counter.aipl`                                | typed field, transient-cast clean |
+| `PingPong.aipl`                    | `samples/PingPong.aipl`                               | typed `init(n: int)`, actor refs |
+| `bounded_buffer.aipl`              | `samples/BoundedBuffer.aipl`                          | `pub var size: int` (Phase 15), typed init |
+| `Philosophers5.aipl`               | `samples/Philosophers.aipl`                           | typed `init(my_id: int, l, r, n: int)`, `pub var meals` |
+| `philosophers.aipl`                | `samples/Philosophers.aipl`                           | same |
+| `Phase11_TypedCounter.aipl`        | `samples/Counter.aipl`                                | already current |
+| `Phase12_EffectsLog.aipl`          | `samples/Effects.aipl`                                | `!{fs, net, ai, mut}` declarations |
+| `Phase13_Channels.aipl`            | `samples/Channels.aipl`                               | `channel(N, "T")`, `channel_send`, `channel_recv` |
+| `Phase14_Linear.aipl`              | `samples/Linear.aipl`                                 | `linear T` use-after-move |
+| `Phase15_Owned.aipl`               | `samples/Owned.aipl`                                  | `pub` field modifier |
+| `web_calc.aipl`                    | `samples-remote/server.aipl`                          | `web_listen`, `web_expose`, remote actor |
+| `ai-samples/AIHello.aipl`          | `samples-ai/CooperativeNowFuture.aipl` (similar pattern) | typed AI calls |
+| `ai-samples/CooperativeNowFuture.aipl` | `samples-ai/CooperativeNowFuture.aipl`            | typed AI calls + `!{ai, net}` |
+| `ai-samples/RemoteCalcServer.aipl` | `samples-remote/server.aipl`                          | typed remote server |
+| `ai-samples/RemoteCalcClient.aipl` | `samples-remote/client.aipl`                          | typed remote client |
 
 ## Why two implementations?
 
@@ -50,12 +50,12 @@ program but cannot annotate with the Phase 11+ surface.
 ```sh
 # OCaml side
 make ocaml
-echo 'load Hello.abcl' >  /tmp/_run.bat
+echo 'load Hello.aipl' >  /tmp/_run.bat
 echo 'compile'          >> /tmp/_run.bat
 _build/default/src/repl_thread.exe -f /tmp/_run.bat
 
 # Python side (same program logic, typed surface)
-python3 src/python-aipl/aipl_main.py src/python-aipl/samples/Hello.abcl --type-check
+python3 src/python-aipl/aipl_main.py src/python-aipl/samples/Hello.aipl --type-check
 ```
 
 The Python form additionally accepts `--transient` to enable runtime

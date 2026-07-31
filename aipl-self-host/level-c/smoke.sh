@@ -5,9 +5,9 @@ set -u
 cd "$(dirname "$0")"
 
 declare -a SAMPLES=(
-  "SampleLexer.abcl       token count = 26"
-  "SamplePipeline.abcl    13"
-  "SampleWhile.abcl       10"
+  "SampleLexer.aipl       token count = 26"
+  "SamplePipeline.aipl    13"
+  "SampleWhile.aipl       10"
 )
 
 pass=0; fail=0
@@ -16,7 +16,7 @@ for entry in "${SAMPLES[@]}"; do
   expected=$(echo "$entry" | sed -E 's/^[^[:space:]]+[[:space:]]+//')
 
   bash run.sh "samples/$sample" >/dev/null 2>&1
-  log="out/${sample%.abcl}.log"
+  log="out/${sample%.aipl}.log"
   if grep -qF "$expected" "$log"; then
     pass=$((pass+1))
     printf "  PASS  %-30s found '%s'\n" "$sample" "$expected"

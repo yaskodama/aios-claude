@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # make smoke — verify the existing `make` command builds executables
-# from both C (.c) and ABCL/AIPL (.abcl) sources, auto-generating a
+# from both C (.c) and ABCL/AIPL (.aipl) sources, auto-generating a
 # Makefile on first use.
 #
 # Demo dirs seeded by xfsBootstrap (system/main.c):
 #   /home                        hello.c, sum.c
-#   /home/abclcp/abclc           PingPong.abcl, RotLines.abcl
+#   /home/abclcp/abclc           PingPong.aipl, RotLines.aipl
 #
 # Acceptance (6 assertions):
 #   (1) C demo: `make` in /home auto-generates a Makefile listing
@@ -44,7 +44,7 @@ LOG=/tmp/_make.qemu.log
   printf 'run hello\n';           sleep 0.6
   printf 'run sum\n';             sleep 0.6
   # ============================================================
-  # ABCL demo: /home/abclcp/abclc has PingPong.abcl + RotLines.abcl
+  # ABCL demo: /home/abclcp/abclc has PingPong.aipl + RotLines.aipl
   # ============================================================
   printf 'cd /home/abclcp/abclc\n'; sleep 0.4
   printf 'ls\n';                    sleep 0.4
@@ -88,7 +88,7 @@ fi
 
 echo "  -- assertion (3) ABCL Makefile auto-gen --"
 abcl_mk=$(awk '/--- ABCL-MAKEFILE-BEGIN ---/,/--- ABCL-MAKEFILE-END ---/' "$LOG")
-if echo "$abcl_mk" | grep -qE 'TARGETS\s*=.*PingPong.*RotLines|PingPong:\s*PingPong\.abcl|RotLines:\s*RotLines\.abcl'; then
+if echo "$abcl_mk" | grep -qE 'TARGETS\s*=.*PingPong.*RotLines|PingPong:\s*PingPong\.aipl|RotLines:\s*RotLines\.aipl'; then
   PASS=$((PASS+1))
   echo "  PASS (3) Makefile generated in /home/abclcp/abclc with PingPong + RotLines targets"
 else
@@ -98,7 +98,7 @@ else
 fi
 
 echo "  -- assertion (4) ABCL targets built --"
-# After make, both binaries should appear without .abcl/.c suffix.
+# After make, both binaries should appear without .aipl/.c suffix.
 abcl_ls=$(awk '/cd \/home\/abclcp\/abclc/{p=1}/cd \/home\/abclcp\/abclc/,/run PingPong/' "$LOG")
 if echo "$abcl_ls" | grep -qE '^PingPong\s*$' && echo "$abcl_ls" | grep -qE '^RotLines\s*$'; then
   PASS=$((PASS+1))

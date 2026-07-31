@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # G2 smoke — bitmap font text rendering on PL110.
 #
-# Sample: abclc/TextDrawXinu.abcl
+# Sample: abclc/TextDrawXinu.aipl
 #   Painter draws 2 strings + 1 single char with 3 distinct colours,
 #   then measures pixel width of the strings via fb_text_size.
 #
@@ -26,7 +26,7 @@ dune build src/aipl2c.exe >/tmp/_g2_build.log 2>&1 || {
 src=TextDrawXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_g2_${src}.c --xinu --max-msgs 0 \
     > /tmp/_g2_${src}.aipl2c.log 2>&1
 [ -f /tmp/_g2_${src}.c ] || {

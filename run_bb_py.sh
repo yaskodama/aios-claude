@@ -1,10 +1,10 @@
 #!/bin/sh
-# BoundedBufferPy.abcl を Python (tkinter) 上で動かす。
+# BoundedBufferPy.aipl を Python (tkinter) 上で動かす。
 set -e
 cd "$(dirname "$0")"
 
 dune build src/aipl2c.exe
-./_build/default/src/aipl2c.exe abclc/BoundedBufferPy.abcl \
+./_build/default/src/aipl2c.exe abclc/BoundedBufferPy.aipl \
     --python --max-msgs 0 -o /tmp/bb_py.py
 
 exec python3 /tmp/bb_py.py

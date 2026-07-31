@@ -1,2 +1,2 @@
-load src/viz_philosophers.abcl
+load src/viz_philosophers.aipl
 compile

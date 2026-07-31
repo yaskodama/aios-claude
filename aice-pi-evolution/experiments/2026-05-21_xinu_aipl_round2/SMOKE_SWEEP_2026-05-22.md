@@ -17,8 +17,8 @@ Repos:
 | 3 | `host_rpc_demo.py` (RemoteRPC)                     | ✅     | 9/9 assertions: PING / SEND×5 / QUERY×2 / LIST |
 | 4 | `_diag_http_direct.sh` (Xinu direct HTTP)          | ✅     | /, /api/state, /api/actors, /api/uptime all serve |
 | 5 | `host_diners.py` (Python-driven, MEALS=5)          | ✅     | 3 PC + 2 Xinu philos all complete |
-| 6 | `host_diners.abcl` (pure-AIPL static, MEALS=100)   | ✅     | P1=167, P2=515, P3=103 attempts |
-| 7 | `host_diners_bootstrap.abcl` (LOAD + SPAWN, MEALS=20) | ✅  | P1=404, P2=784, P3=20 attempts |
+| 6 | `host_diners.aipl` (pure-AIPL static, MEALS=100)   | ✅     | P1=167, P2=515, P3=103 attempts |
+| 7 | `host_diners_bootstrap.aipl` (LOAD + SPAWN, MEALS=20) | ✅  | P1=404, P2=784, P3=20 attempts |
 
 ## Invariants held
 
@@ -42,7 +42,7 @@ Repos:
 | c_translator extern abcl_class_name              | 20ff4a5 (abclcp)    | HTTP, LIST |
 | aipl_remote uart1:// scheme + meta-actor         | c569bc9 (abclcp)    | diners, bootstrap |
 | _FairLock + LIST buffer drain                    | d43a2ae (abclcp)    | pure-AIPL diners |
-| Bootstrap variant (NoMain + host_diners_bootstrap.abcl) | 0bc3cda (abclcp) | bootstrap diners |
+| Bootstrap variant (NoMain + host_diners_bootstrap.aipl) | 0bc3cda (abclcp) | bootstrap diners |
 
 ## Reproducibility
 

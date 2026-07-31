@@ -9,7 +9,7 @@
 //   2. Drain the boot greeting ("OK ready=1").
 //   3. PING / LIST sanity.
 //   4. Upload a short AIPL source string via the LOAD <name> <bytes>
-//      protocol — Xinu writes it to /home/dyn.abcl.
+//      protocol — Xinu writes it to /home/dyn.aipl.
 //   5. COMPILE dyn — Xinu invokes its in-kernel abclcTranslate +
 //      ccCompile to produce /home/dyn (bytecode a.out).
 //   6. RUN dyn — Xinu's aoutRun executes the bytecode; output

@@ -44,7 +44,7 @@ aice AIPL_WebSpreadsheet_Impl {
     }
     // ── FormulaEval 戦略 ──
     task FE1_LevelAReuse {
-      spec = "aipl-self-host/level-a/metacircular.abcl の eval() を import して formula AST に流用.AIPL の既存自己反映 evaluator がそのまま動く.見積もり 50-100 LOC (主に AST builder).";
+      spec = "aipl-self-host/level-a/metacircular.aipl の eval() を import して formula AST に流用.AIPL の既存自己反映 evaluator がそのまま動く.見積もり 50-100 LOC (主に AST builder).";
     }
     task FE2_DirectInterp {
       spec = "formula 用に専用 interpreter を AIPL で書く.Level-A より高速、ただし車輪再発明.見積もり 200-300 LOC.";
@@ -92,7 +92,7 @@ aice AIPL_WebSpreadsheet_Impl {
       spec = "PEG.js 系で grammar から JS parser 自動生成.AIPL の外側ツール依存、JS-N 限定.見積もり 100-150 LOC + 外部 PEG ライブラリ.";
     }
     task PA4_LevelCPort {
-      spec = "aipl-self-host/level-c/parser.abcl を流用 + AIPL formula 構文に拡張.既存資産再利用.見積もり 150-250 LOC.";
+      spec = "aipl-self-host/level-c/parser.aipl を流用 + AIPL formula 構文に拡張.既存資産再利用.見積もり 150-250 LOC.";
     }
     // ── Integration topology ──
     task IT1_StarTopology {

@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_multi_provider_and_image() -> None:
-    out = _run("MultiProvider.abcl")
+    out = _run("MultiProvider.aipl")
     # Provider override (text only): each path reaches the mock under
     # AIPL_AI_PROVIDER=mock, so all should produce the same canned reply.
     for label in ("default (auto):", "Gemini    [1]:", "Anthropic [2]:",
@@ -43,7 +43,7 @@ def test_multi_provider_and_image() -> None:
     assert "typeof(ai_call(1, \"hi\"))      = string" in out
     assert "typeof(ai_call_image(2, p, img)) = string" in out
     assert "typeof(image_create(2,2,0,0,0,255)) = image(2x2, RGBA)" in out
-    print("OK  MultiProvider.abcl")
+    print("OK  MultiProvider.aipl")
 
 
 if __name__ == "__main__":

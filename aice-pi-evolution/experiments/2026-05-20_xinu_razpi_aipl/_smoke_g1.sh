@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # G1 smoke — framebuffer drawing primitives on PL110.
 #
-# Sample: abclc/FbPrimitivesXinu.abcl
+# Sample: abclc/FbPrimitivesXinu.aipl
 #   Painter draws circle + triangle + rounded-rect twice — once with
 #   AA off, once with AA on — using 24-bit colours (red/green/blue).
 #
@@ -25,7 +25,7 @@ dune build src/aipl2c.exe >/tmp/_g1_build.log 2>&1 || {
 src=FbPrimitivesXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_g1_${src}.c --xinu --max-msgs 0 \
     > /tmp/_g1_${src}.aipl2c.log 2>&1
 [ -f /tmp/_g1_${src}.c ] || {

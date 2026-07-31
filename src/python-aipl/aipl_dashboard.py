@@ -33,14 +33,14 @@ _IDE_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 def _ide_safe_path(rel: str):
     """Resolve `rel` against _IDE_ROOT, returning the absolute path
-    iff it stays inside the workspace and ends in `.abcl`.  None for
+    iff it stays inside the workspace and ends in `.aipl`.  None for
     anything fishy (path traversal, wrong extension, empty)."""
     if not rel:
         return None
     rel = rel.replace("\\", "/").lstrip("/")
     if ".." in rel.split("/"):
         return None
-    if not rel.endswith(".abcl"):
+    if not rel.endswith(".aipl"):
         return None
     full = os.path.realpath(os.path.join(_IDE_ROOT, rel))
     root = os.path.realpath(_IDE_ROOT) + os.sep
@@ -104,22 +104,22 @@ _run_thread = None
 _program_stopped = False       # True after Stop (中止) until next Start/Switch
 _selected_key = ""             # program chosen in the dropdown / initial pick
 _PROGRAM_LABELS = {
-    "local_diners.abcl": "Dining Philosophers (local, 5)",
-    "dine_dynamic.abcl": "Dining Philosophers (3 local + 2 remote / Xinu)",
-    "mac_diners.abcl":   "Dining Philosophers (3 Mac + 2 Xinu, static)",
-    "ring_demo.abcl":    "Token ring (local, 4)",
-    "bounded_buffer.abcl": "Bounded buffer (local, 2 producers + 2 consumers)",
+    "local_diners.aipl": "Dining Philosophers (local, 5)",
+    "dine_dynamic.aipl": "Dining Philosophers (3 local + 2 remote / Xinu)",
+    "mac_diners.aipl":   "Dining Philosophers (3 Mac + 2 Xinu, static)",
+    "ring_demo.aipl":    "Token ring (local, 4)",
+    "bounded_buffer.aipl": "Bounded buffer (local, 2 producers + 2 consumers)",
 }
 
 
 def configure_programs(initial_path: str) -> None:
-    """Build the switchable-program list from the .abcl files next to the
+    """Build the switchable-program list from the .aipl files next to the
     initial program."""
     global _PROGRAMS, _selected_key
     import os, glob
     d = os.path.dirname(os.path.abspath(initial_path))
     progs = []
-    for p in sorted(glob.glob(os.path.join(d, "*.abcl"))):
+    for p in sorted(glob.glob(os.path.join(d, "*.aipl"))):
         base = os.path.basename(p)
         progs.append({"key": base,
                       "label": _PROGRAM_LABELS.get(base, base),
@@ -484,14 +484,14 @@ class _Handler(BaseHTTPRequestHandler):
     # ---- IDE: list / read / write / run ----
 
     def _serve_ide_files(self):
-        """List every .abcl file under the workspace, grouped by
+        """List every .aipl file under the workspace, grouped by
         directory."""
         out = []
         for dirpath, dirnames, filenames in os.walk(_IDE_ROOT):
             dirnames[:] = [d for d in dirnames
                            if not d.startswith(("_", ".", "__"))]
             for fn in sorted(filenames):
-                if not fn.endswith(".abcl"):
+                if not fn.endswith(".aipl"):
                     continue
                 full = os.path.join(dirpath, fn)
                 rel = os.path.relpath(full, _IDE_ROOT)
@@ -683,7 +683,7 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_bytes(200, "application/json", body)
 
     def _handle_ide_run(self):
-        """Run a .abcl program through abcl_main.py and return the
+        """Run a .aipl program through abcl_main.py and return the
         captured stdout+stderr.  Bounded to ABCL_IDE_RUN_TIMEOUT
         seconds (default 8) so a runaway sample can't tie up the
         dashboard."""

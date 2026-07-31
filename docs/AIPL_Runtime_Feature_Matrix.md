@@ -50,7 +50,7 @@ Python (annotated); only the **static type-checker** layer differs
 
 ## Sample programs
 
-Number of `.abcl` sample programs reachable by each runtime
+Number of `.aipl` sample programs reachable by each runtime
 (core directory + AI integration + remote-actor demos):
 
 | Category               | Py-A | Py-I | OCaml | JS-O | JS-B | JS-N | C  |
@@ -67,7 +67,7 @@ Cross-cutting / not tied to a specific runtime:
    integrated full self-host). Master smoke: 47/47 assertions PASS.
 - `docker/cross/samples/`: 4 cross-language interop samples
 
-The C runtime processes the same `.abcl` files as OCaml via
+The C runtime processes the same `.aipl` files as OCaml via
 `aipl2c`; of the 66 reachable samples, 48 currently pass the
 `aipl2c` smoke test (the remaining 9 in `abclc/` have pre-existing
 type ambiguities surfaced by our hard-fail policy).
@@ -98,29 +98,29 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **now / future / await** | `NowFuture`, `CooperativeNowFuture`, `NowFutureDemo` | py-aipl/samples + samples-ai + abclc/ai-samples | three message-passing forms in one program | Py, OCaml, C, JS-B, JS-N |
 | **Bounded mailboxes / select** | `BoundedBuffer`, `bounded_buffer{,_visual}` | py-aipl + abclc + browser-abcl | producer/consumer, selective receive, visualisation | Py, OCaml, C, JS-B, JS-N |
 | **Dining philosophers** | `Philosophers`, `philosophers{-1,-2}`, `Philosophers5{,_debug,_trace,Gui,Py,Xinu}` | py-aipl + abclc + browser-abcl | fork as actor, deadlock-free serialisation, SDL/Python/Xinu codegen variants | Py, OCaml, C, SDL2, Py-gen, Xinu, JS-B, JS-N |
-| **`become` (class swap)** | `become.abcl`, `bbecome.abcl` | abclc | runtime actor-class replacement | Py, OCaml |
-| **`select` / selective receive** | `Channels.abcl`, `Channels2.abcl` | py-aipl/samples | typed channels, worker-pool with request/result | Py |
-| **Method injection** | `MethodPatch.abcl` | py-aipl/samples + abclc/ | `add_method` / `remove_method` runtime patching | Py, OCaml |
-| **Dynamic compile** | `Dynamic.abcl`, `DynamicWorkerPool.abcl` | py-aipl/samples + abclc/ | `compile()` builtin → runtime class generation; worker pool driven by it | Py, OCaml |
-| **Top-level functions** | `Functions.abcl`, `Signatures.abcl` | py-aipl/samples + abclc/ | user functions, multiple overload signatures, typeof | Py, OCaml |
-| **Records** | `Records.abcl` | py-aipl/samples + abclc/ | `{a:int, b:string}` literal, dot-field access, structural typeof | Py, OCaml |
-| **Tuples** | `Tuples.abcl` | py-aipl/samples + abclc/ | positional, immutable, mixed slot types, nesting | Py, OCaml |
-| **Arrays** | `Arrays.abcl`, `MultiDimArrays.abcl` | py-aipl/samples | static-sized, multi-dim, dynamic sizes | Py |
-| **Gradual type checker** | `Typecheck.abcl`, `Typecheck11{b,c,de}.abcl` | py-aipl/samples | Phase 11 → 11e progression: literals, call-site validation, unions/generics, narrowing, length-tagged arrays | Py |
-| **Phase 11 typed counter** | `Phase11_TypedCounter.abcl` | abclc | typed annotations / generics / typeof narrowing | OCaml |
-| **Phase 12 effects** | `Effects.abcl`, `Phase12_EffectsLog.abcl` | py-aipl + abclc | capability-based `!{fs,ai,net,mut}` system | Py (static), OCaml (sample) |
-| **Phase 13 channels** | `Phase13_Channels.abcl` | abclc | CSP channels (design doc + runtime in Py) | Py (runtime), OCaml (sample) |
-| **Phase 14 linear types** | `Linear.abcl`, `Linear2.abcl`, `Phase14_Linear.abcl` | py-aipl + abclc | use-after-move, DB transaction with linear handle | Py (static), OCaml (sample) |
-| **Phase 15 owned fields** | `Owned.abcl`, `Owned_violations.abcl`, `Phase15_Owned.abcl` | py-aipl + abclc | `pub` field visibility, intentional violations | Py (static), OCaml (sample) |
-| **Phase 16 transient cast** | `Transient.abcl`, `Transient_violation.abcl` | py-aipl/samples | runtime type cast at any-boundary | Py |
-| **Phase 17 structured concurrency** | `Phase17_StructuredConc.abcl` | py-aipl/samples | `scope { future ... }` auto-joining | Py |
-| **Session types / protocol traces** | `SessionTyped.abcl` | py-aipl/samples-ai | runtime-checked typed session protocols (arg + reply types); order-only protocol traces; AIOS service registry | Py |
+| **`become` (class swap)** | `become.aipl`, `bbecome.aipl` | abclc | runtime actor-class replacement | Py, OCaml |
+| **`select` / selective receive** | `Channels.aipl`, `Channels2.aipl` | py-aipl/samples | typed channels, worker-pool with request/result | Py |
+| **Method injection** | `MethodPatch.aipl` | py-aipl/samples + abclc/ | `add_method` / `remove_method` runtime patching | Py, OCaml |
+| **Dynamic compile** | `Dynamic.aipl`, `DynamicWorkerPool.aipl` | py-aipl/samples + abclc/ | `compile()` builtin → runtime class generation; worker pool driven by it | Py, OCaml |
+| **Top-level functions** | `Functions.aipl`, `Signatures.aipl` | py-aipl/samples + abclc/ | user functions, multiple overload signatures, typeof | Py, OCaml |
+| **Records** | `Records.aipl` | py-aipl/samples + abclc/ | `{a:int, b:string}` literal, dot-field access, structural typeof | Py, OCaml |
+| **Tuples** | `Tuples.aipl` | py-aipl/samples + abclc/ | positional, immutable, mixed slot types, nesting | Py, OCaml |
+| **Arrays** | `Arrays.aipl`, `MultiDimArrays.aipl` | py-aipl/samples | static-sized, multi-dim, dynamic sizes | Py |
+| **Gradual type checker** | `Typecheck.aipl`, `Typecheck11{b,c,de}.aipl` | py-aipl/samples | Phase 11 → 11e progression: literals, call-site validation, unions/generics, narrowing, length-tagged arrays | Py |
+| **Phase 11 typed counter** | `Phase11_TypedCounter.aipl` | abclc | typed annotations / generics / typeof narrowing | OCaml |
+| **Phase 12 effects** | `Effects.aipl`, `Phase12_EffectsLog.aipl` | py-aipl + abclc | capability-based `!{fs,ai,net,mut}` system | Py (static), OCaml (sample) |
+| **Phase 13 channels** | `Phase13_Channels.aipl` | abclc | CSP channels (design doc + runtime in Py) | Py (runtime), OCaml (sample) |
+| **Phase 14 linear types** | `Linear.aipl`, `Linear2.aipl`, `Phase14_Linear.aipl` | py-aipl + abclc | use-after-move, DB transaction with linear handle | Py (static), OCaml (sample) |
+| **Phase 15 owned fields** | `Owned.aipl`, `Owned_violations.aipl`, `Phase15_Owned.aipl` | py-aipl + abclc | `pub` field visibility, intentional violations | Py (static), OCaml (sample) |
+| **Phase 16 transient cast** | `Transient.aipl`, `Transient_violation.aipl` | py-aipl/samples | runtime type cast at any-boundary | Py |
+| **Phase 17 structured concurrency** | `Phase17_StructuredConc.aipl` | py-aipl/samples | `scope { future ... }` auto-joining | Py |
+| **Session types / protocol traces** | `SessionTyped.aipl` | py-aipl/samples-ai | runtime-checked typed session protocols (arg + reply types); order-only protocol traces; AIOS service registry | Py |
 | **AI integration (mock + real)** | `AIActor`, `AIChain`, `AIChainReal`, `AIHello`, `MultiProvider` | py-aipl/samples + samples-ai + abclc/ai-samples | LLM-backed actors; multi-provider; chained pipeline | Py, OCaml |
-| **AI governance** | `Budgeted.abcl` | py-aipl/samples-ai + abclc/ai-samples | token budget, concurrency cap, fallback chain | Py, OCaml |
-| **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `Reviewer.abcl`, `Fanout.abcl`, `PriorityFanout.abcl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing | Py, OCaml |
+| **AI governance** | `Budgeted.aipl` | py-aipl/samples-ai + abclc/ai-samples | token budget, concurrency cap, fallback chain | Py, OCaml |
+| **AI cooperative pattern** | `CooperativeNowFuture{,-jp,-jp-remote}`, `CooperativeSolve{,-jp,Remote,Remote-jp}`, `Reviewer.aipl`, `Fanout.aipl`, `PriorityFanout.aipl` | py-aipl/samples-ai + abclc/ai-samples | Planner→Solver→Reviewer; fan-out aggregator; priority routing | Py, OCaml |
 | **Remote actors** | `client / server / coordinator / solver / verifier / reviewer_node*`, `RemoteCalcClient/Server` | py-aipl/samples-remote + abclc/samples-remote + abclc/ai-samples | HTTP cross-machine sends; HMAC-signed coordination | Py, OCaml |
-| **Web / dashboard** | `web_calc.abcl`, `SiteGen.abcl` | abclc + py-aipl/samples | embedded HTTP gateway; static-site generator | Py (SiteGen), OCaml (web_calc) |
-| **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.abcl` | abclc | SDL2-backed GUI codegen via aipl2c | SDL2 (via aipl2c) |
+| **Web / dashboard** | `web_calc.aipl`, `SiteGen.aipl` | abclc + py-aipl/samples | embedded HTTP gateway; static-site generator | Py (SiteGen), OCaml (web_calc) |
+| **GUI / SDL2** | `Rotate{One,Three,Four}Lines{,Gui}`, `MultiLineSpin`, `Philosophers5Gui`, `BoundedBufferGui`, `DisasterReturnGui`, `LineDrawer`, `window.aipl` | abclc | SDL2-backed GUI codegen via aipl2c | SDL2 (via aipl2c) |
 | **Python codegen target** | `BoundedBufferPy`, `Philosophers5Py`, `Rotate4LinesPy` | abclc | `aipl2c --python` emits stand-alone Python | Py-gen |
 | **Xinu (embedded OS) target** | `BoundedBufferXinu`, `Philosophers5Xinu`, `Rotate4LinesXinu` | abclc | `aipl2c --xinu` emits Xinu-flavoured C | Xinu |
 | **Pony codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail — cross-actor globals not supported) | abclc | `aipl2c --pony` emits Pony source; `class` → `actor`, methods → `be`; two-step `_aipl_init` decouples construction from init body | Pony |
@@ -129,7 +129,7 @@ Target abbreviations: **Py** = python-aipl / python-aipl-inferred;
 | **Prolog codegen target** | `Hello`, `counter` (verified); `PingPong` (xfail) | abclc | `aipl2c --prolog` emits a single SWI-Prolog `.pl` file using `library(thread)`; `class` → `c_loop(Fields)` thread with `thread_get_message` + `Msg = m(Args) -> body ; ...` dispatch; expressions are hoisted into prolog goals (`X is A + B`, `format(atom(S), "~w~w", [A,B])`) | Prolog |
 | **LLVM codegen target** | `Hello`, `counter` (verified) | abclc | `aipl2c --llvm` emits the same C as the default backend with clang-specific `__attribute__((hot))` / `__attribute__((cold))` annotations + a header banner listing `clang -O2 -pthread`, `clang -emit-llvm -S` (text IR), and `clang -emit-llvm -c` + `lli` flows | LLVM |
 | **OpenMP codegen target** | `Hello`, `counter` (verified) | abclc | `aipl2c --openmp` emits C + `<omp.h>`; the initial spawn loop becomes `#pragma omp parallel for schedule(dynamic)` and `messages_processed++` uses `#pragma omp atomic` instead of the dedicated mutex.  Build with `gcc-15 -fopenmp` or `clang -fopenmp`.  pthreads still drive per-actor message loops (compatible with OpenMP) | OpenMP |
-| **Drone / simulation** | `drone_simulator.abcl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
+| **Drone / simulation** | `drone_simulator.aipl` | browser-abcl | obstacle-aware drone swarm with comm + view range | JS-B, JS-N |
 | **Trace / minimal** | `H`, `P`, `T*`, `LD*`, `MS`, `AA`, `PP`, `PH`, `line*`, `Philosophers5_{debug,trace}` | abclc | reduced repro cases used during runtime / TLA+ / Spin model-checking | OCaml |
 
 ---
@@ -181,8 +181,8 @@ incoming call; available on every runtime that has `reply(...)`
 (C runtime omits reply slots so 29e/29f are ❌ there too).  Shape
 (f) uses the explicit `select { case reply(r) -> ... }` form — see
 note ⁶ above.  Cross-runtime samples:
-`abclc/ai-samples/SendReplyMethod.abcl` (OCaml, commit `cbec37c`)
-and `src/python-aipl/samples-ai/_send_reply_demo/*.abcl` (Python).
+`abclc/ai-samples/SendReplyMethod.aipl` (OCaml, commit `cbec37c`)
+and `src/python-aipl/samples-ai/_send_reply_demo/*.aipl` (Python).
 
 ⁸ CE-10 effect type inference: the inference walk
 (`aipl_inference._collect_effects_from_ast`) accumulates the set of
@@ -206,7 +206,7 @@ min → retire (LIFO).  Hysteresis prevents flapping at the boundary.
 No-op unless `AIPL_DIST_ENABLE=1`; events `pool_created` /
 `pool_scale_up` / `pool_scale_down` / `pool_destroyed` flow into
 the existing structured-log NDJSON.  Sample:
-`src/python-aipl/samples/AutoScalingPool.abcl`.  Picked by the same
+`src/python-aipl/samples/AutoScalingPool.aipl`.  Picked by the same
 MAP-Elites run (reviewer score 0.67 — top of the distribution axis).
 
 ¹⁰ CE-11 capability types: runtime capability tracking layered on
@@ -220,7 +220,7 @@ Capability names coincide with effect tags from BUILTIN_EFFECTS
 static-check time and runtime.  Default mode is advisory (missing
 caps log `cap_violation`); `AIPL_CAP_STRICT=1` raises
 `CapabilityError` on any miss, surfaced as an actor runtime error.
-Sample: `src/python-aipl/samples/CapabilityTypes.abcl`.  Picked by
+Sample: `src/python-aipl/samples/CapabilityTypes.aipl`.  Picked by
 the 2026-05-18 round-2 MAP-Elites (reviewer avg 0.430 — top of the
 type-extension axis; CapabilityTypes=0.73 in the top elite I0012).
 
@@ -235,7 +235,7 @@ the first region that knows the actor.  Logs
 `region_failover_failed` (chain exhausted) for forensic queries.
 5 primitives: `current_region`, `region_chain`, `route_for_region`,
 `failover_region`, `regions_available`.  Sample:
-`src/python-aipl/samples/MultiRegionFailover.abcl`.  Picked by
+`src/python-aipl/samples/MultiRegionFailover.aipl`.  Picked by
 round-2 MAP-Elites (reviewer avg 0.405 — third on the distribution
 axis, top elite I0012 had 0.70 for this task).
 
@@ -269,7 +269,7 @@ extern path — no separate prim map needed.  DR-11 saga gains
 explicit codegen (`gen_stmt | Saga steps ->` emits
 `setjmp(__saga.env)` + per-step bodies + LIFO compensate switch
 + `saga_aborted` call); verified by compiling a 2-step saga
-sample (`/tmp/_ce_saga.abcl`) and running the binary — step1 /
+sample (`/tmp/_ce_saga.aipl`) and running the binary — step1 /
 step2 print as expected.
 
 ¹⁵ CE-12 refinement unification: HM's `unify` previously dropped
@@ -296,7 +296,7 @@ side are ignored (width subtyping), and wholly-disjoint records
 still raise.  Principal-type behavior of unannotated record
 parameters is preserved — inference accumulates the union of
 accessed fields as constraints on the param TVar.  Sample:
-`src/python-aipl/samples/RecordSubtyping.abcl`.  Picked by round-2
+`src/python-aipl/samples/RecordSubtyping.aipl`.  Picked by round-2
 MAP-Elites (reviewer avg 0.400 — fifth, second on the type-
 extension axis after CE-11).
 
@@ -314,7 +314,7 @@ fires.  Eight structured-log events emitted when AIPL_DIST_ENABLE=1:
 `saga_started`, `saga_step_complete`, `saga_step_failed`,
 `saga_compensated`, `saga_compensate_failed`, `saga_finished`,
 `saga_aborted`, plus the existing `actor_quarantined` from IQ.
-Sample: `src/python-aipl/samples/SagaOrchestration.abcl`.  Picked by
+Sample: `src/python-aipl/samples/SagaOrchestration.aipl`.  Picked by
 round-2 MAP-Elites (reviewer avg 0.406 — top of the dist axis after
 the already-implemented DR-10/12/13).
 
@@ -331,7 +331,7 @@ Replica id comes from `AIPL_DIST_REPLICA_ID` (defaults to hostname).
 `crdt_replicate` logs an event for the deployment-layer replicator;
 peer fan-out itself is left to a future multi-region driver
 (DR-12 candidate).  Sample:
-`src/python-aipl/samples/CRDTState.abcl`.  Picked by round-2 MAP-
+`src/python-aipl/samples/CRDTState.aipl`.  Picked by round-2 MAP-
 Elites (reviewer avg 0.410 — second after CE-11 on the distribution
 axis).
 
@@ -395,7 +395,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 | CE-9  | refinement vacuously-false detection (declaration-time) | ✅ |  ❌  |  🟡²  |  🟡² |  ❌  |  ❌  | ❌  | E-α §2.3 (Z3 unsat check on declared type) |
 | **CE-10** | **effect type inference** (`{ai, fs, net, mut}` row in inferred method types)⁸ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C-codegen: `aipl2c --check` / `--dump-effects` calls `Infer.debug_print_class_method_effects` (Phase 12 wire on 2026-05-18); JS-B/JS-N: `typecheck.js` `BUILTIN_EFFECTS` + `collectMethodEffects`¹⁶ |
 | **CE-11** | **capability types** (`grant_cap` / `revoke_cap` / `has_cap` / `current_caps` / `check_capability`; strict mode under `AIPL_CAP_STRICT=1`)¹⁰ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | JS-B/JS-N: shared `browser-abcl/src/runtime.js` `_nextgen_*_cap`; C: `abcl_nextgen_runtime.{c,h}` pthread TLS; auto-extern in OCaml¹⁶ |
-| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C-codegen: `aipl2c --check` calls `Typecheck.run`, which already routes through `Types.unify`'s record arm (intersection-based); verified on `abclc/o2_typeinf/ce_13_record_subtyping/sample{1,2,3}_*.abcl`¹⁶ |
+| **CE-13** | **record width subtyping** (`{a, b, c}` unifies with `{a, b}` — intersection-based, depth subtyping per field)¹⁴ | ❌ | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** | C-codegen: `aipl2c --check` calls `Typecheck.run`, which already routes through `Types.unify`'s record arm (intersection-based); verified on `abclc/o2_typeinf/ce_13_record_subtyping/sample{1,2,3}_*.aipl`¹⁶ |
 | **CE-12** | **refinement unification** (early Z3 subset check in `unify` when `AIPL_REFINE_UNIFY=1`)¹⁵ | ❌ | **✅** | **✅** | **✅** | **🟡** | **✅** | **✅** | JS-N: `server.mjs` installs `globalThis.__AIPL_REFINE_CHECK` (z3 spawn under `AIPL_REFINE_Z3=1`); JS-B falls back to gradual (browser has no z3); OCaml/JS-O/C: `Types.TRefined` + `unify` TRefined arm¹⁶ |
 
 サンプル: `aice-pi-evolution/experiments/2026-05-17_aipl_v2_type_inference/samples/feature_{a..g}/` (7 feature × 3 = 21 demo + 27/27 unit tests).
@@ -403,7 +403,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
 ¹ OCaml は Phase O-2.a (2026-05-18) で **parsing 達成**: lexer に
   `where`/`and`/`or`/`not` キーワード、`type_expr WHERE refine_or`
   sub-grammar、AST に `TyERefined of type_expr * refine_pred`。
-  サンプル: `abclc/WhereClause.abcl`。predicate の検査は CE-1/CE-6/CE-9
+  サンプル: `abclc/WhereClause.aipl`。predicate の検査は CE-1/CE-6/CE-9
   (Z3 backend, footnote ²) が責務。
 
 ² OCaml は Phase O-2.b (2026-05-18) で **Z3 SMT-LIB 2 + CLI** で
@@ -411,12 +411,12 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   (Typecheck.run 経由). `src/refinement.ml` は `Ast.refine_pred` を
   SMT-LIB 2 にレンダして `z3 -in -t:5000` に流し、`sat`/`unsat`/`unknown`
   を解釈。CLI が PATH に無い場合は `Deferred "z3 not available"` で graceful
-  fallback。サンプル: `abclc/WhereVacuous.abcl`。
+  fallback。サンプル: `abclc/WhereVacuous.aipl`。
   Phase O-2.c (2026-05-18) で **`smt_sort` パラメータ化** により
   `TFloat` → SMT-LIB Real 理論に対応 (CE-6)。`float where x > 0.0 and
   x < 1.0` のような decimal 述語、`/` の real division、int リテラル
   の自動 promote (例: `float where x > 0 and x < 100`) が動く。
-  サンプル: `abclc/WhereVacuousReal.abcl`。
+  サンプル: `abclc/WhereVacuousReal.aipl`。
 
 ³ OCaml は Phase O-2.d (2026-05-18) で cross-class 推論を強化:
   `preinfer_all_classes` が method の declared return type (`-> T`)
@@ -444,7 +444,7 @@ Hindley–Milner + Z3 refinement** 推論系を持つ。Py-I (`python-aipl-infer
   も尊重するよう修正 (従来は fresh tvar で常に absorb)。これで
   `method f(p: {a:int, b:int})` に shape 不一致の record literal
   を渡すと type error が出る (count / label / field type すべて)。
-  サンプル: `abclc/RecordStructural.abcl`。
+  サンプル: `abclc/RecordStructural.aipl`。
 
 OCaml ランタイムも HM 推論を持つが (#12 で ✅)、refinement (`where` 句) と
 Z3 backend には対応していない。OCaml への移植は今後の課題。
@@ -502,33 +502,33 @@ AIPL を AIPL 自身で書く 10 層ブートストラップ.進化計算で探�
 「AIPL を解釈する AIPL eval」を実現し、Level Z で全部をまとめて
 **≤20 行の Python bootstrap loader** から起動できる状態に到達.
 
-| Level | 役割 | 主要ファイル (.abcl) | samples | smoke |
+| Level | 役割 | 主要ファイル (.aipl) | samples | smoke |
 |---|---|---|---:|:-:|
-| **C**     | lexer + parser + eval パイプライン | `lexer.abcl` (185) + `parser.abcl` (318) + `eval.abcl` (101) | 3 | ✅ |
-| **C-2**   | アクタースケジューラ (Phase 11+) | `scheduler.abcl` | 6 | ✅ |
-| **C-3**   | スケジューラ + now/future | `scheduler.abcl` | 1 | ✅ |
-| **B-1**   | Phase 11 型検査 | `typeck.abcl` | 6 | ✅ |
-| **B-2**   | Phase 12 効果検査 | `typeck.abcl` | 4 | ✅ |
-| **B-3**   | Phase 13 チャネル検査 | `typeck.abcl` | 5 | ✅ |
-| **B-4**   | Phase 14 linear 検査 | `typeck.abcl` | 4 | ✅ |
-| **B-5**   | Phase 15 owned 検査 | `typeck.abcl` | 4 | ✅ |
-| **A**     | メタサーキュラ eval | `metacircular.abcl` (216) | 4 | ✅ |
-| **Z**     | **統合: Level C + IO bridge + 最小 bootstrap** | `driver_head.abcl` + `io_bridge.abcl` + `bootstrap.py` (**18 行**) | 4 | ✅ (10/10) |
+| **C**     | lexer + parser + eval パイプライン | `lexer.aipl` (185) + `parser.aipl` (318) + `eval.aipl` (101) | 3 | ✅ |
+| **C-2**   | アクタースケジューラ (Phase 11+) | `scheduler.aipl` | 6 | ✅ |
+| **C-3**   | スケジューラ + now/future | `scheduler.aipl` | 1 | ✅ |
+| **B-1**   | Phase 11 型検査 | `typeck.aipl` | 6 | ✅ |
+| **B-2**   | Phase 12 効果検査 | `typeck.aipl` | 4 | ✅ |
+| **B-3**   | Phase 13 チャネル検査 | `typeck.aipl` | 5 | ✅ |
+| **B-4**   | Phase 14 linear 検査 | `typeck.aipl` | 4 | ✅ |
+| **B-5**   | Phase 15 owned 検査 | `typeck.aipl` | 4 | ✅ |
+| **A**     | メタサーキュラ eval | `metacircular.aipl` (216) | 4 | ✅ |
+| **Z**     | **統合: Level C + IO bridge + 最小 bootstrap** | `driver_head.aipl` + `io_bridge.aipl` + `bootstrap.py` (**18 行**) | 4 | ✅ (10/10) |
 | **total** |   | 9 AIPL モジュール (~1500 LOC) + 18 行 Python | **41** | **47/47** |
 
 ### Level Z = self-host complete の証明
 
 `bootstrap.py` は **18 行** で (`.aice` 仕様の ≤20 行制約内):
 
-1. ユーザの `.abcl` ファイルを読む
-2. `level-c/lexer.abcl` + `parser.abcl` + `eval.abcl` + `driver_head.abcl` を連結
+1. ユーザの `.aipl` ファイルを読む
+2. `level-c/lexer.aipl` + `parser.aipl` + `eval.aipl` + `driver_head.aipl` を連結
 3. ホスト AIPL に渡す
 
 …だけ. 構文解析と評価は **全て AIPL 側で完結**. ホスト Python に
 残るのは AIPL ランタイム本体 (組込みプリミティブ + スケジューラ) と
 この 18 行の loader のみ.
 
-`io_bridge.abcl` は fs / ai / net プリミティブを **CE-11 capability check
+`io_bridge.aipl` は fs / ai / net プリミティブを **CE-11 capability check
 ごし** に再エクスポートするので、ホスト権限とユーザコードの間に
 capability 境界が立つ. smoke は `AIPL_CAP_STRICT=1` 下で missing-grant が
 `capability denied` で停止することも確認.
@@ -639,7 +639,7 @@ actor stalls the whole runtime.
 The AIPL programming model (`send` / `now` / `future` / `await`)
 is preserved across all three tiers — the choice of target
 picks a point on the cost/scale curve without changing the
-program text.  The same `.abcl` file:
+program text.  The same `.aipl` file:
 - runs ~1000 actors fine on Python / OCaml / C (OS-thread tier);
 - scales to millions of actors on Erlang / Go / Pony codegen;
 - runs in a browser sandbox via JS-Browser at the cost of
@@ -674,7 +674,7 @@ program text.  The same `.abcl` file:
 - Trades Phase 11+ annotation-driven static checks (effects /
   linear / owned / transient) for full Hindley-Milner inference
 - Cross-verified against OCaml: identical inferred types on shared
-  samples (Hello.abcl, counter.abcl)
+  samples (Hello.aipl, counter.aipl)
 
 ### OCaml — feature parity with Python on the core (≈24/32 ✅)
 - Recently caught up on **method injection** (`add_method`/`remove_method`),
@@ -683,7 +683,7 @@ program text.  The same `.abcl` file:
   **type annotations** (`var x: int`), **records & tuples**, **sized
   arrays** (`var x[N][M]`), **text/image file I/O** (PPM backend for images).
 - Phase 11+ effect/linear/owned/transient features still only exist as
-  `.abcl` design-document samples — not enforced statically.
+  `.aipl` design-document samples — not enforced statically.
 - Solid `become` / `select` / WebSocket (built into `web_gateway.ml`)
   and HTTP remote actor calls (send / now / future, error-tolerant)
   with **HMAC-signed traffic** (`ABCL_REMOTE_SECRET` env, pure-OCaml
@@ -728,7 +728,7 @@ program text.  The same `.abcl` file:
 
 ### Type inference cross-verification
 
-For shared samples (`abclc/Hello.abcl`, `abclc/counter.abcl`),
+For shared samples (`abclc/Hello.aipl`, `abclc/counter.aipl`),
 the three HM-based runtimes (**OCaml**, **Python-inferred**, **C**)
 produce **identical inferred types**:
 
@@ -813,11 +813,11 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
 
 - **(e) user-defined `reply(r)` method** — Erlang プロセス風。Driver に
   通常のメソッド `reply(r)` を定義するだけで OK (actor loop が自動 dispatch)。
-  サンプル: `abclc/ai-samples/SendReplyMethod.abcl` (OCaml `cbec37c`) /
-  `samples-ai/_send_reply_demo/send_reply_style.abcl` (Python `dd9d604`).
+  サンプル: `abclc/ai-samples/SendReplyMethod.aipl` (OCaml `cbec37c`) /
+  `samples-ai/_send_reply_demo/send_reply_style.aipl` (Python `dd9d604`).
 - **(f) `select { case reply(r) -> ... }` block** — OTP / Erlang
-  receive 風。サンプル: `_ai_call_styles/send_select_style.abcl` (OCaml) /
-  `samples-ai/_send_reply_demo/send_select_style.abcl` (Python `9aaf371`).
+  receive 風。サンプル: `_ai_call_styles/send_select_style.aipl` (OCaml) /
+  `samples-ai/_send_reply_demo/send_select_style.aipl` (Python `9aaf371`).
 
 両ランタイムに 4 形態 (now / future+await / send+reply-method / send+select)
 の `ai_call` デモが揃った。実 OpenAI provider + mock 両方で動作確認済。
@@ -851,10 +851,10 @@ OCaml と Python (型推論) で `send` / `now` / `future` / `select` / `reply`
   tightened fix (3) (script-mode quiescence) ported to Python type-
   inferred runtime (commit `dd9d604`); Python gained the OCaml-style
   `select { case method(args) -> ... }` statement (commit `9aaf371`).
-  Cross-runtime parity samples in `abclc/ai-samples/SendReplyMethod.abcl`
+  Cross-runtime parity samples in `abclc/ai-samples/SendReplyMethod.aipl`
   (commit `cbec37c`) and `src/python-aipl/samples-ai/_send_reply_demo/`.
 
 For source pointers, run `grep` against the files listed in each
 runtime's source column.
 
-*Last regenerated: 2026-05-18 (after **Self-host bootstrap Level Z completed**: 10-level chain wraps up with `aipl-self-host/level-z/` — an 18-line Python `bootstrap.py` + AIPL-side `driver_head.abcl` + CE-11 capability-checked `io_bridge.abcl` + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in `aipl2c --check`, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = 103 next-gen / self-host assertions all PASS.*
+*Last regenerated: 2026-05-18 (after **Self-host bootstrap Level Z completed**: 10-level chain wraps up with `aipl-self-host/level-z/` — an 18-line Python `bootstrap.py` + AIPL-side `driver_head.aipl` + CE-11 capability-checked `io_bridge.aipl` + 4 samples; master smoke 47/47 PASS across all 10 levels.  Earlier same-day work: CE-10 / CE-13 surfaced in `aipl2c --check`, JS-B/JS-N 26/26 closeout (CE-10 / CE-12 / CE-13 / DR-11), Round 6 + Round 7 evolution rounds picked (CE-16 V1 Tail-row-variable, DR-17 W1 Plumtree) as the next implementation pair.  Sample suite: OCaml/abclc 24 + Py-I 24 + JS-B/JS-N 14 + self-host 41 = 103 next-gen / self-host assertions all PASS.*

@@ -2,7 +2,7 @@
   "name": "ReceptionWorkflowZEvolution",
   "runtime": "ocaml_abcl_cplus",
   "input": "aice-z-evolution/examples/ReceptionWorkflowZEvolution.aice",
-  "abcl": "aice-z-evolution/out/ReceptionWorkflowZEvolution.abcl",
+  "abcl": "aice-z-evolution/out/ReceptionWorkflowZEvolution.aipl",
   "report": "aice-z-evolution/out/ReceptionWorkflowZEvolution.report.md",
   "target_language": "ABCL",
   "checks": [

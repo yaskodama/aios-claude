@@ -60,7 +60,7 @@ aice AIPL_OCaml_NextGenPort {
       spec = "既存 75/75 abclc smoke + 39/39 o2_typeinf/o1_distributed smoke + Phase 13 Channels / Phase 17 Scope などの complex samples が無変更で動作。新機能は全て opt-in (`AIPL_DIST_ENABLE=1` + 機能別 env var) で発火。";
     }
     task PyIParity {
-      spec = "OCaml 側と Py-I 側で同一の .abcl ソースが同じ観測結果を出す (mock provider 越し)。CE-* 系は --infer 出力の effects / 型表示が同等。DR-* 系は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での Py-A vs OCaml の同等性 (18/18 mirror) と同様。";
+      spec = "OCaml 側と Py-I 側で同一の .aipl ソースが同じ観測結果を出す (mock provider 越し)。CE-* 系は --infer 出力の effects / 型表示が同等。DR-* 系は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での Py-A vs OCaml の同等性 (18/18 mirror) と同様。";
     }
     task ImplCostBudget {
       spec = "8 機能合計 800 行以内 (Py-I 合計 ~700 行 + OCaml syntax overhead で +15%)。最も難い PortSaga (grammar) と PortCRDT (大規模 data structures) で全体の 50% を占める想定。AST / parser 修正は parser.mly + ast.ml の 2 ファイルのみ。";
@@ -108,7 +108,7 @@ aice AIPL_OCaml_NextGenPort {
       persona = "あなたは後方互換性レビュアーです。OCaml AIPL の 75 abclc smoke samples (Counter / BoundedBuffer / AIChain / Channels / Phase11+ 型付き / Phase 13 channels / Phase 17 scope) + 15 o2_typeinf + 24 o1_distributed samples が無変更で動作するか。OCaml の Phase O で確立された opt-in パターン (AIPL_DIST_ENABLE=1) を全 8 機能で踏襲するか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
     }
     reviewer PyIParity {
-      persona = "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.abcl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+      persona = "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.aipl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
     }
     reviewer OCamlIdiomaticity {
       persona = "あなたは OCaml イディオム性レビュアーです。Py-I の Python idiom (dict / TLS via threading.local / class-with-methods) を OCaml らしく書き直す妥当性を評価。Hashtbl vs Map / Mutex 付き ref vs Atomic / module-local mutable / record. Py-I の dict-based CRDT を OCaml で variant + record にするべきか dict のまま JSON 持ちにするべきか等。1.0 = OCaml idiom 完璧、0.7 = 大半 idiom、0.3 = Python の直訳を持ち込み過ぎ、0.0 = OCaml 的でない。1 行で返答。";

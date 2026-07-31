@@ -1,0 +1,58 @@
+// Priority3Xinu.aipl
+// P2 demo: three worker actors at high / normal / low priority.
+// Controller bulk-sends N tick messages to each worker, then blocks.
+//
+// Expected serial behaviour (Xinu prio-driven preemption):
+//   1. On spawn, [aipl] prio class=… lines report each worker's tid+prio.
+//   2. HiWorker preempts Controller mid-loop and prints its N HIGH marks
+//      eagerly; LoWorker waits because prio 10 < Controller's prio 20.
+//   3. Once Controller blocks on recv, MdWorker (prio 20) drains, then
+//      LoWorker (prio 10) drains — proving no starvation.
+//
+// Smoke (_smoke_p2.sh) checks: getprio assignment, last-HIGH < first-LOW,
+// and that all 3*N marks appear.
+
+class HiWorker priority(high) {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { print("[aipl] HIGH-tick"); hits = hits + 1; }
+}
+
+class MdWorker {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { print("[aipl] MID-tick"); hits = hits + 1; }
+}
+
+class LoWorker priority(low) {
+  var hits = 0;
+  method init() { hits = 0; }
+  method tick() { print("[aipl] LOW-tick"); hits = hits + 1; }
+}
+
+class Controller {
+  var hi = nil;
+  var md = nil;
+  var lo = nil;
+
+  method init() {
+    hi = new HiWorker();
+    md = new MdWorker();
+    lo = new LoWorker();
+    send self.fire();
+  }
+
+  method fire() {
+    // Xinu mailbox MAX_MAILBOX=16 → cap each worker at 10 to leave
+    // headroom for the init message + a couple of bookkeeping slots.
+    var i = 1;
+    while (i <= 10) do {
+      send hi.tick();
+      send md.tick();
+      send lo.tick();
+      i = i + 1;
+    }
+  }
+}
+
+var ctrl = new Controller();

@@ -1,6 +1,6 @@
 # AIPL_XinuRazPi_Round1
 
-> AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) で進化させる.Round 0 (= 既存 src/aipl2c.ml --xinu + gen_program_xinu + 3 サンプル + xinu-raz) を base に、(R) regression 修復、(P) パフォーマンス/スケジューラ、(F) AIPL 機能拡張 (Xinu C ランタイム上)、(G) GUI/I/O 拡張、(N) 分散/ネットワーク の 5 軸で進化.全 phase は (1) aipl2c の .abcl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で起動成功 ✅ の 3 段ゲートを通過すること.
+> AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) で進化させる.Round 0 (= 既存 src/aipl2c.ml --xinu + gen_program_xinu + 3 サンプル + xinu-raz) を base に、(R) regression 修復、(P) パフォーマンス/スケジューラ、(F) AIPL 機能拡張 (Xinu C ランタイム上)、(G) GUI/I/O 拡張、(N) 分散/ネットワーク の 5 軸で進化.全 phase は (1) aipl2c の .aipl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で起動成功 ✅ の 3 段ゲートを通過すること.
 
 ## 1. 発見された進化軌跡 (best champion lineage)
 

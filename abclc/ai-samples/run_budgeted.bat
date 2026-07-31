@@ -1,2 +1,2 @@
-load Budgeted.abcl
+load Budgeted.aipl
 compile

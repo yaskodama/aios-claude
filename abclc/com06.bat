@@ -1,2 +1,2 @@
-load window.abcl
+load window.aipl
 compile

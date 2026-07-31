@@ -3,7 +3,7 @@
 // Narrowed slice of AIPLSelfHost_B_PhaseChase.aice that scores
 // candidates ONLY against the Phase 11 task (typed function /
 // var-decl / arity / union / promotion / return-type rules).
-// Used as the GA companion to aipl-self-host/level-b/typeck.abcl
+// Used as the GA companion to aipl-self-host/level-b/typeck.aipl
 // so the lineage shows when the search reaches Level B-1's design
 // frontier.
 

@@ -13,11 +13,11 @@ LOG=_smoke_logs/_phase
 mkdir -p _smoke_logs
 
 declare -a SAMPLES=(
-  "Phase11_TypedCounter.abcl"
-  "Phase12_EffectsLog.abcl"
-  "Phase13_Channels.abcl"
-  "Phase14_Linear.abcl"
-  "Phase15_Owned.abcl"
+  "Phase11_TypedCounter.aipl"
+  "Phase12_EffectsLog.aipl"
+  "Phase13_Channels.aipl"
+  "Phase14_Linear.aipl"
+  "Phase15_Owned.aipl"
 )
 declare -a EXPECTS=(
   "Phase 11 — typed calc"
@@ -31,7 +31,7 @@ pass=0; fail=0
 for i in "${!SAMPLES[@]}"; do
   abcl="${SAMPLES[$i]}"
   expect="${EXPECTS[$i]}"
-  log="${LOG}_${abcl%.abcl}.log"
+  log="${LOG}_${abcl%.aipl}.log"
 
   printf 'load %s\ncompile\n' "$abcl" > _run.bat
   "$REPL" -f "$PWD/_run.bat" > "$log" 2>&1 &

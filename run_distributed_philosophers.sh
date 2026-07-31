@@ -38,7 +38,7 @@ fi
 # bridge is online, so P3/P4 and the browser philosophers line up at a
 # clean starting point.
 cat > /tmp/run_distributed_philosophers.cmds <<'EOF'
-load src/distributed_philosophers_ocaml.abcl
+load src/distributed_philosophers_ocaml.aipl
 compile
 EOF
 

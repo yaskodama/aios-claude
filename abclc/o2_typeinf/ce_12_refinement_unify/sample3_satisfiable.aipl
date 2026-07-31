@@ -1,0 +1,15 @@
+// CE-12 / sample 3 — satisfiable refinement (no warning expected).
+//
+// Run:
+//   AIPL_REFINE_CHECK=1 \
+//   _build/default/src/repl_thread.exe --check \
+//     abclc/o2_typeinf/ce_12_refinement_unify/sample3_satisfiable.aipl
+//
+// Expected: no `[refine warning]` lines.  The CE-12 subset API
+// (`Refinement.check_subset`) is reachable from OCaml callers and is
+// the foundation for a future unify-time early-flag pass — see Matrix
+// footnote o.
+
+class C {
+  method ok(p: int where x > 0 and x < 100) -> int { return p; }
+}

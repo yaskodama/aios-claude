@@ -4,7 +4,7 @@
 // -> dump lineage as JSON for the Python report pipeline.
 //
 // Run:
-//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_PyI_NextGen.abcl
+//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_PyI_NextGen.aipl
 //
 // Reviewers compute deterministic scores in Phase 5. Setting use_ai=1
 // (Phase 6) makes them call ai_call_with_system per scoring request.
@@ -743,7 +743,7 @@ class Coordinator {
       // crash-recovery: flush lineage every generation so silent SDK
       // hangs (cf. Pi_Phase1_OpenSearch v3 attempt 2026-05-16) do not
       // lose the partial result.  Cost: one fs write per generation.
-      var ckpt_n = now lineage.dump("out/AIPL_PyI_NextGen.abcl_lineage.json");
+      var ckpt_n = now lineage.dump("out/AIPL_PyI_NextGen.aipl_lineage.json");
       print("[ckpt gen=" + gen + "] flushed " + ckpt_n + " individuals");
       gen = gen + 1;
     }
@@ -751,8 +751,8 @@ class Coordinator {
     print("[done] cells filled: " + (now elite.size()));
     print(now elite.best_summary(5));
 
-    var n = now lineage.dump("out/AIPL_PyI_NextGen.abcl_lineage.json");
-    print("[lineage] wrote " + n + " individuals to out/AIPL_PyI_NextGen.abcl_lineage.json");
+    var n = now lineage.dump("out/AIPL_PyI_NextGen.aipl_lineage.json");
+    print("[lineage] wrote " + n + " individuals to out/AIPL_PyI_NextGen.aipl_lineage.json");
   }
 }
 

@@ -33,7 +33,7 @@ PASS=0; FAIL=0
 for src in Rotate4LinesXinu Philosophers5Xinu BoundedBufferXinu; do
   exp=$(expected_actors "$src")
   echo "=== $src (expected actors=$exp) ==="
-  ./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+  ./_build/default/src/aipl2c.exe abclc/${src}.aipl \
       -o /tmp/_p1_${src}.c --xinu --max-msgs 0 > /tmp/_p1_${src}.aipl2c.log 2>&1
   [ -f /tmp/_p1_${src}.c ] || { echo "  FAIL aipl2c"; FAIL=$((FAIL+4)); continue; }
   cp /tmp/_p1_${src}.c "$XINU/apps/abcl_program.c"

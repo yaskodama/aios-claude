@@ -69,7 +69,7 @@ aice AIPL_XinuRazPi_RemoteRPC {
     }
 
     task H4_SamplePrograms {
-      spec = "AIPL 側 sample `abclc/RemoteRpcDemoXinu.abcl` を追加.2 class を public 化: `Counter` (var n=0; method bump(){ n=n+1; print(7000+n); } method dump(){ print(8000+n); }) と `Greeter` (var who_tag=0; method set_who(t){ who_tag=t; print(9000+t); } method hello(){ print(10000+who_tag); }).Host 側 reference client は 2 種: (a) bash+nc 版 `host_rpc_demo.sh` で 8 行コマンドを流す、(b) Python 版 `host_rpc_demo.py` (stdlib のみ) で同じシーケンスを socket API 経由で実行.";
+      spec = "AIPL 側 sample `abclc/RemoteRpcDemoXinu.aipl` を追加.2 class を public 化: `Counter` (var n=0; method bump(){ n=n+1; print(7000+n); } method dump(){ print(8000+n); }) と `Greeter` (var who_tag=0; method set_who(t){ who_tag=t; print(9000+t); } method hello(){ print(10000+who_tag); }).Host 側 reference client は 2 種: (a) bash+nc 版 `host_rpc_demo.sh` で 8 行コマンドを流す、(b) Python 版 `host_rpc_demo.py` (stdlib のみ) で同じシーケンスを socket API 経由で実行.";
       weight = 0.12;
       acceptance = "6 assertion: (1) AIPL 側で Counter/Greeter class が register 済で起動時 spawn 0、(2) bash client が SPAWN Counter→SEND bump×2→SEND dump で 7001/7002/8002 digest を吐く、(3) Greeter の set_who(42)+hello で 9042/10042 digest、(4) LIST が n_actors=2、(5) Python client が同じ digest を観測、(6) shell (UART0 xsh$) は client 接続中も使える.";
     }
@@ -201,7 +201,7 @@ aice AIPL_XinuRazPi_RemoteRPC {
   file_impact {
     primary = [
       "src/c_translator.ml::gen_program_xinu  (~30 LOC: abcl_class_names[] emission + spawn-by-name helper)",
-      "abclc/RemoteRpcDemoXinu.abcl           (~60 LOC: Counter + Greeter)"
+      "abclc/RemoteRpcDemoXinu.aipl           (~60 LOC: Counter + Greeter)"
     ];
     new_files = [
       "aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/_smoke_h{1,2,3}.sh",
@@ -227,7 +227,7 @@ aice AIPL_XinuRazPi_RemoteRPC {
     // AIPL 側: 起動時には何もインスタンス化しない.Counter / Greeter
     // class が宣言だけされていれば、host から SPAWN で生成できる.
     aipl_side {
-      file = "abclc/RemoteRpcDemoXinu.abcl";
+      file = "abclc/RemoteRpcDemoXinu.aipl";
       classes = [
         "class Counter { var n = 0; method bump() { n = n + 1; print(7000+n); } method dump() { print(8000+n); } }",
         "class Greeter { var who_tag = 0; method set_who(t) { who_tag = t; print(9000+t); } method hello() { print(10000+who_tag); } }"

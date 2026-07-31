@@ -163,7 +163,7 @@
 \midrule
 \texttt{schemas/*.schema.json}        & $\rightarrow$ &                       \\
 \texttt{examples/*.aice} (5 ファイル) & $\rightarrow$ & \texttt{out/*.ga.json} \\
-                                      & $\rightarrow$ & \texttt{out/*.abcl} (\,オプション\,) \\
+                                      & $\rightarrow$ & \texttt{out/*.aipl} (\,オプション\,) \\
                                       & $\rightarrow$ & \texttt{out/*.lineage.json} \\
                                       & $\rightarrow$ & \texttt{out/*.elite\_map.json} \\
                                       & $\rightarrow$ & \texttt{out/*.ranking.json} \\
@@ -347,14 +347,14 @@ UltimateNextLanguage   & 52 & 30 & 0.797 & ParallelOOP / actor / type=high \\
 
 \subsection{AIPL アクター並列実行結果}
 
-Python パイプラインと並行して、生成された 5 つの \texttt{.abcl} を
+Python パイプラインと並行して、生成された 5 つの \texttt{.aipl} を
 \texttt{ABCL\_AI\_PROVIDER=mock} で実行した (表~\ref{tab:abcl_results})。
 RNG パスが Python と独立なため個体集合は異なるが、cell 充填数は
 むしろ多くなり、actor framework が end-to-end で動作することを確認した。
 
 \begin{table}[h]
 \centering
-\caption{AIPL ランタイム実行結果 (\texttt{.abcl})}
+\caption{AIPL ランタイム実行結果 (\texttt{.aipl})}
 \label{tab:abcl_results}
 \small
 \begin{tabular}{lrrrl}
@@ -542,7 +542,7 @@ for ex in NextLanguagePrediction WebServiceEvolution \
           UltimateNextLanguage; do
   python3 -m src.cli examples/$ex.aice -o out --abcl --no-run
   ABCL_AI_PROVIDER=mock python3 ../src/python-aipl/aipl_main.py \
-      --timeout 240 out/$ex.abcl
+      --timeout 240 out/$ex.aipl
 done
 \end{lstlisting}
 
@@ -558,7 +558,7 @@ done
 \subsection*{自動生成出力}
 \begin{itemize}
   \item \texttt{out/*.ga.json} (各 \(\sim\)3 KB)
-  \item \texttt{out/*.abcl} (各 \(\sim\)19 KB)
+  \item \texttt{out/*.aipl} (各 \(\sim\)19 KB)
   \item \texttt{out/*.lineage.json} (各 28--44 KB)
   \item \texttt{out/*.elite\_map.json} (各 \(\sim\)8 KB)
   \item \texttt{out/*.ranking.json} (各 \(\sim\)45 KB)

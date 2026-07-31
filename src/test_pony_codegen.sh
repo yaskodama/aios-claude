@@ -26,14 +26,14 @@ trap "rm -rf '$TMPROOT'" EXIT
 # Samples expected to round-trip cleanly (no cross-actor globals
 # in init, no `sender`-driven sends).
 GOOD=(
-  Hello.abcl
-  counter.abcl
+  Hello.aipl
+  counter.aipl
 )
 
 # Samples expected to fail (used as a negative check — sender / cross-ref).
 # The codegen still emits Pony source but ponyc rejects it.
 EXPECTED_FAIL=(
-  PingPong.abcl
+  PingPong.aipl
 )
 
 pass=0; fail=0; total=0; xfail=0
@@ -41,7 +41,7 @@ pass=0; fail=0; total=0; xfail=0
 check_good() {
   local f="$1"
   total=$((total + 1))
-  local name="${f%.abcl}"
+  local name="${f%.aipl}"
   local dir="$TMPROOT/$name"
   mkdir -p "$dir"
   if ! "$ABCL2C" "abclc/$f" -o "$dir/main.pony" --pony > /dev/null 2>&1; then
@@ -70,7 +70,7 @@ check_good() {
 check_xfail() {
   local f="$1"
   total=$((total + 1))
-  local name="${f%.abcl}"
+  local name="${f%.aipl}"
   local dir="$TMPROOT/$name"
   mkdir -p "$dir"
   "$ABCL2C" "abclc/$f" -o "$dir/main.pony" --pony > /dev/null 2>&1

@@ -1,2 +1,2 @@
-load sample3_lww_replicate.abcl
+load sample3_lww_replicate.aipl
 compile

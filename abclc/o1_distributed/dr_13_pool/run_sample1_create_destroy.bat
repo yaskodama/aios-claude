@@ -1,2 +1,2 @@
-load sample1_create_destroy.abcl
+load sample1_create_destroy.aipl
 compile

@@ -6,12 +6,12 @@ set -u
 cd "$(dirname "$0")"
 
 declare -a SAMPLES=(
-  "SampleClean.abcl              0"
-  "SampleArityViolation.abcl     2"
-  "SampleTypeViolation.abcl      2"
-  "SampleReturnViolation.abcl    1"
-  "SampleUnion.abcl              1"
-  "SampleSelfConsistency.abcl    1"
+  "SampleClean.aipl              0"
+  "SampleArityViolation.aipl     2"
+  "SampleTypeViolation.aipl      2"
+  "SampleReturnViolation.aipl    1"
+  "SampleUnion.aipl              1"
+  "SampleSelfConsistency.aipl    1"
 )
 
 pass=0; fail=0
@@ -21,7 +21,7 @@ for entry in "${SAMPLES[@]}"; do
   expected_issues="$2"
 
   bash run.sh "samples/$sample" >/dev/null 2>&1
-  log="out/${sample%.abcl}.log"
+  log="out/${sample%.aipl}.log"
   actual=$(grep -E '^issues=' "$log" | sed 's/issues=//')
   if [ "$actual" = "$expected_issues" ]; then
     pass=$((pass+1))

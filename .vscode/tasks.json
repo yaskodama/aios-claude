@@ -53,7 +53,7 @@
       "presentation": { "reveal": "silent" }
     },
     {
-      "label": "ABCL: run current .abcl (Python runtime)",
+      "label": "ABCL: run current .aipl (Python runtime)",
       "type": "shell",
       "command": "/usr/bin/python3 ${workspaceFolder}/src/python-abcl/abcl_main.py ${file}",
       "group": "test",
@@ -61,7 +61,7 @@
       "presentation": { "reveal": "always", "panel": "dedicated" }
     },
     {
-      "label": "ABCL: run current .abcl with dashboard (port 8800)",
+      "label": "ABCL: run current .aipl with dashboard (port 8800)",
       "type": "shell",
       "command": "/usr/bin/python3 ${workspaceFolder}/src/python-abcl/abcl_main.py --dashboard 8800 --timeout 30 ${file}",
       "problemMatcher": [],

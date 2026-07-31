@@ -20,21 +20,21 @@ export AIPL_DIST_LOG_FILE="${AIPL_DIST_LOG_FILE:-$LOGDIR/aipl_dist.ndjson}"
 # Per-sample env (case is bash-3.2 friendly).
 env_for() {
   case "$1" in
-    ce11_capability/sample2_strict_raise.abcl) echo "AIPL_CAP_STRICT=1" ;;
-    ce12_refinement/sample1_satisfiable.abcl)  echo "AIPL_REFINE_UNIFY=1" ;;
-    ce12_refinement/sample2_window_unsat.abcl) echo "AIPL_REFINE_CHECK=1" ;;
-    ce12_refinement/sample3_subset_implied.abcl) echo "AIPL_REFINE_UNIFY=1" ;;
-    ce16_rowpoly/sample1_basic_rowvar.abcl)    echo "AIPL_ROWPOLY=1" ;;
-    ce16_rowpoly/sample2_open_closed.abcl)     echo "AIPL_ROWPOLY=1" ;;
-    ce16_rowpoly/sample3_nested_rowvar.abcl)   echo "AIPL_ROWPOLY=1" ;;
-    dr17_plumtree/sample1_eager_broadcast.simple.abcl) echo "AIPL_DIST_ENABLE=1" ;;
-    dr17_plumtree/sample2_lazy_repair.abcl)            echo "AIPL_DIST_ENABLE=1" ;;
-    dr17_plumtree/sample3_demote_promote.abcl)         echo "AIPL_DIST_ENABLE=1" ;;
-    dr12_region/sample1_primary_hit.abcl)
+    ce11_capability/sample2_strict_raise.aipl) echo "AIPL_CAP_STRICT=1" ;;
+    ce12_refinement/sample1_satisfiable.aipl)  echo "AIPL_REFINE_UNIFY=1" ;;
+    ce12_refinement/sample2_window_unsat.aipl) echo "AIPL_REFINE_CHECK=1" ;;
+    ce12_refinement/sample3_subset_implied.aipl) echo "AIPL_REFINE_UNIFY=1" ;;
+    ce16_rowpoly/sample1_basic_rowvar.aipl)    echo "AIPL_ROWPOLY=1" ;;
+    ce16_rowpoly/sample2_open_closed.aipl)     echo "AIPL_ROWPOLY=1" ;;
+    ce16_rowpoly/sample3_nested_rowvar.aipl)   echo "AIPL_ROWPOLY=1" ;;
+    dr17_plumtree/sample1_eager_broadcast.simple.aipl) echo "AIPL_DIST_ENABLE=1" ;;
+    dr17_plumtree/sample2_lazy_repair.aipl)            echo "AIPL_DIST_ENABLE=1" ;;
+    dr17_plumtree/sample3_demote_promote.aipl)         echo "AIPL_DIST_ENABLE=1" ;;
+    dr12_region/sample1_primary_hit.aipl)
       echo "AIPL_REGION=us-east-1 AIPL_REGION_FAILOVER=us-east-1,eu-west-1 AIPL_ROUTE_REGION_us-east-1=Greeter:fast" ;;
-    dr12_region/sample2_failover_chain.abcl)
+    dr12_region/sample2_failover_chain.aipl)
       echo "AIPL_REGION=us-east-1 AIPL_REGION_FAILOVER=us-east-1,eu-west-1,ap-northeast-1 AIPL_ROUTE_REGION_eu-west-1=Greeter:slow" ;;
-    dr12_region/sample3_chain_exhausted.abcl)
+    dr12_region/sample3_chain_exhausted.aipl)
       echo "AIPL_REGION=us-east-1 AIPL_REGION_FAILOVER=us-east-1,eu-west-1" ;;
     *) echo "" ;;
   esac
@@ -44,13 +44,13 @@ env_for() {
 # (Plain `run` is still allowed since Py-I's runtime is permissive.)
 expect_check_type_error() {
   case "$1" in
-    ce13_record_subtyping/sample2_disjoint_rejected.abcl) return 0 ;;
+    ce13_record_subtyping/sample2_disjoint_rejected.aipl) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 pass=0; fail=0; total=0
-for rel in $(cd "$HERE" && find ce* dr* -name "sample*.abcl" | sort); do
+for rel in $(cd "$HERE" && find ce* dr* -name "sample*.aipl" | sort); do
   total=$((total+1))
   abs="$HERE/$rel"
   envvars="$(env_for "$rel")"

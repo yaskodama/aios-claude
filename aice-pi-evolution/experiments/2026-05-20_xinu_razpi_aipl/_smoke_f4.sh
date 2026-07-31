@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # F4 smoke — strings + int arrays in the Xinu AIPL runtime.
 #
-# Sample: abclc/StringArrayXinu.abcl runs a Probe actor that exercises
+# Sample: abclc/StringArrayXinu.aipl runs a Probe actor that exercises
 #         str_concat, array bounds checks, and a 200-cycle alloc/free
 #         loop.  All three assertions read out of the serial log.
 #
@@ -22,7 +22,7 @@ LOG=/tmp/_f4.qemu.log
 dune build src/aipl2c.exe >/tmp/_f4_build.log 2>&1 || {
   echo "FAIL: dune build"; tail /tmp/_f4_build.log; exit 1; }
 
-./_build/default/src/aipl2c.exe abclc/StringArrayXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/StringArrayXinu.aipl \
     -o /tmp/_f4_StringArrayXinu.c --xinu --max-msgs 0 \
     > /tmp/_f4_aipl2c.log 2>&1
 [ -f /tmp/_f4_StringArrayXinu.c ] || {

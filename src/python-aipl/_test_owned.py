@@ -87,13 +87,13 @@ class D { method run() { var p = new P(); var v = p.xs; } }
 
 def test_owned_sample_clean():
     here = os.path.dirname(__file__)
-    src = open(os.path.join(here, "samples", "Owned.abcl")).read()
+    src = open(os.path.join(here, "samples", "Owned.aipl")).read()
     assert _check(src) == []
 
 
 def test_owned_violations_sample_emits_three():
     here = os.path.dirname(__file__)
-    src = open(os.path.join(here, "samples", "Owned_violations.abcl")).read()
+    src = open(os.path.join(here, "samples", "Owned_violations.aipl")).read()
     msgs = _check(src)
     assert len(msgs) == 3, msgs
 

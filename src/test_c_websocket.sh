@@ -26,7 +26,7 @@ pass=0; fail=0; total=0
 
 # Case 1: build a program that uses all three ws_ builtins
 total=$((total + 1))
-cat > "$TMPROOT/ws_smoke.abcl" <<EOF
+cat > "$TMPROOT/ws_smoke.aipl" <<EOF
 class Hub {
   method run() {
     var p = ws_listen(9099);
@@ -41,7 +41,7 @@ var h = new Hub();
 send h.run();
 EOF
 
-if ! "$ABCL2C" "$TMPROOT/ws_smoke.abcl" -o "$TMPROOT/ws_smoke.c" --max-msgs 4 > /dev/null 2>&1; then
+if ! "$ABCL2C" "$TMPROOT/ws_smoke.aipl" -o "$TMPROOT/ws_smoke.c" --max-msgs 4 > /dev/null 2>&1; then
   fail=$((fail + 1)); printf '  FAIL  aipl2c\n'
 else
   if cc -O2 -Wall -pthread \

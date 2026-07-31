@@ -2,12 +2,12 @@
 
 **AIPL** = Actor-based Intelligent Parallel Language (formerly AIPL).
 
-Every builtin available to `.abcl` programs running on the Python
+Every builtin available to `.aipl` programs running on the Python
 runtime (`src/python-aipl/`).  All are total: filesystem and AI
 calls return a sentinel value (`""`, `0`, `None`, etc.) on error
-rather than raising, so `.abcl` programs can probe gracefully.
+rather than raising, so `.aipl` programs can probe gracefully.
 
-> Internal module/file/extension names (`abcl_*.py`, `.abcl`,
+> Internal module/file/extension names (`abcl_*.py`, `.aipl`,
 > `ABCL_AI_PROVIDER`) retain the historical naming for backward compat.
 
 ## I/O and clock
@@ -91,7 +91,7 @@ var pad[R][R+1] = -1;                      // dynamic from local + arith
 ```
 
 Works in field declarations and local variables. See
-`samples/Arrays.abcl` (1-D) and `samples/MultiDimArrays.abcl` (N-D).
+`samples/Arrays.aipl` (1-D) and `samples/MultiDimArrays.aipl` (N-D).
 
 ## Builtin signatures via typeof (Python runtime)
 
@@ -112,7 +112,7 @@ typeof(image_pixel(img, 0, 0))             → "tuple(int, int, int, int)"
 Signatures are documentation-strings (not statically checked), but
 they cover I/O, image, AI-call, JSON, dynamic-class, method-patch,
 distributed, and meta builtins. See
-`samples/Signatures.abcl` for an end-to-end demo.
+`samples/Signatures.aipl` for an end-to-end demo.
 
 ## User-defined functions (Python runtime)
 
@@ -203,7 +203,7 @@ typeof(actor_ref)              → "actor(ClassName)"
 ```
 
 Record fields can hold anything (scalars, arrays, other records,
-actors). See `samples/Records.abcl`.
+actors). See `samples/Records.aipl`.
 
 ## Files / images / JSON for app generation (Python runtime)
 
@@ -269,7 +269,7 @@ class SiteGen {
 }
 ```
 
-See `samples/SiteGen.abcl` for a full HTML+CSS+image+manifest pipeline.
+See `samples/SiteGen.aipl` for a full HTML+CSS+image+manifest pipeline.
 
 ## Dynamic method injection / removal (Python runtime)
 
@@ -296,7 +296,7 @@ remove_method("Greeter", "shout");
 
 Per-actor override wins over class-level on dispatch, so a single
 instance can be patched without affecting siblings. See
-`samples/MethodPatch.abcl`.
+`samples/MethodPatch.aipl`.
 
 ## Dynamic compile / spawn
 
@@ -308,7 +308,7 @@ instance can be patched without affecting siblings. See
 Together these enable factory actors that synthesise new behaviour at
 runtime — e.g. receive a class spec via message, compile it, spawn an
 instance, and reply with the actor reference. See
-`samples/Dynamic.abcl` and `samples/DynamicWorkerPool.abcl` for working
+`samples/Dynamic.aipl` and `samples/DynamicWorkerPool.aipl` for working
 examples.
 
 ```abcl
@@ -351,7 +351,7 @@ so the methods are named `ask` for text and `see` for vision:
 | `AI.usage()` / `AI.cost()` / `AI.remaining()` | monitoring |
 
 For real parallelism (one actor processes one message at a time),
-spawn extra instances: `var ai2 = new AI();`. Sample: `samples/AIActor.abcl`.
+spawn extra instances: `var ai2 = new AI();`. Sample: `samples/AIActor.aipl`.
 
 ## AI calls
 

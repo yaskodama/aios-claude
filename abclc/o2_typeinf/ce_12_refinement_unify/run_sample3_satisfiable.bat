@@ -1,2 +1,2 @@
-load sample3_satisfiable.abcl
+load sample3_satisfiable.aipl
 compile

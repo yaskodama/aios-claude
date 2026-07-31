@@ -5,7 +5,7 @@
 ```
 7cde80b aipl: User Manual next-gen chapter + evolution round 6 results
 1ece4f3 c-aipl: aipl2c --check surfaces CE-10 effects + closes CE-13 🟡
-341bc03 js-aipl: nextgen smoke runner + sample .abcl + session-doc refresh
+341bc03 js-aipl: nextgen smoke runner + sample .aipl + session-doc refresh
 441cdb0 js-aipl: JS-B / JS-N close 26/26 — CE-10/12/13 + DR-11
 4ffba13 js-aipl: port CE-11 + DR-10/12/13 to shared JS-Browser + JS-Node
 ```
@@ -74,9 +74,9 @@ actors (HMAC) + 研究論文 2 本 + ユーザマニュアルの言語プロジ�
 
 dangling-else は `%nonassoc IFX < %nonassoc ELSE` + `%prec IFX` で明示的に解消されており、yacc/jison 警告 0 件. AWAIT は `%nonassoc UAWAIT` + `AWAIT expr %prec UAWAIT` で binop との shift/reduce を回避.
 
-DR-11 saga 構文 (`saga { step { ... } compensate { ... } }`) は jison の `%s saga` start condition + brace-depth state で実装. `step` / `compensate` は saga ブロック内でのみ token 化されるので、`method step()` や `send self.step()` 等の既存サンプル (drone_simulator.abcl) と衝突しない.
+DR-11 saga 構文 (`saga { step { ... } compensate { ... } }`) は jison の `%s saga` start condition + brace-depth state で実装. `step` / `compensate` は saga ブロック内でのみ token 化されるので、`method step()` や `send self.step()` 等の既存サンプル (drone_simulator.aipl) と衝突しない.
 
-手書き再帰下降のため LR 系コンフリクト概念がない: `aice-evolution-v2/src/aice_parser.py` (`.aice` DSL), `aipl-self-host/level-c/parser.abcl` (AIPL セルフホスト).
+手書き再帰下降のため LR 系コンフリクト概念がない: `aice-evolution-v2/src/aice_parser.py` (`.aice` DSL), `aipl-self-host/level-c/parser.aipl` (AIPL セルフホスト).
 
 ---
 
@@ -117,8 +117,8 @@ DR-11 saga 構文 (`saga { step { ... } compensate { ... } }`) は jison の `%s
 | CE-11 cap + DR-10 CRDT + DR-12 region + DR-13 pool | `src/browser-abcl/src/runtime.js` 29 prims, 310 LOC (前 commit) | Set / Map / process.env ベースの per-Runtime 状態 |
 
 ### サンプル
-- `src/browser-abcl/saga_demo.abcl` — DR-11 happy + failure path
-- `src/browser-abcl/effects_demo.abcl` — CE-10 ai / fs / mut の伝播
+- `src/browser-abcl/saga_demo.aipl` — DR-11 happy + failure path
+- `src/browser-abcl/effects_demo.aipl` — CE-10 ai / fs / mut の伝播
 - `src/browser-abcl/_smoke_nextgen.sh` — 14 assertion (Phase 1-4)
 
 ---

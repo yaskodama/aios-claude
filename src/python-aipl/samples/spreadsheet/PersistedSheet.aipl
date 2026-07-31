@@ -1,0 +1,395 @@
+// Round 3 Phase 3 — P3 DistCheckpoint (save / load round-trip).
+//
+// Self-contained: includes the PA4 parser + CA4 cell actor + FE4
+// eval (copies of Phase 1/2) plus save_to_file / load_from_file
+// helpers gated by the CE-11 "fs" capability.
+//
+// Save format: one cell per line.  Literals use "Value", formulas
+// keep their source string so reload is a straight PA4 reparse.
+//
+//   A1|Value|10
+//   B1|Value|20
+//   C1|Formula|A1+B1
+//   ...
+//
+// Run with:
+//   AIPL_AI_PROVIDER=mock python3 aipl_main.py \
+//     samples/spreadsheet/PersistedSheet.aipl
+
+// ── PA4 parser (copy from StringFormulaSheet) ─────────────────
+function is_digit_ch(c) {
+  if (c == "0") { return 1; } if (c == "1") { return 1; }
+  if (c == "2") { return 1; } if (c == "3") { return 1; }
+  if (c == "4") { return 1; } if (c == "5") { return 1; }
+  if (c == "6") { return 1; } if (c == "7") { return 1; }
+  if (c == "8") { return 1; } if (c == "9") { return 1; }
+  return 0;
+}
+function digit_val(c) {
+  if (c == "0") { return 0; } if (c == "1") { return 1; }
+  if (c == "2") { return 2; } if (c == "3") { return 3; }
+  if (c == "4") { return 4; } if (c == "5") { return 5; }
+  if (c == "6") { return 6; } if (c == "7") { return 7; }
+  if (c == "8") { return 8; } if (c == "9") { return 9; }
+  return 0;
+}
+function is_alpha_ch(c) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
+  if (str_index(alpha, c) >= 0) { return 1; }
+  return 0;
+}
+function parse_int_str(s) {
+  var v = 0;
+  var i = 0;
+  var n = str_len(s);
+  while (i < n) do {
+    v = v * 10 + digit_val(str_sub(s, i, i + 1));
+    i = i + 1;
+  }
+  return v;
+}
+function lex_int(s, i, n) {
+  var v: int = 0;
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var d = str_sub(s, j, j + 1);
+      if (is_digit_ch(d) == 1) { v = v * 10 + digit_val(d); j = j + 1; }
+      else { done = 1; }
+    }
+  }
+  return {val: v, end_pos: j};
+}
+function lex_ident(s, i, n) {
+  var id: string = "";
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var k = str_sub(s, j, j + 1);
+      if (is_alpha_ch(k) == 1) { id = id + k; j = j + 1; }
+      else {
+        if (is_digit_ch(k) == 1) { id = id + k; j = j + 1; }
+        else { done = 1; }
+      }
+    }
+  }
+  return {val: id, end_pos: j};
+}
+function lex_formula(s) {
+  var tokens = [];
+  var i: int = 0;
+  var n: int = str_len(s);
+  while (i < n) do {
+    var c = str_sub(s, i, i + 1);
+    if (c == " ") { i = i + 1; }
+    else {
+      if (is_digit_ch(c) == 1) {
+        var r = lex_int(s, i, n);
+        array_push(tokens, {kind: "INT", val: r.val});
+        i = r.end_pos;
+      } else {
+        if (is_alpha_ch(c) == 1) {
+          var r2 = lex_ident(s, i, n);
+          array_push(tokens, {kind: "IDENT", val: r2.val});
+          i = r2.end_pos;
+        } else {
+          array_push(tokens, {kind: c, val: c});
+          i = i + 1;
+        }
+      }
+    }
+  }
+  array_push(tokens, {kind: "EOF", val: ""});
+  return tokens;
+}
+function parse_primary(tokens, pos) {
+  var t = array_get(tokens, pos);
+  if (t.kind == "INT") {
+    return {ast: {tag: "Lit", val: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "IDENT") {
+    var nxt = array_get(tokens, pos + 1);
+    if (nxt.kind == "(") {
+      var args = [];
+      var p: int = pos + 2;
+      var first: int = 1;
+      var done: int = 0;
+      while (done == 0) do {
+        var ck = array_get(tokens, p);
+        if (ck.kind == ")") { done = 1; }
+        else {
+          if (first == 0) {
+            if (ck.kind == ",") { p = p + 1; }
+          }
+          first = 0;
+          var sub = parse_expr(tokens, p);
+          array_push(args, sub.ast);
+          p = sub.pos;
+        }
+      }
+      return {ast: {tag: "Call", name: t.val, args: args}, pos: p + 1};
+    }
+    return {ast: {tag: "Ref", id: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "(") {
+    var inner = parse_expr(tokens, pos + 1);
+    return {ast: inner.ast, pos: inner.pos + 1};
+  }
+  return {ast: {tag: "Lit", val: 0}, pos: pos + 1};
+}
+function parse_mul(tokens, pos) {
+  var l = parse_primary(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "*") {
+      var r = parse_primary(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "*", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "/") {
+        var r2 = parse_primary(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "/", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+function parse_add(tokens, pos) {
+  var l = parse_mul(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "+") {
+      var r = parse_mul(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "+", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "-") {
+        var r2 = parse_mul(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "-", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+function parse_expr(tokens, pos) { return parse_add(tokens, pos); }
+function parse_formula(src) {
+  var toks = lex_formula(src);
+  var r = parse_expr(toks, 0);
+  return r.ast;
+}
+
+// ── CA4 + FE4 actor (copy from ActorSheet) ────────────────────
+function lookup_actor(target_id, dep_ids, dep_refs) {
+  var i = 0;
+  var n = array_len(dep_ids);
+  while (i < n) do {
+    if (array_get(dep_ids, i) == target_id) {
+      return array_get(dep_refs, i);
+    }
+    i = i + 1;
+  }
+  return 0;
+}
+function eval_one(node, dep_ids, dep_refs) {
+  if (node.tag == "Lit") { return node.val; }
+  if (node.tag == "Ref") {
+    var target = lookup_actor(node.id, dep_ids, dep_refs);
+    if (target == 0) { return 0; }
+    var v = now target.read();
+    return v;
+  }
+  if (node.tag == "Bin") {
+    var l = eval_one(node.lhs, dep_ids, dep_refs);
+    var r = eval_one(node.rhs, dep_ids, dep_refs);
+    if (node.op == "+") { return l + r; }
+    if (node.op == "-") { return l - r; }
+    if (node.op == "*") { return l * r; }
+    if (node.op == "/") { return l / r; }
+    return 0;
+  }
+  if (node.tag == "Call") {
+    if (node.name == "SUM") {
+      var total = 0;
+      var i = 0;
+      var n = array_len(node.args);
+      while (i < n) do {
+        total = total + eval_one(array_get(node.args, i), dep_ids, dep_refs);
+        i = i + 1;
+      }
+      return total;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+class Cell {
+  var id        = "";
+  var kind      = "Value";
+  var val       = 0;
+  var expr      = {tag: "none"};
+  var expr_src  = "";              // P3: keep the source for save
+  var dep_ids   = [];
+  var dep_refs  = [];
+
+  method init(my_id, ids, refs) {
+    id = my_id; dep_ids = ids; dep_refs = refs;
+    reply(0);
+  }
+  method set_value(v) {
+    kind = "Value"; val = v; expr = {tag: "none"}; expr_src = "";
+    reply(0);
+  }
+  method set_formula(src, ast) {
+    kind = "Formula"; expr_src = src; expr = ast; val = 0;
+    reply(0);
+  }
+  method read() {
+    if (kind == "Formula") {
+      var v = eval_one(expr, dep_ids, dep_refs);
+      reply(v);
+    }
+    reply(val);
+  }
+  // P3: serialize as one pipe-delimited line.
+  method dump_line() {
+    if (kind == "Formula") {
+      reply(id + "|Formula|" + expr_src);
+    }
+    reply(id + "|Value|" + val);
+  }
+}
+
+class Sheet {
+  var cell_ids  = [];
+  var cell_refs = [];
+
+  method add_value(id, v) {
+    var c = new Cell(id, cell_ids, cell_refs);
+    var r = now c.set_value(v);
+    array_push(cell_ids, id);
+    array_push(cell_refs, c);
+    reply(0);
+  }
+  method add_formula_src(id, src) {
+    var ast = parse_formula(src);
+    var c = new Cell(id, cell_ids, cell_refs);
+    var r = now c.set_formula(src, ast);
+    array_push(cell_ids, id);
+    array_push(cell_refs, c);
+    reply(0);
+  }
+  method print_all() {
+    var i = 0;
+    var n = array_len(cell_ids);
+    while (i < n) do {
+      var id = array_get(cell_ids, i);
+      var c  = array_get(cell_refs, i);
+      var v  = now c.read();
+      print("[sheet] " + id + " = " + v);
+      i = i + 1;
+    }
+    reply(0);
+  }
+  // ── P3 DistCheckpoint: save / load ──────────────────────────
+  method save_to(path) {
+    check_capability("fs");
+    var body = "";
+    var i = 0;
+    var n = array_len(cell_ids);
+    while (i < n) do {
+      var c = array_get(cell_refs, i);
+      var line = now c.dump_line();
+      body = body + line + "\n";
+      i = i + 1;
+    }
+    var _ = write_file(path, body);
+    print("[save] " + path + " (" + n + " cells)");
+    reply(n);
+  }
+}
+
+// ── helpers: split a string on a char ─────────────────────────
+function split_lines(s) {
+  var out = [];
+  var n = str_len(s);
+  var i = 0;
+  var cur = "";
+  while (i < n) do {
+    var c = str_sub(s, i, i + 1);
+    if (c == "\n") {
+      if (str_len(cur) > 0) { array_push(out, cur); }
+      cur = "";
+    } else {
+      cur = cur + c;
+    }
+    i = i + 1;
+  }
+  if (str_len(cur) > 0) { array_push(out, cur); }
+  return out;
+}
+function split_pipe3(s) {
+  var n = str_len(s);
+  var p1 = str_index(s, "|");
+  var rest = str_sub(s, p1 + 1, n);
+  var p2 = str_index(rest, "|");
+  var a = str_sub(s, 0, p1);
+  var b = str_sub(rest, 0, p2);
+  var c = str_sub(rest, p2 + 1, str_len(rest));
+  return {a: a, b: b, c: c};
+}
+
+// Reload the file from disk into a fresh Sheet actor.
+function load_sheet(path) {
+  check_capability("fs");
+  var body = read_file(path);
+  var lines = split_lines(body);
+  var s2 = new Sheet();
+  var i = 0;
+  var n = array_len(lines);
+  while (i < n) do {
+    var parts = split_pipe3(array_get(lines, i));
+    if (parts.b == "Value") {
+      var v = parse_int_str(parts.c);
+      var r1 = now s2.add_value(parts.a, v);
+    } else {
+      var r2 = now s2.add_formula_src(parts.a, parts.c);
+    }
+    i = i + 1;
+  }
+  print("[load] " + path + " (" + n + " cells)");
+  return s2;
+}
+
+// ── main: build 3x3, save, reload, verify ─────────────────────
+function build_and_dump() {
+  grant_cap("fs");
+  var s = new Sheet();
+  var r1 = now s.add_value("A1", 10);
+  var r2 = now s.add_value("B1", 20);
+  var r3 = now s.add_formula_src("C1", "A1+B1");
+  var r4 = now s.add_value("A2", 30);
+  var r5 = now s.add_value("B2", 40);
+  var r6 = now s.add_formula_src("C2", "A2*B2");
+  var r7 = now s.add_formula_src("A3", "A1*2");
+  var r8 = now s.add_formula_src("B3", "B1*2");
+  var r9 = now s.add_formula_src("C3", "SUM(A1,B1,A2,B2,C1,C2)");
+
+  print("=== original ===");
+  var done1 = now s.print_all();
+
+  var path = "/tmp/_persisted_sheet.txt";
+  var saved = now s.save_to(path);
+
+  print("=== reloaded ===");
+  var s2 = load_sheet(path);
+  var done2 = now s2.print_all();
+
+  print("=== done ===");
+}
+
+build_and_dump();

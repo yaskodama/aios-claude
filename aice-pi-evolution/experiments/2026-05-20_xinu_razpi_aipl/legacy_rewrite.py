@@ -88,7 +88,7 @@ def transform(src: str) -> str:
 
 def main():
     if len(sys.argv) < 2:
-        sys.exit("usage: _legacy_rewrite.py <file.abcl> ...")
+        sys.exit("usage: _legacy_rewrite.py <file.aipl> ...")
     for p in sys.argv[1:]:
         src = pathlib.Path(p).read_text()
         new = transform(src)

@@ -1,0 +1,16 @@
+// NetInitOnlyXinu.aipl — net_init を一度だけ呼んで Xinu の NIC を上げる.
+// その後 actor は idle、Xinu 側 HTTP サーバ (system/main.c で auto-start)
+// が待ち受けを継続する.host からは hostfwd 経由で curl で叩ける.
+
+class NetUp {
+  var inited = 0;
+
+  method init() {
+    if (inited == 0) {
+      var ok = net_init(10);
+      inited = 1;
+    }
+  }
+}
+
+var n = new NetUp();

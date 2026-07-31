@@ -73,7 +73,7 @@ aice AIPL_C_NextGenPort {
       spec = "既存 abclc/_smoke_test.sh の Xinu / Gui / Py 系 cross-compile sample (BoundedBufferXinu, BoundedBufferPy, BoundedBufferGui, Philosophers5Xinu, Rotate4Lines* 等) が無変更で動作。新機能は全て opt-in (linker flag or env var) で発火。";
     }
     task PyIOCamlParityC {
-      spec = "同一の .abcl ソースが Py-I / OCaml / C codegen で同じ観測結果を出す。CE-* は --check / --infer 相当の C-compile time 出力に反映。DR-* は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での 3-way mirror (Py-A vs OCaml vs JS-O) の C 版。";
+      spec = "同一の .aipl ソースが Py-I / OCaml / C codegen で同じ観測結果を出す。CE-* は --check / --infer 相当の C-compile time 出力に反映。DR-* は構造化ログ NDJSON のイベント名 + フィールドが等価。Phase O での 3-way mirror (Py-A vs OCaml vs JS-O) の C 版。";
     }
     task ImplCostBudgetC {
       spec = "8 機能合計 1000 行以内 (Py-I ~700 行、OCaml ~795 行、C は ~1000 行が現実的: 動的データ構造を手書きする分 + libz3 fork wrapper + jmpbuf スタック)。c_translator.ml + abcl_nextgen_runtime.{c,h} の 3 ファイル想定。既存 .c ファイルへの変更は最小限。";
@@ -123,7 +123,7 @@ aice AIPL_C_NextGenPort {
       persona = "あなたは C 版後方互換性レビュアーです。abclc/_smoke_test.sh の Xinu (BoundedBufferXinu / Philosophers5Xinu / Rotate4LinesXinu / BBXinu) と Gui (BoundedBufferGui / Rotate4LinesGui / BBGui) と Py (BoundedBufferPy / BBPy) 系の cross-compile が無変更で通るか。c_translator.ml の既存 backend (--xinu / --python / --pony / --erlang / --go / --prolog / --llvm / --openmp) を新機能が壊さないか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。";
     }
     reviewer PyIOCamlParityC {
-      persona = "あなたは 3-way 整合性レビュアーです。同一 .abcl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
+      persona = "あなたは 3-way 整合性レビュアーです。同一 .aipl が Py-I / OCaml / C で同じ観測結果を出すかを評価。CE-* は --check / --infer 出力 + コンパイル時コメント、DR-* は NDJSON ログイベント名 + フィールド。C は reply slot 不在のため send-and-receive shape は受信側を専用 prim で表現する必要があり、Py-I/OCaml の API と完全一致は難しい。1.0 = 完全一致 (Phase O 同等)、0.7 = log 形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。";
     }
     reviewer CIdiomaticity {
       persona = "あなたは C イディオム性レビュアーです。OCaml の Hashtbl / pthread mutex / Domain.DLS を C で書き直す妥当性を評価。CRDT の opaque ID Hashtbl → khash or 手書き open-addressing、Capability TLS → __thread or pthread_setspecific、Saga → setjmp/longjmp スタック、Pool members → dyn-array realloc。1.0 = C idiom 完璧、0.7 = 大半 idiom、0.3 = OCaml の直訳を持ち込み過ぎ、0.0 = C 的でない。1 行で返答。";

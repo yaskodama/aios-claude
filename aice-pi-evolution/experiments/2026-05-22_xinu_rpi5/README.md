@@ -51,7 +51,7 @@ Pi 5 は AArch64 only + 新 MMIO 配置 + RP1 I/O hub と相違が大きいた�
 | `AIPL_XinuRPi5_Round1.aice` | 設計書 |
 | `AIPL_XinuRPi5_Round1.ga.json` | lowered IR (mock evaluator) |
 | (next) `AIPL_XinuRPi5_Round1_ai.ga.json` | AI evaluator IR (gen/seed 抑え) |
-| (next) `AIPL_XinuRPi5_Round1.abcl` | MAP-Elites orchestrator (`--abcl` で生成 + `use_ai=1` patch) |
+| (next) `AIPL_XinuRPi5_Round1.aipl` | MAP-Elites orchestrator (`--abcl` で生成 + `use_ai=1` patch) |
 
 ## 次のアクション
 

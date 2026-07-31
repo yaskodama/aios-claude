@@ -37,7 +37,7 @@ TARGETS = [
         "port": 8899,
         "cwd": REPO,
         "cmd": "python3 src/python-aipl/aipl_main.py --dashboard 8899 "
-               "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl",
+               "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.aipl",
     },
     {
         "id": "ocaml",
@@ -49,7 +49,7 @@ TARGETS = [
         "href": "http://localhost:8080/dashboard",
         "port": 8080,
         "cwd": REPO,
-        "cmd": "dune build && { printf 'load src/gateway_launch.abcl\\ncompile\\n'; "
+        "cmd": "dune build && { printf 'load src/gateway_launch.aipl\\ncompile\\n'; "
                "sleep 1000000; } | _build/default/src/repl_thread.exe",
     },
     {

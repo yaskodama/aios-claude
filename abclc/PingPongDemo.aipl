@@ -1,0 +1,39 @@
+// PingPongDemo.aipl — two actors bounce a token a bounded number of times,
+// with a short delay so the dashboard console stays readable.  Terminates
+// after `rounds` exchanges.  (OCaml's `wait` blocks the actor thread, so
+// `call wait(ms); send ...` paces each bounce.)
+class Pinger {
+  var partner = "";
+  var left    = 10;
+
+  method init(n) { left = n; }
+
+  method bind(p) {
+    partner = p;
+    print("[Ping] serve (" + left + " rounds)");
+    send partner.ping(left);
+  }
+
+  method pong(n) {
+    print("[Ping] got pong   (" + n + " left)");
+    left = left - 1;
+    if (left == 0) {
+      print("[Ping] DONE");
+    } else {
+      call wait(350);
+      send partner.ping(left);
+    }
+  }
+}
+
+class Ponger {
+  method ping(n) {
+    print("[Pong] got ping   (" + n + " left)");
+    call wait(350);
+    send sender.pong(n);
+  }
+}
+
+var pinger = new Pinger(10);
+var ponger = new Ponger();
+send pinger.bind(ponger);

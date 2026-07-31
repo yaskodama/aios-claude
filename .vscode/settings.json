@@ -1,10 +1,10 @@
 {
-  // Treat .abcl as a C-like source so the default tokenizer picks up
+  // Treat .aipl as a C-like source so the default tokenizer picks up
   // braces, strings, and `//` comments.  When the dedicated TextMate
   // grammar in this folder is loaded VS Code will switch to "abcl"
   // automatically.
   "files.associations": {
-    "*.abcl": "abcl",
+    "*.aipl": "abcl",
     "*.bat": "shellscript"
   },
   "[abcl]": {

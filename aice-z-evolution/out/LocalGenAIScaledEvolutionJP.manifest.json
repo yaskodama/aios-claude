@@ -3,7 +3,7 @@
   "dialect": "aice_evolution_v1",
   "runtime": "ocaml_abcl_cplus",
   "input": "aice-z-evolution/examples/LocalGenAIScaledEvolutionJP.aice",
-  "abcl": "aice-z-evolution/out/LocalGenAIScaledEvolutionJP.abcl",
+  "abcl": "aice-z-evolution/out/LocalGenAIScaledEvolutionJP.aipl",
   "report": "aice-z-evolution/out/LocalGenAIScaledEvolutionJP.report.md",
   "final_archive": "SemiAutoEvolveLocalLLMWinner",
   "stages": [

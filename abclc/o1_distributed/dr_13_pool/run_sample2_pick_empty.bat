@@ -1,2 +1,2 @@
-load sample2_pick_empty.abcl
+load sample2_pick_empty.aipl
 compile

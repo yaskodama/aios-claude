@@ -1,2 +1,2 @@
-load client.abcl
+load client.aipl
 compile

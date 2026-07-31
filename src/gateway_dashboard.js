@@ -8,26 +8,26 @@
 // compile.  `viz` links to a dedicated visualization page when one exists.
 const PROGRAMS = [
   { key:"philosophers", label:"Dining Philosophers (5)",
-    file:"src/viz_philosophers.abcl",
+    file:"src/viz_philosophers.aipl",
     start:"send table.start();", stop:"send table.stop();",
     viz:"/viz_philosophers.html",
     note:"5 philosophers + 5 forks. Load & Run begins dinner; Stop halts. " +
          "The animated ring is the “Open visualization” page." },
   { key:"buffer", label:"Bounded buffer (1 producer / 1 consumer, cap 20)",
-    file:"abclc/bounded_buffer20.abcl", canvas:"buffer", cap:20,
+    file:"abclc/bounded_buffer20.aipl", canvas:"buffer", cap:20,
     speed:{ producer:"p0", consumer:"c0", pdef:250, cdef:500 },
     note:"Producer/Consumer over a capacity-20 buffer; runs on compile. Drag the " +
          "speed sliders to retune each side live; the buffer fills until " +
          "[BUF] FULL back-pressure (producer faster) or drains to EMPTY (consumer faster)." },
   { key:"pingpong", label:"Ping-Pong (2 actors, 10 rounds)",
-    file:"abclc/PingPongDemo.abcl",
+    file:"abclc/PingPongDemo.aipl",
     note:"Two actors bounce a token back and forth 10 times (350 ms apart), " +
          "then stop; runs on compile." },
   { key:"counter", label:"Counter (2 actors)",
-    file:"abclc/counter.abcl",
+    file:"abclc/counter.aipl",
     note:"Two Counter actors run inc → dec via self-send; runs on compile." },
   { key:"hello", label:"Hello (init + greet)",
-    file:"abclc/Hello.abcl",
+    file:"abclc/Hello.aipl",
     note:"One Hello actor: init(5) then greet/inc/greet; runs on compile." },
 ];
 

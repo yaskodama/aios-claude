@@ -1,2 +1,2 @@
-load ide_boot.abcl
+load ide_boot.aipl
 compile

@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("input", help="path to .aice (v2) source or .ga.json IR file")
     p.add_argument("-o", "--out", default="out", help="output directory")
     p.add_argument("--abcl", action="store_true", help="also emit an AIPL orchestrator program (Phase 5)")
-    p.add_argument("--no-run", action="store_true", help="skip MAP-Elites run, only emit artifacts (.ga.json/.abcl)")
+    p.add_argument("--no-run", action="store_true", help="skip MAP-Elites run, only emit artifacts (.ga.json/.aipl)")
     p.add_argument("--ai", action="store_true",
                    help="use LLM-backed evaluator + pairwise judge (Phase 6). "
                         "Honours ABCL_AI_PROVIDER (set to 'mock' for free tests)")
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     schema = GeneSchema.load(schema_path)
 
     # Phase 5/6: optionally emit the AIPL orchestrator
-    if args.abcl:
+    if args.aipl:
         schema_raw = json.loads(schema_path.read_text(encoding="utf-8"))
         # --ai also flips use_ai=1 for the embedded reviewers in ABCL.
         if args.ai:

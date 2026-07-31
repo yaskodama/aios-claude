@@ -2,7 +2,7 @@
 # Smoke-test the browser-abcl JS implementation.
 #
 # Phase 1 (always): node --check on every .js source file
-# Phase 2 (always): drive the jison-generated parser on every .abcl
+# Phase 2 (always): drive the jison-generated parser on every .aipl
 #                   sample, wired with ast.js the same way the demo
 #                   HTML pages do
 # Phase 3 (when --dynamic): start a local http.server, open every demo
@@ -40,8 +40,8 @@ for f in "${js_files[@]}"; do
   fi
 done
 
-# ---- Phase 2: parser+ast on .abcl samples ----
-echo "[Phase 2] parser.js + ast.js on .abcl samples"
+# ---- Phase 2: parser+ast on .aipl samples ----
+echo "[Phase 2] parser.js + ast.js on .aipl samples"
 parse_runner=$(mktemp /tmp/abcl_parse.XXXXXX.mjs)
 cat > "$parse_runner" <<'NODE'
 import { createRequire } from 'node:module';
@@ -69,7 +69,7 @@ for (const f of files) {
 process.exit(fail === 0 ? 0 : 1);
 NODE
 
-abcl_files=(bounded_buffer.abcl philosophers.abcl rotate4lines.abcl drone_simulator.abcl)
+abcl_files=(bounded_buffer.aipl philosophers.aipl rotate4lines.aipl drone_simulator.aipl)
 parse_pass=0; parse_fail=0
 parse_out=$(node "$parse_runner" "$(pwd)" "${abcl_files[@]}" 2>&1)
 echo "$parse_out"
@@ -78,7 +78,7 @@ parse_fail=$(echo "$parse_out" | grep -c '^  FAIL' || true)
 rm -f "$parse_runner"
 
 # ---- Phase 2.5: typecheck.js (flow-sensitive type inference) ----
-echo "[Phase 2.5] typecheck.js on .abcl samples"
+echo "[Phase 2.5] typecheck.js on .aipl samples"
 tc_runner=$(mktemp /tmp/abcl_tc.XXXXXX.mjs)
 cat > "$tc_runner" <<'NODE'
 import { createRequire } from 'node:module';

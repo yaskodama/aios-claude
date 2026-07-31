@@ -1,0 +1,30 @@
+// DR-11 / sample 1 — happy path (no compensate fires).
+//
+// All steps succeed → saga_started → saga_step_complete{0..1} →
+// saga_finished.
+//
+// Capture NDJSON with:
+//   AIPL_DIST_LOG_FILE=/tmp/dr11_1.ndjson \
+//     python3 aipl_main.py samples/nextgen/dr11_saga/sample1_success.aipl
+
+class Bank {
+  var bal = 100;
+  method debit(amt) { bal = bal - amt; print("[bank] debit " + amt + " -> " + bal); }
+  method credit(amt) { bal = bal + amt; print("[bank] credit " + amt + " -> " + bal); }
+}
+
+class Driver {
+  method run(b) {
+    saga {
+      step       { send b.debit(30); }
+      compensate { send b.credit(30); }
+      step       { send b.debit(20); }
+      compensate { send b.credit(20); }
+    }
+    print("[dr11/1] saga finished cleanly");
+  }
+}
+
+var b = new Bank();
+var d = new Driver();
+send d.run(b);

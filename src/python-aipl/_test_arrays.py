@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_arrays() -> None:
-    out = _run("Arrays.abcl")
+    out = _run("Arrays.aipl")
     # Local var workers[3] write/read cycle
     for line in ("workers[0] = alice", "workers[1] = bob", "workers[2] = carol"):
         assert line in out, f"missing: {line}"
@@ -42,7 +42,7 @@ def test_arrays() -> None:
     assert "label[2] = Wed" in out
     assert "label[3] = blank" in out
     assert "label[4] = Fri" in out
-    print("OK  Arrays.abcl")
+    print("OK  Arrays.aipl")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ what its body actually uses.
 ## Layout
 
 ```
-typeck.abcl     — Level B-1 typeck + Phase 12 effect tracking (one file)
+typeck.aipl     — Level B-1 typeck + Phase 12 effect tracking (one file)
 run.sh          — concats typeck + sample, runs through host AIPL
 smoke.sh        — runs all 4 samples + verifies issue counts
 samples/        — clean, missing, indirect, self-consistency
@@ -46,10 +46,10 @@ After walking each function body, `tc_check_function` computes
 
 ```sh
 cd aipl-self-host/level-b2
-bash run.sh   samples/SampleEffectClean.abcl
-bash run.sh   samples/SampleEffectMissing.abcl
-bash run.sh   samples/SampleEffectIndirect.abcl
-bash run.sh   samples/SampleSelfConsistency.abcl
+bash run.sh   samples/SampleEffectClean.aipl
+bash run.sh   samples/SampleEffectMissing.aipl
+bash run.sh   samples/SampleEffectIndirect.aipl
+bash run.sh   samples/SampleSelfConsistency.aipl
 
 bash smoke.sh
 ```
@@ -57,10 +57,10 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleEffectClean.abcl           issues=0
-PASS  SampleEffectMissing.abcl         issues=2
-PASS  SampleEffectIndirect.abcl        issues=1
-PASS  SampleSelfConsistency.abcl       issues=1
+PASS  SampleEffectClean.aipl           issues=0
+PASS  SampleEffectMissing.aipl         issues=2
+PASS  SampleEffectIndirect.aipl        issues=1
+PASS  SampleSelfConsistency.aipl       issues=1
 Level B-2 effects samples: 4 pass / 0 fail
 ```
 

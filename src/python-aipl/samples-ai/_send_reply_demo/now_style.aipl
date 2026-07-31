@@ -1,0 +1,17 @@
+// (1) NOW — synchronous ai_call.  Caller blocks until the worker
+// finishes; `reply(r)` fulfils the now-future and the value is
+// bound to `r` on the calling side.
+//
+//   ABCL_AI_PROVIDER=mock python3 src/python-aipl/aipl_main.py \
+//     src/python-aipl/samples-ai/_send_reply_demo/now_style.aipl
+
+class Helper {
+  method ask(q) {
+    var resp = ai_call(q);
+    reply(resp);
+  }
+}
+
+var h = new Helper();
+var r = now h.ask("hello via now");
+print("[now] " + r);

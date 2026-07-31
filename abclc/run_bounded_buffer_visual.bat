@@ -1,2 +1,2 @@
-load abclc/bounded_buffer_visual.abcl
+load abclc/bounded_buffer_visual.aipl
 compile

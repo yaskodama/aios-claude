@@ -1,2 +1,2 @@
-load abclc/bounded_buffer.abcl
+load abclc/bounded_buffer.aipl
 compile

@@ -20,7 +20,7 @@ cd "$ROOT"
 
 echo "--- [1] AIPL NetInitOnly → C → xinu.elf ---"
 dune build src/aipl2c.exe >/tmp/n1_http_build.log 2>&1 || { echo FAIL aipl2c; exit 1; }
-./_build/default/src/aipl2c.exe abclc/NetInitOnlyXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/NetInitOnlyXinu.aipl \
     -o /tmp/n1_http.c --xinu --max-msgs 0 >/tmp/n1_http_a2c.log 2>&1
 cp /tmp/n1_http.c "$XINU/apps/abcl_program.c"
 ( cd "$XINU/compile" \

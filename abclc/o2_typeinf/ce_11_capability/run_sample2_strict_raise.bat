@@ -1,2 +1,2 @@
-load sample2_strict_raise.abcl
+load sample2_strict_raise.aipl
 compile

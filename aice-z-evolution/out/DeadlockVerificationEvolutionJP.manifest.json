@@ -3,7 +3,7 @@
   "dialect": "aice_evolution_v1",
   "runtime": "ocaml_abcl_cplus",
   "input": "aice-z-evolution/examples/DeadlockVerificationEvolutionJP.aice",
-  "abcl": "aice-z-evolution/out/DeadlockVerificationEvolutionJP.abcl",
+  "abcl": "aice-z-evolution/out/DeadlockVerificationEvolutionJP.aipl",
   "report": "aice-z-evolution/out/DeadlockVerificationEvolutionJP.report.md",
   "final_archive": "ProvenAndCheckedWinner",
   "stages": [

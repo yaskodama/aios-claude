@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end smoke for OCaml remote actor calls.
 #
-#   1) Launch abclc/RemoteServer.abcl (web_listen on :8090, actor `echo`)
-#   2) Run abclc/RemoteClient.abcl which exercises send/now/future against
+#   1) Launch abclc/RemoteServer.aipl (web_listen on :8090, actor `echo`)
+#   2) Run abclc/RemoteClient.aipl which exercises send/now/future against
 #      `remote("localhost:8090", "echo")`.
 #   3) Grep both sides' captured stdout for the expected interaction.
 set -u
@@ -18,7 +18,7 @@ SRV_LOG="$TMP/server.log"
 CLI_LOG="$TMP/client.log"
 
 echo "[start] server"
-printf 'load abclc/RemoteServer.abcl\ncompile\n' \
+printf 'load abclc/RemoteServer.aipl\ncompile\n' \
   | "$REPL" > "$SRV_LOG" 2>&1 &
 SRV_PID=$!
 sleep 2
@@ -30,7 +30,7 @@ if ! lsof -i :8090 >/dev/null 2>&1; then
 fi
 
 echo "[run] client"
-printf 'load abclc/RemoteClient.abcl\ncompile\n' \
+printf 'load abclc/RemoteClient.aipl\ncompile\n' \
   | gtimeout 8 "$REPL" > "$CLI_LOG" 2>&1
 kill "$SRV_PID" 2>/dev/null
 wait "$SRV_PID" 2>/dev/null
@@ -61,17 +61,17 @@ echo "[start] signed server (ABCL_REMOTE_SECRET=topsecret)"
 SRV2_LOG="$TMP/server2.log"
 CLI2_LOG="$TMP/client2.log"
 CLI3_LOG="$TMP/client3.log"
-ABCL_REMOTE_SECRET=topsecret printf 'load abclc/RemoteServer.abcl\ncompile\n' \
+ABCL_REMOTE_SECRET=topsecret printf 'load abclc/RemoteServer.aipl\ncompile\n' \
   | ABCL_REMOTE_SECRET=topsecret "$REPL" > "$SRV2_LOG" 2>&1 &
 SRV2_PID=$!
 sleep 2
 
 echo "[run] client with matching secret"
-ABCL_REMOTE_SECRET=topsecret printf 'load abclc/RemoteClient.abcl\ncompile\n' \
+ABCL_REMOTE_SECRET=topsecret printf 'load abclc/RemoteClient.aipl\ncompile\n' \
   | ABCL_REMOTE_SECRET=topsecret gtimeout 8 "$REPL" > "$CLI2_LOG" 2>&1
 
 echo "[run] client with WRONG secret (should be rejected)"
-ABCL_REMOTE_SECRET=wrongkey printf 'load abclc/RemoteClient.abcl\ncompile\n' \
+ABCL_REMOTE_SECRET=wrongkey printf 'load abclc/RemoteClient.aipl\ncompile\n' \
   | ABCL_REMOTE_SECRET=wrongkey gtimeout 8 "$REPL" > "$CLI3_LOG" 2>&1
 kill "$SRV2_PID" 2>/dev/null; wait "$SRV2_PID" 2>/dev/null
 

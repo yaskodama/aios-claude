@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_method_patch() -> None:
-    out = _run("MethodPatch.abcl")
+    out = _run("MethodPatch.aipl")
 
     # Initial state
     assert "[g1] hello, Alice" in out
@@ -60,7 +60,7 @@ def test_method_patch() -> None:
     assert "Mary" not in out
     assert "final methods_of(g1) = ['greet', 'init', 'whisper']" in out
     assert "final methods_of(g2) = ['greet', 'init']" in out
-    print("OK  MethodPatch.abcl")
+    print("OK  MethodPatch.aipl")
 
 
 if __name__ == "__main__":

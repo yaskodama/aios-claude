@@ -11,7 +11,7 @@ Fork actors live on Xinu at ids 0..4.  P4 and P5 (Xinu philosophers,
 ids 5, 6) run their own AIPL `send`/callback loop and need no help
 from the host.
 
-Topology (must match abclc/DiningPhilosophersDistXinu.abcl):
+Topology (must match abclc/DiningPhilosophersDistXinu.aipl):
     P1: low=F0  high=F4
     P2: low=F0  high=F1
     P3: low=F1  high=F2

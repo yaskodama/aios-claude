@@ -1,2 +1,2 @@
-load src/web_philosophers.abcl
+load src/web_philosophers.aipl
 compile

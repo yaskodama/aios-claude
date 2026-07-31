@@ -1,2 +1,2 @@
-load sample1_grant_revoke.abcl
+load sample1_grant_revoke.aipl
 compile

@@ -22,7 +22,7 @@
 
 | Suite | 件数 | PASS | FAIL |
 |---|---:|---:|---:|
-| `src/python-aipl/samples/*.abcl` | 33 | **33** | 0 |
+| `src/python-aipl/samples/*.aipl` | 33 | **33** | 0 |
 | `samples/feature_*/*.aipl` (Phase A-G) | 21 | **21** | 0 |
 | **合計** | **54** | **54** | **0** |
 

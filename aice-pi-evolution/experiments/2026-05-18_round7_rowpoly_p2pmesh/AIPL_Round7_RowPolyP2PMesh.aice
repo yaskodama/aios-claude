@@ -101,7 +101,7 @@ aice AIPL_Round7_RowPolyP2PMesh {
       spec = "選ばれた pair が AIPL を実プロダクションスタック (Erlang/OTP / Akka / Pony) と比較しても遜色ない levels に押し上げるか。1.0 = peer 級、0.7 = ある主要側面で対等、0.3 = 玩具→実用境界、0.0 = まだ玩具。";
     }
     task SampleCoverage {
-      spec = "選んだ variant が AIPL の既存 sample 群 (actor / select / saga / pool / CRDT) と自然に統合できるか。row-poly は record sample (`abclc/RecordStructural.abcl`)、P2P は distributed sample で素直にテスト可能か。";
+      spec = "選んだ variant が AIPL の既存 sample 群 (actor / select / saga / pool / CRDT) と自然に統合できるか。row-poly は record sample (`abclc/RecordStructural.aipl`)、P2P は distributed sample で素直にテスト可能か。";
     }
   }
 

@@ -2,21 +2,21 @@
 # run.sh — drive a Level A sample through the metacircular evaluator.
 #
 # Usage:
-#   bash run.sh samples/SampleArith.abcl
-# Concats metacircular.abcl + the sample into a tmpfile and runs it
+#   bash run.sh samples/SampleArith.aipl
+# Concats metacircular.aipl + the sample into a tmpfile and runs it
 # through the Python AIPL interpreter, capturing stdout to out/.
 
 set -u
 cd "$(dirname "$0")"
 
-SAMPLE="${1:?usage: $0 samples/<File>.abcl}"
-NAME=$(basename "$SAMPLE" .abcl)
+SAMPLE="${1:?usage: $0 samples/<File>.aipl}"
+NAME=$(basename "$SAMPLE" .aipl)
 OUT_LOG="out/${NAME}.log"
-TMP="/tmp/_lvA_${NAME}.abcl"
+TMP="/tmp/_lvA_${NAME}.aipl"
 
 mkdir -p out
 
-cat metacircular.abcl "$SAMPLE" > "$TMP"
+cat metacircular.aipl "$SAMPLE" > "$TMP"
 
 # The metacircular evaluator stacks AIPL eval_* frames on top of the
 # host Python frames; each AIPL function call uses ~10 Python frames,

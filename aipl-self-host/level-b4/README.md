@@ -54,10 +54,10 @@ The signature of `tc_infer_expr` etc. is identical to B-3.
 
 ```sh
 cd aipl-self-host/level-b4
-bash run.sh   samples/SampleLinearClean.abcl
-bash run.sh   samples/SampleUseAfterMove.abcl
-bash run.sh   samples/SampleDoubleConsume.abcl
-bash run.sh   samples/SampleSelfConsistency.abcl
+bash run.sh   samples/SampleLinearClean.aipl
+bash run.sh   samples/SampleUseAfterMove.aipl
+bash run.sh   samples/SampleDoubleConsume.aipl
+bash run.sh   samples/SampleSelfConsistency.aipl
 
 bash smoke.sh
 ```
@@ -65,10 +65,10 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleLinearClean.abcl           issues=0
-PASS  SampleUseAfterMove.abcl          issues=1
-PASS  SampleDoubleConsume.abcl         issues=1
-PASS  SampleSelfConsistency.abcl       issues=1
+PASS  SampleLinearClean.aipl           issues=0
+PASS  SampleUseAfterMove.aipl          issues=1
+PASS  SampleDoubleConsume.aipl         issues=1
+PASS  SampleSelfConsistency.aipl       issues=1
 Level B-4 linear samples: 4 pass / 0 fail
 ```
 

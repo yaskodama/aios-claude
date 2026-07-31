@@ -144,7 +144,7 @@ fields and identical pending mailboxes are treated as the same node
 (visited-set pruning); deepcopy is used per step so methods can
 mutate freely.
 
-## Loading `.abcl` files directly
+## Loading `.aipl` files directly
 
 `aipl_modelcheck_load.py` parses an AIPL source file with the
 existing `aipl_parser`, walks the resulting AST, and dynamically
@@ -154,10 +154,10 @@ statements build the initial `World`.
 
 ```sh
 # Detect deadlock in a 2-lock acquire-in-opposite-order pattern:
-python3 aipl_modelcheck_load.py samples-mc/TwoLockDeadlock.abcl --depth 500
+python3 aipl_modelcheck_load.py samples-mc/TwoLockDeadlock.aipl --depth 500
 
 # Verify the ordered fix is deadlock-free:
-python3 aipl_modelcheck_load.py samples-mc/TwoLockOrdered.abcl --depth 500
+python3 aipl_modelcheck_load.py samples-mc/TwoLockOrdered.aipl --depth 500
 ```
 
 For accurate deadlock vs normal-halt classification, supply a
@@ -172,7 +172,7 @@ def all_phils_done(state):
                for a in state.actors.values()
                if hasattr(a, "_fields") and "done" in a._fields)
 
-init, _ = load_program("samples-mc/TwoLockDeadlock.abcl")
+init, _ = load_program("samples-mc/TwoLockDeadlock.aipl")
 mc = ModelChecker(init, depth=500)
 res = mc.check_deadlock_free(is_terminal=all_phils_done)
 print(res.render())

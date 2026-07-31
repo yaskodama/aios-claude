@@ -1,2 +1,2 @@
-load sample3_chain_exhausted.abcl
+load sample3_chain_exhausted.aipl
 compile

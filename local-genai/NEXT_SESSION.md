@@ -31,7 +31,7 @@
 | `local-genai/ollama_chat.py` | 122 行 | gradio web chat UI (gemma2:2b + llama3.2:3b 切替、 G1 完了状態の system prompt) |
 | `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.aice` | 195 行 | 次の進化空間 6 グループの設計仕様 |
 | `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.ga.json` | 17.1 KB | GA spec (21 prior_seeds + 8 design axes) |
-| `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.abcl` | 22.1 KB | AIPL runtime プログラム (8-axis MAP-Elites + 4 reviewers) |
+| `aice-evolution-v2/examples/LocalGenAIAutoloopNextEvolution.aipl` | 22.1 KB | AIPL runtime プログラム (8-axis MAP-Elites + 4 reviewers) |
 | `local-genai/aipl_v4_map_elites.py` | 410 行 | **G4 実装**: archive-based MAP-Elites (cell = smoothing × n × alpha_bin, 100 cells)。 N1/N2/N3 + 5 prior winner seed → empty-cell 狙いの LLM prompt → cell-best acceptance |
 
 ### lineage JSON (実験記録)

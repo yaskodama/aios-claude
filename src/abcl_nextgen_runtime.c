@@ -52,7 +52,7 @@ static long as_int(value_t v) {
 
 /* ── minimal file-I/O builtin (used by some saga / cap samples) ──
    The C codegen prelude doesn't ship a `read_file` primitive but
-   several .abcl samples reference it.  Provide a thin wrapper so
+   several .aipl samples reference it.  Provide a thin wrapper so
    the link step resolves; fopen failure triggers `longjmp` into
    any enclosing saga frame via the active jmpbuf if set, or
    `abort()` otherwise.  Writes/appends/exists are similarly minimal. */

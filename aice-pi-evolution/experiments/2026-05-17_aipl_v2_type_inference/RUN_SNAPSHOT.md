@@ -1,13 +1,13 @@
 # AIPL 全サンプル — 実行確認 (Phase E-2 段階)
 
 **実行日:** 2026-05-17
-**目的:** 全 AIPL サンプル (.abcl 33 件 + .aipl 21 件) が型検査だけでなく **インタプリタで実際に走るか** を確認。
+**目的:** 全 AIPL サンプル (.aipl 33 件 + .aipl 21 件) が型検査だけでなく **インタプリタで実際に走るか** を確認。
 
 ## 結果サマリ
 
 | Suite | 件数 | run PASS | run FAIL |
 |---|---:|---:|---:|
-| `src/python-aipl/samples/*.abcl` | 33 | 33 | 0 |
+| `src/python-aipl/samples/*.aipl` | 33 | 33 | 0 |
 | `samples/feature_*/*.aipl` (型推論デモ) | 21 | 21 | 0 |
 | **合計** | **54** | **54** | **0** |
 
@@ -45,9 +45,9 @@
 | g_integration | sample2_inference_catches | (no stdout) | 0 bytes |
 | g_integration | sample3_clean | (no stdout) | 0 bytes |
 
-## .abcl 公式サンプルの実行詳細
+## .aipl 公式サンプルの実行詳細
 
-`src/python-aipl/samples/*.abcl` 全 33 件は `python3 aipl_main.py <file>` でデフォルト挙動 (型検査なし、interp 走る) で実行。Traceback / parse error / FATAL いずれもなしで終了。
+`src/python-aipl/samples/*.aipl` 全 33 件は `python3 aipl_main.py <file>` でデフォルト挙動 (型検査なし、interp 走る) で実行。Traceback / parse error / FATAL いずれもなしで終了。
 
 詳細ログは `src/python-aipl/_run_logs/*.log` (gitignored)。
 

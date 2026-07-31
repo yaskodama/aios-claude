@@ -1731,7 +1731,7 @@ def _b_session_check(args, frame, interp):
 
 def _b_serve_forever(args, frame, interp):
     """Block the current thread.  Useful at the end of a server-style
-    .abcl program after web_listen / web_expose so the process keeps
+    .aipl program after web_listen / web_expose so the process keeps
     accepting incoming messages."""
     try:
         while True:
@@ -2129,7 +2129,7 @@ def _b_regions_available(args, frame, interp):
 # ---------------------------------------------------------------------------
 # Standard library (string + I/O + misc).  Keep these synchronous and
 # total — anything that can hit the filesystem returns "" / False on
-# error rather than raising, so an .abcl program can probe gracefully.
+# error rather than raising, so an .aipl program can probe gracefully.
 
 def _b_str_len(args, frame, interp):
     return len(_to_str(args[0])) if args else 0
@@ -2762,7 +2762,7 @@ def run_repl() -> None:
             print(":exit / :quit  leave the REPL")
             print(":show          list known classes and globals")
             print(":clear         discard pending buffered input")
-            print("Otherwise type any .abcl statement; multi-line input is")
+            print("Otherwise type any .aipl statement; multi-line input is")
             print("buffered until the parser accepts it.")
             continue
         if stripped == ":show":

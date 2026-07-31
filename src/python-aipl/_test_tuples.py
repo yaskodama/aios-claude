@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_tuples() -> None:
-    out = _run("Tuples.abcl")
+    out = _run("Tuples.aipl")
 
     # 1) Heterogeneous tuple from the request
     assert "t1     = (1, 20, test)" in out
@@ -54,7 +54,7 @@ def test_tuples() -> None:
     assert "origin = (0, 0)" in out
     assert "meta   = (city, 100, 35.6)" in out
     assert "typeof(meta)   = tuple(string, int, float)" in out
-    print("OK  Tuples.abcl")
+    print("OK  Tuples.aipl")
 
 
 if __name__ == "__main__":

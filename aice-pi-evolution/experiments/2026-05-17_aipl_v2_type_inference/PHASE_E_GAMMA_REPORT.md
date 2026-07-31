@@ -168,7 +168,7 @@ shape mismatch を場所付きで報告。
 
 | Suite | PASS |
 |---|---|
-| `src/python-aipl/samples/*.abcl` (33 件) | 33/33 |
+| `src/python-aipl/samples/*.aipl` (33 件) | 33/33 |
 | `feature_a_hm/` (3 件) | 3/3 |
 | `feature_b_crossclass/` (3 件) | 3/3 |
 | `feature_c_refinement/` (3 件) | 3/3 (refinement issue は期待通り) |

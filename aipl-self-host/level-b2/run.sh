@@ -2,13 +2,13 @@
 set -u
 cd "$(dirname "$0")"
 
-SAMPLE="${1:?usage: $0 samples/<File>.abcl}"
-NAME=$(basename "$SAMPLE" .abcl)
+SAMPLE="${1:?usage: $0 samples/<File>.aipl}"
+NAME=$(basename "$SAMPLE" .aipl)
 OUT_LOG="out/${NAME}.log"
-TMP="/tmp/_lvB2_${NAME}.abcl"
+TMP="/tmp/_lvB2_${NAME}.aipl"
 
 mkdir -p out
-cat typeck.abcl "$SAMPLE" > "$TMP"
+cat typeck.aipl "$SAMPLE" > "$TMP"
 
 PYTHONRECURSIONLIMIT_HACK="
 import sys; sys.setrecursionlimit(20000)

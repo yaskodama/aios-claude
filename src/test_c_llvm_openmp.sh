@@ -28,13 +28,13 @@ TMPROOT=$(mktemp -d /tmp/aipl-llvm-omp.XXXXXX)
 trap "rm -rf '$TMPROOT'" EXIT
 TIMEOUT=${TIMEOUT:-3}
 
-SAMPLES=(Hello.abcl counter.abcl)
+SAMPLES=(Hello.aipl counter.aipl)
 
 pass=0; fail=0; total=0
 run_one() {
   local sample="$1" flag="$2" tag="$3" cc="$4" cflags="$5"
   total=$((total + 1))
-  local base="${sample%.abcl}"
+  local base="${sample%.aipl}"
   local out="$TMPROOT/$tag/$base"
   mkdir -p "$TMPROOT/$tag"
   if ! "$AIPL2C" "abclc/$sample" -o "$out.c" "$flag" > "$out.gen.log" 2>&1; then

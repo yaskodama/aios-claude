@@ -25,7 +25,7 @@ echo "--- [1] AIPL TcpEchoClientXinu → C → Xinu kernel ---"
 dune build src/aipl2c.exe >/tmp/n1_diag_build.log 2>&1 || {
   echo "FAIL: dune build"; tail /tmp/n1_diag_build.log; exit 1; }
 
-./_build/default/src/aipl2c.exe abclc/TcpEchoClientXinu.abcl \
+./_build/default/src/aipl2c.exe abclc/TcpEchoClientXinu.aipl \
     -o /tmp/n1_diag.c --xinu --max-msgs 0 >/tmp/n1_diag_a2c.log 2>&1 || {
   echo "FAIL: aipl2c"; cat /tmp/n1_diag_a2c.log; exit 1; }
 cp /tmp/n1_diag.c "$XINU/apps/abcl_program.c"

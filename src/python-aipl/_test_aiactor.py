@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_ai_actor() -> None:
-    out = _run("AIActor.abcl")
+    out = _run("AIActor.aipl")
 
     # Auto-spawned AI is reachable from user code without `new AI()`.
     assert "typeof(AI) = actor(AI, methods=[ask, ask_p, ask_sys, ask_sys_p, cost, remaining, see, see_p, see_sys, see_sys_p, usage])" in out
@@ -62,7 +62,7 @@ def test_ai_actor() -> None:
     assert "typeof(future AI.ask(\"x\"))          = future" in out
     assert "typeof(ai_call)        (builtin sig) = function([provider:int|string,] prompt:string) -> string" in out
     assert "typeof(ai_call_image)  (builtin sig) = function([provider,] prompt:string, image+) -> string" in out
-    print("OK  AIActor.abcl")
+    print("OK  AIActor.aipl")
 
 
 if __name__ == "__main__":

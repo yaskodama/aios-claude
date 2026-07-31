@@ -218,7 +218,7 @@ class _Handler(BaseHTTPRequestHandler):
             print(f"[gateway] unknown actor: {to_name!r} (from={from_name})")
             return self.send_error(404, f"no exposed actor: {to_name}")
 
-        # Print so a server-side .abcl program shows traffic in its
+        # Print so a server-side .aipl program shows traffic in its
         # log without explicit handler instrumentation.
         print(f"[gateway] -> {to_name}.{method}({args}) from={from_name!r}", flush=True)
         try:

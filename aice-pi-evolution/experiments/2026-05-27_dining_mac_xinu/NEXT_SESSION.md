@@ -47,7 +47,7 @@
 ```sh
 cd /Users/kodamay/ocaml-app/abclcp-project
 python3 src/python-aipl/aipl_main.py --dashboard 8899 \
-  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl
+  aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.aipl
 # → http://127.0.0.1:8899/actors  (起動時は "not started"; Start で開始)
 ```
 - ダッシュボードがプログラムのライフサイクルを管理 (main は常駐)。**未開始で起動**。
@@ -60,14 +60,14 @@ python3 src/python-aipl/aipl_main.py --dashboard 8899 \
     head=水色枠/tail=橙枠, producer 上→帯→consumer 下のフロー矢印)。
   - ★`_json_safe` は list/tuple を再帰して JSON 配列にする (Buffer の `slots` 配列を図に出すため)。
 - API: `GET /api/programs|actors|program|console` , `POST /api/load|control|speed`。
-- 切替対象 (実験ディレクトリ内の *.abcl を自動列挙):
-  - `local_diners.abcl` — **local 5** (Pi 不要, 全 5 哲学者+5 fork 可視化, 50 食, suicide)
-  - `dine_dynamic.abcl` — **3 Mac + 2 Xinu, 動的** (要 Pi)。冒頭で RESET → ソース送付(LOAD)→
+- 切替対象 (実験ディレクトリ内の *.aipl を自動列挙):
+  - `local_diners.aipl` — **local 5** (Pi 不要, 全 5 哲学者+5 fork 可視化, 50 食, suicide)
+  - `dine_dynamic.aipl` — **3 Mac + 2 Xinu, 動的** (要 Pi)。冒頭で RESET → ソース送付(LOAD)→
     実機コンパイル(COMPILE/RUN)→ SPAWN → 50 食 + suicide。**何度でも再ラン可**。
-  - `mac_diners.abcl` — **3 Mac + 2 Xinu, 静的** (要 Pi)。RESET → SPAWN (事前リンク済クラス, 動的
+  - `mac_diners.aipl` — **3 Mac + 2 Xinu, 静的** (要 Pi)。RESET → SPAWN (事前リンク済クラス, 動的
     コンパイルなし) → 50 食 + suicide。**何度でも再ラン可**。
-  - `ring_demo.abcl` — local token ring 4 (Pi 不要, 切替テスト用)。
-  - `bounded_buffer.abcl` — **有限バッファ (producer/consumer)** local (Pi 不要)。
+  - `ring_demo.aipl` — local token ring 4 (Pi 不要, 切替テスト用)。
+  - `bounded_buffer.aipl` — **有限バッファ (producer/consumer)** local (Pi 不要)。
     1 個の Buffer アクターが容量 **20** のリングを所有 (mailbox 順序 = 相互排他, 追加ロック無し)。
     Producer ×2 (各 80 個) / Consumer ×2。満杯なら `refused`→バックオフ (back-pressure)、
     空なら `empty`→待機。全 producer 完了 + drain 後に consumer へ `closed`→suicide で終了。

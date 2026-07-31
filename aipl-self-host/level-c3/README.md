@@ -45,7 +45,7 @@ unpacks each message.
 
 ```sh
 cd aipl-self-host/level-c3
-bash run.sh samples/SampleNow.abcl
+bash run.sh samples/SampleNow.aipl
 bash smoke.sh
 ```
 
@@ -56,7 +56,7 @@ Output:
 7
 [sched] ran 2 round(s)
 [expected: 7]
-PASS  SampleNow.abcl
+PASS  SampleNow.aipl
 Level C-3 scheduler samples: 1 pass / 0 fail
 ```
 

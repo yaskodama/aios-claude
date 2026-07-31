@@ -86,7 +86,7 @@ Parallel Language; 旧称 ABCL/c+) の設計と実装を,\textbf{Hindley-Milner 
 メッセージ境界以外の領域を \code{value\_t} タグ付き共用体から\textbf{ネイティブ
 C 型に特殊化}する HM 駆動コード生成を確立した.第三に,1986 年の ABCL/1 系譜の
 アクターモデルに現代的な LLM 連携を組み込み,\code{ai\_call(provider,~prompt)}
-プリミティブとして第一級化した.第四に,同一の \code{.abcl} ソースから
+プリミティブとして第一級化した.第四に,同一の \code{.aipl} ソースから
 OS スレッド (1:1) / 軽量スレッド (M:N) / 協調イベントループの 3 並行モデル
 すべてに展開できる\textbf{ターゲット非依存セマンティクス}を確立し,
 AIPL を AIPL で記述する完全な\textbf{セルフホスト塔} (Level\,A--C-3,
@@ -128,7 +128,7 @@ Language) を提案する.特に本稿は AIPL の\textbf{型推論版}
   \item \textbf{アクター意味論の保存}: \code{send}/\code{now}/\code{future}/
     \code{await} の四プリミティブで Hewitt 型アクター \cite{hewitt1973} を記述
     でき,LLM 連携 \code{ai\_call} を組込みとして第一級化する.
-  \item \textbf{実装多様性と意味論保存}: 同一の \code{.abcl} ソースを
+  \item \textbf{実装多様性と意味論保存}: 同一の \code{.aipl} ソースを
     7 種のランタイムと 8 種のコード生成ターゲットで実行でき,
     HM ベースの 3 実装は推論結果が一致する.
 \end{enumerate}
@@ -241,7 +241,7 @@ AIPL の型システムは \textbf{HM 推論}を中核に置き,その周囲に
 
 \subsubsection{HM 推論 (本稿の中心)}
 
-AIPL の \code{.abcl} ソースには通常,型注釈を一切書かない:
+AIPL の \code{.aipl} ソースには通常,型注釈を一切書かない:
 
 \begin{lstlisting}
 class Hello {
@@ -518,7 +518,7 @@ AIPL のセマンティクスは,以下の異なる並行モデル上で同型�
     に統合できる.
 \end{enumerate}
 
-同一の \code{.abcl} ファイルが,コード変更なくこの三層のいずれにも
+同一の \code{.aipl} ファイルが,コード変更なくこの三層のいずれにも
 配置可能であることが本研究の重要な実証成果である.
 
 \section{実装}
@@ -578,7 +578,7 @@ AIPL は単一言語に対して 7 種のランタイム実装と 8 種のコー
   \bottomrule
 \end{longtable}
 
-すべて単一のソースを共有する.Hello.abcl を例に取れば,8 ターゲット
+すべて単一のソースを共有する.Hello.aipl を例に取れば,8 ターゲット
 すべてで意味的に同じ出力 (\code{Hello! count = 5} 等) を得る.
 
 \subsection{コード生成の中核技術}
@@ -669,8 +669,8 @@ AIPL コードを評価する構造:
 \end{tabularx}
 
 \textbf{Phase monotonicity の自動証明.} 各 Level B-N の checker は,
-それ自身の \code{.abcl} ソースに対しても自分のルールが矛盾なく
-適用できることを \code{SampleSelfConsistency.abcl} で確認している.
+それ自身の \code{.aipl} ソースに対しても自分のルールが矛盾なく
+適用できることを \code{SampleSelfConsistency.aipl} で確認している.
 これは「Phase N の checker は Phase N の規約に従って書かれている」
 という不変条件の経験的検証となる.
 
@@ -724,11 +724,11 @@ $^*$ OCaml smoke の 9 fail は \code{abclc/} の Gui/Py/Xinu サンプル
 \label{sec:cross}
 
 本研究の中心的な経験結果として,3 つの HM 実装
-(OCaml / Python 推論版 / C コード生成) が,同一の \code{.abcl}
+(OCaml / Python 推論版 / C コード生成) が,同一の \code{.aipl}
 入力に対して\textbf{完全に一致する推論型}を出力することを確認した:
 
 \begin{lstlisting}
-// abclc/Hello.abcl
+// abclc/Hello.aipl
 class Hello { float count = 0.; method init(n) { count = n; } method greet() {...} }
 var h = new Hello(5);
 \end{lstlisting}
@@ -849,7 +849,7 @@ future ... \}}) は Loom の \code{StructuredTaskScope} と意味論が
     プロバイダ・予算・並行性をランタイムが管理する設計.
   \item Hindley-Milner 推論を中心とする多層型システム.実装ごとに
     どの層を有効にするかが独立に選べる.
-  \item 同一の \code{.abcl} を OS スレッド層・M:N 層・協調イベント
+  \item 同一の \code{.aipl} を OS スレッド層・M:N 層・協調イベント
     ループ層の三並行モデルすべてに展開できることの実証.
   \item AIPL を AIPL で記述した 9 段階のセルフホスト塔
     (\code{aipl-self-host/}) で言語仕様の自己一貫性を経験的に示した.

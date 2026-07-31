@@ -1,2 +1,2 @@
-load sample3_mixed.abcl
+load sample3_mixed.aipl
 compile

@@ -49,10 +49,10 @@ up() {
 
   echo "[run-cross] starting $PY_SRV ..."
   docker run -d --rm --name "$PY_SRV" --network "$NET" \
-    "$PY_IMG" /app/samples-remote/python_server.abcl >/dev/null
+    "$PY_IMG" /app/samples-remote/python_server.aipl >/dev/null
   echo "[run-cross] starting $OC_SRV ..."
   docker run -d --rm --name "$OC_SRV" --network "$NET" \
-    "$OC_IMG" /app/samples-remote/ocaml_server.abcl >/dev/null
+    "$OC_IMG" /app/samples-remote/ocaml_server.aipl >/dev/null
 
   # Give the gateways a moment to bind their listeners.
   echo "[run-cross] waiting 4s for both gateways to come up ..."
@@ -61,12 +61,12 @@ up() {
   echo
   echo "==================== Python driver ===================="
   docker run --rm --network "$NET" \
-    "$PY_IMG" /app/samples-remote/python_driver.abcl
+    "$PY_IMG" /app/samples-remote/python_driver.aipl
 
   echo
   echo "==================== OCaml driver  ===================="
   docker run --rm --network "$NET" \
-    "$OC_IMG" /app/samples-remote/ocaml_driver.abcl
+    "$OC_IMG" /app/samples-remote/ocaml_driver.aipl
 
   echo
   echo "==================== Server logs (tail) ===================="

@@ -4,7 +4,7 @@
 // -> dump lineage as JSON for the Python report pipeline.
 //
 // Run:
-//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_OCaml_NextGenPort.abcl
+//   AIPL_AI_PROVIDER=mock /usr/bin/python3 src/python-aipl/aipl_main.py AIPL_OCaml_NextGenPort.aipl
 //
 // Reviewers compute deterministic scores in Phase 5. Setting use_ai=1
 // (Phase 6) makes them call ai_call_with_system per scoring request.
@@ -743,7 +743,7 @@ class Coordinator {
       // crash-recovery: flush lineage every generation so silent SDK
       // hangs (cf. Pi_Phase1_OpenSearch v3 attempt 2026-05-16) do not
       // lose the partial result.  Cost: one fs write per generation.
-      var ckpt_n = now lineage.dump("out/AIPL_OCaml_NextGenPort.abcl_lineage.json");
+      var ckpt_n = now lineage.dump("out/AIPL_OCaml_NextGenPort.aipl_lineage.json");
       print("[ckpt gen=" + gen + "] flushed " + ckpt_n + " individuals");
       gen = gen + 1;
     }
@@ -751,8 +751,8 @@ class Coordinator {
     print("[done] cells filled: " + (now elite.size()));
     print(now elite.best_summary(5));
 
-    var n = now lineage.dump("out/AIPL_OCaml_NextGenPort.abcl_lineage.json");
-    print("[lineage] wrote " + n + " individuals to out/AIPL_OCaml_NextGenPort.abcl_lineage.json");
+    var n = now lineage.dump("out/AIPL_OCaml_NextGenPort.aipl_lineage.json");
+    print("[lineage] wrote " + n + " individuals to out/AIPL_OCaml_NextGenPort.aipl_lineage.json");
   }
 }
 
@@ -770,7 +770,7 @@ var profiles = new TaskProfiles();
 var rev1 = new Reviewer("TypeImplFeasibility", "あなたは OCaml 型推論実装可能性レビュアーです。CE-10 / CE-11 / CE-12 / CE-13 の OCaml への直訳が `infer.ml` (773 行) と `refinement.ml` (189 行) にどの程度の追加で組み込めるかを評価。Py-I 同等実装は合計 ~250 行で済んだので OCaml も同等規模が target。1.0 = ≤200 行 + 既存 unify を破壊しない、0.7 = ≤350 行、0.3 = ≤500 行、0.0 = type system 再設計レベル。'OK: <根拠>' / 'NG: <欠落>' の 1 行返答。", 0, 0.16666666666666666, util, digits);
 var rev2 = new Reviewer("DistImplFeasibility", "あなたは OCaml 分散ランタイム実装可能性レビュアーです。DR-10 / DR-11 / DR-12 / DR-13 を `aipl_dist.ml` (590 行) + `eval_thread.ml` の追加で実装できるかを評価。Py-I 合計 ~450 行 (CRDT 270 + Saga 165 + Region 125 + Pool 207 のうち各 dist 部分)。1.0 = ≤500 行 + 既存 DR-1〜9 維持、0.7 = ≤700 行、0.3 = ≤900 行、0.0 = 完全新設計。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev3 = new Reviewer("BackwardCompat", "あなたは後方互換性レビュアーです。OCaml AIPL の 75 abclc smoke samples (Counter / BoundedBuffer / AIChain / Channels / Phase11+ 型付き / Phase 13 channels / Phase 17 scope) + 15 o2_typeinf + 24 o1_distributed samples が無変更で動作するか。OCaml の Phase O で確立された opt-in パターン (AIPL_DIST_ENABLE=1) を全 8 機能で踏襲するか。1.0 = 完全 opt-in、0.7 = 1-2 サンプル軽微変化、0.3 = 多数で挙動変化、0.0 = 致命的。1 行で返答。", 0, 0.16666666666666666, util, digits);
-var rev4 = new Reviewer("PyIParity", "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.abcl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。", 0, 0.16666666666666666, util, digits);
+var rev4 = new Reviewer("PyIParity", "あなたは Py-I/OCaml 整合性レビュアーです。同一の `.aipl` ソースが両方で同じ観測結果を出すかを評価。CE-* なら --infer 出力の effects / 型表示の等価、DR-* なら構造化ログ NDJSON のイベント名 + フィールドの一致。Phase O で 18/18 mirror を達成した実績あり。1.0 = 完全一致、0.7 = ログ形式 / timing 違い、0.3 = 部分的、0.0 = 不一致。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev5 = new Reviewer("OCamlIdiomaticity", "あなたは OCaml イディオム性レビュアーです。Py-I の Python idiom (dict / TLS via threading.local / class-with-methods) を OCaml らしく書き直す妥当性を評価。Hashtbl vs Map / Mutex 付き ref vs Atomic / module-local mutable / record. Py-I の dict-based CRDT を OCaml で variant + record にするべきか dict のまま JSON 持ちにするべきか等。1.0 = OCaml idiom 完璧、0.7 = 大半 idiom、0.3 = Python の直訳を持ち込み過ぎ、0.0 = OCaml 的でない。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var rev6 = new Reviewer("ImplCostEstimate", "あなたは実装コスト見積もりレビュアーです。Phase O (~1305 LOC for 18 features) と Phase O-3 (95 行 for 3 fixes) の LOC 効率を参照しつつ、8 機能合計が aipl_dist.ml + refinement.ml + infer.ml + eval_thread.ml + parser.mly + ast.ml に 800 行以内で済むかを評価。Py-I は ~700 行 + OCaml syntax overhead +15% で目算 ~800 行。1.0 = ≤600 行、0.7 = ≤800 行、0.3 = ≤1000 行、0.0 = >1000 行。1 行で返答。", 0, 0.16666666666666666, util, digits);
 var eval_actor = new Evaluator(rev1, rev2, rev3, rev4, rev5, rev6);

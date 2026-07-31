@@ -349,7 +349,7 @@ schema = json.loads((base / "schemas/pi_paradigm.schema.json").read_text())
 for stem in ("Pi_Phase0_LowLevelBaseline","Pi_Phase1_OpenSearch",
              "Pi_Phase2_BignumRefinement","Pi_PiLang_Final"):
     spec = json.loads((base / "examples" / f"{stem}.ga.json").read_text())
-    src = generate_program(spec, schema).replace(f"{stem}.abcl", f"{stem}.aipl")
+    src = generate_program(spec, schema).replace(f"{stem}.aipl", f"{stem}.aipl")
     (base / "examples" / f"{stem}.aipl").write_text(src, encoding="utf-8")
     print(stem, "ok", len(spec['evaluation']['reviewers']), "reviewers")
 PY
@@ -378,7 +378,7 @@ done
 
 | 項目 | 決定 | 理由 |
 |---|---|---|
-| 言語ファイル拡張子 | `.aipl` (`.abcl` ではなく) | ユーザ明示指定。AIPL = ABCL は本プロジェクトでは同義だが、ユーザは `.aipl` を採用 |
+| 言語ファイル拡張子 | `.aipl` (`.aipl` ではなく) | ユーザ明示指定。AIPL = ABCL は本プロジェクトでは同義だが、ユーザは `.aipl` を採用 |
 | Phase-0 の `generations` | 0 | fingerprint だけ取って Phase-1 へ橋渡しする設計。種を進化させない |
 | Final の `algorithm` | `frozen` | 言語仕様の凍結ファイルとして使う。MAP-Elites は走らせない |
 | Phase-1 `open_axes` | `true` | LLM 変異が 3 新軸 (`proof_obligation`, `guard_digits`, `simd_lanes`) を発芽させる余地を残す |

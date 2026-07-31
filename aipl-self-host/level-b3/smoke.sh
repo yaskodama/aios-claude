@@ -5,11 +5,11 @@ set -u
 cd "$(dirname "$0")"
 
 declare -a SAMPLES=(
-  "SampleChannelClean.abcl          0"
-  "SampleChannelSendMismatch.abcl   1"
-  "SampleChannelRecvMismatch.abcl   1"
-  "SampleChannelTryRecv.abcl        0"
-  "SampleSelfConsistency.abcl       1"
+  "SampleChannelClean.aipl          0"
+  "SampleChannelSendMismatch.aipl   1"
+  "SampleChannelRecvMismatch.aipl   1"
+  "SampleChannelTryRecv.aipl        0"
+  "SampleSelfConsistency.aipl       1"
 )
 
 pass=0; fail=0
@@ -17,7 +17,7 @@ for entry in "${SAMPLES[@]}"; do
   set -- $entry
   sample="$1"; expected="$2"
   bash run.sh "samples/$sample" >/dev/null 2>&1
-  log="out/${sample%.abcl}.log"
+  log="out/${sample%.aipl}.log"
   actual=$(grep -E '^issues=' "$log" | sed 's/issues=//')
   if [ "$actual" = "$expected" ]; then
     pass=$((pass+1))

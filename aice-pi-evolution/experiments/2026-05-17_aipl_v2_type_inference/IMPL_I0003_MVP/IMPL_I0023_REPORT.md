@@ -104,7 +104,7 @@ NDJSON log (`/tmp/qlog.ndjson`):
 
 | Suite | PASS |
 |---|---|
-| `src/python-aipl/samples/*.abcl` (33 件) | **33/33** |
+| `src/python-aipl/samples/*.aipl` (33 件) | **33/33** |
 | `samples/feature_*/*.aipl` (21 件) | **21/21** |
 | 単体テスト | **19/19** |
 
@@ -146,7 +146,7 @@ aipl_dist.py 合計: 331 + 95 = **426 LOC**。`AIPL_DIST_ENABLE=0` での副作�
 | `aipl_interp.dispatch` + `aipl_runtime.Actor._run` への opt-in hook | ✅ +19 LOC |
 | 単体テスト (4 新規 + 15 既存 = 19) | ✅ 19/19 PASS |
 | End-to-end .aipl サンプル (`quarantine_demo.aipl`) | ✅ 期待通り 1 fail + 3 skip + done |
-| 既存 33 .abcl + 21 .aipl 回帰 | ✅ 54/54 PASS |
+| 既存 33 .aipl + 21 .aipl 回帰 | ✅ 54/54 PASS |
 | I0023 11 軸中 1 軸 (quarantine) を実装、6 軸を既存機能でカバー | ✅ |
 
 **I0023 (hang resilience) は MVP として完成**。残る軸 (multi_process placement / true cluster scheduling) は I0036 系の作業に持ち越し。
@@ -154,7 +154,7 @@ aipl_dist.py 合計: 331 + 95 = **426 LOC**。`AIPL_DIST_ENABLE=0` での副作�
 ## 7. 次の自然なステップ
 
 - **I0036 (Erlang OTP) MVP**: `quorum_replicate` + `multi_process_local` + gRPC など 5 軸の本格分散 (~1000 LOC)
-- **I-7 を実 LLM call で実測**: AIActor.abcl + 実 OpenAI key + RPM=10 で rate-limit シミュレーション
+- **I-7 を実 LLM call で実測**: AIActor.aipl + 実 OpenAI key + RPM=10 で rate-limit シミュレーション
 - **PsiLang v3 を quarantine 付きで再走**: 実データで 35/38 喪失が改善されるか実測
 
 ---

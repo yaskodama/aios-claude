@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_diners_web.sh — 5-哲学者デモ + Web ダッシュボード起動.
 #
-# 1. abclc/DiningPhilosophersDistXinu.abcl を aipl2c → C → Xinu kernel build
+# 1. abclc/DiningPhilosophersDistXinu.aipl を aipl2c → C → Xinu kernel build
 # 2. QEMU を以下の構成で起動:
 #      UART0 (console)  → TCP 127.0.0.1:5554 (server)
 #      UART1 (AIPL RPC) → TCP 127.0.0.1:5555 (server)
@@ -15,7 +15,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
 XINU="${XINU_RAZ:-/Users/kodamay/projects/xinu-raz/xinu}"
 COMPILER_ROOT="${COMPILER_ROOT:-/opt/homebrew/bin/arm-none-eabi-}"
-SAMPLE="${SAMPLE:-abclc/DiningPhilosophersDistXinu.abcl}"
+SAMPLE="${SAMPLE:-abclc/DiningPhilosophersDistXinu.aipl}"
 
 CONSOLE_PORT="${CONSOLE_PORT:-5554}"
 RPC_PORT="${RPC_PORT:-5555}"

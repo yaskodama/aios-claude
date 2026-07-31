@@ -1,12 +1,12 @@
 #!/bin/sh
-# Rotate4LinesPy.abcl を Python (tkinter) 上で動かす。
+# Rotate4LinesPy.aipl を Python (tkinter) 上で動かす。
 #  - python3 -c 'import tkinter' が成功する Python が必要。
 #  - Homebrew Python なら `brew install python-tk@3.14` 等で入る。
 set -e
 cd "$(dirname "$0")"
 
 dune build src/aipl2c.exe
-./_build/default/src/aipl2c.exe abclc/Rotate4LinesPy.abcl \
+./_build/default/src/aipl2c.exe abclc/Rotate4LinesPy.aipl \
     --python --max-msgs 0 -o /tmp/r4l_py.py
 
 exec python3 /tmp/r4l_py.py

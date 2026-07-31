@@ -1,4 +1,4 @@
-"""Smoke test: export 4 philosophers .abcl to .pml files.
+"""Smoke test: export 4 philosophers .aipl to .pml files.
 
 Verifies that the AIPL → Promela exporter produces well-formed
 output for the philosophers samples.  Does NOT run SPIN itself
@@ -37,7 +37,7 @@ def _check_pml(src_path: str, expected_classes: list[str],
 
 def test_philosophers_naive():
     _check_pml(
-        os.path.join(HERE, "samples-mc/PhilosophersNaive.abcl"),
+        os.path.join(HERE, "samples-mc/PhilosophersNaive.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_methods=["request", "release", "init", "try_eat", "granted"],
     )
@@ -45,7 +45,7 @@ def test_philosophers_naive():
 
 def test_philosophers_ordered():
     _check_pml(
-        os.path.join(HERE, "samples-mc/PhilosophersOrdered.abcl"),
+        os.path.join(HERE, "samples-mc/PhilosophersOrdered.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_methods=["request", "release", "init", "try_eat", "granted"],
     )
@@ -53,7 +53,7 @@ def test_philosophers_ordered():
 
 def test_philosophers5_naive():
     _check_pml(
-        os.path.join(HERE, "samples-mc/Philosophers5Naive.abcl"),
+        os.path.join(HERE, "samples-mc/Philosophers5Naive.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_methods=["request", "granted"],
     )
@@ -61,7 +61,7 @@ def test_philosophers5_naive():
 
 def test_philosophers5_ordered():
     _check_pml(
-        os.path.join(HERE, "samples-mc/Philosophers5Ordered.abcl"),
+        os.path.join(HERE, "samples-mc/Philosophers5Ordered.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_methods=["request", "granted"],
     )

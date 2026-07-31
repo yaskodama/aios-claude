@@ -1,6 +1,6 @@
 """AIPL → Promela / SPIN exporter.
 
-Translates an .abcl actor program (the same focused subset
+Translates an .aipl actor program (the same focused subset
 aipl_modelcheck_load and aipl_to_tla accept) into a Promela (.pml)
 specification, suitable for verification with SPIN.
 
@@ -408,7 +408,7 @@ def emit_promela(prog: Program, name: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Export an .abcl program to Promela for SPIN")
+        description="Export an .aipl program to Promela for SPIN")
     ap.add_argument("source")
     ap.add_argument("-o", "--out-dir", default="out_promela")
     ap.add_argument("--name", default=None,

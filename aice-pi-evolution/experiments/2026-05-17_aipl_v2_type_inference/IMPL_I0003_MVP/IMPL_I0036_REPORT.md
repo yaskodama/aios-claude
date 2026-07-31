@@ -111,7 +111,7 @@ NDJSON:
 
 | Suite | PASS |
 |---|---|
-| `src/python-aipl/samples/*.abcl` (33 件) | **33/33** |
+| `src/python-aipl/samples/*.aipl` (33 件) | **33/33** |
 | `samples/feature_*/*.aipl` (21 件) | **21/21** |
 | 単体テスト | **27/27** |
 | 既存 phase samples (env_var_routing / structured_log / quarantine / end_to_end) | 全 OK |

@@ -5,9 +5,9 @@
 #   * Browser JS engine:  src/browser-abcl/src/{ast,runtime,interpreter}.js
 #                         plus a jison-generated parser under src/browser-abcl/src/parser/
 #
-# Sample .abcl programs live under abclc/ and are meant to be executed by the
+# Sample .aipl programs live under abclc/ and are meant to be executed by the
 # OCaml REPL (_build/default/src/repl_thread.exe). The JS build keeps its own
-# demo .abcl sources inlined in its HTML pages.
+# demo .aipl sources inlined in its HTML pages.
 
 OCAML_REPL   = _build/default/src/repl_thread.exe
 BROWSER_DIR  = src/browser-abcl
@@ -35,7 +35,7 @@ help:
 	@echo '  make clean             Remove dune build artifacts'
 	@echo '  make cleanall          clean + also remove generated JS parser'
 	@echo '  make samples           List sample programs under abclc/'
-	@echo '  make run-hello         Run abclc/Hello.abcl through the OCaml REPL'
+	@echo '  make run-hello         Run abclc/Hello.aipl through the OCaml REPL'
 	@echo '  make run-philosophers  Run the 5-philosopher dinner sample'
 	@echo '  make run-rotate4       Run the Rotate4Lines sample'
 	@echo '  make serve-js          Serve the browser build at http://localhost:$(SERVE_PORT)'
@@ -75,10 +75,10 @@ cleanall: clean
 # ---------------- Samples ----------------
 
 samples:
-	@ls -1 abclc/*.abcl
+	@ls -1 abclc/*.aipl
 
 run-hello: ocaml
-	@printf 'load abclc/Hello.abcl\ncompile\nquit\n' | $(OCAML_REPL)
+	@printf 'load abclc/Hello.aipl\ncompile\nquit\n' | $(OCAML_REPL)
 
 run-philosophers: ocaml
 	./run_philosophers.sh
@@ -108,9 +108,9 @@ smoke-dynamic:
 repl:
 	$(PY) $(PYDIR)/aipl_main.py
 
-# Reformat a .abcl file.  Usage: make fmt FILE=path/to/x.abcl [INPLACE=1]
+# Reformat a .aipl file.  Usage: make fmt FILE=path/to/x.aipl [INPLACE=1]
 fmt:
-	@if [ -z "$(FILE)" ]; then echo "usage: make fmt FILE=path/to.abcl [INPLACE=1]"; exit 2; fi
+	@if [ -z "$(FILE)" ]; then echo "usage: make fmt FILE=path/to.aipl [INPLACE=1]"; exit 2; fi
 	@if [ "$(INPLACE)" = "1" ]; then $(PY) $(PYDIR)/abcl_fmt.py -i "$(FILE)"; \
 	 else $(PY) $(PYDIR)/abcl_fmt.py "$(FILE)"; fi
 

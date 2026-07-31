@@ -10,7 +10,7 @@ tail-first env idiom, but with one new dimension — types as strings.
 ## Layout
 
 ```
-typeck.abcl     — the type checker (functions only, no actor)
+typeck.aipl     — the type checker (functions only, no actor)
 run.sh          — concats typeck + a sample, runs through host AIPL
 smoke.sh        — runs all 6 samples + verifies expected issue counts
 samples/        — typed AST programs (clean + 4 violation kinds + self-consistency)
@@ -51,12 +51,12 @@ A program is `{fns: [FunctionDecl], main: [stmt]}`.
 
 ```sh
 cd aipl-self-host/level-b
-bash run.sh   samples/SampleClean.abcl
-bash run.sh   samples/SampleArityViolation.abcl
-bash run.sh   samples/SampleTypeViolation.abcl
-bash run.sh   samples/SampleReturnViolation.abcl
-bash run.sh   samples/SampleUnion.abcl
-bash run.sh   samples/SampleSelfConsistency.abcl
+bash run.sh   samples/SampleClean.aipl
+bash run.sh   samples/SampleArityViolation.aipl
+bash run.sh   samples/SampleTypeViolation.aipl
+bash run.sh   samples/SampleReturnViolation.aipl
+bash run.sh   samples/SampleUnion.aipl
+bash run.sh   samples/SampleSelfConsistency.aipl
 
 # all six at once + count check
 bash smoke.sh
@@ -65,12 +65,12 @@ bash smoke.sh
 ## Verification (smoke.sh)
 
 ```
-PASS  SampleClean.abcl                 issues=0
-PASS  SampleArityViolation.abcl        issues=2
-PASS  SampleTypeViolation.abcl         issues=2
-PASS  SampleReturnViolation.abcl       issues=1
-PASS  SampleUnion.abcl                 issues=1
-PASS  SampleSelfConsistency.abcl       issues=1
+PASS  SampleClean.aipl                 issues=0
+PASS  SampleArityViolation.aipl        issues=2
+PASS  SampleTypeViolation.aipl         issues=2
+PASS  SampleReturnViolation.aipl       issues=1
+PASS  SampleUnion.aipl                 issues=1
+PASS  SampleSelfConsistency.aipl       issues=1
 Level B-1 typeck samples: 6 pass / 0 fail
 ```
 

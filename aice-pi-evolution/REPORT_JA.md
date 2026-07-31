@@ -80,7 +80,7 @@ aice-pi-evolution/
 
 ### 3.2 `.ga.json → .aipl` 変換
 
-`aice-evolution-v2/src/aipl_codegen.generate_program(spec, schema)` を直接呼び、`.aipl` 拡張子で保存。Run hint の `.abcl` → `.aipl` も書き換え済み。
+`aice-evolution-v2/src/aipl_codegen.generate_program(spec, schema)` を直接呼び、`.aipl` 拡張子で保存。Run hint の `.aipl` → `.aipl` も書き換え済み。
 
 ### 3.3 `.aipl` 実行 (AIPL ランタイム + mock provider)
 

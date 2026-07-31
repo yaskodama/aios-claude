@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # run_diners_bootstrap.sh — pure-AIPL diners with runtime SPAWN.
 #
-# Xinu side : abclc/DiningPhilosophersDistXinu_NoMain.abcl
+# Xinu side : abclc/DiningPhilosophersDistXinu_NoMain.aipl
 #             Fork + Philosopher classes linked, but NO instances at
 #             boot (actor table starts empty).
 #
 # PC   side : aice-pi-evolution/experiments/2026-05-20_xinu_remote_rpc/
-#             host_diners_bootstrap.abcl
+#             host_diners_bootstrap.aipl
 #             LOADs the source, then SPAWNs 5 Forks + 2 Xinu philos
 #             over UART1 RPC, then kicks them with SEND try_eat, then
 #             runs the usual 3 PC philosophers.
@@ -21,8 +21,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
 XINU="${XINU_RAZ:-/Users/kodamay/projects/xinu-raz/xinu}"
 COMPILER_ROOT="${COMPILER_ROOT:-/opt/homebrew/bin/arm-none-eabi-}"
-SAMPLE="${SAMPLE:-abclc/DiningPhilosophersDistXinu_NoMain.abcl}"
-HOST_AIPL="${HOST_AIPL:-$HERE/../2026-05-20_xinu_remote_rpc/host_diners_bootstrap.abcl}"
+SAMPLE="${SAMPLE:-abclc/DiningPhilosophersDistXinu_NoMain.aipl}"
+HOST_AIPL="${HOST_AIPL:-$HERE/../2026-05-20_xinu_remote_rpc/host_diners_bootstrap.aipl}"
 
 CONSOLE_PORT="${CONSOLE_PORT:-5554}"
 RPC_PORT="${RPC_PORT:-5555}"

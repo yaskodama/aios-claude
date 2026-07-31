@@ -2,7 +2,7 @@
 //   node run_cooperative.mjs                          # mock AI (default)
 //   GEMINI_API_KEY=... node run_cooperative.mjs       # real Gemini
 //   ABCL_AI_PROVIDER=mock node run_cooperative.mjs    # force mock
-//   node run_cooperative.mjs path/to/sample.abcl
+//   node run_cooperative.mjs path/to/sample.aipl
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { execFileSync, execSync } from "node:child_process";
@@ -51,7 +51,7 @@ function geminiCallSync(prompt, system, apiKey) {
   }
 }
 
-const file = process.argv[2] || "cooperative_now_future.abcl";
+const file = process.argv[2] || "cooperative_now_future.aipl";
 const src = readFileSync(resolve(__dirname, file), "utf8");
 const tree = parser.parse(src);
 

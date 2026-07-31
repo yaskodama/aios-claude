@@ -1,0 +1,81 @@
+// local_diners.aipl — self-contained 5-philosopher dining (all Py-I actors)
+// for showing the browser dashboard (run with --dashboard PORT, open /actors).
+// Philosophers loop forever (think -> take forks -> eat -> put down -> think)
+// so the dashboard always has live actors with changing state.
+// Deadlock-free: every philosopher takes its lower-numbered fork first.
+
+class Fork {
+  var holder = 0;
+  method acquire(pid) {
+    if (holder == 0) { holder = pid; send sender.granted(pid); }
+    else { send sender.denied(pid); }
+  }
+  method release(pid) { if (holder == pid) { holder = 0; } }
+}
+
+class Philosopher {
+  var id     = 0;
+  var lo     = 0;
+  var hi     = 0;
+  var state  = 0;        // 0 = no forks, 1 = holds low fork
+  var meals  = 0;
+  var target = 50;       // stop after this many meals
+  var status = "thinking";
+
+  method init(i, l, h) {
+    id = i; lo = l; hi = h; state = 0; meals = 0; status = "thinking";
+    send self.think();
+  }
+  method think() {
+    status = "thinking";
+    print("P" + id + " thinking");
+    sleep(0.4);
+    send lo.acquire(id);
+  }
+  method granted(pid) {
+    if (state == 0) {
+      state = 1; status = "took low fork";
+      print("P" + id + " took a fork");
+      send hi.acquire(id);
+    } else {
+      print("P" + id + " took a fork");
+      meals = meals + 1;
+      status = "eating";
+      print("P" + id + " eating (meal " + meals + ")");
+      sleep(0.5);
+      send hi.release(id);
+      send lo.release(id);
+      state = 0;
+      status = "put down forks";
+      print("P" + id + " put down forks");
+      if (meals >= target) {
+        status = "done";
+        print("P" + id + " finished after " + meals + " meals (terminating)");
+        suicide();
+      } else {
+        send self.think();
+      }
+    }
+  }
+  method denied(pid) {
+    if (state == 1) { send lo.release(id); state = 0; }
+    status = "waiting (fork busy)";
+    print("P" + id + " waiting (a fork is busy)");
+    sleep(0.1);
+    send self.think();
+  }
+}
+
+var f0 = new Fork();
+var f1 = new Fork();
+var f2 = new Fork();
+var f3 = new Fork();
+var f4 = new Fork();
+
+// each philosopher i shares fork i with i-1 and fork i+1 with i+1;
+// pass (lower, higher) fork so the lower one is always acquired first.
+var p0 = new Philosopher(1, f0, f1);
+var p1 = new Philosopher(2, f1, f2);
+var p2 = new Philosopher(3, f2, f3);
+var p3 = new Philosopher(4, f3, f4);
+var p4 = new Philosopher(5, f0, f4);

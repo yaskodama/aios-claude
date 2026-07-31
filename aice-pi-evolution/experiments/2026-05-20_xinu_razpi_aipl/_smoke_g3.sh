@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # G3 smoke — PL050 mouse → AIPL actor message dispatch.
 #
-# Sample: abclc/MouseDemoXinu.abcl
+# Sample: abclc/MouseDemoXinu.aipl
 #   MouseLogger subscribes to click / move / release, then synthesises
 #   1 click + 2 moves + 1 release via mouse_inject().  Callbacks print
 #   tagged digests (1xxx click / 2xxx move / 3xxx release) so the smoke
@@ -27,7 +27,7 @@ dune build src/aipl2c.exe >/tmp/_g3_build.log 2>&1 || {
 src=MouseDemoXinu
 echo "=== $src ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_g3_${src}.c --xinu --max-msgs 0 \
     > /tmp/_g3_${src}.aipl2c.log 2>&1
 [ -f /tmp/_g3_${src}.c ] || {

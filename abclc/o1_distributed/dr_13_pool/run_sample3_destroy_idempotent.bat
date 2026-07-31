@@ -1,2 +1,2 @@
-load sample3_destroy_idempotent.abcl
+load sample3_destroy_idempotent.aipl
 compile

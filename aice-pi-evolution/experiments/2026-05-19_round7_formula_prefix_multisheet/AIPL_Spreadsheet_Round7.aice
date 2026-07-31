@@ -173,7 +173,7 @@ aice AIPL_Spreadsheet_Round7 {
   file_impact {
     primary = [
       "src/browser-abcl/spreadsheet.html        (~1200 LOC additions)",
-      "src/browser-abcl/spreadsheet.abcl        (~10 LOC — initial sheet[0] only)",
+      "src/browser-abcl/spreadsheet.aipl        (~10 LOC — initial sheet[0] only)",
       "src/browser-abcl/src/runtime.js          (~80 LOC — multi-sheet swap-in)",
       "src/node-aipl-server/server.mjs          (~30 LOC — v2 save schema accept)",
       "src/python-aipl/samples/spreadsheet/README.md   (~14 row table additions)"

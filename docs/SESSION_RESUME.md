@@ -101,8 +101,8 @@ bash /tmp/coop_remote_jp.sh # reviewer を Docker 別ノードで動かす
 ### 3.3 Python AIPL
 ```bash
 cd /Users/kodamay/ocaml-app/abclcp-project/src/python-aipl
-/opt/homebrew/bin/python3.13 aipl_main.py samples-ai/CooperativeNowFuture.abcl
-/opt/homebrew/bin/python3.13 aipl_main.py samples-ai/SessionTyped.abcl   # session 型チェック実演
+/opt/homebrew/bin/python3.13 aipl_main.py samples-ai/CooperativeNowFuture.aipl
+/opt/homebrew/bin/python3.13 aipl_main.py samples-ai/SessionTyped.aipl   # session 型チェック実演
 ```
 
 ### 3.4 全 smoke (3 ランタイム + Dist)
@@ -169,9 +169,9 @@ node /tmp/abcl_pptr_test/_check_*.mjs
 - `src/python-aipl/aipl_interp.py` — aios_*/protocol_*/session_* builtins、
   `_b_await` の auto-observe、`_aios_dispatch` ヘルパ
 - `src/python-aipl/aipl_aios.py` — **新規モジュール** (aios + protocol + session)
-- `src/python-aipl/samples-ai/CooperativeNowFuture.abcl` — 新規
-- `src/python-aipl/samples-ai/SessionTyped.abcl` — 新規 (型検査実演)
-- `src/python-aipl/samples-remote/reviewer_node_full_jp.abcl` — 新規
+- `src/python-aipl/samples-ai/CooperativeNowFuture.aipl` — 新規
+- `src/python-aipl/samples-ai/SessionTyped.aipl` — 新規 (型検査実演)
+- `src/python-aipl/samples-remote/reviewer_node_full_jp.aipl` — 新規
 
 ### JavaScript (browser)
 - `src/browser-abcl/src/parser/grammar.jison` — `now/future/await`、
@@ -193,7 +193,7 @@ node /tmp/abcl_pptr_test/_check_*.mjs
   5 サンプル切替)
 - `src/browser-abcl/rotate4lines_workers.html` — **新規** (Web Worker demo)
 - `src/browser-abcl/run_cooperative.mjs` — **新規** (Node 用ヘッドレスランナー)
-- `src/browser-abcl/cooperative_now_future.abcl` — **新規** (Node 用サンプル)
+- `src/browser-abcl/cooperative_now_future.aipl` — **新規** (Node 用サンプル)
 - `src/browser-abcl/favicon.ico` — 404 抑制
 
 ### ビルド/環境

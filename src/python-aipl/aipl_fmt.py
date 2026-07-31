@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""abcl_fmt — reformat a .abcl source file.
+"""abcl_fmt — reformat a .aipl source file.
 
 Text-based, deliberately conservative.  Walks the source one
 character at a time and emits:

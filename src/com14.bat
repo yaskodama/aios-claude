@@ -1,2 +1,2 @@
-load AA.abcl
+load AA.aipl
 compile

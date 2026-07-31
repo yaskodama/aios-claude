@@ -5,9 +5,9 @@
 //
 //   Round 0 (= 現状, commit f4dd437 以前から残存):
 //     - src/aipl2c.ml --xinu フラグ + src/c_translator.ml の
-//       gen_program_xinu (3283 行) で .abcl → C への Xinu 専用 codegen
+//       gen_program_xinu (3283 行) で .aipl → C への Xinu 専用 codegen
 //     - abclc/{Rotate4LinesXinu, Philosophers5Xinu,
-//       BoundedBufferXinu}.abcl の 3 サンプル
+//       BoundedBufferXinu}.aipl の 3 サンプル
 //     - run_{r4l,p5,bb,pingpong}_xinu.sh 起動スクリプト
 //     - /Users/kodamay/projects/xinu-raz/xinu に Xinu カーネルソース.
 //       Cross-compiler arm-none-eabi + QEMU versatilepb (Cocoa GUI) で動く
@@ -27,13 +27,13 @@
 aice AIPL_XinuRazPi_Round1 {
   dialect = "aice_evolution_v2";
 
-  task = "AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) で進化させる.Round 0 (= 既存 src/aipl2c.ml --xinu + gen_program_xinu + 3 サンプル + xinu-raz) を base に、(R) regression 修復、(P) パフォーマンス/スケジューラ、(F) AIPL 機能拡張 (Xinu C ランタイム上)、(G) GUI/I/O 拡張、(N) 分散/ネットワーク の 5 軸で進化.全 phase は (1) aipl2c の .abcl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で起動成功 ✅ の 3 段ゲートを通過すること.";
+  task = "AIPL を Embedded Xinu / Raspberry Pi 系 (arm-qemu + 実 Pi) で進化させる.Round 0 (= 既存 src/aipl2c.ml --xinu + gen_program_xinu + 3 サンプル + xinu-raz) を base に、(R) regression 修復、(P) パフォーマンス/スケジューラ、(F) AIPL 機能拡張 (Xinu C ランタイム上)、(G) GUI/I/O 拡張、(N) 分散/ネットワーク の 5 軸で進化.全 phase は (1) aipl2c の .aipl → C 翻訳 ✅ + (2) Xinu kernel build ✅ + (3) QEMU で起動成功 ✅ の 3 段ゲートを通過すること.";
 
   gene_schema = "../../../aice-evolution-v2/schemas/programming_paradigm.schema.json";
 
   seed_from {
     base_compiler  = "src/aipl2c.ml --xinu  + src/c_translator.ml:gen_program_xinu";
-    base_samples   = "abclc/{Rotate4LinesXinu, Philosophers5Xinu, BoundedBufferXinu}.abcl";
+    base_samples   = "abclc/{Rotate4LinesXinu, Philosophers5Xinu, BoundedBufferXinu}.aipl";
     base_runner    = "run_{r4l,p5,bb,pingpong}_xinu.sh";
     base_kernel    = "/Users/kodamay/projects/xinu-raz/xinu  (arm-qemu, PL110 LCD, PL050 mouse, WM)";
     base_toolchain = "arm-none-eabi-gcc + qemu-system-arm + dune 3.20";
@@ -110,7 +110,7 @@ aice AIPL_XinuRazPi_Round1 {
     }
 
     task F4_StringsAndArrays {
-      spec = "Xinu C ランタイムで string / array primitives を強化.GC な heap 管理 (現在の linear heap を簡易 mark-sweep に).abcl では `var arr: int[10]` のような構文をサポート.";
+      spec = "Xinu C ランタイムで string / array primitives を強化.GC な heap 管理 (現在の linear heap を簡易 mark-sweep に).aipl では `var arr: int[10]` のような構文をサポート.";
       weight = 0.06;
       acceptance = "3 assertion: 1000 alloc / free でリーク無し、array OOB が検出される、string concat / split が動く.";
     }
@@ -248,7 +248,7 @@ aice AIPL_XinuRazPi_Round1 {
 
     decision external_repo {
       // /Users/kodamay/projects/xinu-raz は外部 (この abclcp-project の
-      // git 管理外).abclcp 側からは絶対パスで参照、xinu-raz を
+      // git 管理外).aiplcp 側からは絶対パスで参照、xinu-raz を
       // 直接編集する場合は別途明示する.
       xinu_raz = "/Users/kodamay/projects/xinu-raz/xinu  (separately versioned)";
       changes_record = "Xinu 側に手を入れた phase は commit message に明記";
@@ -271,13 +271,13 @@ aice AIPL_XinuRazPi_Round1 {
     primary = [
       "src/aipl2c.ml                                       (~20 LOC: flag handling)",
       "src/c_translator.ml::gen_program_xinu               (~600-1000 LOC)",
-      "abclc/*Xinu.abcl                                    (~50-150 LOC across 3 samples — R0)",
-      "abclc/*.abcl 新規 Xinu サンプル                      (~200-400 LOC: P/F/G/N 用デモ)",
+      "abclc/*Xinu.aipl                                    (~50-150 LOC across 3 samples — R0)",
+      "abclc/*.aipl 新規 Xinu サンプル                      (~200-400 LOC: P/F/G/N 用デモ)",
       "run_*_xinu.sh                                       (~20 LOC: smoke + headless mode)"
     ];
     new_files = [
       "aice-pi-evolution/experiments/2026-05-20_xinu_razpi_aipl/_smoke_*.sh",
-      "abclc/<NetXinu / FontXinu / DistXinu / etc>.abcl",
+      "abclc/<NetXinu / FontXinu / DistXinu / etc>.aipl",
       "abclc/_smoke_logs/<phase>.log"
     ];
     external = [

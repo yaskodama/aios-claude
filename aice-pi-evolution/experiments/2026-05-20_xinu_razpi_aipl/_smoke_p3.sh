@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # P3 smoke — lock-free MPSC mailbox under multi-producer contention.
 #
-# Sample: abclc/MpscStressXinu.abcl
+# Sample: abclc/MpscStressXinu.aipl
 #   4 Producer actors × K=32 ticks each → 128 ticks → single Counter
 #   actor.  Counter prints its final n.
 #
@@ -29,7 +29,7 @@ src=MpscStressXinu
 EXPECTED=128       # 4 producers * K=32 ticks
 echo "=== $src (expected ticks=$EXPECTED) ==="
 
-./_build/default/src/aipl2c.exe abclc/${src}.abcl \
+./_build/default/src/aipl2c.exe abclc/${src}.aipl \
     -o /tmp/_p3_${src}.c --xinu --max-msgs 0 \
     > /tmp/_p3_${src}.aipl2c.log 2>&1
 [ -f /tmp/_p3_${src}.c ] || {

@@ -1,6 +1,6 @@
 """AIPL → TLA+ exporter.
 
-Translates an .abcl actor program (the same focused subset
+Translates an .aipl actor program (the same focused subset
 aipl_modelcheck_load accepts) into a TLA+ MODULE + cfg file pair
 that TLC can model-check.  Output:
 
@@ -506,7 +506,7 @@ def emit_module(prog: Program, module_name: str) -> tuple[str, str]:
     tla = f"""---- MODULE {module_name} ----
 EXTENDS Integers, Sequences, FiniteSets, TLC
 
-\\* Actor instance sets (constants from the .abcl)
+\\* Actor instance sets (constants from the .aipl)
 {chr(10).join(instance_set_lines)}
 
 VARIABLES {", ".join(all_class_vars)}, mailboxes
@@ -563,7 +563,7 @@ CHECK_DEADLOCK FALSE
 # CLI
 
 def main():
-    ap = argparse.ArgumentParser(description="Export an .abcl program to TLA+ for TLC")
+    ap = argparse.ArgumentParser(description="Export an .aipl program to TLA+ for TLC")
     ap.add_argument("source")
     ap.add_argument("-o", "--out-dir", default="out_tla")
     ap.add_argument("--name", default=None,

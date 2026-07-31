@@ -682,7 +682,7 @@ def write_outputs(input_path: Path, out_dir: Path) -> dict[str, str]:
         program = parse_evolution_program(input_path)
         out_dir.mkdir(parents=True, exist_ok=True)
         stem = input_path.stem
-        abcl_path = out_dir / f"{stem}.abcl"
+        abcl_path = out_dir / f"{stem}.aipl"
         report_path = out_dir / f"{stem}.report.md"
         manifest_path = out_dir / f"{stem}.manifest.json"
         abcl_path.write_text(emit_evolution_abcl(program), encoding="utf-8")
@@ -741,7 +741,7 @@ def write_outputs(input_path: Path, out_dir: Path) -> dict[str, str]:
     winners = evolve(repaired, checks)
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = input_path.stem
-    abcl_path = out_dir / f"{stem}.abcl"
+    abcl_path = out_dir / f"{stem}.aipl"
     report_path = out_dir / f"{stem}.report.md"
     manifest_path = out_dir / f"{stem}.manifest.json"
     abcl_path.write_text(emit_abcl(repaired, z_spec, checks, winners), encoding="utf-8")

@@ -3,7 +3,7 @@
   "dialect": "aice_evolution_v1",
   "runtime": "ocaml_abcl_cplus",
   "input": "aice-z-evolution/examples/TrafficLightParadigmEvolutionJP.auto.aice",
-  "abcl": "aice-z-evolution/out/TrafficLightParadigmEvolutionJP.auto.abcl",
+  "abcl": "aice-z-evolution/out/TrafficLightParadigmEvolutionJP.auto.aipl",
   "report": "aice-z-evolution/out/TrafficLightParadigmEvolutionJP.auto.report.md",
   "final_archive": "ParallelOOPWinner",
   "stages": [

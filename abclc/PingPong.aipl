@@ -1,0 +1,23 @@
+// OCaml AIPL sample.  Phase 11+ typed equivalent:
+// src/python-aipl/samples/PingPong.aipl, which annotates `left: int`
+// and the typed `bind(p)` / `init(n: int)` signatures.
+class Pinger {
+  method init() {
+    print("Pinger starting");
+    send ponger.ping();
+  }
+  method pong() {
+    print("Pinger got pong");
+    send sender.ping();
+  }
+}
+
+class Ponger {
+  method ping() {
+    print("Ponger got ping");
+    send sender.pong();
+  }
+}
+
+var pinger = new Pinger();
+var ponger = new Ponger();

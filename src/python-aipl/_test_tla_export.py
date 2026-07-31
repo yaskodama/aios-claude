@@ -1,4 +1,4 @@
-"""Smoke test: export 4 philosophers .abcl to .tla + .cfg pairs.
+"""Smoke test: export 4 philosophers .aipl to .tla + .cfg pairs.
 
 Verifies that the AIPL → TLA+ exporter produces well-formed output
 files for the philosophers samples.  Does NOT run TLC (TLC requires
@@ -37,7 +37,7 @@ def _check_module(src_path: str, expected_classes: list[str],
 
 def test_philosophers_naive():
     _check_module(
-        os.path.join(HERE, "samples-mc/PhilosophersNaive.abcl"),
+        os.path.join(HERE, "samples-mc/PhilosophersNaive.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_actions=["Fork_request", "Fork_release",
                           "Phil_init", "Phil_try_eat", "Phil_granted"],
@@ -46,7 +46,7 @@ def test_philosophers_naive():
 
 def test_philosophers_ordered():
     _check_module(
-        os.path.join(HERE, "samples-mc/PhilosophersOrdered.abcl"),
+        os.path.join(HERE, "samples-mc/PhilosophersOrdered.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_actions=["Fork_request", "Fork_release",
                           "Phil_init", "Phil_try_eat", "Phil_granted"],
@@ -55,7 +55,7 @@ def test_philosophers_ordered():
 
 def test_philosophers5_naive():
     _check_module(
-        os.path.join(HERE, "samples-mc/Philosophers5Naive.abcl"),
+        os.path.join(HERE, "samples-mc/Philosophers5Naive.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_actions=["Fork_request", "Phil_granted"],
     )
@@ -63,7 +63,7 @@ def test_philosophers5_naive():
 
 def test_philosophers5_ordered():
     _check_module(
-        os.path.join(HERE, "samples-mc/Philosophers5Ordered.abcl"),
+        os.path.join(HERE, "samples-mc/Philosophers5Ordered.aipl"),
         expected_classes=["Fork", "Phil"],
         expected_actions=["Fork_request", "Phil_granted"],
     )

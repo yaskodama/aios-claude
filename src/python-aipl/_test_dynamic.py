@@ -1,6 +1,6 @@
 """Smoke test for the AIPL `compile()` and `spawn()` builtins.
 
-Runs the two sample .abcl programs under the python-aipl runtime and
+Runs the two sample .aipl programs under the python-aipl runtime and
 asserts the expected output appears, so the new dynamic-class machinery
 doesn't regress."""
 
@@ -34,7 +34,7 @@ def _run(sample: str) -> str:
 
 
 def test_dynamic_basic() -> None:
-    out = _run("Dynamic.abcl")
+    out = _run("Dynamic.aipl")
     # Greeter compiled and used three times
     assert "[factory] compiled 1 class(es) for 'Greeter'" in out
     assert "[Greeter#1] hello, Alice" in out
@@ -49,11 +49,11 @@ def test_dynamic_basic() -> None:
     assert "[Greeter#1] hello, Dave" in out
     # The original Greeter actor still has its own count (#4 for Eve).
     assert "[Greeter#4] hello, Eve" in out
-    print("OK  Dynamic.abcl")
+    print("OK  Dynamic.aipl")
 
 
 def test_dynamic_worker_pool() -> None:
-    out = _run("DynamicWorkerPool.abcl")
+    out = _run("DynamicWorkerPool.aipl")
     # 3 workers spawned (ids 0..2), 5 jobs run, sum = 4+9+25+49+121 = 208.
     for w in ("[worker 0]", "[worker 1]", "[worker 2]"):
         assert w in out, f"missing worker output: {w}"
@@ -62,7 +62,7 @@ def test_dynamic_worker_pool() -> None:
         assert sq in out, f"missing computation: {sq}"
     assert "[manager] sum of squares = 208" in out
     assert "=== final result: 208 ===" in out
-    print("OK  DynamicWorkerPool.abcl")
+    print("OK  DynamicWorkerPool.aipl")
 
 
 if __name__ == "__main__":

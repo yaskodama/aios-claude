@@ -1,0 +1,33 @@
+// (3) SEND + RECEIVE-VIA-METHOD — Erlang-actor-OOP style.
+//
+// Python AIPL has no `select { case ... }` statement (OCaml does).
+// Instead, after fix (1), `reply(v)` on the send path delivers a
+// `reply(v)` message to the SENDER's mailbox.  The sender's actor
+// loop dispatches it through its own `reply` method (just another
+// method declaration), so the receiver can be expressed as a plain
+// method body — no special syntax needed.
+//
+//   ABCL_AI_PROVIDER=mock python3 src/python-aipl/aipl_main.py \
+//     src/python-aipl/samples-ai/_send_reply_demo/send_reply_style.aipl
+
+class Worker {
+  method ask(q) {
+    var r = ai_call(q);
+    reply(r);                         // fire result back to sender's `reply`
+  }
+}
+
+class Driver {
+  // Receiver for Worker's reply — invoked by the actor loop when the
+  // `reply(r)` message lands in Driver's mailbox.
+  method reply(r) {
+    print("[send/reply] got: " + r);
+  }
+  method run(q) {
+    var w = new Worker();
+    send w.ask(q);
+  }
+}
+
+var d = new Driver();
+send d.run("hello via send/reply");

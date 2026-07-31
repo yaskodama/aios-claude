@@ -303,7 +303,7 @@ aice Xinu_KernelEvolution_Round1 {
     ];
     untouched = [
       "abclcp-project/src/*  (= aipl2c)            — ABI 互換のため 原則不変",
-      "abclcp-project/abclc/*Xinu.abcl             — kernel 変更は AIPL から透過",
+      "abclcp-project/abclc/*Xinu.aipl             — kernel 変更は AIPL から透過",
       "browser-abcl / spreadsheet / drone-sim      — 完全に独立"
     ];
     new_files = [
@@ -329,7 +329,7 @@ aice Xinu_KernelEvolution_Round1 {
     run_evolution {
       requires = "GEMINI_API_KEY が export 済、google-genai SDK が import 可";
       cmd      = "AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-05-21_xinu_kernel_evolution/Xinu_KernelEvolution_Round1.aipl --timeout 1800 --idle-ms 600000";
-      output   = "out/Xinu_KernelEvolution_Round1.abcl_lineage.json";
+      output   = "out/Xinu_KernelEvolution_Round1.aipl_lineage.json";
       duration = "20-40 分 (seed=6 + gen=20 + 4 reviewers x 13 tasks ~= 1400 LLM calls)";
     }
   }

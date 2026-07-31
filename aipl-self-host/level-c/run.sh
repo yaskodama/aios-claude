@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Drive a Level C sample through the AIPL parser+eval pipeline.
-# Usage:  bash run.sh samples/<File>.abcl
+# Usage:  bash run.sh samples/<File>.aipl
 set -u
 cd "$(dirname "$0")"
 
-SAMPLE="${1:?usage: $0 samples/<File>.abcl}"
-NAME=$(basename "$SAMPLE" .abcl)
+SAMPLE="${1:?usage: $0 samples/<File>.aipl}"
+NAME=$(basename "$SAMPLE" .aipl)
 OUT_LOG="out/${NAME}.log"
-TMP="/tmp/_lvC_${NAME}.abcl"
+TMP="/tmp/_lvC_${NAME}.aipl"
 
 mkdir -p out
 
 # Concat lexer + parser (when present) + sample.
-PIECES=(lexer.abcl)
-[ -f parser.abcl ] && PIECES+=(parser.abcl)
-[ -f eval.abcl ]   && PIECES+=(eval.abcl)
+PIECES=(lexer.aipl)
+[ -f parser.aipl ] && PIECES+=(parser.aipl)
+[ -f eval.aipl ]   && PIECES+=(eval.aipl)
 
 cat "${PIECES[@]}" "$SAMPLE" > "$TMP"
 

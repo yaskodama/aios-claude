@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Distributed 3-node smoke test for AIPL.
 
-Spins up samples-remote/{solver,verifier,coordinator}.abcl as three
+Spins up samples-remote/{solver,verifier,coordinator}.aipl as three
 local processes against the mock AI provider so the test needs no
 network and no API keys.  Verifies the inter-node message chain
 produced output on every node and ran via the mock.
@@ -58,10 +58,10 @@ def main() -> int:
     # Offline provider — no keys required.
     env["ABCL_AI_PROVIDER"] = "mock"
 
-    solver   = _spawn("solver",   "samples-remote/solver.abcl",      env)
-    verifier = _spawn("verifier", "samples-remote/verifier.abcl",    env)
+    solver   = _spawn("solver",   "samples-remote/solver.aipl",      env)
+    verifier = _spawn("verifier", "samples-remote/verifier.aipl",    env)
     time.sleep(1.5)
-    coord    = _spawn("coord",    "samples-remote/coordinator.abcl", env)
+    coord    = _spawn("coord",    "samples-remote/coordinator.aipl", env)
 
     # The coordinator drives one demo question on startup.  Let the
     # whole chain (3 mock calls) settle, then bring everyone down.

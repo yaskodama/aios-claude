@@ -53,7 +53,7 @@ Round 1 が「設計の理想」を見たのに対し、round 2 reviewer は「�
 |------|---------|----:|---------|
 | 🥇   | **FE4 ActorEval**     | **0.546** | 各 cell actor が自分の formula を評価. AIPL ど真ん中 |
 | 2    | FE3 LazyMemoize       | 0.537 | Level-A eval + per-cell memoize, 依存 cell の invalidate |
-| 3    | FE1 LevelAReuse       | 0.517 | metacircular.abcl 流用 (50-100 LOC で済む) |
+| 3    | FE1 LevelAReuse       | 0.517 | metacircular.aipl 流用 (50-100 LOC で済む) |
 | 3    | FE2 DirectInterp      | 0.517 | 専用 interpreter 新規実装 |
 
 意外に **FE1 LevelAReuse が 3 位タイ**. 「LOC が最小」だけが基準ではなく、
@@ -85,7 +85,7 @@ P3 が勝った = 既存 infra 再利用の重要性. P1 圧倒的敗北は **3 
 | Rank | Variant | Avg | Verdict |
 |------|---------|----:|---------|
 | 🥇   | **PA2 PrattParser**    | **0.543** | top-down operator precedence, 演算子拡張容易 |
-| 🥇   | **PA4 LevelCPort**     | 0.543 | aipl-self-host/level-c/parser.abcl 拡張 (タイ) |
+| 🥇   | **PA4 LevelCPort**     | 0.543 | aipl-self-host/level-c/parser.aipl 拡張 (タイ) |
 | 3    | PA1 RecursiveDescent   | 0.531 | AIPL function で素直に書く |
 | ❌   | PA3 PEG_Generator      | 0.517 | 外部ライブラリ依存、JS-N 限定 |
 

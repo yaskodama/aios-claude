@@ -1,2 +1,2 @@
-load sample2_disjoint_rejected.abcl
+load sample2_disjoint_rejected.aipl
 compile

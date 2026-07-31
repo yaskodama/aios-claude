@@ -1,0 +1,61 @@
+// DistCheckpointXinu.aipl
+// F1 demo: actor field snapshot / restore.
+//
+// Bank starts with balance=100, score=50.  Takes a "v1" snapshot,
+// mutates fields to balance=999 score=777, restores "v1", and prints
+// digests so the smoke can verify the fields rewound.
+//
+// _smoke_f1.sh expects:
+//   (1) chkpt op=save marker  (slot=N, fields=3 — n_fields = MAX_FIELDS
+//                              but only the first 3 are class fields;
+//                              we accept fields >= 3)
+//   (2) chkpt op=load marker  (slot=N, fields=N)
+//   (3) digest before save = 100, mutated = 999, after load = 100
+//       (printed as 1100 / 1999 / 1100 with the "1xxx" tag so we can
+//        disambiguate the print stream)
+//   (4) checkpoint_list returns 1 after save, 0 after clear
+
+class Bank {
+  var balance = 100;
+  var score   = 50;
+  var owner   = 42;
+  var n_save  = 0;
+  var n_load  = 0;
+
+  method init() {
+    // (a) initial state — tag it
+    print(1000 + balance);                   // 1100
+    var slot1 = checkpoint_save(self, "v1");
+    print(2000 + slot1);                     // 2000 (slot=0)
+    n_save = n_save + 1;
+
+    // (b) mutate
+    balance = 999;
+    score   = 777;
+    owner   = 7;
+    print(1000 + balance);                   // 1999
+
+    var n_live1 = checkpoint_list();
+    print(3000 + n_live1);                   // 3001 (1 live snapshot)
+
+    // (c) restore — fields should rewind to (100, 50, 42)
+    var ok = checkpoint_load(self, "v1");
+    n_load = n_load + 1;
+    print(4000 + ok);                        // 4001
+    print(1000 + balance);                   // 1100 (restored)
+    print(5000 + score);                     // 5050
+    print(6000 + owner);                     // 6042
+
+    // (d) tag mismatch — should be a no-op (returns 0)
+    var miss = checkpoint_load(self, "no-such-tag");
+    print(7000 + miss);                      // 7000
+
+    // (e) clear all
+    var cleared = checkpoint_clear();
+    print(8000 + cleared);                   // 8001
+    var n_live2 = checkpoint_list();
+    print(3000 + n_live2);                   // 3000 (0 live)
+  }
+}
+
+var b = new Bank();

@@ -1,2 +1,2 @@
-load PingPong.abcl
+load PingPong.aipl
 compile

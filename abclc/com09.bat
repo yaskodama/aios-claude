@@ -1,2 +1,2 @@
-load LD2.abcl
+load LD2.aipl
 compile

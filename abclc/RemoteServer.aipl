@@ -1,0 +1,33 @@
+// Remote actor server (OCaml side A).
+//
+//   start:  ./_build/default/src/repl_thread.exe
+//           AIPL> load abclc/RemoteServer.aipl
+//           AIPL> compile
+//
+// Listens on :8090. Exposes an `echo` actor; its methods are reachable
+// from any other AIPL process via `send remote("localhost:8090", "echo").m(...)`
+// or `now remote(...)`.
+class Echo {
+  var hits = 0;
+
+  method init() {
+    print("[server] echo actor ready on :8090");
+  }
+
+  // Fire-and-forget: caller uses `send remote(...).note("hi")`.
+  method note(msg) {
+    hits = hits + 1;
+    print("[server] note hit=" + hits + " msg=" + msg);
+  }
+
+  // Synchronous: caller uses `now remote(...).ask("...")` and gets
+  // the reply value back.
+  method ask(question) {
+    hits = hits + 1;
+    print("[server] ask hit=" + hits + " q=" + question);
+    reply("answer-" + hits + ":" + question);
+  }
+}
+
+var echo = new Echo();
+web_listen(8090);

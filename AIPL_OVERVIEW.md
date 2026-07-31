@@ -74,13 +74,13 @@ flowchart TD
 
 | phase | feature                               | source / sample                        |
 | ---   | ---                                   | ---                                    |
-| 11a–e | typed annotations / unions / generics / length-arrays | `samples/Typecheck*.abcl` |
-| 12    | capability effects `!{fs,ai,net,mut}` | `samples/Effects.abcl`                 |
-| 13    | CSP channels                          | `samples/Channels.abcl`                |
-| 14    | linear / use-after-move               | `samples/Linear.abcl`                  |
-| 15    | owned (`pub` field visibility)        | `samples/Owned.abcl`                   |
-| 16    | transient cast at any-boundary        | `samples/Transient.abcl`               |
-| 17    | structured concurrency (`scope { future ... }`) | `samples/Phase17_StructuredConc.abcl` |
+| 11a–e | typed annotations / unions / generics / length-arrays | `samples/Typecheck*.aipl` |
+| 12    | capability effects `!{fs,ai,net,mut}` | `samples/Effects.aipl`                 |
+| 13    | CSP channels                          | `samples/Channels.aipl`                |
+| 14    | linear / use-after-move               | `samples/Linear.aipl`                  |
+| 15    | owned (`pub` field visibility)        | `samples/Owned.aipl`                   |
+| 16    | transient cast at any-boundary        | `samples/Transient.aipl`               |
+| 17    | structured concurrency (`scope { future ... }`) | `samples/Phase17_StructuredConc.aipl` |
 
 Each phase has a `_test_*.py` unit test under `src/python-aipl/`.
 
@@ -103,7 +103,7 @@ Each phase has a `_test_*.py` unit test under `src/python-aipl/`.
 **Total: 37/37 smoke tests passing across the self-host stack.**
 
 Every Level B-N's checker also passes its own rules when applied
-to itself (the `SampleSelfConsistency.abcl` fixture), proving phase
+to itself (the `SampleSelfConsistency.aipl` fixture), proving phase
 monotonicity.
 
 ---
@@ -205,34 +205,34 @@ If you're new to the project, this is the recommended path:
 
 ```
 Phase  feature              sample
-11+    typed Counter         Counter.abcl
-       typed Hello           Hello.abcl
-       typed PingPong        PingPong.abcl
-       typed NowFuture       NowFuture.abcl
-       typed records         Records.abcl
-       typed tuples          Tuples.abcl
-       typed arrays          Arrays.abcl  MultiDimArrays.abcl
-       generics + signatures Functions.abcl  Signatures.abcl
-       method patching       MethodPatch.abcl
-       dynamic compile       Dynamic.abcl  DynamicWorkerPool.abcl
-12     capability effects    Effects.abcl
-13     CSP channels          Channels.abcl  Channels2.abcl
-14     linear                Linear.abcl  Linear2.abcl
-15     owned                 Owned.abcl  Owned_violations.abcl
-16     transient cast        Transient.abcl  Transient_violation.abcl
-17     structured conc.      Phase17_StructuredConc.abcl
-ai     real LLM samples      samples-ai/*.abcl
-remote remote-actor demos    samples-remote/*.abcl
+11+    typed Counter         Counter.aipl
+       typed Hello           Hello.aipl
+       typed PingPong        PingPong.aipl
+       typed NowFuture       NowFuture.aipl
+       typed records         Records.aipl
+       typed tuples          Tuples.aipl
+       typed arrays          Arrays.aipl  MultiDimArrays.aipl
+       generics + signatures Functions.aipl  Signatures.aipl
+       method patching       MethodPatch.aipl
+       dynamic compile       Dynamic.aipl  DynamicWorkerPool.aipl
+12     capability effects    Effects.aipl
+13     CSP channels          Channels.aipl  Channels2.aipl
+14     linear                Linear.aipl  Linear2.aipl
+15     owned                 Owned.aipl  Owned_violations.aipl
+16     transient cast        Transient.aipl  Transient_violation.aipl
+17     structured conc.      Phase17_StructuredConc.aipl
+ai     real LLM samples      samples-ai/*.aipl
+remote remote-actor demos    samples-remote/*.aipl
 ```
 
 ### OCaml AIPL (`abclc/`)
 
 ```
-Phase11_TypedCounter.abcl
-Phase12_EffectsLog.abcl
-Phase13_Channels.abcl
-Phase14_Linear.abcl
-Phase15_Owned.abcl
+Phase11_TypedCounter.aipl
+Phase12_EffectsLog.aipl
+Phase13_Channels.aipl
+Phase14_Linear.aipl
+Phase15_Owned.aipl
 ... plus the existing Hello/Counter/PingPong/Philosophers etc.
 ```
 
@@ -260,10 +260,10 @@ level-c3/   SampleNow
 ### Cross-language (`docker/cross/`)
 
 ```
-samples/python_server.abcl  Python Counter on :8080
-samples/python_driver.abcl  Python driver → Py + OCaml
-samples/ocaml_server.abcl   OCaml Calc on :8080
-samples/ocaml_driver.abcl   OCaml driver → OCaml + Py
+samples/python_server.aipl  Python Counter on :8080
+samples/python_driver.aipl  Python driver → Py + OCaml
+samples/ocaml_server.aipl   OCaml Calc on :8080
+samples/ocaml_driver.aipl   OCaml driver → OCaml + Py
 ```
 
 ---
@@ -284,7 +284,7 @@ abclcp-project/
 │   ├── *.ml / *.mll / *.mly    OCaml runtime
 │   ├── python-aipl/            research runtime
 │   └── browser-abcl/           browser-side runtime
-├── abclc/                      OCaml-side .abcl samples
+├── abclc/                      OCaml-side .aipl samples
 ├── aice-evolution-v2/          next-gen-axis predictor
 │   ├── examples/*.aice         GA specs
 │   ├── src/                    GA implementation

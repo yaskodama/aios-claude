@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test all .abcl samples under abclc/o1_distributed/.
+# Smoke-test all .aipl samples under abclc/o1_distributed/.
 #
 # Phase O-1.* AIPL v2 Distributed samples are organised one
 # feature-group per subdir.  Each sample exercises a runtime feature
@@ -23,7 +23,7 @@ fi
 pass=0; fail=0; total=0
 declare -a FAILS
 
-for f in */sample*.abcl; do
+for f in */sample*.aipl; do
   [ -e "$f" ] || continue
   total=$((total+1))
   if "$REPL" --check "$f" >/dev/null 2>&1; then

@@ -22,7 +22,7 @@ def _run(sample: str) -> str:
 
 
 def test_linear() -> None:
-    out = _run("Linear.abcl")
+    out = _run("Linear.aipl")
     # Correct linear-pipeline runs OK.
     assert "ok_pipeline = 0" in out
     assert "ok_branch   = 0" in out
@@ -37,7 +37,7 @@ def test_linear() -> None:
     # Correct ok_branch must NOT be flagged (return-terminating then-branch
     # doesn't poison the post-if moved set).
     assert "ok_branch: use of moved" not in out
-    print("OK  Linear.abcl")
+    print("OK  Linear.aipl")
 
 
 if __name__ == "__main__":

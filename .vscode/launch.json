@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "ABCL: run current .abcl (Python)",
+      "name": "ABCL: run current .aipl (Python)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/python-abcl/abcl_main.py",
@@ -12,7 +12,7 @@
       "cwd": "${workspaceFolder}/src/python-abcl"
     },
     {
-      "name": "ABCL: run current .abcl with --dashboard 8800",
+      "name": "ABCL: run current .aipl with --dashboard 8800",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/python-abcl/abcl_main.py",
@@ -47,14 +47,14 @@
       "type": "pickString",
       "description": "Pick a sample to run",
       "options": [
-        "samples/Hello.abcl",
-        "samples/Counter.abcl",
-        "samples/PingPong.abcl",
-        "samples/NowFuture.abcl",
-        "samples/BoundedBuffer.abcl",
-        "samples/Philosophers.abcl",
-        "samples-remote/server.abcl",
-        "samples-remote/client.abcl"
+        "samples/Hello.aipl",
+        "samples/Counter.aipl",
+        "samples/PingPong.aipl",
+        "samples/NowFuture.aipl",
+        "samples/BoundedBuffer.aipl",
+        "samples/Philosophers.aipl",
+        "samples-remote/server.aipl",
+        "samples-remote/client.aipl"
       ]
     }
   ]

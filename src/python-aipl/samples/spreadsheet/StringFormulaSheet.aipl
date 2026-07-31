@@ -1,0 +1,272 @@
+// Round 3 Phase 1 — formula parser (PA4 LevelCPort extension).
+//
+// Same 3x3 sheet as HelloSheet but formulas are STRINGS that get
+// parsed at sheet-build time.  Parser style follows
+// aipl-self-host/level-c/parser.aipl: every parser function takes
+// (tokens, pos) and returns a record {ast, pos} — no mutable
+// globals, no shared parser state.
+//
+//   "A1+B1"                  →  Bin(+, Ref A1, Ref B1)
+//   "A2*B2"                  →  Bin(*, Ref A2, Ref B2)
+//   "A1*2"                   →  Bin(*, Ref A1, Lit 2)
+//   "SUM(A1,B1,A2,B2,C1,C2)" →  Call(SUM, [refs])
+
+// ── character predicates ──────────────────────────────────────
+function is_digit_ch(c) {
+  if (c == "0") { return 1; } if (c == "1") { return 1; }
+  if (c == "2") { return 1; } if (c == "3") { return 1; }
+  if (c == "4") { return 1; } if (c == "5") { return 1; }
+  if (c == "6") { return 1; } if (c == "7") { return 1; }
+  if (c == "8") { return 1; } if (c == "9") { return 1; }
+  return 0;
+}
+function digit_val(c) {
+  if (c == "0") { return 0; } if (c == "1") { return 1; }
+  if (c == "2") { return 2; } if (c == "3") { return 3; }
+  if (c == "4") { return 4; } if (c == "5") { return 5; }
+  if (c == "6") { return 6; } if (c == "7") { return 7; }
+  if (c == "8") { return 8; } if (c == "9") { return 9; }
+  return 0;
+}
+function is_alpha_ch(c) {
+  var alpha: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
+  if (str_index(alpha, c) >= 0) { return 1; }
+  return 0;
+}
+
+// ── lexer: string → array of {kind, val} ──────────────────────
+function lex_int(s, i, n) {
+  // Returns {val, end_pos} for an integer starting at i.
+  var v: int = 0;
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var d = str_sub(s, j, j + 1);
+      if (is_digit_ch(d) == 1) {
+        v = v * 10 + digit_val(d);
+        j = j + 1;
+      } else { done = 1; }
+    }
+  }
+  return {val: v, end_pos: j};
+}
+
+function lex_ident(s, i, n) {
+  var id: string = "";
+  var j: int = i;
+  var done: int = 0;
+  while (done == 0) do {
+    if (j >= n) { done = 1; }
+    else {
+      var k = str_sub(s, j, j + 1);
+      if (is_alpha_ch(k) == 1) { id = id + k; j = j + 1; }
+      else {
+        if (is_digit_ch(k) == 1) { id = id + k; j = j + 1; }
+        else { done = 1; }
+      }
+    }
+  }
+  return {val: id, end_pos: j};
+}
+
+function lex_formula(s) {
+  var tokens = [];
+  var i: int = 0;
+  var n: int = str_len(s);
+  while (i < n) do {
+    var c = str_sub(s, i, i + 1);
+    if (c == " ") { i = i + 1; }
+    else {
+      if (is_digit_ch(c) == 1) {
+        var r = lex_int(s, i, n);
+        array_push(tokens, {kind: "INT", val: r.val});
+        i = r.end_pos;
+      } else {
+        if (is_alpha_ch(c) == 1) {
+          var r2 = lex_ident(s, i, n);
+          array_push(tokens, {kind: "IDENT", val: r2.val});
+          i = r2.end_pos;
+        } else {
+          array_push(tokens, {kind: c, val: c});
+          i = i + 1;
+        }
+      }
+    }
+  }
+  array_push(tokens, {kind: "EOF", val: ""});
+  return tokens;
+}
+
+// ── recursive descent (functional state) ──────────────────────
+// each parse_* returns {ast, pos}
+
+function parse_primary(tokens, pos) {
+  var t = array_get(tokens, pos);
+  if (t.kind == "INT") {
+    return {ast: {tag: "Lit", val: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "IDENT") {
+    var nxt = array_get(tokens, pos + 1);
+    if (nxt.kind == "(") {
+      // function call: IDENT "(" args ")"
+      var args = [];
+      var p: int = pos + 2;     // past "("
+      var first: int = 1;
+      var done: int = 0;
+      while (done == 0) do {
+        var ck = array_get(tokens, p);
+        if (ck.kind == ")") { done = 1; }
+        else {
+          if (first == 0) {
+            if (ck.kind == ",") { p = p + 1; }
+          }
+          first = 0;
+          var sub = parse_expr(tokens, p);
+          array_push(args, sub.ast);
+          p = sub.pos;
+        }
+      }
+      return {ast: {tag: "Call", name: t.val, args: args}, pos: p + 1};
+    }
+    return {ast: {tag: "Ref", id: t.val}, pos: pos + 1};
+  }
+  if (t.kind == "(") {
+    var inner = parse_expr(tokens, pos + 1);
+    return {ast: inner.ast, pos: inner.pos + 1};   // consume ")"
+  }
+  return {ast: {tag: "Lit", val: 0}, pos: pos + 1};
+}
+
+function parse_mul(tokens, pos) {
+  var l = parse_primary(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "*") {
+      var r = parse_primary(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "*", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "/") {
+        var r2 = parse_primary(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "/", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+
+function parse_add(tokens, pos) {
+  var l = parse_mul(tokens, pos);
+  var done: int = 0;
+  while (done == 0) do {
+    var t = array_get(tokens, l.pos);
+    if (t.kind == "+") {
+      var r = parse_mul(tokens, l.pos + 1);
+      l = {ast: {tag: "Bin", op: "+", lhs: l.ast, rhs: r.ast}, pos: r.pos};
+    } else {
+      if (t.kind == "-") {
+        var r2 = parse_mul(tokens, l.pos + 1);
+        l = {ast: {tag: "Bin", op: "-", lhs: l.ast, rhs: r2.ast}, pos: r2.pos};
+      } else { done = 1; }
+    }
+  }
+  return l;
+}
+
+function parse_expr(tokens, pos) {
+  return parse_add(tokens, pos);
+}
+
+function parse_formula(src) {
+  var toks = lex_formula(src);
+  var r = parse_expr(toks, 0);
+  return r.ast;
+}
+
+// ── reuse eval from HelloSheet ────────────────────────────────
+function sheet_get(sheet, id) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.id == id) { return c; }
+    i = i + 1;
+  }
+  return {id: id, kind: "Empty", val: 0, expr: {tag: "none"}};
+}
+
+function eval_expr(ast, sheet) {
+  if (ast.tag == "Lit") { return ast.val; }
+  if (ast.tag == "Ref") {
+    var c = sheet_get(sheet, ast.id);
+    if (c.kind == "Formula") { return eval_expr(c.expr, sheet); }
+    return c.val;
+  }
+  if (ast.tag == "Bin") {
+    var l = eval_expr(ast.lhs, sheet);
+    var r = eval_expr(ast.rhs, sheet);
+    if (ast.op == "+") { return l + r; }
+    if (ast.op == "-") { return l - r; }
+    if (ast.op == "*") { return l * r; }
+    if (ast.op == "/") { return l / r; }
+    return 0;
+  }
+  if (ast.tag == "Call") {
+    if (ast.name == "SUM") {
+      var total: int = 0;
+      var i: int = 0;
+      var n: int = array_len(ast.args);
+      while (i < n) do {
+        total = total + eval_expr(array_get(ast.args, i), sheet);
+        i = i + 1;
+      }
+      return total;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+// ── sheet helpers ─────────────────────────────────────────────
+function add_value(sheet, id, v) {
+  array_push(sheet, {id: id, kind: "Value", val: v, expr: {tag:"none"}});
+}
+function add_formula(sheet, id, src) {
+  var ast = parse_formula(src);
+  array_push(sheet, {id: id, kind: "Formula", val: 0, expr: ast});
+}
+function recompute_and_print(sheet) {
+  var i: int = 0;
+  var n: int = array_len(sheet);
+  while (i < n) do {
+    var c = array_get(sheet, i);
+    if (c.kind == "Formula") {
+      var v = eval_expr(c.expr, sheet);
+      print("[sheet] " + c.id + " = " + v);
+    } else {
+      print("[sheet] " + c.id + " = " + c.val);
+    }
+    i = i + 1;
+  }
+}
+
+// ── main: same 3x3 sheet, formulas as STRINGS ─────────────────
+var sheet = [];
+
+add_value(sheet, "A1", 10);
+add_value(sheet, "B1", 20);
+add_formula(sheet, "C1", "A1+B1");
+
+add_value(sheet, "A2", 30);
+add_value(sheet, "B2", 40);
+add_formula(sheet, "C2", "A2*B2");
+
+add_formula(sheet, "A3", "A1*2");
+add_formula(sheet, "B3", "B1*2");
+add_formula(sheet, "C3", "SUM(A1,B1,A2,B2,C1,C2)");
+
+print("=== StringFormulaSheet 3x3 ===");
+recompute_and_print(sheet);
+print("=== done ===");

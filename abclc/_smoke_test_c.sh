@@ -21,27 +21,27 @@ if [ ! -x "$AIPL2C" ]; then dune build || exit 1; fi
 # and link against abcl_nextgen_runtime.c.  CE-13 / record-subtyping
 # samples are static-type-check artifacts, so we skip them here.
 samples=(
-  abclc/o2_typeinf/ce_11_capability/sample1_grant_revoke.abcl
-  abclc/o2_typeinf/ce_11_capability/sample2_strict_raise.abcl
-  abclc/o2_typeinf/ce_11_capability/sample3_advisory_log.abcl
-  abclc/o1_distributed/dr_10_crdt/sample1_gcounter.abcl
-  abclc/o1_distributed/dr_10_crdt/sample2_orset.abcl
-  abclc/o1_distributed/dr_10_crdt/sample3_lww_replicate.abcl
-  abclc/o1_distributed/dr_11_saga/sample1_success.abcl
-  abclc/o1_distributed/dr_11_saga/sample2_compensate.abcl
-  abclc/o1_distributed/dr_11_saga/sample3_single_step.abcl
-  abclc/o1_distributed/dr_12_multi_region/sample1_primary_hit.abcl
-  abclc/o1_distributed/dr_12_multi_region/sample2_failover_chain.abcl
-  abclc/o1_distributed/dr_12_multi_region/sample3_chain_exhausted.abcl
-  abclc/o1_distributed/dr_13_pool/sample1_create_destroy.abcl
-  abclc/o1_distributed/dr_13_pool/sample2_pick_empty.abcl
-  abclc/o1_distributed/dr_13_pool/sample3_destroy_idempotent.abcl
+  abclc/o2_typeinf/ce_11_capability/sample1_grant_revoke.aipl
+  abclc/o2_typeinf/ce_11_capability/sample2_strict_raise.aipl
+  abclc/o2_typeinf/ce_11_capability/sample3_advisory_log.aipl
+  abclc/o1_distributed/dr_10_crdt/sample1_gcounter.aipl
+  abclc/o1_distributed/dr_10_crdt/sample2_orset.aipl
+  abclc/o1_distributed/dr_10_crdt/sample3_lww_replicate.aipl
+  abclc/o1_distributed/dr_11_saga/sample1_success.aipl
+  abclc/o1_distributed/dr_11_saga/sample2_compensate.aipl
+  abclc/o1_distributed/dr_11_saga/sample3_single_step.aipl
+  abclc/o1_distributed/dr_12_multi_region/sample1_primary_hit.aipl
+  abclc/o1_distributed/dr_12_multi_region/sample2_failover_chain.aipl
+  abclc/o1_distributed/dr_12_multi_region/sample3_chain_exhausted.aipl
+  abclc/o1_distributed/dr_13_pool/sample1_create_destroy.aipl
+  abclc/o1_distributed/dr_13_pool/sample2_pick_empty.aipl
+  abclc/o1_distributed/dr_13_pool/sample3_destroy_idempotent.aipl
 )
 
 pass=0; fail=0; declare -a FAILS
 TMPDIR=${TMPDIR:-/tmp}
 for s in "${samples[@]}"; do
-  base=$(basename "$s" .abcl)
+  base=$(basename "$s" .aipl)
   cfile="$TMPDIR/${base}_c.c"
   bin="$TMPDIR/${base}_c"
 

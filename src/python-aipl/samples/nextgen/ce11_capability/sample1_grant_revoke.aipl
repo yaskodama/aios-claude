@@ -1,0 +1,12 @@
+// CE-11 / sample 1 — basic grant / revoke / has_cap flow (Py-I).
+//
+// Run:
+//   python3 aipl_main.py samples/nextgen/ce11_capability/sample1_grant_revoke.aipl
+
+grant_cap("fs");
+print("[ce11/1] has(fs) = " + has_cap("fs"));      // 1
+print("[ce11/1] has(ai) = " + has_cap("ai"));      // 0
+grant_cap("ai");
+print("[ce11/1] caps now = " + current_caps());    // "ai fs"
+revoke_cap("fs");
+print("[ce11/1] caps now = " + current_caps());    // "ai"

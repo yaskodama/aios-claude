@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test all .abcl samples under abclc/ via the REPL.
+# Smoke-test all .aipl samples under abclc/ via the REPL.
 #
 # For each sample we drive `repl_thread.exe -f` with a one-shot
 # script that loads the file and compiles it.  The REPL never
@@ -32,18 +32,18 @@ declare -a FAILS
 # not executed in the REPL.  Route them through aipl2c instead.
 classify() {
   case "$1" in
-    *Gui.abcl)  echo gui  ;;
-    *Py.abcl)   echo py   ;;
-    *Xinu.abcl) echo xinu ;;
+    *Gui.aipl)  echo gui  ;;
+    *Py.aipl)   echo py   ;;
+    *Xinu.aipl) echo xinu ;;
     *)          echo repl ;;
   esac
 }
 
 run_repl() {
   local abcl="$1"
-  local name="${abcl%.abcl}"
+  local name="${abcl%.aipl}"
   # script must live in cwd (abclc/) so REPL's chdir doesn't move away
-  # from the directory holding the .abcl file
+  # from the directory holding the .aipl file
   local script="./_smoke.bat"
   local log="$LOGDIR/${name}.log"
   printf 'load %s\ncompile\n' "$abcl" > "$script"
@@ -65,11 +65,11 @@ run_repl() {
 run_aipl2c() {
   local abcl="$1"
   local mode="$2"
-  local name="${abcl%.abcl}"
+  local name="${abcl%.aipl}"
   local log="$LOGDIR/${name}.log"
   case "$mode" in
     # The Gui/Py/Xinu codegen targets predate the strict HM typechecker:
-    # their .abcl samples rely on placeholder field initialisers
+    # their .aipl samples rely on placeholder field initialisers
     # (`var buffer = 0;` then later `buffer = some_actor;`) that HM
     # rejects by design.  The C / Python / Xinu back-ends accept the
     # lower-level pattern fine, so we bypass the type checker here.
@@ -82,7 +82,7 @@ run_aipl2c() {
 # Build a Gui-variant's translated C with SDL2 to verify the link path.
 build_c_gui() {
   local abcl="$1"
-  local name="${abcl%.abcl}"
+  local name="${abcl%.aipl}"
   local c="$LOGDIR/${name}.c"
   local bin="$LOGDIR/${name}.bin"
   local log="$LOGDIR/${name}.cc.log"
@@ -117,7 +117,7 @@ run_one() {
   fi
 }
 
-for f in *.abcl; do
+for f in *.aipl; do
   [ -e "$f" ] || continue
   run_one "$f"
 done

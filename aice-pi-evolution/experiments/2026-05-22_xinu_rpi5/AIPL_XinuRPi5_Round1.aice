@@ -134,9 +134,9 @@ aice AIPL_XinuRPi5_Round1 {
     }
 
     task X1_AbclProgramOnRPi5 {
-      spec = "Round 1 で動いていた `abclc/HelloPrintXinu.abcl` (もしくは最小の AIPL hello) を arm-rpi5 platform でコンパイル + 実行.aipl2c --xinu の codegen が AArch64 でも問題なく link する (= 32-bit 前提のキャストや fixed-width 型がない) ことを確認.";
+      spec = "Round 1 で動いていた `abclc/HelloPrintXinu.aipl` (もしくは最小の AIPL hello) を arm-rpi5 platform でコンパイル + 実行.aipl2c --xinu の codegen が AArch64 でも問題なく link する (= 32-bit 前提のキャストや fixed-width 型がない) ことを確認.";
       weight = 0.08;
-      acceptance = "4 assertion: (1) AIPL hello が UART0 に出力、(2) actor mailbox の send/recv が AArch64 で動く、(3) value_t の layout が 64-bit でも壊れない、(4) Round 2 既存 sample (DiningPhilosophersDistXinu.abcl 等) が arm-qemu で regression なし.";
+      acceptance = "4 assertion: (1) AIPL hello が UART0 に出力、(2) actor mailbox の send/recv が AArch64 で動く、(3) value_t の layout が 64-bit でも壊れない、(4) Round 2 既存 sample (DiningPhilosophersDistXinu.aipl 等) が arm-qemu で regression なし.";
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -310,7 +310,7 @@ aice AIPL_XinuRPi5_Round1 {
     ];
     abclcp_project = [
       "src/c_translator.ml                          (~30 LOC: AAPCS64 でも壊れない fixed-width 型の見直し、64-bit value_t 確認)",
-      "abclc/HelloPi5Xinu.abcl  (new)               (~20 LOC: 最小 hello sample)",
+      "abclc/HelloPi5Xinu.aipl  (new)               (~20 LOC: 最小 hello sample)",
       "aice-pi-evolution/experiments/2026-05-22_xinu_rpi5/_smoke_pi5_boot.sh (~80 LOC: 実機 USB-serial 経由)"
     ];
     untouched = [
@@ -328,14 +328,14 @@ aice AIPL_XinuRPi5_Round1 {
 
     generate_aipl {
       cmd = "cd aice-evolution-v2 && python3 -m src.cli --no-run --abcl -o ../aice-pi-evolution/experiments/2026-05-22_xinu_rpi5/ ../aice-pi-evolution/experiments/2026-05-22_xinu_rpi5/AIPL_XinuRPi5_Round1.aice";
-      output = "AIPL_XinuRPi5_Round1.abcl (= MAP-Elites orchestrator)";
+      output = "AIPL_XinuRPi5_Round1.aipl (= MAP-Elites orchestrator)";
       post   = "use_ai 0 -> 1 を 4 reviewer に patch (Round 2 と同じ手順)";
     }
 
     run_evolution {
       requires = "GEMINI_API_KEY が export 済、google-genai SDK が import 可";
-      cmd      = "AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-05-22_xinu_rpi5/AIPL_XinuRPi5_Round1.abcl --timeout 2400 --idle-ms 600000";
-      output   = "out/AIPL_XinuRPi5_Round1.abcl_lineage.json";
+      cmd      = "AIPL_AI_PROVIDER=gemini python3 -u src/python-aipl/aipl_main.py aice-pi-evolution/experiments/2026-05-22_xinu_rpi5/AIPL_XinuRPi5_Round1.aipl --timeout 2400 --idle-ms 600000";
+      output   = "out/AIPL_XinuRPi5_Round1.aipl_lineage.json";
       duration = "30-50 分 (seed=8 + gen=15 + 4 reviewers × 12 tasks ≈ 1500 LLM calls)";
     }
 
@@ -346,5 +346,5 @@ aice AIPL_XinuRPi5_Round1 {
   }
 
   // ─── 最終目標 ─────────────────────────────────────────────────
-  goal = "Round 1 全 12 phase (B0-B2 + U0-U1 + M0-M1 + S0-S1 + X0-X1 + N0-N1) 完了後、Raspberry Pi 5 実機で (a) firmware が kernel_2712.img を読み込んで AArch64 boot stub が動き、(b) UART0 (header pin 8/10、115200/8N1) に Xinu バナーが出て、(c) MMU + memory + scheduler + timer + IRQ が立ち上がり、(d) xsh$ プロンプトに到達して date / ps / halt が動き、(e) AIPL hello サンプル (HelloPi5Xinu.abcl) が AArch64 上で実行できる — を達成する.既存 arm-qemu / arm-rpi3 platform の Round 1 + Round 2 + kernel-evo + Round 2 拡張で築いた smoke (合計 30+ 個) は absolute 不変条件として保持.";
+  goal = "Round 1 全 12 phase (B0-B2 + U0-U1 + M0-M1 + S0-S1 + X0-X1 + N0-N1) 完了後、Raspberry Pi 5 実機で (a) firmware が kernel_2712.img を読み込んで AArch64 boot stub が動き、(b) UART0 (header pin 8/10、115200/8N1) に Xinu バナーが出て、(c) MMU + memory + scheduler + timer + IRQ が立ち上がり、(d) xsh$ プロンプトに到達して date / ps / halt が動き、(e) AIPL hello サンプル (HelloPi5Xinu.aipl) が AArch64 上で実行できる — を達成する.既存 arm-qemu / arm-rpi3 platform の Round 1 + Round 2 + kernel-evo + Round 2 拡張で築いた smoke (合計 30+ 個) は absolute 不変条件として保持.";
 }

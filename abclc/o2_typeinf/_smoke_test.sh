@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test all .abcl samples under abclc/o2_typeinf/.
+# Smoke-test all .aipl samples under abclc/o2_typeinf/.
 #
 # Phase O-2.* type-inference samples are organised one feature-group
 # per subdir (ce_where, ce_int_refine, ce_real_refine, ce_record,
@@ -22,7 +22,7 @@ fi
 pass=0; fail=0; total=0
 declare -a FAILS
 
-for f in */sample*.abcl; do
+for f in */sample*.aipl; do
   [ -e "$f" ] || continue
   total=$((total+1))
   if "$REPL" --check "$f" >/dev/null 2>&1; then
