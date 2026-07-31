@@ -93,7 +93,7 @@ from aipl_ast import (
     If, While, Become, Block, Return,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
-    NowCall, FutureCall,
+    NowCall, FutureCall, AwaitExpr, SelectStmt,
 )
 
 
@@ -329,8 +329,148 @@ def _unify(pattern: str, actual: str, bindings: dict) -> bool:
 # ---------------------------------------------------------------------------
 # Walker — full call-site validation lives here in Phase 11b.
 
+# ---------------------------------------------------------------------------
+# reply の線形性と、期限なしの待ち（OCaml 版 infer.ml の
+# max_replies / replies_on_all_paths / check_deadline に対応）。
+
+def _stmts_of(node):
+    """Block でも文の並びでも、中の文を列挙する。"""
+    if node is None:
+        return []
+    if isinstance(node, Block):
+        return list(node.stmts)
+    if isinstance(node, list):
+        return list(node)
+    return [node]
+
+
+def _max_replies(stmts) -> int:
+    """この文の並びが返しうる reply の最大回数（2 で頭打ちにする）。
+
+    OCaml 版と同じく構文的な上界であって、実行経路の解析ではない。
+    if は両枝の最大、while は本体が返しうるなら 2（複数回になりうる）。
+    """
+    total = 0
+    for st in stmts:
+        total += _max_replies_stmt(st)
+        if total >= 2:
+            return 2
+    return total
+
+
+def _max_replies_stmt(st) -> int:
+    if isinstance(st, CallStmt):
+        fn = getattr(st, "name", None) or getattr(getattr(st, "expr", None), "name", None)
+        return 1 if fn == "reply" else 0
+    if isinstance(st, If):
+        return max(_max_replies(_stmts_of(st.then_body)),
+                   _max_replies(_stmts_of(getattr(st, "else_body", None))))
+    if isinstance(st, While):
+        # 本体が返すなら、ループで複数回返りうる
+        return 2 if _max_replies(_stmts_of(st.body)) > 0 else 0
+    if isinstance(st, Block):
+        return _max_replies(list(st.stmts))
+    if isinstance(st, SelectStmt):
+        # case 本体の reply は「選ばれたメッセージ」への返信であって
+        # このメソッド自身の返信ではない。数えない（OCaml 版と同じ）。
+        # timeout 本体は自分の返信なので数える。
+        tb = getattr(st, "timeout_body", None)
+        return _max_replies(_stmts_of(tb)) if tb is not None else 0
+    return 0
+
+
+def _has_return(stmts) -> bool:
+    """メソッド本体に return があるか。
+
+    Py-I のメソッドは OCaml 版と違い `return` でも値を返せる。
+    戻り値型の義務は reply か return のどちらかで果たされる。"""
+    for st in stmts:
+        if isinstance(st, Return):
+            return True
+        if isinstance(st, If):
+            if (_has_return(_stmts_of(st.then_body))
+                    or _has_return(_stmts_of(getattr(st, "else_body", None)))):
+                return True
+        elif isinstance(st, While):
+            if _has_return(_stmts_of(st.body)):
+                return True
+        elif isinstance(st, Block):
+            if _has_return(list(st.stmts)):
+                return True
+    return False
+
+
+def _replies_on_all_paths(stmts) -> bool:
+    """どの経路でも必ず1回は reply するか。"""
+    for st in stmts:
+        if _replies_here(st):
+            return True
+    return False
+
+
+def _replies_here(st) -> bool:
+    if isinstance(st, CallStmt):
+        fn = getattr(st, "name", None) or getattr(getattr(st, "expr", None), "name", None)
+        return fn == "reply"
+    if isinstance(st, If):
+        eb = getattr(st, "else_body", None)
+        if eb is None:
+            return False          # else が無ければ抜ける経路がある
+        return (_replies_on_all_paths(_stmts_of(st.then_body))
+                and _replies_on_all_paths(_stmts_of(eb)))
+    if isinstance(st, Block):
+        return _replies_on_all_paths(list(st.stmts))
+    return False
+
+
+
+def _scan_unbounded_waits(stmts):
+    """期限を書いていない now / await を拾って種別を返す。"""
+    found = []
+
+    def walk_expr(e):
+        if e is None or isinstance(e, (str, int, float, bool)):
+            return
+        if isinstance(e, NowCall) and getattr(e, "deadline", None) is None:
+            found.append("now")
+        if isinstance(e, AwaitExpr) and getattr(e, "deadline", None) is None:
+            found.append("await")
+        if isinstance(e, CallExpr) and getattr(e, "name", None) == "await":
+            found.append("await")
+        for f in getattr(e, "__dataclass_fields__", {}):
+            v = getattr(e, f, None)
+            if isinstance(v, list):
+                for x in v:
+                    walk_expr(x)
+            elif hasattr(v, "__dataclass_fields__"):
+                walk_expr(v)
+
+    def walk_stmt(st):
+        if st is None:
+            return
+        for f in getattr(st, "__dataclass_fields__", {}):
+            v = getattr(st, f, None)
+            if isinstance(v, list):
+                for x in v:
+                    (walk_stmt if hasattr(x, "__dataclass_fields__") and
+                     type(x).__name__ in _STMT_NAMES else walk_expr)(x)
+            elif hasattr(v, "__dataclass_fields__"):
+                (walk_stmt if type(v).__name__ in _STMT_NAMES else walk_expr)(v)
+
+    for st in stmts:
+        walk_stmt(st)
+    return found
+
+
+_STMT_NAMES = {"Block", "If", "While", "VarDecl", "VarNew", "Assign",
+               "IndexAssign", "FieldAssign", "Send", "CallStmt", "Become",
+               "Scope", "Spawn", "SelectStmt", "SelectCase", "SagaStmt",
+               "SagaStep", "Return", "GlobalStmt"}
+
+
 class TypeChecker:
     def __init__(self, program: Program, builtin_signatures: dict):
+        self.warnings: list = []
         self.program = program
         self.builtin_sigs = dict(builtin_signatures)
         self.fn_sigs: dict = {}
@@ -403,7 +543,44 @@ class TypeChecker:
         self._check_effect_declarations()
         return self.issues
 
+    def _check_reply_and_deadlines(self, fn, where: str):
+        """reply の線形性と、期限なしの待ちを見る（OCaml 版 infer.ml と同じ規律）。"""
+        stmts = _stmts_of(getattr(fn, "body", None))
+
+        # reply の線形性は「メソッド」だけの規律。function は return で返すので
+        # 対象外（ここを分けないと、戻り値型を宣言した関数がすべて誤検出になる）。
+        if not isinstance(fn, MethodDecl):
+            self._check_deadlines_only(stmts, where)
+            return
+
+        n = _max_replies(stmts)
+        if n >= 2:
+            self._issue(where, "reply が複数回起こりうる（返信は高々一度）")
+        ret = getattr(fn, "return_annotation", None)
+        # return で返しているなら義務は果たされている
+        if ret and ret != "unit" and not _has_return(stmts):
+            if n == 0:
+                self._issue(where, f"戻り値型 {ret} を宣言しているが reply が無い")
+            elif not _replies_on_all_paths(stmts):
+                self._issue(where,
+                            f"戻り値型 {ret} を宣言しているが reply しない経路がある")
+
+        self._check_deadlines_only(stmts, where)
+
+    def _check_deadlines_only(self, stmts, where: str):
+        """期限なしの now / await（OCaml 版は既定で警告、
+        AIOS_STRICT_DEADLINE=1 でエラー）。"""
+        import os as _os
+        strict = _os.environ.get("AIOS_STRICT_DEADLINE") in ("1", "true", "yes")
+        for kind in _scan_unbounded_waits(stmts):
+            msg = f"{kind} に期限が無い（`{kind} ... timeout <ms> else <expr>` と書く）"
+            if strict:
+                self._issue(where, msg)
+            else:
+                self.warnings.append(TypeIssue(where, msg))
+
     def _check_function(self, fn, where: str, observed_key: Optional[str] = None):
+        self._check_reply_and_deadlines(fn, where)
         prev_key = self._current_observed_key
         prev_moved = self._moved
         if observed_key is not None:
@@ -874,4 +1051,12 @@ class TypeChecker:
 
 
 def check(program: Program, builtin_signatures: dict) -> list[TypeIssue]:
-    return TypeChecker(program, builtin_signatures).check()
+    """型検査を走らせる。
+
+    戻り値にはエラーに加えて警告（期限なしの now / await）も含める。
+    警告を返さないと --type-check にも type_check() にも現れず、
+    「検査したのに誰にも見えない」状態になるため。
+    """
+    tc = TypeChecker(program, builtin_signatures)
+    issues = tc.check()
+    return issues + list(getattr(tc, "warnings", []))
