@@ -539,6 +539,11 @@ class TypeChecker:
                                          observed_key=f"{d.name}.{fn.name}")
             elif isinstance(d, GlobalStmt):
                 self._check_stmt(d.stmt, env={}, where="global")
+                # トップレベルにも期限なしの待ちは現れる
+                # （クラスの外で `print(now front.place(3));` と書ける）。
+                # ここを見落とすと OCaml 版が3件出すファイルで1件しか出ず、
+                # 検査が過小報告になる。
+                self._check_deadlines_only([d.stmt], "top level")
         # Phase 12: compare declared vs observed effects per user function.
         self._check_effect_declarations()
         return self.issues
