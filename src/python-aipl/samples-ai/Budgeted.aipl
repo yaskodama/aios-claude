@@ -17,13 +17,13 @@ class Worker {
   }
 
   method ask(topic: string) !{ai, net} {
-    print("[w" + id + "] start: " + topic);
+    print("[w" ++ id ++ "] start: " ++ topic);
     var resp: string = ai_call_with_system(
       "Reply in ONE short sentence, no preamble.",
       topic
     );
-    print("[w" + id + "] reply: " + resp);
-    print("[w" + id + "] usage: " + ai_usage() + "  remaining=" + ai_remaining());
+    print("[w" ++ id ++ "] reply: " ++ resp);
+    print("[w" ++ id ++ "] usage: " ++ ai_usage() ++ "  remaining=" ++ ai_remaining());
   }
 }
 

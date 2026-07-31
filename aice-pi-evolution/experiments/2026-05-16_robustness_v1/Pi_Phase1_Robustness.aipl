@@ -53,7 +53,7 @@ class Util {
 
   method axis_values(table, axis) {
     // table is "axis:v1,v2|axis:v1,v2|..."
-    var key = axis + ":";
+    var key = axis ++ ":";
     var idx = str_index(table, key);
     if (idx < 0) { reply(""); }
     else {
@@ -66,7 +66,7 @@ class Util {
   }
 
   method get_axis(genome, axis) {
-    var key = axis + "=";
+    var key = axis ++ "=";
     var idx = str_index(genome, key);
     if (idx < 0) { reply(""); }
     else {
@@ -79,11 +79,11 @@ class Util {
   }
 
   method set_axis(genome, axis, value) {
-    var key = axis + "=";
+    var key = axis ++ "=";
     var idx = str_index(genome, key);
     if (idx < 0) {
       if (str_len(genome) == 0) { reply(key + value); }
-      else { reply(genome + "|" + key + value); }
+      else { reply(genome ++ "|" ++ key ++ value); }
     } else {
       var prefix = str_sub(genome, 0, idx);
       var after = idx + str_len(key);
@@ -209,8 +209,8 @@ class Worker {
     while (i < n) do {
       var axis = now util.nth_csv(cell_axes_csv, i);
       var v = now util.get_axis(genome, axis);
-      if (i == 0) { out = axis + "=" + v; }
-      else { out = out + "|" + axis + "=" + v; }
+      if (i == 0) { out = axis ++ "=" ++ v; }
+      else { out = out ++ "|" ++ axis ++ "=" ++ v; }
       i = i + 1;
     }
     reply(out);
@@ -257,8 +257,8 @@ class Generator {
       var vals = now util.axis_values(values_table, axis);
       var n_vals = now util.count_csv(vals);
       var v = now util.nth_csv(vals, random(n_vals));
-      if (i == 0) { g = axis + "=" + v; }
-      else { g = g + "|" + axis + "=" + v; }
+      if (i == 0) { g = axis ++ "=" ++ v; }
+      else { g = g ++ "|" ++ axis ++ "=" ++ v; }
       i = i + 1;
     }
     reply(g);
@@ -284,8 +284,8 @@ class Generator {
       var src = a;
       if (random(2) == 1) { src = b; }
       var v = now util.get_axis(src, axis);
-      if (i == 0) { child = axis + "=" + v; }
-      else { child = child + "|" + axis + "=" + v; }
+      if (i == 0) { child = axis ++ "=" ++ v; }
+      else { child = child ++ "|" ++ axis ++ "=" ++ v; }
       i = i + 1;
     }
     reply(child);
@@ -316,8 +316,8 @@ class Reviewer {
 
   method score(genome, task_profile) {
     if (use_ai == 1) {
-      var prompt = "評価対象の遺伝子: " + genome +
-                   "\n理想プロファイル: " + task_profile +
+      var prompt = "評価対象の遺伝子: " ++ genome ++
+                   "\n理想プロファイル: " ++ task_profile ++
                    "\n\nこのプロファイルに対する適合度を 0.0 から 1.0 の単一の decimal number で返してください。説明禁止。数値1つだけ。";
       var ai_text = ai_call_with_system(persona, prompt);
       var ai_score = now util.parse_score(ai_text, digits);
@@ -341,7 +341,7 @@ class Reviewer {
       if (eq >= 0) {
         var axis = str_sub(pair, 0, eq);
         var want = str_sub(pair, eq + 1);
-        var key = axis + "=";
+        var key = axis ++ "=";
         var gidx = str_index(genome, key);
         if (gidx >= 0) {
           var gstart = gidx + str_len(key);
@@ -460,11 +460,11 @@ class EliteMap {
     var i = 0;
     var out = "";
     while (i < n) do {
-      var line = "  cell=" + array_get(cells, i) +
-                 "  score=" + array_get(scores, i) +
-                 "  id=" + array_get(ids, i);
+      var line = "  cell=" ++ array_get(cells, i) ++
+                 "  score=" ++ array_get(scores, i) ++
+                 "  id=" ++ array_get(ids, i);
       if (i == 0) { out = line; }
-      else { out = out + "\n" + line; }
+      else { out = out ++ "\n" ++ line; }
       i = i + 1;
     }
     reply(out);
@@ -502,18 +502,18 @@ class Lineage {
     while (i < n) do {
       // score gets a trailing "0" so 0.0 stringifies to "0.00"
       // (Python runtime emits "0." which would be invalid JSON).
-      var entry = "  {\"id\":\"" + array_get(ids, i) + "\"," +
-                  "\"genome\":\"" + array_get(genomes, i) + "\"," +
-                  "\"parent\":\"" + array_get(parents, i) + "\"," +
-                  "\"score\":" + array_get(scores, i) + "0," +
-                  "\"generation\":" + array_get(generations, i) + "," +
-                  "\"operator\":\"" + array_get(operators, i) + "\"," +
-                  "\"cell\":\"" + array_get(cells, i) + "\"}";
-      if (i < n - 1) { out = out + entry + ",\n"; }
-      else { out = out + entry + "\n"; }
+      var entry = "  {\"id\":\"" ++ array_get(ids, i) ++ "\"," ++
+                  "\"genome\":\"" ++ array_get(genomes, i) ++ "\"," ++
+                  "\"parent\":\"" ++ array_get(parents, i) ++ "\"," ++
+                  "\"score\":" ++ array_get(scores, i) ++ "0," ++
+                  "\"generation\":" ++ array_get(generations, i) ++ "," ++
+                  "\"operator\":\"" ++ array_get(operators, i) ++ "\"," ++
+                  "\"cell\":\"" ++ array_get(cells, i) ++ "\"}";
+      if (i < n - 1) { out = out ++ entry ++ ",\n"; }
+      else { out = out ++ entry ++ "\n"; }
       i = i + 1;
     }
-    out = out + "]\n";
+    out = out ++ "]\n";
     write_file(path, out);
     reply(n);
   }
@@ -567,21 +567,21 @@ class Coordinator {
 
   method run() {
     print("=== Pi_Phase1_Robustness (AIPL — Actor-based Intelligent Parallel Language — orchestrator) ===");
-    print("seed_count=" + seed_count + "  generations=" + generations);
+    print("seed_count=" ++ seed_count ++ "  generations=" ++ generations);
 
     // Phase 1: seed
     var i = 0;
     while (i < seed_count) do {
       var g = now generator.seed();
       next_id = next_id + 1;
-      var id = "I" + next_id;
+      var id = "I" ++ next_id;
       var cell = now worker.compute_cell(g, cell_axes_csv);
       var score = now worker.compute_score(g, task_csv);
       send lineage.add(id, g, "", score, 0, "seed", cell);
       send elite.propose(cell, id, g, score);
       i = i + 1;
     }
-    print("[seed] elite cells filled: " + (now elite.size()));
+    print("[seed] elite cells filled: " ++ (now elite.size()));
 
     // Phase 2: evolution
     var gen = 1;
@@ -603,7 +603,7 @@ class Coordinator {
         op = "axis_resample";
       }
       next_id = next_id + 1;
-      var cid = "I" + next_id;
+      var cid = "I" ++ next_id;
       var ccell = now worker.compute_cell(child, cell_axes_csv);
       var cscore = now worker.compute_score(child, task_csv);
       send lineage.add(cid, child, "", cscore, gen, op, ccell);
@@ -611,11 +611,11 @@ class Coordinator {
       gen = gen + 1;
     }
 
-    print("[done] cells filled: " + (now elite.size()));
+    print("[done] cells filled: " ++ (now elite.size()));
     print(now elite.best_summary(5));
 
     var n = now lineage.dump("out/Pi_Phase1_Robustness.aipl_lineage.json");
-    print("[lineage] wrote " + n + " individuals to out/Pi_Phase1_Robustness.aipl_lineage.json");
+    print("[lineage] wrote " ++ n ++ " individuals to out/Pi_Phase1_Robustness.aipl_lineage.json");
   }
 }
 

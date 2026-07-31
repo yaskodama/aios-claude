@@ -14,23 +14,23 @@ var path = "/tmp/_aipl_img_test.ppm";
 
 // 8x8 magenta canvas.
 var img = image_create(8, 8, 200, 50, 200);
-print("created          " + img);
-print("image_size       = " + image_size(img));
+print("created          " ++ img);
+print("image_size       = " ++ image_size(img));
 
 // Paint a small green dot at (3,3).
 image_set_pixel(img, 3, 3, 0, 255, 0);
-print("pixel(3,3)       = " + image_pixel(img, 3, 3));
-print("pixel(0,0)       = " + image_pixel(img, 0, 0));
+print("pixel(3,3)       = " ++ image_pixel(img, 3, 3));
+print("pixel(0,0)       = " ++ image_pixel(img, 0, 0));
 
 // Persist + round-trip.
 image_save(img, path);
-print("saved to         " + path);
+print("saved to         " ++ path);
 
 var loaded = image_load(path);
-print("loaded           " + loaded);
-print("loaded size      = " + image_size(loaded));
-print("loaded(3,3)      = " + image_pixel(loaded, 3, 3));
-print("loaded(0,0)      = " + image_pixel(loaded, 0, 0));
+print("loaded           " ++ loaded);
+print("loaded size      = " ++ image_size(loaded));
+print("loaded(3,3)      = " ++ image_pixel(loaded, 3, 3));
+print("loaded(0,0)      = " ++ image_pixel(loaded, 0, 0));
 
 // Programmatic fill: draw a vertical gradient. We wrap the loops in
 // a method because top-level `while` is not in the decl grammar.

@@ -8,10 +8,10 @@
 class Bootstrap {
   method run(src: string) {
     var tokens = tokenize(src);
-    print("[level-z] lex   : " + array_len(tokens) + " tokens");
+    print("[level-z] lex   : " ++ array_len(tokens) ++ " tokens");
 
     var prog = parse_program(tokens);
-    print("[level-z] parse : " + array_len(prog.main) + " stmts");
+    print("[level-z] parse : " ++ array_len(prog.main) ++ " stmts");
 
     print("[level-z] eval  :");
     run_program(prog);

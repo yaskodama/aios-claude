@@ -51,4 +51,4 @@ var c = new Counter();
 send c.inc(3);
 send c.inc(4);
 var v = now c.value();
-print("count = " + v);
+print("count = " ++ v);

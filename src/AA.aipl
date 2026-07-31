@@ -10,23 +10,23 @@ class Hello {
     var i = 1;
     count = n;
     print(typeof(count));
-    print("Hello object initialized with " + n);
+    print("Hello object initialized with " ++ n);
     var hh = new H();
     print(typeof(hh));
 //    print(typeof(sender));
   }
 
   method greet() {
-    print("Hello! count = " + count);
+    print("Hello! count = " ++ count);
     var xs = typeof(count);
     var xy = "aaaa";
     print(typeof(xy));
     var xz = array_empty();
-    print("type: "+typeof(xz));
+    print("type: "++typeof(xz));
     xz = array_push(xz, 10.);
-    print("type: "+typeof(xz));
+    print("type: "++typeof(xz));
     xz = array_push(xz, 20.);
-    print("type: "+typeof(xz));
+    print("type: "++typeof(xz));
     var c = 3;
     print(c);
     print(array_len(xz));
@@ -41,7 +41,7 @@ class Hello {
   method inc() {
     var i = 1;
     count = count + 1.;
-    print("count incremented to " + count);
+    print("count incremented to " ++ count);
   }
 }
 

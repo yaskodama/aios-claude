@@ -10,8 +10,8 @@ crdt_gcounter_inc(a, 3);
 crdt_gcounter_inc(a, 2);
 crdt_gcounter_inc(b, 4);
 
-print("[dr10/1] A value = " + crdt_gcounter_value(a));   // 5
-print("[dr10/1] B value = " + crdt_gcounter_value(b));   // 4
+print("[dr10/1] A value = " ++ crdt_gcounter_value(a));   // 5
+print("[dr10/1] B value = " ++ crdt_gcounter_value(b));   // 4
 
 var m = crdt_gcounter_merge(a, b);
-print("[dr10/1] merged  = " + crdt_gcounter_value(m));   // 9 if different replicas
+print("[dr10/1] merged  = " ++ crdt_gcounter_value(m));   // 9 if different replicas

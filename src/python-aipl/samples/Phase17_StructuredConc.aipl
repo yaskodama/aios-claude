@@ -18,7 +18,7 @@ class Worker {
   pub var label: string = "?";
   method init(l: string) { label = l; }
   method work(x: int) -> int {
-    print("[" + label + "] x=" + x);
+    print("[" ++ label ++ "] x=" ++ x);
     reply(x * x);
   }
 }

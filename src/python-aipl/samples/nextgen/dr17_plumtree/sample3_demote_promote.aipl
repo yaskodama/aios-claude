@@ -6,17 +6,17 @@
 // lazy peer can be promoted to eager.
 
 var s_init = plumtree_init("self", "p1,p2,p3", "p4");
-print("[dr17/3] eager = " + plumtree_eager_peers("self"));
-print("[dr17/3] lazy  = " + plumtree_lazy_peers("self"));
+print("[dr17/3] eager = " ++ plumtree_eager_peers("self"));
+print("[dr17/3] lazy  = " ++ plumtree_lazy_peers("self"));
 
 // Demote p2 (suppose it kept sending dupes).
 var d1 = plumtree_demote("self", "p2");
-print("[dr17/3] demoted p2 = " + d1);
-print("[dr17/3] eager after demote = " + plumtree_eager_peers("self"));
-print("[dr17/3] lazy  after demote = " + plumtree_lazy_peers("self"));
+print("[dr17/3] demoted p2 = " ++ d1);
+print("[dr17/3] eager after demote = " ++ plumtree_eager_peers("self"));
+print("[dr17/3] lazy  after demote = " ++ plumtree_lazy_peers("self"));
 
 // Promote p4 (useful lazy peer).
 var p1 = plumtree_promote("self", "p4");
-print("[dr17/3] promoted p4 = " + p1);
-print("[dr17/3] eager after promote = " + plumtree_eager_peers("self"));
-print("[dr17/3] lazy  after promote = " + plumtree_lazy_peers("self"));
+print("[dr17/3] promoted p4 = " ++ p1);
+print("[dr17/3] eager after promote = " ++ plumtree_eager_peers("self"));
+print("[dr17/3] lazy  after promote = " ++ plumtree_lazy_peers("self"));

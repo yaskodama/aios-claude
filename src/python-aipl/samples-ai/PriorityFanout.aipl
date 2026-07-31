@@ -23,13 +23,13 @@ class Worker {
   }
 
   method ask(topic: string) !{ai, net} {
-    print("[w" + id + " p=" + prio + "] start: " + topic);
+    print("[w" ++ id ++ " p=" ++ prio ++ "] start: " ++ topic);
     var resp: string = ai_call_priority_with_system(
       prio,
       "Reply in ONE short sentence, no preamble.",
       topic
     );
-    print("[w" + id + " p=" + prio + "] reply: " + resp);
+    print("[w" ++ id ++ " p=" ++ prio ++ "] reply: " ++ resp);
   }
 }
 

@@ -2,10 +2,10 @@
 //   ( e1, e2, ... )    -- tuple literal (>=2 elements)
 //   tuple[n]            -- index access (n must be a literal integer)
 var t = (1, "two", 3.5);
-print("t[0] = " + t[0]);
-print("t[1] = " + t[1]);
-print("t[2] = " + t[2]);
+print("t[0] = " ++ t[0]);
+print("t[1] = " ++ t[1]);
+print("t[2] = " ++ t[2]);
 
 // Nested tuples
 var pair = ((10, 20), "label");
-print("pair[1] = " + pair[1]);
+print("pair[1] = " ++ pair[1]);

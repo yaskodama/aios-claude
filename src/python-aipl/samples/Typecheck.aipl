@@ -18,7 +18,7 @@ function add(a: int, b: int) -> int {
 }
 
 function greet(name: string) -> string {
-  return "hello, " + name;
+  return "hello, " ++ name;
 }
 
 class Counter {
@@ -44,7 +44,7 @@ function bad_param(a: int) -> string {
 class Mismatch {
   var label: string = 42;          // int vs string
   method add_one(n: int) -> int {
-    return n + "x";                // result is string, declared int
+    return n ++ "x";                // result is string, declared int
   }
 }
 
@@ -58,17 +58,17 @@ class Demo {
     print("=== AIPL Phase 11 — gradual static type-check ===");
 
     // 1) Show the function signatures the checker built up.
-    print("typeof(add)       = " + typeof(add));
-    print("typeof(greet)     = " + typeof(greet));
-    print("typeof(bad_return)= " + typeof(bad_return));
+    print("typeof(add)       = " ++ typeof(add));
+    print("typeof(greet)     = " ++ typeof(greet));
+    print("typeof(bad_return)= " ++ typeof(bad_return));
     print("");
 
     // 2) Run the checker and surface its findings.
     var issues = type_check();
-    print("type_check() returned " + array_len(issues) + " issue(s):");
+    print("type_check() returned " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
     print("");
@@ -76,19 +76,19 @@ class Demo {
     // 3) Confirm the well-typed code still RUNS — gradual: errors are
     // warnings at runtime, not hard stops (use --strict CLI flag for that).
     var s = add(3, 4);
-    print("add(3, 4)   = " + s);
+    print("add(3, 4)   = " ++ s);
     var g = greet("world");
-    print("greet       = " + g);
+    print("greet       = " ++ g);
     var c = new Counter();
     send c.tick();
     send c.tick();
     var n = now c.get();
-    print("counter.get = " + n);
+    print("counter.get = " ++ n);
 
     print("");
-    print("typeof(s) = " + typeof(s) + "   (matches `int` annotation)");
-    print("typeof(g) = " + typeof(g) + " (matches `string` annotation)");
-    print("typeof(n) = " + typeof(n) + "   (Counter.get -> int)");
+    print("typeof(s) = " ++ typeof(s) ++ "   (matches `int` annotation)");
+    print("typeof(g) = " ++ typeof(g) ++ " (matches `string` annotation)");
+    print("typeof(n) = " ++ typeof(n) ++ "   (Counter.get -> int)");
   }
 }
 

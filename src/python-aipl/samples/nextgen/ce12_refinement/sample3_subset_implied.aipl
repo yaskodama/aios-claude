@@ -12,4 +12,4 @@ function strictly_positive(y: int where y > 0) -> int {
   return non_negative(y);   // subset compat: OK under AIPL_REFINE_UNIFY=1
 }
 
-print("[ce12/3] strictly_positive(7) = " + strictly_positive(7));
+print("[ce12/3] strictly_positive(7) = " ++ strictly_positive(7));

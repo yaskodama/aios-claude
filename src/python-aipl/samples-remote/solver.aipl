@@ -9,12 +9,12 @@
 //   GEMINI_API_KEY=... /usr/bin/python3 abcl_main.py samples-remote/solver.aipl
 class Solver {
   method answer(q: string) -> string !{ai, net} {
-    print("[solver] q=" + q);
+    print("[solver] q=" ++ q);
     var a: string = ai_call_with_system(
       "Answer in two short sentences.  No preamble.",
       q
     );
-    print("[solver] a=" + a);
+    print("[solver] a=" ++ a);
     reply(a);
   }
 }

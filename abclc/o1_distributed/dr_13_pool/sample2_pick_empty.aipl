@@ -8,9 +8,9 @@
 class D {
   method run() {
     var p = pool_create("Worker", 0, 4, 2);
-    print("[demo] pool name: " + p);
-    print("[demo] pick #1: '" + pool_pick(p) + "'");
-    print("[demo] pick #2: '" + pool_pick(p) + "'");
+    print("[demo] pool name: " ++ p);
+    print("[demo] pick #1: '" ++ pool_pick(p) ++ "'");
+    print("[demo] pick #2: '" ++ pool_pick(p) ++ "'");
     pool_destroy(p);
   }
 }

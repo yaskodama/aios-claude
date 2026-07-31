@@ -8,17 +8,17 @@ class Driver {
   method run() {
     print("=== Level C — SampleLexer ===");
     var src: string =
-      "// hello\n" +
-      "var x = 3;\n" +
-      "var y = x + 4;\n" +
+      "// hello\n" ++
+      "var x = 3;\n" ++
+      "var y = x + 4;\n" ++
       "if (y >= 7) { print(\"big\"); }\n";
 
     var tokens = tokenize(src);
-    print("token count = " + array_len(tokens));
+    print("token count = " ++ array_len(tokens));
     var i = 0;
     while (i < array_len(tokens)) do {
       var t = array_get(tokens, i);
-      print("  " + i + "  " + t.kind + " = " + t.val);
+      print("  " ++ i ++ "  " ++ t.kind ++ " = " ++ t.val);
       i = i + 1;
     }
   }

@@ -23,16 +23,16 @@ var hub = "uart1://192.168.3.50:5555";
 print("=== static distributed diners: 3 Mac + 2 Xinu (pre-linked, no dynamic compile) ===");
 // Reset the Xinu actor table so forks deterministically get ids 0..4 and the
 // program can be re-run without rebooting the Pi.
-print("Xinu RESET -> " + remote_now(hub, "_", "reset"));
+print("Xinu RESET -> " ++ remote_now(hub, "_", "reset"));
 print("spawning forks F0..F4 -> ids "
-      + remote_now(hub, "_", "spawn", "Fork") + " "
-      + remote_now(hub, "_", "spawn", "Fork") + " "
-      + remote_now(hub, "_", "spawn", "Fork") + " "
-      + remote_now(hub, "_", "spawn", "Fork") + " "
-      + remote_now(hub, "_", "spawn", "Fork"));
-print("spawning Xinu P4 -> id " + remote_now(hub, "_", "spawn", "Philosopher", 4, "ref:2", "ref:3"));
-print("spawning Xinu P5 -> id " + remote_now(hub, "_", "spawn", "Philosopher", 5, "ref:3", "ref:4"));
-print("Xinu actors -> " + remote_now(hub, "_", "list"));
+      ++ remote_now(hub, "_", "spawn", "Fork") ++ " "
+      ++ remote_now(hub, "_", "spawn", "Fork") ++ " "
+      ++ remote_now(hub, "_", "spawn", "Fork") ++ " "
+      ++ remote_now(hub, "_", "spawn", "Fork") ++ " "
+      ++ remote_now(hub, "_", "spawn", "Fork"));
+print("spawning Xinu P4 -> id " ++ remote_now(hub, "_", "spawn", "Philosopher", 4, "ref:2", "ref:3"));
+print("spawning Xinu P5 -> id " ++ remote_now(hub, "_", "spawn", "Philosopher", 5, "ref:3", "ref:4"));
+print("Xinu actors -> " ++ remote_now(hub, "_", "list"));
 
 class Philosopher {
   var my_id        = 0;
@@ -46,13 +46,13 @@ class Philosopher {
   method init(pid, lo, hi, target) {
     my_id = pid; lo_fork = lo; hi_fork = hi; meals_target = target;
     meals_done = 0; attempts = 0;
-    print("  [P" + my_id + "] thinking (low=F" + lo_fork + " high=F" + hi_fork + ")");
+    print("  [P" ++ my_id ++ "] thinking (low=F" ++ lo_fork ++ " high=F" ++ hi_fork ++ ")");
     send self.try_eat();
   }
 
   method try_eat() {
     if (meals_done >= meals_target) {
-      print("  [P" + my_id + "] DONE after " + attempts + " attempts (terminating)");
+      print("  [P" ++ my_id ++ "] DONE after " ++ attempts ++ " attempts (terminating)");
       suicide();
     } else {
       attempts = attempts + 1;
@@ -73,7 +73,7 @@ class Philosopher {
         } else {
           sleep(0.150);
           meals_done = meals_done + 1;
-          print("  [P" + my_id + " ATE meal=" + meals_done + "] (attempts=" + attempts + ")");
+          print("  [P" ++ my_id ++ " ATE meal=" ++ meals_done ++ "] (attempts=" ++ attempts ++ ")");
           sleep(0.040);
           remote_call(hub, hi_fork, "release", my_id);
           remote_call(hub, lo_fork, "release", my_id);

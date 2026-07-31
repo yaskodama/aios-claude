@@ -18,7 +18,7 @@ class Specialist {
 
   method init(r: string) {
     role = r;
-    persona = "You are a " + r + ".  Reply in two short sentences with your perspective on the topic.  No preamble.";
+    persona = "You are a " ++ r ++ ".  Reply in two short sentences with your perspective on the topic.  No preamble.";
   }
 
   method analyze(topic: string) -> string !{ai, net} {
@@ -55,7 +55,7 @@ class Coordinator {
     print(ans_s);
     print("=== Pragmatist (parallel) ===");
     print(ans_p);
-    print("[parallel] elapsed_ms = " + elapsed);
+    print("[parallel] elapsed_ms = " ++ elapsed);
   }
 
   // Sequential: same calls but waiting for each before issuing the next.
@@ -72,7 +72,7 @@ class Coordinator {
     print(ans_s);
     print("=== Pragmatist (sequential) ===");
     print(ans_p);
-    print("[sequential] elapsed_ms = " + elapsed);
+    print("[sequential] elapsed_ms = " ++ elapsed);
   }
 }
 

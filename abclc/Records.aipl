@@ -2,11 +2,11 @@
 //   { label: expr, ... }   -- record literal
 //   record.label            -- field access (inferred from the record type)
 var alice = {name: "alice", age: 30};
-print("alice.name = " + alice.name);
-print("alice.age  = " + alice.age);
+print("alice.name = " ++ alice.name);
+print("alice.age  = " ++ alice.age);
 
 // Nested records and chained access
 var p = {pos: {x: 3, y: 4}, label: "origin"};
-print("p.label = " + p.label);
-print("p.pos.x = " + p.pos.x);
-print("p.pos.y = " + p.pos.y);
+print("p.label = " ++ p.label);
+print("p.pos.x = " ++ p.pos.x);
+print("p.pos.y = " ++ p.pos.y);

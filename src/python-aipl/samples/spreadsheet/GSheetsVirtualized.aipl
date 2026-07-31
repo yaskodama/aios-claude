@@ -225,32 +225,32 @@ function run_demo() {
   var live1   = now s.live_count();
   var span1   = now s.total_spawn();
   var ret1    = now s.total_retire();
-  print("[vp] rows 0..4 : live=" + live1 + "  spawn=" + span1 + "  retire=" + ret1);
+  print("[vp] rows 0..4 : live=" ++ live1 ++ "  spawn=" ++ span1 ++ "  retire=" ++ ret1);
 
   // Check a cell in viewport: A1 = row 0 col 0 → value 1.
   var a1_ref = now s.find_live("A1");
   var a1_val = now a1_ref.read();
-  print("[read] A1 (in vp) = " + a1_val);
+  print("[read] A1 (in vp) = " ++ a1_val);
 
   // Off-viewport cell: C50 should not be live.
   var c50_live = now s.is_live("C50");
-  print("[in_vp] C50 currently live? " + c50_live);
+  print("[in_vp] C50 currently live? " ++ c50_live);
 
   // Scroll way down: viewport rows 95..99.
   var _v2 = now s.viewport_set(95, 99);
   var live2   = now s.live_count();
   var span2   = now s.total_spawn();
   var ret2    = now s.total_retire();
-  print("[vp] rows 95..99: live=" + live2 + "  spawn=" + span2 + "  retire=" + ret2);
+  print("[vp] rows 95..99: live=" ++ live2 ++ "  spawn=" ++ span2 ++ "  retire=" ++ ret2);
 
   // Old A1 should now be retired.
   var a1_live = now s.is_live("A1");
-  print("[in_vp] A1 currently live (after scroll)? " + a1_live);
+  print("[in_vp] A1 currently live (after scroll)? " ++ a1_live);
 
   // New viewport: B98 → row 97 col 1 → value 97*5 + 1 + 1 = 487.
   var b98_ref = now s.find_live("B98");
   var b98_val = now b98_ref.read();
-  print("[read] B98 (in vp) = " + b98_val);
+  print("[read] B98 (in vp) = " ++ b98_val);
 
   // Scroll back to middle: rows 50..54.  Some overlap with neither
   // previous viewport, so 25 retire + 25 spawn.
@@ -258,7 +258,7 @@ function run_demo() {
   var live3   = now s.live_count();
   var span3   = now s.total_spawn();
   var ret3    = now s.total_retire();
-  print("[vp] rows 50..54: live=" + live3 + "  spawn=" + span3 + "  retire=" + ret3);
+  print("[vp] rows 50..54: live=" ++ live3 ++ "  spawn=" ++ span3 ++ "  retire=" ++ ret3);
 
   // Bounded invariant: live count never exceeds 25 (= 5 rows × 5 cols).
   if (live1 == 25) { print("[invariant] vp1 live=25 OK"); }

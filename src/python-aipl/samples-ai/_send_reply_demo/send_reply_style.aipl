@@ -21,7 +21,7 @@ class Driver {
   // Receiver for Worker's reply — invoked by the actor loop when the
   // `reply(r)` message lands in Driver's mailbox.
   method reply(r) {
-    print("[send/reply] got: " + r);
+    print("[send/reply] got: " ++ r);
   }
   method run(q) {
     var w = new Worker();

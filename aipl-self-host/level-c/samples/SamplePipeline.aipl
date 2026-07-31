@@ -13,16 +13,16 @@ class Driver {
   method run() {
     print("=== Level C — SamplePipeline ===");
     var src: string =
-      "var x = 3;" +
-      "var y = x * x + 4;" +
-      "print(y);" +
+      "var x = 3;" ++
+      "var y = x * x + 4;" ++
+      "print(y);" ++
       "if (y > 10) { print(1); } else { print(0); }";
 
     var tokens = tokenize(src);
-    print("[lex] " + array_len(tokens) + " tokens");
+    print("[lex] " ++ array_len(tokens) ++ " tokens");
 
     var prog = parse_program(tokens);
-    print("[parse] main has " + array_len(prog.main) + " stmts");
+    print("[parse] main has " ++ array_len(prog.main) ++ " stmts");
 
     print("[eval] running:");
     run_program(prog);

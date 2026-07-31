@@ -23,7 +23,7 @@ class Driver {
 
     var prog_clean = { fns: [tc_compat], main: [] };
     var clean_issues = tc_check_program(prog_clean);
-    print("self-spec issues=" + array_len(clean_issues));
+    print("self-spec issues=" ++ array_len(clean_issues));
 
     print("");
     print("--- intentional violation: double-consume linear ---");
@@ -47,17 +47,17 @@ class Driver {
     };
     var prog_bad = { fns: [consume, bad_caller], main: [] };
     var bad_issues = tc_check_program(prog_bad);
-    print("bad-caller issues=" + array_len(bad_issues));
+    print("bad-caller issues=" ++ array_len(bad_issues));
     var j = 0;
     while (j < array_len(bad_issues)) do {
-      print("  - " + array_get(bad_issues, j));
+      print("  - " ++ array_get(bad_issues, j));
       j = j + 1;
     }
     print("(expected: 1 — second consume is use-after-move on y)");
 
     var total = array_len(clean_issues) + array_len(bad_issues);
     print("");
-    print("issues=" + total);
+    print("issues=" ++ total);
   }
 }
 

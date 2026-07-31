@@ -21,14 +21,14 @@ class Manager {
   method init() {
     if (compiled == 0) {
       var src =
-        "class Worker {\n" +
-        "  var id = 0;\n" +
-        "  method init(my_id) { id = my_id; }\n" +
-        "  method square(x) {\n" +
-        "    var r = x * x;\n" +
-        "    print(\"  [worker \" + id + \"] square(\" + x + \") = \" + r);\n" +
-        "    reply(r);\n" +
-        "  }\n" +
+        "class Worker {\n" ++
+        "  var id = 0;\n" ++
+        "  method init(my_id) { id = my_id; }\n" ++
+        "  method square(x) {\n" ++
+        "    var r = x * x;\n" ++
+        "    print(\"  [worker \" ++ id ++ \"] square(\" ++ x ++ \") = \" ++ r);\n" ++
+        "    reply(r);\n" ++
+        "  }\n" ++
         "}\n";
       compile(src);
       compiled = 1;
@@ -38,12 +38,12 @@ class Manager {
   method ensure_workers(n) {
     var i = 0;
     while (i < n) do {
-      var w_name = "worker_" + i;
+      var w_name = "worker_" ++ i;
       workers = array_push(workers, spawn("Worker", w_name, i));
       i = i + 1;
     }
     n_workers = n;
-    print("[manager] " + n + " workers ready");
+    print("[manager] " ++ n ++ " workers ready");
     reply(n);
   }
 
@@ -83,7 +83,7 @@ class Manager {
       sum = sum + v;
       k = k + 1;
     }
-    print("[manager] sum of squares = " + sum);
+    print("[manager] sum of squares = " ++ sum);
     reply(sum);
   }
 }
@@ -95,4 +95,4 @@ var mgr = new Manager();
 // would not have fired before the blocking `now mgr.run()` below.
 var ready = now mgr.ensure_workers(3);
 var total = now mgr.run();
-print("=== final result: " + total + " ===");
+print("=== final result: " ++ total ++ " ===");

@@ -26,7 +26,7 @@ class Buffer {
       tail = tail + 1;
       if (tail >= cap) { tail = 0; }
       count = count + 1;
-      print("Buffer  <- " + item + "   (from P" + pid + ", now " + count + "/" + cap + ")");
+      print("Buffer  <- " ++ item ++ "   (from P" ++ pid ++ ", now " ++ count ++ "/" ++ cap ++ ")");
       send sender.stored(item);
     } else {
       send sender.refused(item);
@@ -40,7 +40,7 @@ class Buffer {
       head = head + 1;
       if (head >= cap) { head = 0; }
       count = count - 1;
-      print("Buffer  -> " + v + "   (to C" + cid + ", now " + count + "/" + cap + ")");
+      print("Buffer  -> " ++ v ++ "   (to C" ++ cid ++ ", now " ++ count ++ "/" ++ cap ++ ")");
       send sender.received(v);
     } else {
       if (producers_left <= 0) {
@@ -53,7 +53,7 @@ class Buffer {
 
   method producer_done() {
     producers_left = producers_left - 1;
-    print("Buffer  a producer finished (" + producers_left + " still producing)");
+    print("Buffer  a producer finished (" ++ producers_left ++ " still producing)");
   }
 }
 
@@ -72,7 +72,7 @@ class Producer {
   method step() {
     if (made >= target) {
       status = "done";
-      print("P" + id + " produced all " + made + " items (terminating)");
+      print("P" ++ id ++ " produced all " ++ made ++ " items (terminating)");
       send buf.producer_done();
       suicide();
     } else {
@@ -84,13 +84,13 @@ class Producer {
   method stored(item) {
     made = made + 1;
     status = "producing";
-    print("P" + id + " produced " + item + "   (" + made + "/" + target + ")");
+    print("P" ++ id ++ " produced " ++ item ++ "   (" ++ made ++ "/" ++ target ++ ")");
     sleep(delay);
     send self.step();
   }
   method refused(item) {
     status = "blocked (full)";
-    print("P" + id + " blocked: buffer full, will retry " + item);
+    print("P" ++ id ++ " blocked: buffer full, will retry " ++ item);
     sleep(0.25);
     send self.step();
   }
@@ -114,19 +114,19 @@ class Consumer {
   method received(v) {
     got = got + 1;
     status = "consuming";
-    print("C" + id + " consumed " + v + "   (total " + got + ")");
+    print("C" ++ id ++ " consumed " ++ v ++ "   (total " ++ got ++ ")");
     sleep(delay);
     send self.step();
   }
   method empty() {
     status = "waiting (empty)";
-    print("C" + id + " waiting: buffer empty");
+    print("C" ++ id ++ " waiting: buffer empty");
     sleep(0.25);
     send self.step();
   }
   method closed() {
     status = "done";
-    print("C" + id + " done after " + got + " items (buffer closed, terminating)");
+    print("C" ++ id ++ " done after " ++ got ++ " items (buffer closed, terminating)");
     suicide();
   }
 }

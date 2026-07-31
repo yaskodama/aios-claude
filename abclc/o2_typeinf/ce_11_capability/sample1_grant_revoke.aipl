@@ -11,12 +11,12 @@
 
 class Demo {
   method run() {
-    print("[demo] held initially: " + current_caps());
+    print("[demo] held initially: " ++ current_caps());
     grant_cap("fs");
     grant_cap("ai");
-    print("[demo] after grants:   " + current_caps());
+    print("[demo] after grants:   " ++ current_caps());
     revoke_cap("ai");
-    print("[demo] held finally:   " + current_caps());
+    print("[demo] held finally:   " ++ current_caps());
   }
 }
 var d = new Demo();

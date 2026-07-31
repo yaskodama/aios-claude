@@ -30,13 +30,13 @@ class Fork {
 
   method init(myId) {
     id = myId;
-    print("VIZ FORK " + id + " FREE");
+    print("VIZ FORK " ++ id ++ " FREE");
   }
 
   method take(reqId) {
     if (taken == 0) {
       taken = 1;
-      print("VIZ FORK " + id + " TAKEN " + reqId);
+      print("VIZ FORK " ++ id ++ " TAKEN " ++ reqId);
       send sender.fork_granted();
     } else {
       waiter = sender;
@@ -46,9 +46,9 @@ class Fork {
   method release() {
     if (waiter == "") {
       taken = 0;
-      print("VIZ FORK " + id + " FREE");
+      print("VIZ FORK " ++ id ++ " FREE");
     } else {
-      print("VIZ FORK " + id + " HANDOFF");
+      print("VIZ FORK " ++ id ++ " HANDOFF");
       send waiter.fork_granted();
       waiter = "";
     }
@@ -77,14 +77,14 @@ class Philosopher {
 
   method stop() {
     running = 0;
-    print("[P" + id + "] stop requested");
+    print("[P" ++ id ++ "] stop requested");
   }
 
   method think() {
     if (running == 0) {
-      print("VIZ PHILO " + id + " DONE");
+      print("VIZ PHILO " ++ id ++ " DONE");
     } else {
-      print("VIZ PHILO " + id + " THINK");
+      print("VIZ PHILO " ++ id ++ " THINK");
       call wait(700);
       send self.hungry();
     }
@@ -92,9 +92,9 @@ class Philosopher {
 
   method hungry() {
     if (running == 0) {
-      print("VIZ PHILO " + id + " DONE");
+      print("VIZ PHILO " ++ id ++ " DONE");
     } else {
-      print("VIZ PHILO " + id + " HUNGRY");
+      print("VIZ PHILO " ++ id ++ " HUNGRY");
       hasLow = 0;
       send lowFork.take(id);
     }
@@ -113,7 +113,7 @@ class Philosopher {
         send highFork.release();
         hasLow = 0;
       }
-      print("VIZ PHILO " + id + " DONE");
+      print("VIZ PHILO " ++ id ++ " DONE");
     } else {
       if (hasLow == 0) {
         hasLow = 1;
@@ -128,10 +128,10 @@ class Philosopher {
     if (running == 0) {
       send lowFork.release();
       send highFork.release();
-      print("VIZ PHILO " + id + " DONE");
+      print("VIZ PHILO " ++ id ++ " DONE");
     } else {
       eatCount = eatCount + 1;
-      print("VIZ PHILO " + id + " EAT " + eatCount);
+      print("VIZ PHILO " ++ id ++ " EAT " ++ eatCount);
       call wait(900);
       send self.eat_done();
     }
@@ -141,7 +141,7 @@ class Philosopher {
     send lowFork.release();
     send highFork.release();
     if (running == 0) {
-      print("VIZ PHILO " + id + " DONE");
+      print("VIZ PHILO " ++ id ++ " DONE");
     } else {
       send self.think();
     }

@@ -12,4 +12,4 @@ function pipeline(in_path: string, out_path: string) -> int !{ai, fs, net} {
 
 write_file("/tmp/aipl_ce10_in.txt", "What is 1+1?\n");
 pipeline("/tmp/aipl_ce10_in.txt", "/tmp/aipl_ce10_out.txt");
-print("[ce10/3] pipeline done -> " + read_file("/tmp/aipl_ce10_out.txt"));
+print("[ce10/3] pipeline done -> " ++ read_file("/tmp/aipl_ce10_out.txt"));

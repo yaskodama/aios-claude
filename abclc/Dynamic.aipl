@@ -12,9 +12,9 @@
 class Factory {
   method build(class_name, source, actor_name) {
     var n = compile(source);
-    print("[Factory] compiled " + n + " new class(es)");
+    print("[Factory] compiled " ++ n ++ " new class(es)");
     var who = spawn(class_name, actor_name);
-    print("[Factory] spawned " + who);
+    print("[Factory] spawned " ++ who);
     reply(who);
   }
 }
@@ -22,7 +22,7 @@ class Factory {
 var f = new Factory();
 
 // Build a Greeter class at runtime and instantiate it via spawn.
-var src = "class Greeter { var label = \"g1\"; method hi(n) { print(\"hello \" + n + \" from \" + label); } }";
+var src = "class Greeter { var label = \"g1\"; method hi(n) { print(\"hello \" ++ n ++ \" from \" ++ label); } }";
 var g = now f.build("Greeter", src, "g1");
 
 send g.hi("Alice");

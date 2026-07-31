@@ -23,7 +23,7 @@ class Driver {
 
     var prog_clean = { classes: [], fns: [tc_compat], main: [] };
     var clean_issues = tc_check_program(prog_clean);
-    print("self-spec issues=" + array_len(clean_issues));
+    print("self-spec issues=" ++ array_len(clean_issues));
 
     print("");
     print("--- intentional violation: external read + write ---");
@@ -49,17 +49,17 @@ class Driver {
       ]
     };
     var bad_issues = tc_check_program(prog_bad);
-    print("bad-prog issues=" + array_len(bad_issues));
+    print("bad-prog issues=" ++ array_len(bad_issues));
     var j = 0;
     while (j < array_len(bad_issues)) do {
-      print("  - " + array_get(bad_issues, j));
+      print("  - " ++ array_get(bad_issues, j));
       j = j + 1;
     }
     print("(expected: 2 — private read + external write)");
 
     var total = array_len(clean_issues) + array_len(bad_issues);
     print("");
-    print("issues=" + total);
+    print("issues=" ++ total);
   }
 }
 

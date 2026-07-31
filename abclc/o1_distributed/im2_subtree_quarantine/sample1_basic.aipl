@@ -16,15 +16,15 @@
 // Worker A side still prints its tick.
 
 class Helper {
-  method help(tag: string) { print("help:" + tag); }
+  method help(tag: string) { print("help:" ++ tag); }
 }
 class Worker {
   var id = 0;
   method init(my_id: int) { id = my_id; }
   method run(ok: int) {
     var h = new Helper();
-    send h.help("from-" + id);
-    if (ok == 0) { error("worker " + id + " died"); }
+    send h.help("from-" ++ id);
+    if (ok == 0) { error("worker " ++ id ++ " died"); }
   }
 }
 class Supervisor {

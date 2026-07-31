@@ -20,25 +20,25 @@ class SiteGen {
 
   // Render a tiny HTML page from title + body string.
   function html_page(title: string, body: string) -> string {
-    return "<!doctype html>\n" +
-           "<html><head>\n" +
-           "  <meta charset=\"utf-8\">\n" +
-           "  <title>" + title + "</title>\n" +
-           "  <link rel=\"stylesheet\" href=\"style.css\">\n" +
-           "  <link rel=\"icon\" type=\"image/png\" href=\"logo.png\">\n" +
-           "</head><body>\n" +
-           "<header><img src=\"logo.png\" width=\"64\" height=\"64\" alt=\"logo\">\n" +
-           "<h1>" + title + "</h1></header>\n" +
-           "<main>" + body + "</main>\n" +
+    return "<!doctype html>\n" ++
+           "<html><head>\n" ++
+           "  <meta charset=\"utf-8\">\n" ++
+           "  <title>" ++ title ++ "</title>\n" ++
+           "  <link rel=\"stylesheet\" href=\"style.css\">\n" ++
+           "  <link rel=\"icon\" type=\"image/png\" href=\"logo.png\">\n" ++
+           "</head><body>\n" ++
+           "<header><img src=\"logo.png\" width=\"64\" height=\"64\" alt=\"logo\">\n" ++
+           "<h1>" ++ title ++ "</h1></header>\n" ++
+           "<main>" ++ body ++ "</main>\n" ++
            "</body></html>\n";
   }
 
   function css_theme(primary: string) -> string {
-    return "body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2em auto; }\n" +
-           "header { display: flex; align-items: center; gap: 1em; }\n" +
-           "h1 { color: " + primary + "; }\n" +
-           "main { line-height: 1.6; }\n" +
-           "a { color: " + primary + "; }\n";
+    return "body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2em auto; }\n" ++
+           "header { display: flex; align-items: center; gap: 1em; }\n" ++
+           "h1 { color: " ++ primary ++ "; }\n" ++
+           "main { line-height: 1.6; }\n" ++
+           "a { color: " ++ primary ++ "; }\n";
   }
 
   // Build a 64x64 RGBA logo: gradient from dark blue to teal with
@@ -82,37 +82,37 @@ class SiteGen {
     var logo = build_logo();
     var logo_path = path_join(out_dir, "logo.png");
     image_save(logo, logo_path);
-    print("logo: " + typeof(logo) + " -> " + logo_path);
+    print("logo: " ++ typeof(logo) ++ " -> " ++ logo_path);
 
     // 2) Generate style.css from theme color.
     var css_path = path_join(out_dir, "style.css");
     write_file(css_path, css_theme(config.theme.primary));
-    print("css : " + css_path);
+    print("css : " ++ css_path);
 
     // 3) Generate index.html.
     var posts = config.posts;
     var n_posts = array_len(posts);
-    var index_body = "<p>" + config.tagline + "</p>\n<ul>\n";
+    var index_body = "<p>" ++ config.tagline ++ "</p>\n<ul>\n";
     var i = 0;
     while (i < n_posts) do {
       var p = array_get(posts, i);
-      var post_url = "posts/" + p.slug + ".html";
-      index_body = index_body + "  <li><a href=\"" + post_url + "\">" + p.title + "</a></li>\n";
+      var post_url = "posts/" ++ p.slug ++ ".html";
+      index_body = index_body ++ "  <li><a href=\"" ++ post_url ++ "\">" ++ p.title ++ "</a></li>\n";
       i = i + 1;
     }
-    index_body = index_body + "</ul>\n";
+    index_body = index_body ++ "</ul>\n";
     var idx_path = path_join(out_dir, "index.html");
     write_file(idx_path, html_page(config.site_name, index_body));
-    print("idx : " + idx_path);
+    print("idx : " ++ idx_path);
 
     // 4) Generate one HTML file per post.
     var j = 0;
     while (j < n_posts) do {
       var p2 = array_get(posts, j);
-      var body = "<article>\n" + p2.body + "\n<p><a href=\"../index.html\">&larr; back</a></p>\n</article>";
-      var post_path = path_join(out_dir, path_join("posts", p2.slug + ".html"));
+      var body = "<article>\n" ++ p2.body ++ "\n<p><a href=\"../index.html\">&larr; back</a></p>\n</article>";
+      var post_path = path_join(out_dir, path_join("posts", p2.slug ++ ".html"));
       write_file(post_path, html_page(p2.title, body));
-      print("post: " + post_path);
+      print("post: " ++ post_path);
       j = j + 1;
     }
 
@@ -126,23 +126,23 @@ class SiteGen {
     // 6) Verify by reading back.
     var listing = list_dir(out_dir);
     print("");
-    print("Generated " + array_len(listing) + " entries in " + out_dir + ":");
+    print("Generated " ++ array_len(listing) ++ " entries in " ++ out_dir ++ ":");
     var k = 0;
     while (k < array_len(listing)) do {
-      print("  - " + array_get(listing, k));
+      print("  - " ++ array_get(listing, k));
       k = k + 1;
     }
 
     // 7) typeof showcase on the new value kinds.
     print("");
-    print("typeof(logo)             = " + typeof(logo));
-    print("typeof(image_size(logo)) = " + typeof(image_size(logo)));
-    print("typeof(manifest)         = " + typeof(manifest));
+    print("typeof(logo)             = " ++ typeof(logo));
+    print("typeof(image_size(logo)) = " ++ typeof(image_size(logo)));
+    print("typeof(manifest)         = " ++ typeof(manifest));
     var raw = read_bytes(logo_path);
-    print("typeof(raw)              = " + typeof(raw) + "  (len=" + array_len(raw) + ")");
-    print("typeof(image_pixel(logo, 32, 32)) = " + typeof(image_pixel(logo, 32, 32)));
+    print("typeof(raw)              = " ++ typeof(raw) ++ "  (len=" ++ array_len(raw) ++ ")");
+    print("typeof(image_pixel(logo, 32, 32)) = " ++ typeof(image_pixel(logo, 32, 32)));
     var px = image_pixel(logo, 32, 32);
-    print("center pixel (32,32) = (" + px[0] + "," + px[1] + "," + px[2] + "," + px[3] + ")");
+    print("center pixel (32,32) = (" ++ px[0] ++ "," ++ px[1] ++ "," ++ px[2] ++ "," ++ px[3] ++ ")");
 
     reply(out_dir);
   }
@@ -163,10 +163,10 @@ var config = {
   ]
 };
 
-print("config typeof = " + typeof(config));
+print("config typeof = " ++ typeof(config));
 print("");
 
 var gen = new SiteGen();
 var dir = now gen.generate(config);
 print("");
-print("=== done; site root = " + dir + " ===");
+print("=== done; site root = " ++ dir ++ " ===");

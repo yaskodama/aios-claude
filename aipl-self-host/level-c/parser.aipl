@@ -34,7 +34,7 @@ function expect_punct(tokens, pos, val: string) {
   if (t.kind == "PUNCT") {
     if (t.val == val) { return pos + 1; }
   }
-  print("[parse] expected '" + val + "' but got " + t.kind + "='" + t.val + "'");
+  print("[parse] expected '" ++ val ++ "' but got " ++ t.kind ++ "='" ++ t.val ++ "'");
   return pos + 1;
 }
 
@@ -43,7 +43,7 @@ function expect_kw(tokens, pos, val: string) {
   if (t.kind == "KW") {
     if (t.val == val) { return pos + 1; }
   }
-  print("[parse] expected keyword '" + val + "' but got " + t.kind + "='" + t.val + "'");
+  print("[parse] expected keyword '" ++ val ++ "' but got " ++ t.kind ++ "='" ++ t.val ++ "'");
   return pos + 1;
 }
 
@@ -82,7 +82,7 @@ function parse_primary(tokens, pos) {
       return (after, inner[1]);
     }
   }
-  print("[parse] primary: unexpected " + t.kind + "='" + t.val + "'");
+  print("[parse] primary: unexpected " ++ t.kind ++ "='" ++ t.val ++ "'");
   return (pos + 1, {tag: "Int", val: 0});
 }
 
@@ -295,7 +295,7 @@ function parse_stmt(tokens, pos) {
     }
   }
 
-  print("[parse] unexpected stmt token at pos " + pos + ": " + t.kind + "='" + t.val + "'");
+  print("[parse] unexpected stmt token at pos " ++ pos ++ ": " ++ t.kind ++ "='" ++ t.val ++ "'");
   return (pos + 1, {tag: "Int", val: 0});
 }
 

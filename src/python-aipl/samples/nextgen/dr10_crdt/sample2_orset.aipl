@@ -9,6 +9,6 @@ crdt_orset_add(s, "bob");
 crdt_orset_add(s, "carol");
 crdt_orset_remove(s, "bob");
 
-print("[dr10/2] has alice = " + crdt_orset_contains(s, "alice"));   // true
-print("[dr10/2] has bob   = " + crdt_orset_contains(s, "bob"));     // false
-print("[dr10/2] values    = " + crdt_orset_values(s));
+print("[dr10/2] has alice = " ++ crdt_orset_contains(s, "alice"));   // true
+print("[dr10/2] has bob   = " ++ crdt_orset_contains(s, "bob"));     // false
+print("[dr10/2] values    = " ++ crdt_orset_values(s));

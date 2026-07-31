@@ -19,9 +19,9 @@ class Coordinator {
   var verifier_addr = "localhost:9002";
 
   method solve(q) {
-    print("[coord] solve: " + q);
+    print("[coord] solve: " ++ q);
     var ans = remote_now(solver_addr, "solver", "answer", q);
-    print("[coord] got answer (len=" + str(ans) + ")");
+    print("[coord] got answer (len=" ++ str(ans) ++ ")");
     var verdict = remote_now(verifier_addr, "verifier", "check", q, ans);
     print("[coord] verdict ready");
     print("=== ANSWER ===");

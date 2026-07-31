@@ -10,12 +10,12 @@ class Pinger {
 
   method bind(p) {
     partner = p;
-    print("[Ping] serve (" + left + " rounds)");
+    print("[Ping] serve (" ++ left ++ " rounds)");
     send partner.ping(left);
   }
 
   method pong(n) {
-    print("[Ping] got pong   (" + n + " left)");
+    print("[Ping] got pong   (" ++ n ++ " left)");
     left = left - 1;
     if (left == 0) {
       print("[Ping] DONE");
@@ -28,7 +28,7 @@ class Pinger {
 
 class Ponger {
   method ping(n) {
-    print("[Pong] got ping   (" + n + " left)");
+    print("[Pong] got ping   (" ++ n ++ " left)");
     call wait(350);
     send sender.pong(n);
   }

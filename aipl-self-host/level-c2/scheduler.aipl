@@ -230,7 +230,7 @@ function eval_stmt_actor(s, env, fields, sched) {
     var arg_vals = eval_args(s.args, env, fields, sched);
     var tgt = sched_lookup(sched, s.target);
     if (tgt == 0) {
-      print("[sched] send: unknown actor `" + s.target + "`");
+      print("[sched] send: unknown actor `" ++ s.target ++ "`");
       return 0;
     }
     // Send AST uses `meth` (not `method`, which is an AIPL keyword)
@@ -265,7 +265,7 @@ function actor_step_one(actor, sched) {
   var msg = actor_dequeue(actor);
   var m = actor_method(actor, msg.meth);
   if (m == 0) {
-    print("[sched] " + actor.name + ": unknown method `" + msg.meth + "`");
+    print("[sched] " ++ actor.name ++ ": unknown method `" ++ msg.meth ++ "`");
     return 1;
   }
   // bind params -> args in a fresh env
@@ -307,6 +307,6 @@ function sched_run(sched, max_steps: int) {
       step = step + 1;
     }
   }
-  print("[sched] ran " + step + " round(s)");
+  print("[sched] ran " ++ step ++ " round(s)");
   return step;
 }

@@ -13,7 +13,7 @@
 
 class Mailer {
   method deliver(p: record {name: string, email: string}) -> string {
-    return "To " + p.name + " <" + p.email + ">";
+    return "To " ++ p.name ++ " <" ++ p.email ++ ">";
   }
 }
 
@@ -23,5 +23,5 @@ var bad = {label: "abc"};
 // At runtime the call still proceeds (Py-I's runtime is permissive)
 // but `aipl_main --check` and `--infer` will flag the unify failure.
 var s = now m.deliver(bad);
-print("[ce13/2] runtime result = " + s);
+print("[ce13/2] runtime result = " ++ s);
 print("[ce13/2] (run --check to see the type error)");

@@ -15,14 +15,14 @@
 class Greeter {
   // `p` is unannotated; inference figures out it needs at least .name.
   method greet(p) {
-    return "Hello, " + p.name;
+    return "Hello, " ++ p.name;
   }
 }
 
 class Mailer {
   // Reads .name AND .email — inference accumulates both.
   method deliver(p) {
-    return "Sending to " + p.name + " <" + p.email + ">";
+    return "Sending to " ++ p.name ++ " <" ++ p.email ++ ">";
   }
 }
 

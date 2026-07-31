@@ -26,12 +26,12 @@ class FileLog {
   method write(line) { append_file(path, line); }
   method peek() {
     var c = read_file(path);
-    print("[filelog] " + c);
+    print("[filelog] " ++ c);
   }
 }
 
 class Pure {
-  method add(a, b) { print("[pure] " + (a + b)); }
+  method add(a, b) { print("[pure] " ++ (a + b)); }
 }
 
 class Caller {

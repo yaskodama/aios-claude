@@ -18,7 +18,7 @@ class Pinger {
   }
 
   method pong() {
-    print("Pinger got pong, left=" + left);
+    print("Pinger got pong, left=" ++ left);
     left = left - 1;
     if (left > 0) {
       send sender.ping();

@@ -30,14 +30,14 @@ class Philosopher {
     my_id = pid; lo_fork = lo; hi_fork = hi;
     meals_target = target;
     meals_done = 0; attempts = 0;
-    print("  [P" + my_id + "] thinking (low=F" + lo_fork
-          + " high=F" + hi_fork + ")");
+    print("  [P" ++ my_id ++ "] thinking (low=F" ++ lo_fork
+          ++ " high=F" ++ hi_fork ++ ")");
     send self.try_eat();
   }
 
   method try_eat() {
     if (meals_done >= meals_target) {
-      print("  [P" + my_id + "] done after " + attempts + " attempts");
+      print("  [P" ++ my_id ++ "] done after " ++ attempts ++ " attempts");
     } else {
       attempts = attempts + 1;
 
@@ -59,13 +59,13 @@ class Philosopher {
           sleep(0.150);
           meals_done = meals_done + 1;
           if (meals_done <= 10) {
-            print("  [P" + my_id + " ate meal=" + meals_done
-                  + "] (attempts=" + attempts + ")");
+            print("  [P" ++ my_id ++ " ate meal=" ++ meals_done
+                  ++ "] (attempts=" ++ attempts ++ ")");
           } else {
             var bucket = meals_done - ((meals_done / 10) * 10);
             if (bucket == 0) {
-              print("  [P" + my_id + " ate meal=" + meals_done
-                    + "] (attempts=" + attempts + ")");
+              print("  [P" ++ my_id ++ " ate meal=" ++ meals_done
+                    ++ "] (attempts=" ++ attempts ++ ")");
             }
           }
           sleep(0.040);
@@ -88,8 +88,8 @@ print("    PC drives SPAWN to instantiate the actor topology.");
 var hub_url = "uart1://127.0.0.1:5555";
 
 print("");
-print("[boot] PING -> " + remote_now(hub_url, "_", "ping"));
-print("[boot] LIST -> " + remote_now(hub_url, "_", "list"));
+print("[boot] PING -> " ++ remote_now(hub_url, "_", "ping"));
+print("[boot] LIST -> " ++ remote_now(hub_url, "_", "list"));
 
 // 1. Transfer the AIPL source text to Xinu (= LOAD).  The source
 //    body is sent as raw bytes; Xinu writes it into /home/diners.aipl.
@@ -101,11 +101,11 @@ print("[boot] LIST -> " + remote_now(hub_url, "_", "list"));
 // wire sends UTF-8 bytes; any multi-byte glyph here would desync the
 // next RPC (Xinu reads `len` bytes, leftovers contaminate SPAWN).
 var src = "// dining philosophers - bootstrapped at runtime\n"
-        + "// (the actor classes are pre-linked in the kernel)\n"
-        + "// SPAWN sequence will follow.\n";
+        ++ "// (the actor classes are pre-linked in the kernel)\n"
+        ++ "// SPAWN sequence will follow.\n";
 var src_len = str_len(src);
 print("");
-print("[boot] LOAD  diners (" + src_len + " bytes) ...");
+print("[boot] LOAD  diners (" ++ src_len ++ " bytes) ...");
 remote_call(hub_url, "_", "load", "diners", src_len, src);
 
 // 2. Spawn the actor topology over RPC.  Each SPAWN returns the new
@@ -117,7 +117,7 @@ var f1_id = remote_now(hub_url, "_", "spawn", "Fork");
 var f2_id = remote_now(hub_url, "_", "spawn", "Fork");
 var f3_id = remote_now(hub_url, "_", "spawn", "Fork");
 var f4_id = remote_now(hub_url, "_", "spawn", "Fork");
-print("       Fork ids:  " + f0_id + " " + f1_id + " " + f2_id + " " + f3_id + " " + f4_id);
+print("       Fork ids:  " ++ f0_id ++ " " ++ f1_id ++ " " ++ f2_id ++ " " ++ f3_id ++ " " ++ f4_id);
 
 // Xinu P4 (my_id=4, lo=F2, hi=F3), P5 (my_id=5, lo=F3, hi=F4).
 // Fork ids are passed with the "ref:N" prefix so Xinu's SPAWN
@@ -125,9 +125,9 @@ print("       Fork ids:  " + f0_id + " " + f1_id + " " + f2_id + " " + f3_id + "
 // fields receive V_INT and `send f_low.acquire(...)` is silently
 // dropped by the actor dispatcher — Philosopher.try_eat then
 // spins forever, eventually triggering a kernel reboot.
-var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, "ref:" + f2_id, "ref:" + f3_id);
-var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, "ref:" + f3_id, "ref:" + f4_id);
-print("       Xinu P4 id=" + p4_id + "  P5 id=" + p5_id);
+var p4_id = remote_now(hub_url, "_", "spawn", "Philosopher", 4, "ref:" ++ f2_id, "ref:" ++ f3_id);
+var p5_id = remote_now(hub_url, "_", "spawn", "Philosopher", 5, "ref:" ++ f3_id, "ref:" ++ f4_id);
+print("       Xinu P4 id=" ++ p4_id ++ "  P5 id=" ++ p5_id);
 
 // 3. Kick the Xinu philosophers.  Fork_denied now uses wait(20)
 //    (AIPL builtin mapped to Xinu's sleep(20ms) — see
@@ -139,7 +139,7 @@ remote_call(hub_url, p4_id, "try_eat");
 remote_call(hub_url, p5_id, "try_eat");
 
 print("");
-print("[boot] new LIST -> " + remote_now(hub_url, "_", "list"));
+print("[boot] new LIST -> " ++ remote_now(hub_url, "_", "list"));
 print("");
 
 // 4. Three PC philosophers — same topology as host_diners.aipl, but
@@ -147,6 +147,6 @@ print("");
 //    hard-coded.  Cast to string so remote_call's <to_actor> is a
 //    string id.
 print("=== diners running: 3 PC + 2 Xinu, meals=20 each ===");
-var p1 = new Philosopher(1, "" + f0_id, "" + f4_id, 20);
-var p2 = new Philosopher(2, "" + f0_id, "" + f1_id, 20);
-var p3 = new Philosopher(3, "" + f1_id, "" + f2_id, 20);
+var p1 = new Philosopher(1, "" ++ f0_id, "" ++ f4_id, 20);
+var p2 = new Philosopher(2, "" ++ f0_id, "" ++ f1_id, 20);
+var p3 = new Philosopher(3, "" ++ f1_id, "" ++ f2_id, 20);

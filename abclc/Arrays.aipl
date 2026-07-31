@@ -10,27 +10,27 @@
 
 // 1D, zero-filled
 var counts[5];
-print("counts        = " + counts);
-print("counts[2]     = " + array_get(counts, 2));
+print("counts        = " ++ counts);
+print("counts[2]     = " ++ array_get(counts, 2));
 
 // 1D, init-filled
 var labels[3] = "blank";
-print("labels        = " + labels);
+print("labels        = " ++ labels);
 
 // 2D, zero-filled
 var grid[2][3];
-print("grid          = " + grid);
-print("grid[1]       = " + array_get(grid, 1));
+print("grid          = " ++ grid);
+print("grid[1]       = " ++ array_get(grid, 1));
 
 // 2D, init-filled
 var ones[3][2] = 1;
-print("ones          = " + ones);
+print("ones          = " ++ ones);
 
 // Dynamic dimensions via local vars
 var R = 2;
 var C = 4;
 var pad[R][C] = 9;
-print("pad           = " + pad);
+print("pad           = " ++ pad);
 
 // Fields in a class can also use sized-array syntax.
 class Matrix {
@@ -39,7 +39,7 @@ class Matrix {
   var cells[rows][cols];
 
   method dump() {
-    print("Matrix.cells = " + cells);
+    print("Matrix.cells = " ++ cells);
   }
 }
 

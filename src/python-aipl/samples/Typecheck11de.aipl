@@ -13,11 +13,11 @@ function describe(x: int | string) -> string {
   // Inside this branch, x is narrowed to int — `x + 1` is well-typed.
   if (typeof(x) == "int") {
     var n: int = x + 1;
-    return "int: " + n;
+    return "int: " ++ n;
   }
   // Else branch: x narrowed to string.
   var s: string = x;
-  return "str: " + s;
+  return "str: " ++ s;
 }
 
 // Inverted guard via != demonstrates the narrowing of the OTHER branch.
@@ -43,13 +43,13 @@ class Demo {
     // -- 11d narrowing in action --
     var d1: string = describe(42);          // OK: int branch
     var d2: string = describe("hi");        // OK: string branch
-    print("describe(42)  = " + d1);
-    print("describe(hi)  = " + d2);
+    print("describe(42)  = " ++ d1);
+    print("describe(hi)  = " ++ d2);
 
     var l1: int = safe_len(99);             // OK: not-string branch -> int
     var l2: int = safe_len("hello");        // OK: string branch -> str_len
-    print("safe_len(99)    = " + l1);
-    print("safe_len(hello) = " + l2);
+    print("safe_len(99)    = " ++ l1);
+    print("safe_len(hello) = " ++ l2);
 
     // -- 11e correct uses --
     var trio: array[int, 3] = [1, 2, 3];     // OK: 3 == 3
@@ -73,10 +73,10 @@ class Demo {
     // -- show issues --
     var issues = type_check();
     print("");
-    print("type_check() found " + array_len(issues) + " issue(s):");
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
   }

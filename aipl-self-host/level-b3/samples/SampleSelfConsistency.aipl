@@ -38,10 +38,10 @@ class Driver {
 
     var prog_clean = { fns: [tc_compat, infer_expr], main: [] };
     var clean_issues = tc_check_program(prog_clean);
-    print("self-spec issues=" + array_len(clean_issues));
+    print("self-spec issues=" ++ array_len(clean_issues));
     var i = 0;
     while (i < array_len(clean_issues)) do {
-      print("  - " + array_get(clean_issues, i));
+      print("  - " ++ array_get(clean_issues, i));
       i = i + 1;
     }
 
@@ -66,17 +66,17 @@ class Driver {
     };
     var prog_bad = { fns: [bad_chan], main: [] };
     var bad_issues = tc_check_program(prog_bad);
-    print("bad-chan issues=" + array_len(bad_issues));
+    print("bad-chan issues=" ++ array_len(bad_issues));
     var j = 0;
     while (j < array_len(bad_issues)) do {
-      print("  - " + array_get(bad_issues, j));
+      print("  - " ++ array_get(bad_issues, j));
       j = j + 1;
     }
     print("(expected: 1 — string sent on channel[int])");
 
     var total = array_len(clean_issues) + array_len(bad_issues);
     print("");
-    print("issues=" + total);
+    print("issues=" ++ total);
   }
 }
 

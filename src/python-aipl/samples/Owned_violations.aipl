@@ -23,7 +23,7 @@ class Bandit {
 
     // Violation 3: external read of a private field.
     var stolen = acct.balance;
-    print("stolen amount = " + stolen);
+    print("stolen amount = " ++ stolen);
   }
 }
 

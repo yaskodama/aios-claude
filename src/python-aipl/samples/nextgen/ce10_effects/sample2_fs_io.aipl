@@ -13,4 +13,4 @@ function read_log(path: string) -> string !{fs} {
 }
 
 write_log("/tmp/aipl_ce10_log.txt", "hello CE-10\n");
-print("[ce10/2] read = " + read_log("/tmp/aipl_ce10_log.txt"));
+print("[ce10/2] read = " ++ read_log("/tmp/aipl_ce10_log.txt"));

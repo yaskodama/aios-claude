@@ -16,7 +16,7 @@ class Mailbox {
 
   method deliver(who: string, msg: string) {
     seen = seen + 1;
-    print("[mailbox #" + seen + "] from=" + who + " msg=" + msg);
+    print("[mailbox #" ++ seen ++ "] from=" ++ who ++ " msg=" ++ msg);
   }
 
   method ping() {

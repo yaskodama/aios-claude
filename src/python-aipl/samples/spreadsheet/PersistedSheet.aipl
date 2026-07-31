@@ -258,9 +258,9 @@ class Cell {
   // P3: serialize as one pipe-delimited line.
   method dump_line() {
     if (kind == "Formula") {
-      reply(id + "|Formula|" + expr_src);
+      reply(id ++ "|Formula|" ++ expr_src);
     }
-    reply(id + "|Value|" + val);
+    reply(id ++ "|Value|" ++ val);
   }
 }
 
@@ -290,7 +290,7 @@ class Sheet {
       var id = array_get(cell_ids, i);
       var c  = array_get(cell_refs, i);
       var v  = now c.read();
-      print("[sheet] " + id + " = " + v);
+      print("[sheet] " ++ id ++ " = " ++ v);
       i = i + 1;
     }
     reply(0);
@@ -304,11 +304,11 @@ class Sheet {
     while (i < n) do {
       var c = array_get(cell_refs, i);
       var line = now c.dump_line();
-      body = body + line + "\n";
+      body = body ++ line ++ "\n";
       i = i + 1;
     }
     var _ = write_file(path, body);
-    print("[save] " + path + " (" + n + " cells)");
+    print("[save] " ++ path ++ " (" ++ n ++ " cells)");
     reply(n);
   }
 }
@@ -361,7 +361,7 @@ function load_sheet(path) {
     }
     i = i + 1;
   }
-  print("[load] " + path + " (" + n + " cells)");
+  print("[load] " ++ path ++ " (" ++ n ++ " cells)");
   return s2;
 }
 

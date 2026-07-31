@@ -3,16 +3,16 @@ class Hello {
 
   method init(n) {
     count = n;
-    print("Hello object initialized with " + n);
+    print("Hello object initialized with " ++ n);
   }
 
   method greet() {
-    print("Hello! count = " + count);
+    print("Hello! count = " ++ count);
   }
 
   method inc() {
     count = count + 1.;
-    print("count incremented to " + count);
+    print("count incremented to " ++ count);
   }
 }
 

@@ -32,7 +32,7 @@ class Driver {
 
     // now — synchronous, returns the value
     var s: int = now calc.add(3, 4);
-    print("[now] 3 + 4 = " + s);
+    print("[now] 3 + 4 = " ++ s);
 
     // future — fire two parallel jobs, then await both
     var f1 = future calc.slow_double(10);
@@ -40,7 +40,7 @@ class Driver {
     print("[future] both jobs running in parallel");
     var v1: int = await(f1);
     var v2: int = await(f2);
-    print("[future] results: " + v1 + ", " + v2);
+    print("[future] results: " ++ v1 ++ ", " ++ v2);
   }
 }
 

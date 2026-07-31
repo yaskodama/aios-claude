@@ -32,7 +32,7 @@ function snd(t: (T, U)) -> U {
 var i: int = id(42);
 var s: string = id("hello");
 print("id(42)      = " + i);
-print("id(\"hello\") = " + s);
+print("id(\"hello\") = " ++ s);
 
 // pair builds a (T, T) tuple.
 var pp = pair(10, 20);

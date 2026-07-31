@@ -147,7 +147,7 @@ function tc_infer_expr(ast, tenv, fns, issues) {
     var nargs: int = array_len(ast.args);
     if (nparams != nargs) {
       array_push(issues,
-        "call to " + ast.name + ": arity " + nargs + " vs declared " + nparams);
+        "call to " ++ ast.name ++ ": arity " ++ nargs ++ " vs declared " ++ nparams);
     } else {
       var i: int = 0;
       while (i < nparams) do {
@@ -155,7 +155,7 @@ function tc_infer_expr(ast, tenv, fns, issues) {
         var at = tc_infer_expr(array_get(ast.args, i), tenv, fns, issues);
         if (tc_compatible(p.type, at) == 0) {
           array_push(issues,
-            "call to " + ast.name + " arg `" + p.name + "` mismatch (expected " + p.type + ", got " + at + ")");
+            "call to " ++ ast.name ++ " arg `" ++ p.name ++ "` mismatch (expected " ++ p.type ++ ", got " ++ at ++ ")");
         }
         i = i + 1;
       }
@@ -183,7 +183,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues) {
     if (anno != "any") {
       if (tc_compatible(anno, rhs_ty) == 0) {
         array_push(issues,
-          "var `" + s.name + "` initializer mismatch (expected " + anno + ", got " + rhs_ty + ")");
+          "var `" ++ s.name ++ "` initializer mismatch (expected " ++ anno ++ ", got " ++ rhs_ty ++ ")");
       }
     }
     // Bind under the annotation if given, else under the inferred type.
@@ -200,7 +200,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues) {
     if (declared != "any") {
       if (tc_compatible(declared, rhs_ty) == 0) {
         array_push(issues,
-          "assign to `" + s.name + "` mismatch (declared " + declared + ", got " + rhs_ty + ")");
+          "assign to `" ++ s.name ++ "` mismatch (declared " ++ declared ++ ", got " ++ rhs_ty ++ ")");
       }
     }
     return 0;
@@ -225,7 +225,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues) {
     if (expected_ret != "any") {
       if (tc_compatible(expected_ret, rt) == 0) {
         array_push(issues,
-          "return type mismatch (declared " + expected_ret + ", got " + rt + ")");
+          "return type mismatch (declared " ++ expected_ret ++ ", got " ++ rt ++ ")");
       }
     }
     return 0;

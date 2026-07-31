@@ -9,18 +9,18 @@ class Counter {
 
   method tick() {
     n = n + 1;
-    print("[pyserver] tick -> n=" + n);
+    print("[pyserver] tick -> n=" ++ n);
     reply(n);
   }
 
   method get() {
-    print("[pyserver] get -> n=" + n);
+    print("[pyserver] get -> n=" ++ n);
     reply(n);
   }
 
   method add(a, b) {
     var sum = a + b;
-    print("[pyserver] add(" + a + "," + b + ") -> " + sum);
+    print("[pyserver] add(" ++ a ++ "," ++ b ++ ") -> " ++ sum);
     reply(sum);
   }
 }

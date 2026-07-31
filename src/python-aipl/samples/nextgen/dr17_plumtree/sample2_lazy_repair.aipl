@@ -14,18 +14,18 @@ var c_init = plumtree_init("c", "",   "a");
 
 // Origin broadcast.
 var fanout = plumtree_broadcast("a", "msg-2", "lazy-repair-payload");
-print("[dr17/2] origin a eager fanout = " + fanout);
+print("[dr17/2] origin a eager fanout = " ++ fanout);
 
 // Eager: a → b.
 var ok_b = plumtree_deliver("b", "a", "msg-2", "lazy-repair-payload");
-print("[dr17/2] b eager accepted = " + ok_b);
+print("[dr17/2] b eager accepted = " ++ ok_b);
 
 // Lazy: a → c (digest only, c hasn't seen the msg).
 var triggered = plumtree_digest("c", "a", "msg-2");
-print("[dr17/2] c received digest, pull triggered = " + triggered);
-print("[dr17/2] c sees before pull? " + plumtree_seen("c", "msg-2"));
+print("[dr17/2] c received digest, pull triggered = " ++ triggered);
+print("[dr17/2] c sees before pull? " ++ plumtree_seen("c", "msg-2"));
 
 // Simulate the pull completing: a delivers the full payload to c.
 var ok_c = plumtree_deliver("c", "a", "msg-2", "lazy-repair-payload");
-print("[dr17/2] c sees after pull?  " + plumtree_seen("c", "msg-2"));
-print("[dr17/2] c payload = " + plumtree_payload("c", "msg-2"));
+print("[dr17/2] c sees after pull?  " ++ plumtree_seen("c", "msg-2"));
+print("[dr17/2] c payload = " ++ plumtree_payload("c", "msg-2"));

@@ -31,7 +31,7 @@ class Fork {
   method take(reqId) {
     if (taken == 0) {
       taken = 1;
-      print("[F" + id + "] taken by P" + reqId);
+      print("[F" ++ id ++ "] taken by P" ++ reqId);
       send sender.fork_granted();
     } else {
       waiter = sender;
@@ -41,9 +41,9 @@ class Fork {
   method release() {
     if (waiter == "") {
       taken = 0;
-      print("[F" + id + "] free");
+      print("[F" ++ id ++ "] free");
     } else {
-      print("[F" + id + "] handed off");
+      print("[F" ++ id ++ "] handed off");
       send waiter.fork_granted();
       waiter = "";
     }
@@ -66,18 +66,18 @@ class Philosopher {
   }
 
   method start() {
-    print("[P" + id + "] start");
+    print("[P" ++ id ++ "] start");
     send self.think();
   }
 
   method think() {
-    print("[P" + id + "] THINK");
+    print("[P" ++ id ++ "] THINK");
     call wait(700);
     send self.hungry();
   }
 
   method hungry() {
-    print("[P" + id + "] HUNGRY");
+    print("[P" ++ id ++ "] HUNGRY");
     hasLow = 0;
     send lowFork.take(id);
   }
@@ -93,7 +93,7 @@ class Philosopher {
 
   method eat() {
     eatCount = eatCount + 1;
-    print("[P" + id + "] EAT (" + eatCount + "/" + limit + ")");
+    print("[P" ++ id ++ "] EAT (" ++ eatCount ++ "/" ++ limit ++ ")");
     call wait(900);
     send self.eat_done();
   }
@@ -102,7 +102,7 @@ class Philosopher {
     send lowFork.release();
     send highFork.release();
     if (eatCount == limit) {
-      print("[P" + id + "] DONE");
+      print("[P" ++ id ++ "] DONE");
     } else {
       send self.think();
     }

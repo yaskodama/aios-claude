@@ -29,7 +29,7 @@ function head(arr: array[T]) -> T {
 // --- union annotations ---
 
 function describe(x: int | string) -> string {
-  return "got " + x;
+  return "got " ++ x;
 }
 
 class Demo {
@@ -39,30 +39,30 @@ class Demo {
     // -- generics: type variable binds per call --
     var n: int    = id(42);          // OK: T = int
     var s: string = id("hello");     // OK: T = string
-    print("id(42)    = " + n);
-    print("id(hello) = " + s);
+    print("id(42)    = " ++ n);
+    print("id(hello) = " ++ s);
 
     // -- pair: both args bind T to the same type --
     var p1: tuple(int, int)       = pair(1, 2);
     var p2: tuple(string, string) = pair("a", "b");
-    print("pair p1[0]=" + p1[0] + " p1[1]=" + p1[1]);
-    print("pair p2[0]=" + p2[0]);
+    print("pair p1[0]=" ++ p1[0] ++ " p1[1]=" ++ p1[1]);
+    print("pair p2[0]=" ++ p2[0]);
 
     // -- head: array[T] -> T --
     var hi: int = head([10, 20, 30]);
-    print("head(int) = " + hi);
+    print("head(int) = " ++ hi);
 
     // -- union annotations --
     var u1: int | string = 42;       // OK: int ∈ int|string
     var u2: int | string = "hello";  // OK: string ∈ int|string
-    print("u1 = " + u1);
-    print("u2 = " + u2);
+    print("u1 = " ++ u1);
+    print("u2 = " ++ u2);
 
     // describe accepts either int or string
     var d1: string = describe(7);
     var d2: string = describe("x");
-    print("describe int = " + d1);
-    print("describe str = " + d2);
+    print("describe int = " ++ d1);
+    print("describe str = " ++ d2);
 
     // -- intentionally INCORRECT (each flagged) --
 
@@ -81,10 +81,10 @@ class Demo {
     // -- show issues --
     var issues = type_check();
     print("");
-    print("type_check() found " + array_len(issues) + " issue(s):");
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
   }

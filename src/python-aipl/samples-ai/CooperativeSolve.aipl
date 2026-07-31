@@ -58,13 +58,13 @@ class Coordinator {
     print("");
 
     print("================== 2) SOLVER ==================");
-    var ps = "Problem:\n" + problem + "\n\nPlan:\n" + plan;
+    var ps = "Problem:\n" ++ problem ++ "\n\nPlan:\n" ++ plan;
     var solution = now solver.solve(ps);
     print(solution);
     print("");
 
     print("================== 3) REVIEWER ==================");
-    var psol = "Problem:\n" + problem + "\n\nDraft solution:\n" + solution;
+    var psol = "Problem:\n" ++ problem ++ "\n\nDraft solution:\n" ++ solution;
     var critique = now reviewer.review(psol);
     print(critique);
     print("");

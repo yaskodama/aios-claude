@@ -6,7 +6,7 @@ class LineDrawer {
     cx = xc;
     cy = yc;
     len = l;
-    call print("Line::init called:cx<" + cx + ">:cy<" + cy + ">:len<" + len + ">");
+    call print("Line::init called:cx<" ++ cx ++ ">:cy<" ++ cy ++ ">:len<" ++ len ++ ">");
   }
   method draw() {
     call sdl_init(640, 480);

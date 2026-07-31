@@ -8,4 +8,4 @@ function take_positive(n: int where n > 0) -> int {
   return n + 1;
 }
 
-print("[ce12/1] take_positive(5) = " + take_positive(5));
+print("[ce12/1] take_positive(5) = " ++ take_positive(5));

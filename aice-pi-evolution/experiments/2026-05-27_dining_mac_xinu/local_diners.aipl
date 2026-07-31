@@ -28,29 +28,29 @@ class Philosopher {
   }
   method think() {
     status = "thinking";
-    print("P" + id + " thinking");
+    print("P" ++ id ++ " thinking");
     sleep(0.4);
     send lo.acquire(id);
   }
   method granted(pid) {
     if (state == 0) {
       state = 1; status = "took low fork";
-      print("P" + id + " took a fork");
+      print("P" ++ id ++ " took a fork");
       send hi.acquire(id);
     } else {
-      print("P" + id + " took a fork");
+      print("P" ++ id ++ " took a fork");
       meals = meals + 1;
       status = "eating";
-      print("P" + id + " eating (meal " + meals + ")");
+      print("P" ++ id ++ " eating (meal " ++ meals ++ ")");
       sleep(0.5);
       send hi.release(id);
       send lo.release(id);
       state = 0;
       status = "put down forks";
-      print("P" + id + " put down forks");
+      print("P" ++ id ++ " put down forks");
       if (meals >= target) {
         status = "done";
-        print("P" + id + " finished after " + meals + " meals (terminating)");
+        print("P" ++ id ++ " finished after " ++ meals ++ " meals (terminating)");
         suicide();
       } else {
         send self.think();
@@ -60,7 +60,7 @@ class Philosopher {
   method denied(pid) {
     if (state == 1) { send lo.release(id); state = 0; }
     status = "waiting (fork busy)";
-    print("P" + id + " waiting (a fork is busy)");
+    print("P" ++ id ++ " waiting (a fork is busy)");
     sleep(0.1);
     send self.think();
   }

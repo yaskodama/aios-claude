@@ -18,25 +18,25 @@
 
 class Worker {
   method work(item) {
-    print("[worker] processing " + item);
+    print("[worker] processing " ++ item);
   }
 }
 
 class Driver {
   method run() {
     var p = pool_create("Worker", 2, 8, 4);
-    print("[pool] created: " + p + ", size=" + pool_size(p));
+    print("[pool] created: " ++ p ++ ", size=" ++ pool_size(p));
     // Fire 12 jobs through the pool — round-robin picks a member each
     // time, scaling decisions are made before every pick.
     var i = 0;
     while (i < 12) do {
       var who = pool_pick(p);
-      send who.work("job-" + i);
+      send who.work("job-" ++ i);
       i = i + 1;
     }
     // Let the workers drain; then check pool size.
     wait(200);
-    print("[pool] final size=" + pool_size(p));
+    print("[pool] final size=" ++ pool_size(p));
     pool_destroy(p);
   }
 }

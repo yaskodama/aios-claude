@@ -14,7 +14,7 @@ class Node {
   method token(count) {
     holds = 1;
     hops = count;
-    print("Node " + id + " holds the token (hop " + count + ")");
+    print("Node " ++ id ++ " holds the token (hop " ++ count ++ ")");
     sleep(0.4);
     holds = 0;
     send next.token(count + 1);

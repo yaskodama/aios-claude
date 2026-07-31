@@ -38,16 +38,16 @@ var reviewer = new Reviewer();
 var question = "What is 12 * 11? Show only the number.";
 
 var plan = now planner.plan(question);
-print("[plan] " + plan);
+print("[plan] " ++ plan);
 
 var fut_ans   = future solver.solve(plan);
 var fut_brief = future reviewer.brief();
 
 var answer = await fut_ans;
-print("[answer] " + answer);
+print("[answer] " ++ answer);
 
 var brief = await fut_brief;
-print("[reviewer brief] " + brief);
+print("[reviewer brief] " ++ brief);
 
 var verdict = now reviewer.review(answer);
-print("[verdict] " + verdict);
+print("[verdict] " ++ verdict);

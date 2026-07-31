@@ -46,13 +46,13 @@ class Philosopher {
       got_left = 1;
       send right.request();
     } else {
-      print("[phil " + id + "] eating, meals=" + meals);
+      print("[phil " ++ id ++ "] eating, meals=" ++ meals);
       meals = meals - 1;
       got_left = 0;
       send left.release();
       send right.release();
       if (meals > 0) { send self.try_left(); }
-      else           { print("[phil " + id + "] done"); }
+      else           { print("[phil " ++ id ++ "] done"); }
     }
   }
 

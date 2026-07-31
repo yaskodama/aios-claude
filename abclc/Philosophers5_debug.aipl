@@ -16,20 +16,20 @@ class Fork {
   method take() {
     if (taken == 0) {
       taken = 1;
-      print("F" + id + " taken by " + sender);
+      print("F" ++ id ++ " taken by " ++ sender);
       send sender.fork_granted();
     } else {
       waiter = sender;
-      print("F" + id + " queuing waiter=" + sender);
+      print("F" ++ id ++ " queuing waiter=" ++ sender);
     }
   }
 
   method release() {
     if (waiter == "") {
       taken = 0;
-      print("F" + id + " released");
+      print("F" ++ id ++ " released");
     } else {
-      print("F" + id + " transfer to waiter=" + waiter);
+      print("F" ++ id ++ " transfer to waiter=" ++ waiter);
       send waiter.fork_granted();
       waiter = "";
     }
@@ -51,13 +51,13 @@ class Philosopher {
   }
 
   method think() {
-    print("P" + id + " think");
+    print("P" ++ id ++ " think");
     call wait(700);
     send self.hungry();
   }
 
   method hungry() {
-    print("P" + id + " hungry, requesting " + lowFork);
+    print("P" ++ id ++ " hungry, requesting " ++ lowFork);
     hasLow = 0;
     send lowFork.take();
   }
@@ -65,23 +65,23 @@ class Philosopher {
   method fork_granted() {
     if (hasLow == 0) {
       hasLow = 1;
-      print("P" + id + " got low, requesting " + highFork);
+      print("P" ++ id ++ " got low, requesting " ++ highFork);
       send highFork.take();
     } else {
-      print("P" + id + " got both — eating");
+      print("P" ++ id ++ " got both — eating");
       send self.eat();
     }
   }
 
   method eat() {
     eatCount = eatCount + 1;
-    print("P" + id + " eat #" + eatCount);
+    print("P" ++ id ++ " eat #" ++ eatCount);
     call wait(900);
     send self.eat_done();
   }
 
   method eat_done() {
-    print("P" + id + " done, releasing " + lowFork + "," + highFork);
+    print("P" ++ id ++ " done, releasing " ++ lowFork ++ "," ++ highFork);
     send lowFork.release();
     send highFork.release();
     send self.think();

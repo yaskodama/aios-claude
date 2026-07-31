@@ -72,16 +72,16 @@ class Demo {
   method run() {
     print("=== Phase 14 — linear ownership ===");
     var n = ok_pipeline("a.txt");
-    print("ok_pipeline = " + n);
+    print("ok_pipeline = " ++ n);
     var b = ok_branch("b.txt", 1);
-    print("ok_branch   = " + b);
+    print("ok_branch   = " ++ b);
 
     var issues = type_check();
     print("");
-    print("type_check() found " + array_len(issues) + " issue(s):");
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
   }

@@ -8,9 +8,9 @@
 class D {
   method run() {
     var p = pool_create("Worker", 1, 4, 2);
-    print("[demo] destroyed real: " + pool_destroy(p));
-    print("[demo] destroyed again: " + pool_destroy(p));
-    print("[demo] destroyed bogus: " + pool_destroy("pool::DoesNotExist"));
+    print("[demo] destroyed real: " ++ pool_destroy(p));
+    print("[demo] destroyed again: " ++ pool_destroy(p));
+    print("[demo] destroyed bogus: " ++ pool_destroy("pool::DoesNotExist"));
   }
 }
 var d = new D();

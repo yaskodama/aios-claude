@@ -19,5 +19,5 @@ var fb = future b.ask("second question");
 var ra = await(fa);
 var rb = await(fb);
 
-print("[future] a: " + ra);
-print("[future] b: " + rb);
+print("[future] a: " ++ ra);
+print("[future] b: " ++ rb);

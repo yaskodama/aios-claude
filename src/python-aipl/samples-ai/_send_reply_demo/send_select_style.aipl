@@ -20,7 +20,7 @@ class Driver {
     send w.ask(q);
     select {
       case reply(r) -> {
-        print("[select] got: " + r);
+        print("[select] got: " ++ r);
       }
       timeout 10000 -> {
         print("[select] timeout");

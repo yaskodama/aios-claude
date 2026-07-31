@@ -105,7 +105,7 @@ function scan_string_end(src: string, n: int, start: int) {
   var done: int = 0;
   while (done == 0) do {
     if (i >= n) { done = 1; }
-    else { if (str_sub(src, i, i + 1) == "\"") { done = 1; } else { i = i + 1; } }
+    else { if (str_sub(src, i, i ++ 1) == "\"") { done = 1; } else { i = i ++ 1; } }
   }
   return i;
 }
@@ -169,7 +169,7 @@ function lex_one(src: string, n: int, i: int, tokens) {
     return aend;
   }
 
-  print("[lex] unknown char at pos " + i + ": " + c);
+  print("[lex] unknown char at pos " ++ i ++ ": " ++ c);
   return i + 1;
 }
 

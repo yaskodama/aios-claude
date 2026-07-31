@@ -15,7 +15,7 @@
 class CodeFactory {
   method create(name: string, source: string) {
     var n = compile(source);
-    print("[factory] compiled " + n + " class(es) for '" + name + "'");
+    print("[factory] compiled " ++ n ++ " class(es) for '" ++ name ++ "'");
     var fresh_actor = spawn(name);
     reply(fresh_actor);
   }
@@ -32,12 +32,12 @@ class Main {
     print("=== AIPL dynamic compile + spawn demo ===");
 
     // 1) Synthesize a Greeter class at runtime.
-    var greeter_src: string = "class Greeter {\n" +
-                      "  var count: int = 0;\n" +
-                      "  method hello(who: string) {\n" +
-                      "    count = count + 1;\n" +
-                      "    print(\"  [Greeter#\" + count + \"] hello, \" + who);\n" +
-                      "  }\n" +
+    var greeter_src: string = "class Greeter {\n" ++
+                      "  var count: int = 0;\n" ++
+                      "  method hello(who: string) {\n" ++
+                      "    count = count + 1;\n" ++
+                      "    print(\"  [Greeter#\" ++ count ++ \"] hello, \" ++ who);\n" ++
+                      "  }\n" ++
                       "}\n";
     var greeter = now factory.create("Greeter", greeter_src);
     send greeter.hello("Alice");
@@ -45,15 +45,15 @@ class Main {
     send greeter.hello("Carol");
 
     // 2) Synthesize a Counter class at runtime — completely different.
-    var counter_src: string = "class Counter {\n" +
-                      "  var n: int = 0;\n" +
-                      "  method tick() {\n" +
-                      "    n = n + 1;\n" +
-                      "    print(\"  [Counter] tick -> n=\" + n);\n" +
-                      "  }\n" +
-                      "  method dump() {\n" +
-                      "    print(\"  [Counter] final n=\" + n);\n" +
-                      "  }\n" +
+    var counter_src: string = "class Counter {\n" ++
+                      "  var n: int = 0;\n" ++
+                      "  method tick() {\n" ++
+                      "    n = n + 1;\n" ++
+                      "    print(\"  [Counter] tick -> n=\" ++ n);\n" ++
+                      "  }\n" ++
+                      "  method dump() {\n" ++
+                      "    print(\"  [Counter] final n=\" ++ n);\n" ++
+                      "  }\n" ++
                       "}\n";
     var counter = now factory.create("Counter", counter_src);
     send counter.tick();

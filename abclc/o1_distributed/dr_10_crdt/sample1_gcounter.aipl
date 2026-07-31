@@ -14,11 +14,11 @@ class D {
     var c = crdt_gcounter_new();
     crdt_gcounter_inc(c, 3);
     crdt_gcounter_inc(c, 4);
-    print("[demo] local value: " + crdt_gcounter_value(c));
+    print("[demo] local value: " ++ crdt_gcounter_value(c));
     var c2 = crdt_gcounter_new();
     crdt_gcounter_inc(c2, 10);
     var m = crdt_gcounter_merge(c, c2);
-    print("[demo] merged value: " + crdt_gcounter_value(m));
+    print("[demo] merged value: " ++ crdt_gcounter_value(m));
   }
 }
 var d = new D();

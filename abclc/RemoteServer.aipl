@@ -17,15 +17,15 @@ class Echo {
   // Fire-and-forget: caller uses `send remote(...).note("hi")`.
   method note(msg) {
     hits = hits + 1;
-    print("[server] note hit=" + hits + " msg=" + msg);
+    print("[server] note hit=" ++ hits ++ " msg=" ++ msg);
   }
 
   // Synchronous: caller uses `now remote(...).ask("...")` and gets
   // the reply value back.
   method ask(question) {
     hits = hits + 1;
-    print("[server] ask hit=" + hits + " q=" + question);
-    reply("answer-" + hits + ":" + question);
+    print("[server] ask hit=" ++ hits ++ " q=" ++ question);
+    reply("answer-" ++ hits ++ ":" ++ question);
   }
 }
 

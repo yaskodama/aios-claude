@@ -14,4 +14,4 @@ class Helper {
 
 var h = new Helper();
 var r = now h.ask("hello via now");
-print("[now] " + r);
+print("[now] " ++ r);

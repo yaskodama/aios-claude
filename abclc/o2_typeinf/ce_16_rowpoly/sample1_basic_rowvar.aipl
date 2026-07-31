@@ -13,10 +13,10 @@
 
 class Greeter {
   method greet(p) -> string {
-    return "Hello, " + p.name;
+    return "Hello, " ++ p.name;
   }
   method label(p) -> string {
-    return "id=" + p.id;
+    return "id=" ++ p.id;
   }
 }
 

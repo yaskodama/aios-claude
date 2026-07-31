@@ -30,13 +30,13 @@ class Histogram {
     print("Counts:");
     var i: int = 0;
     while (i < 10) do {
-      print("  bucket[" + i + "] = " + counts[i]);
+      print("  bucket[" ++ i ++ "] = " ++ counts[i]);
       i = i + 1;
     }
     print("Labels:");
     var j: int = 0;
     while (j < 5) do {
-      print("  label[" + j + "] = " + labels[j]);
+      print("  label[" ++ j ++ "] = " ++ labels[j]);
       j = j + 1;
     }
   }
@@ -54,7 +54,7 @@ class Demo {
     print("Workers:");
     var i: int = 0;
     while (i < 3) do {
-      print("  workers[" + i + "] = " + workers[i]);
+      print("  workers[" ++ i ++ "] = " ++ workers[i]);
       i = i + 1;
     }
 
@@ -65,7 +65,7 @@ class Demo {
     print("Temperatures (slot 1,2 keep default -1):");
     var j: int = 0;
     while (j < 4) do {
-      print("  t[" + j + "] = " + temperatures[j]);
+      print("  t[" ++ j ++ "] = " ++ temperatures[j]);
       j = j + 1;
     }
 
@@ -76,7 +76,7 @@ class Demo {
       sum = sum + temperatures[k];
       k = k + 1;
     }
-    print("sum = " + sum);
+    print("sum = " ++ sum);
 
     // Use the field-level arrays via Histogram.
     var h = new Histogram();

@@ -3,15 +3,15 @@ class Demo {
   method init() {
     var path = "/tmp/_aipl_jsb_io_test.txt";
     var before = file_exists(path);
-    print("exists before = " + before);
+    print("exists before = " ++ before);
 
     write_file(path, "hello from JS-B / JS-N\n");
-    print("exists after  = " + file_exists(path));
-    print("content       = " + read_file(path));
+    print("exists after  = " ++ file_exists(path));
+    print("content       = " ++ read_file(path));
 
     append_file(path, "line 2\n");
     append_file(path, "line 3\n");
-    print("after append  =\n" + read_file(path));
+    print("after append  =\n" ++ read_file(path));
   }
 }
 

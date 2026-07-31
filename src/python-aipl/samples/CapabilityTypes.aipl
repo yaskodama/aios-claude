@@ -17,11 +17,11 @@
 class Demo {
   method run() {
     print("[demo] starting");
-    print("[demo] held: " + current_caps());
+    print("[demo] held: " ++ current_caps());
 
     grant_cap("fs");
     grant_cap("ai");
-    print("[demo] after grants: " + current_caps());
+    print("[demo] after grants: " ++ current_caps());
 
     // Asserting a held cap — passes silently.
     check_capability("fs");
@@ -31,7 +31,7 @@ class Demo {
     // returns true; strict mode (AIPL_CAP_STRICT=1): raises and the
     // print below is skipped.
     revoke_cap("ai");
-    print("[demo] revoked ai; held: " + current_caps());
+    print("[demo] revoked ai; held: " ++ current_caps());
     check_capability("ai");
     print("[demo] check_capability(ai) — advisory passed, strict would have raised");
   }

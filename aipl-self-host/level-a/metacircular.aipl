@@ -37,7 +37,7 @@ function meta_env_get(env, name) {
     }
     i = i - 1;
   }
-  print("[meta] meta_env_get: undefined " + name);
+  print("[meta] meta_env_get: undefined " ++ name);
   return 0;
 }
 
@@ -62,7 +62,7 @@ function lookup_fn(funcs, name) {
     }
     i = i - 1;
   }
-  print("[meta] lookup_fn: undefined function " + name);
+  print("[meta] lookup_fn: undefined function " ++ name);
   return 0;
 }
 
@@ -79,7 +79,7 @@ function apply_binop(op: string, a, b) {
   if (op == ">")  { if (a >  b) { return 1; } return 0; }
   if (op == "<=") { if (a <= b) { return 1; } return 0; }
   if (op == ">=") { if (a >= b) { return 1; } return 0; }
-  print("[meta] apply_binop: unknown op " + op);
+  print("[meta] apply_binop: unknown op " ++ op);
   return 0;
 }
 
@@ -113,7 +113,7 @@ function eval_expr(ast, env, funcs) {
     var marked = eval_stmt_list(fn.body, call_env, funcs);
     return marked[1];
   }
-  print("[meta] eval_expr: unknown tag " + ast.tag);
+  print("[meta] eval_expr: unknown tag " ++ ast.tag);
   return 0;
 }
 
@@ -138,7 +138,7 @@ function eval_stmt(ast, env, funcs) {
   // marker-returning eval_stmt_list and re-export its marker tuple.
   // (eval_stmt itself never carries a Return marker; only eval_stmt_list
   //  does, see below.)
-  print("[meta] eval_stmt: unknown tag " + ast.tag);
+  print("[meta] eval_stmt: unknown tag " ++ ast.tag);
   return 0;
 }
 

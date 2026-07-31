@@ -52,13 +52,13 @@ class Coordinator {
     print("");
 
     print("================== 2) SOLVER (local) ==================");
-    var ps = "Problem:\n" + problem + "\n\nPlan:\n" + plan;
+    var ps = "Problem:\n" ++ problem ++ "\n\nPlan:\n" ++ plan;
     var solution = now solver.solve(ps);
     print(solution);
     print("");
 
-    print("================== 3) REVIEWER (REMOTE @ " + reviewer_addr + ") ==================");
-    var psol = "Problem:\n" + problem + "\n\nDraft solution:\n" + solution;
+    print("================== 3) REVIEWER (REMOTE @ " ++ reviewer_addr ++ ") ==================");
+    var psol = "Problem:\n" ++ problem ++ "\n\nDraft solution:\n" ++ solution;
     var critique = remote_now(reviewer_addr, "reviewer", "review", psol);
     print(critique);
     print("");

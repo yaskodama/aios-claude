@@ -14,5 +14,5 @@ function ask_ai(q: string) -> string !{ai, net} {
   return ai_call_with_system("Answer in one word.", q);
 }
 
-print("[ce10/1] sum = " + pure_add(3, 4));
-print("[ce10/1] ai  = " + ask_ai("hello"));
+print("[ce10/1] sum = " ++ pure_add(3, 4));
+print("[ce10/1] ai  = " ++ ask_ai("hello"));

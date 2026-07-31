@@ -8,7 +8,7 @@
 //   - variadic / optional-first signature handling
 
 function add(a: int, b: int) -> int { return a + b; }
-function greet(name: string) -> string { return "hello " + name; }
+function greet(name: string) -> string { return "hello " ++ name; }
 
 class Counter {
   var count: int = 0;
@@ -52,16 +52,16 @@ class Demo {
 
     // -- print stats ----
     var issues = type_check();
-    print("type_check() found " + array_len(issues) + " issue(s):");
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
 
     print("");
-    print("typeof(c.get())     = " + typeof(now c.get()));   // -> int
-    print("typeof(future c.get()) = " + typeof(future c.get())); // -> future
+    print("typeof(c.get())     = " ++ typeof(now c.get()));   // -> int
+    print("typeof(future c.get()) = " ++ typeof(future c.get())); // -> future
   }
 }
 

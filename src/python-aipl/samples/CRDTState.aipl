@@ -19,12 +19,12 @@ class Demo {
     var c = crdt_gcounter_new();
     crdt_gcounter_inc(c, 3);
     crdt_gcounter_inc(c, 4);
-    print("[g-counter] local value: " + crdt_gcounter_value(c));
+    print("[g-counter] local value: " ++ crdt_gcounter_value(c));
 
     var c2 = crdt_gcounter_new();
     crdt_gcounter_inc(c2, 10);
     var merged = crdt_gcounter_merge(c, c2);
-    print("[g-counter] merged value: " + crdt_gcounter_value(merged));
+    print("[g-counter] merged value: " ++ crdt_gcounter_value(merged));
 
     // ── OR-Set ──
     var s = crdt_orset_new();
@@ -32,15 +32,15 @@ class Demo {
     crdt_orset_add(s, "banana");
     crdt_orset_add(s, "cherry");
     crdt_orset_remove(s, "banana");
-    print("[or-set] contains apple: " + crdt_orset_contains(s, "apple"));
-    print("[or-set] contains banana: " + crdt_orset_contains(s, "banana"));
-    print("[or-set] values: " + crdt_orset_values(s));
+    print("[or-set] contains apple: " ++ crdt_orset_contains(s, "apple"));
+    print("[or-set] contains banana: " ++ crdt_orset_contains(s, "banana"));
+    print("[or-set] values: " ++ crdt_orset_values(s));
 
     // ── LWW-Register ──
     var r = crdt_lww_new("v0");
     crdt_lww_write(r, "v1");
     crdt_lww_write(r, "v2");
-    print("[lww] value: " + crdt_lww_value(r));
+    print("[lww] value: " ++ crdt_lww_value(r));
 
     // Replicate hook (no-op unless AIPL_DIST_ENABLE=1).
     crdt_replicate("demo_counter", merged);

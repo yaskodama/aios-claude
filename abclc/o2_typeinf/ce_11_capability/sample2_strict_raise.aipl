@@ -10,7 +10,7 @@
 
 class Demo {
   method run() {
-    print("[demo] before check, held: " + current_caps());
+    print("[demo] before check, held: " ++ current_caps());
     check_capability("ai");
     print("[demo] should not reach here under strict mode");
   }

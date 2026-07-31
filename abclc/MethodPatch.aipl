@@ -21,7 +21,7 @@ send g.greet("Alice");
 
 // Class-level: add a shout() method visible to every Greeter actor.
 var added = add_method("Greeter",
-  "method shout(n) { print(\"[\" + label + \"] HEY!! \" + n); }");
+  "method shout(n) { print(\"[\" ++ label ++ \"] HEY!! \" ++ n); }");
 print("added " + added + " new method(s)");
 
 send g.greet("Bob");
@@ -32,7 +32,7 @@ send! g.shout("Carol");
 
 // Actor-level: only g sees this whisper. A second instance won't.
 var added2 = add_method("g",
-  "method whisper(n) { print(\"[\" + label + \"] *psst* \" + n); }");
+  "method whisper(n) { print(\"[\" ++ label ++ \"] *psst* \" ++ n); }");
 print("added " + added2 + " per-actor method(s)");
 send! g.whisper("Dave");
 

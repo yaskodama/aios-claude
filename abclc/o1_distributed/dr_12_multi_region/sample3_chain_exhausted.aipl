@@ -6,7 +6,7 @@
 
 class D {
   method run() {
-    print("[demo] failover NoSuch -> '" + failover_region("NoSuch") + "'");
+    print("[demo] failover NoSuch -> '" ++ failover_region("NoSuch") ++ "'");
   }
 }
 var d = new D();

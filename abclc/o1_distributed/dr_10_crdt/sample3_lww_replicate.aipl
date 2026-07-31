@@ -12,7 +12,7 @@ class D {
     var r = crdt_lww_new("v0");
     crdt_lww_write(r, "v1");
     crdt_lww_write(r, "v2");
-    print("[demo] value: " + crdt_lww_value(r));
+    print("[demo] value: " ++ crdt_lww_value(r));
     crdt_replicate(r);
     print("[demo] replicated");
   }

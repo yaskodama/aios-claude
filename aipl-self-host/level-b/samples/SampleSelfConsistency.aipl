@@ -145,10 +145,10 @@ class Driver {
     };
 
     var issues = tc_check_program(self_prog);
-    print("self-spec issues=" + array_len(issues));
+    print("self-spec issues=" ++ array_len(issues));
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  - " + array_get(issues, i));
+      print("  - " ++ array_get(issues, i));
       i = i + 1;
     }
     print("(expected: 0 — typeck signatures are internally coherent)");
@@ -176,10 +176,10 @@ class Driver {
     };
 
     var bad_issues = tc_check_program(bad_prog);
-    print("broken-caller issues=" + array_len(bad_issues));
+    print("broken-caller issues=" ++ array_len(bad_issues));
     var j = 0;
     while (j < array_len(bad_issues)) do {
-      print("  - " + array_get(bad_issues, j));
+      print("  - " ++ array_get(bad_issues, j));
       j = j + 1;
     }
     print("(expected: 1 — int passed to string-annotated `expected`)");
@@ -187,7 +187,7 @@ class Driver {
     // Aggregated count for smoke.sh (self-spec + broken).
     var total_issues = array_len(issues) + array_len(bad_issues);
     print("");
-    print("issues=" + total_issues);
+    print("issues=" ++ total_issues);
   }
 }
 

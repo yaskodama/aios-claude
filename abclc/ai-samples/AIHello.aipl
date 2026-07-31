@@ -3,7 +3,7 @@
 class Greeter {
   method ask(question) {
     var resp = ai_call(question);
-    print("Q: " + question);
+    print("Q: " ++ question);
     print("A:");
     print(resp);
   }

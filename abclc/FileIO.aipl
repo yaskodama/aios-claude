@@ -12,12 +12,12 @@ var path = "/tmp/_aipl_io_test.txt";
 
 // Make sure we start clean.
 var initial_exists = file_exists(path);
-print("initial file_exists      = " + initial_exists);
+print("initial file_exists      = " ++ initial_exists);
 
 write_file(path, "hello, AIPL file I/O\n");
-print("after write, exists      = " + file_exists(path));
-print("read_file()              = " + read_file(path));
+print("after write, exists      = " ++ file_exists(path));
+print("read_file()              = " ++ read_file(path));
 
 append_file(path, "second line\n");
 append_file(path, "third line\n");
-print("read_file() after append =\n" + read_file(path));
+print("read_file() after append =\n" ++ read_file(path));

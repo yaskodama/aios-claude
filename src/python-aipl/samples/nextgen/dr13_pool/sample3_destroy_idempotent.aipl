@@ -1,5 +1,5 @@
 // DR-13 / sample 3 — pool_destroy is idempotent (second call no-ops).
 
 var p = pool_create("Worker", 0, 4, 2);
-print("[dr13/3] first  destroy = " + pool_destroy(p));   // true
-print("[dr13/3] second destroy = " + pool_destroy(p));   // false (or 0)
+print("[dr13/3] first  destroy = " ++ pool_destroy(p));   // true
+print("[dr13/3] second destroy = " ++ pool_destroy(p));   // false (or 0)

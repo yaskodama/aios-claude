@@ -12,7 +12,7 @@ class Reviewer {
   var persona = "あなたは厳しいレビュアーです。問題と解答案を見て、2〜3文で次を述べてください: (1) 解答は正しいか? (2) 最も重要な改善点は何か?  前置きはなしで、プレーンテキストで返答してください。";
 
   method review(problem_and_solution) {
-    print("[reviewer] レビュー開始 (" + str_len(problem_and_solution) + " 文字)");
+    print("[reviewer] レビュー開始 (" ++ str_len(problem_and_solution) ++ " 文字)");
     var r = ai_call_with_system(persona, problem_and_solution);
     print("[reviewer] 結論を返却");
     reply(r);

@@ -12,9 +12,9 @@ class D {
     crdt_orset_add(s, "banana");
     crdt_orset_add(s, "cherry");
     crdt_orset_remove(s, "banana");
-    print("[demo] contains apple: " + crdt_orset_contains(s, "apple"));
-    print("[demo] contains banana: " + crdt_orset_contains(s, "banana"));
-    print("[demo] values: " + crdt_orset_values(s));
+    print("[demo] contains apple: " ++ crdt_orset_contains(s, "apple"));
+    print("[demo] contains banana: " ++ crdt_orset_contains(s, "banana"));
+    print("[demo] values: " ++ crdt_orset_values(s));
   }
 }
 var d = new D();

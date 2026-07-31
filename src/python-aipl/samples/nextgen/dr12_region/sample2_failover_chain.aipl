@@ -8,4 +8,4 @@
 // Expected: failover_region returns "eu-west-1" and emits a
 // region_failover NDJSON event.
 
-print("[dr12/2] failover Greeter = " + failover_region("Greeter"));
+print("[dr12/2] failover Greeter = " ++ failover_region("Greeter"));

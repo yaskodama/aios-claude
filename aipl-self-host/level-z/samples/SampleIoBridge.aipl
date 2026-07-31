@@ -26,7 +26,7 @@ print("[io] fs grant ok");
 print("[io] write done");
 
 var s = now io.read("/tmp/levelz_io_demo.txt");
-print("[io] read = " + s);
+print("[io] read = " ++ s);
 
 // Without granting "ai" first, this should log a cap_violation
 // event (and, under AIPL_CAP_STRICT=1, raise).
@@ -34,4 +34,4 @@ print("[io] attempting ungranted ai_simple (advisory) ...");
 grant_cap("ai");
 grant_cap("net");
 var r = now io.ai_simple("ignored under mock provider");
-print("[io] ai_simple = " + r);
+print("[io] ai_simple = " ++ r);

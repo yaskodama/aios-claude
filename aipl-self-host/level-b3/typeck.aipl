@@ -161,11 +161,11 @@ function eff_render(set) {
   var i: int = 0;
   var n: int = array_len(set);
   while (i < n) do {
-    if (i > 0) { s = s + ", "; }
+    if (i > 0) { s = s ++ ", "; }
     s = s + array_get(set, i);
     i = i + 1;
   }
-  return s + "}";
+  return s ++ "}";
 }
 
 // Builtin effect table.  Hard-coded to the names the host's
@@ -259,7 +259,7 @@ function tc_infer_expr(ast, tenv, fns, issues, observed) {
       if (array_len(ast.args) >= 2) {
         var elem_ast = array_get(ast.args, 1);
         if (elem_ast.tag == "Str") {
-          return "channel[" + elem_ast.val + "]";
+          return "channel[" ++ elem_ast.val ++ "]";
         }
       }
       return "channel[any]";
@@ -270,8 +270,8 @@ function tc_infer_expr(ast, tenv, fns, issues, observed) {
       var elem  = channel_elem_type(ch_ty);
       if (tc_compatible(elem, v_ty) == 0) {
         array_push(issues,
-          "channel_send: element type mismatch (channel expects " + elem +
-          ", got " + v_ty + ")");
+          "channel_send: element type mismatch (channel expects " ++ elem ++
+          ", got " ++ v_ty ++ ")");
       }
       return "int";
     }
@@ -285,7 +285,7 @@ function tc_infer_expr(ast, tenv, fns, issues, observed) {
     }
     if (ast.name == "channel_try_recv") {
       var ch_ty3 = tc_infer_expr(array_get(ast.args, 0), tenv, fns, issues, observed);
-      return "tuple(int, " + channel_elem_type(ch_ty3) + ")";
+      return "tuple(int, " ++ channel_elem_type(ch_ty3) ++ ")";
     }
     if (ast.name == "channel_close") {
       tc_infer_expr(array_get(ast.args, 0), tenv, fns, issues, observed);
@@ -317,7 +317,7 @@ function tc_infer_expr(ast, tenv, fns, issues, observed) {
     var nargs: int = array_len(ast.args);
     if (nparams != nargs) {
       array_push(issues,
-        "call to " + ast.name + ": arity " + nargs + " vs declared " + nparams);
+        "call to " ++ ast.name ++ ": arity " ++ nargs ++ " vs declared " ++ nparams);
     } else {
       var i2: int = 0;
       while (i2 < nparams) do {
@@ -325,7 +325,7 @@ function tc_infer_expr(ast, tenv, fns, issues, observed) {
         var at = tc_infer_expr(array_get(ast.args, i2), tenv, fns, issues, observed);
         if (tc_compatible(p.type, at) == 0) {
           array_push(issues,
-            "call to " + ast.name + " arg `" + p.name + "` mismatch (expected " + p.type + ", got " + at + ")");
+            "call to " ++ ast.name ++ " arg `" ++ p.name ++ "` mismatch (expected " ++ p.type ++ ", got " ++ at ++ ")");
         }
         i2 = i2 + 1;
       }
@@ -344,7 +344,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues, observed) {
     if (anno != "any") {
       if (tc_compatible(anno, rhs_ty) == 0) {
         array_push(issues,
-          "var `" + s.name + "` initializer mismatch (expected " + anno + ", got " + rhs_ty + ")");
+          "var `" ++ s.name ++ "` initializer mismatch (expected " ++ anno ++ ", got " ++ rhs_ty ++ ")");
       }
     }
     if (anno == "any") {
@@ -360,7 +360,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues, observed) {
     if (declared != "any") {
       if (tc_compatible(declared, rhs_ty) == 0) {
         array_push(issues,
-          "assign to `" + s.name + "` mismatch (declared " + declared + ", got " + rhs_ty + ")");
+          "assign to `" ++ s.name ++ "` mismatch (declared " ++ declared ++ ", got " ++ rhs_ty ++ ")");
       }
     }
     return 0;
@@ -385,7 +385,7 @@ function tc_check_stmt(s, tenv, fns, expected_ret, issues, observed) {
     if (expected_ret != "any") {
       if (tc_compatible(expected_ret, rt) == 0) {
         array_push(issues,
-          "return type mismatch (declared " + expected_ret + ", got " + rt + ")");
+          "return type mismatch (declared " ++ expected_ret ++ ", got " ++ rt ++ ")");
       }
     }
     return 0;
@@ -423,9 +423,9 @@ function tc_check_function(fn_decl, fns, issues) {
   var miss = eff_missing(fn_decl.effects, observed);
   if (array_len(miss) > 0) {
     array_push(issues,
-      "function " + fn_decl.name + ": effect set incomplete — declared " +
-      eff_render(fn_decl.effects) + " but uses " + eff_render(observed) +
-      "; missing: " + eff_render(miss));
+      "function " ++ fn_decl.name ++ ": effect set incomplete — declared " ++
+      eff_render(fn_decl.effects) ++ " but uses " ++ eff_render(observed) ++
+      "; missing: " ++ eff_render(miss));
   }
   return 0;
 }

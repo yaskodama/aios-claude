@@ -9,20 +9,20 @@ class Fork {
   method take() {
     if (taken == 0) {
       taken = 1;
-      print("F" + id + ".take from " + sender + " GRANT  [t=1,w=]");
+      print("F" ++ id ++ ".take from " ++ sender ++ " GRANT  [t=1,w=]");
       send sender.fork_granted();
     } else {
-      print("F" + id + ".take from " + sender + " QUEUE  [t=" + taken + ",old_waiter=" + waiter + " -> new=" + sender + "]");
+      print("F" ++ id ++ ".take from " ++ sender ++ " QUEUE  [t=" ++ taken ++ ",old_waiter=" ++ waiter ++ " -> new=" ++ sender ++ "]");
       waiter = sender;
     }
   }
 
   method release() {
     if (waiter == "") {
-      print("F" + id + ".release from " + sender + " FREE   [was t=" + taken + "]");
+      print("F" ++ id ++ ".release from " ++ sender ++ " FREE   [was t=" ++ taken ++ "]");
       taken = 0;
     } else {
-      print("F" + id + ".release from " + sender + " XFER to " + waiter + " [t stays 1]");
+      print("F" ++ id ++ ".release from " ++ sender ++ " XFER to " ++ waiter ++ " [t stays 1]");
       send waiter.fork_granted();
       waiter = "";
     }
@@ -44,38 +44,38 @@ class Philosopher {
   }
 
   method think() {
-    print("P" + id + ".think (hasLow=" + hasLow + ")");
+    print("P" ++ id ++ ".think (hasLow=" ++ hasLow ++ ")");
     call wait(700);
     send self.hungry();
   }
 
   method hungry() {
-    print("P" + id + ".hungry RESET hasLow=0, take " + lowFork);
+    print("P" ++ id ++ ".hungry RESET hasLow=0, take " ++ lowFork);
     hasLow = 0;
     send lowFork.take();
   }
 
   method fork_granted() {
-    print("P" + id + ".fork_granted from " + sender + " (hasLow=" + hasLow + ")");
+    print("P" ++ id ++ ".fork_granted from " ++ sender ++ " (hasLow=" ++ hasLow ++ ")");
     if (hasLow == 0) {
       hasLow = 1;
-      print("P" + id + "   -> got low, take " + highFork);
+      print("P" ++ id ++ "   -> got low, take " ++ highFork);
       send highFork.take();
     } else {
-      print("P" + id + "   -> got high, send self.eat");
+      print("P" ++ id ++ "   -> got high, send self.eat");
       send self.eat();
     }
   }
 
   method eat() {
     eatCount = eatCount + 1;
-    print("P" + id + ".eat #" + eatCount);
+    print("P" ++ id ++ ".eat #" ++ eatCount);
     call wait(900);
     send self.eat_done();
   }
 
   method eat_done() {
-    print("P" + id + ".eat_done release " + lowFork + "," + highFork);
+    print("P" ++ id ++ ".eat_done release " ++ lowFork ++ "," ++ highFork);
     send lowFork.release();
     send highFork.release();
     send self.think();

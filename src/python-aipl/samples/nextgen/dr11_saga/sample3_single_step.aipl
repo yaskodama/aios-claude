@@ -4,7 +4,7 @@
 // and the loop doesn't off-by-one on indices.
 
 class Logger {
-  method emit(msg) { print("[log] " + msg); }
+  method emit(msg) { print("[log] " ++ msg); }
 }
 
 class Driver {

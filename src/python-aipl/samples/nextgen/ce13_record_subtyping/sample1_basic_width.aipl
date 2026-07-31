@@ -8,11 +8,11 @@
 
 class Greeter {
   method greet(p) {
-    return "Hello, " + p.name;
+    return "Hello, " ++ p.name;
   }
 }
 
 var g = new Greeter();
 var user = {name: "Alice", age: 30, email: "alice@example.com"};
 var hi = now g.greet(user);
-print("[ce13/1] " + hi);
+print("[ce13/1] " ++ hi);

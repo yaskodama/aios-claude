@@ -13,15 +13,15 @@ class Booking {
 
   method reserve(n) {
     seats = seats - n;
-    print("[booking] reserved " + n + ", seats now " + seats);
+    print("[booking] reserved " ++ n ++ ", seats now " ++ seats);
   }
   method release(n) {
     seats = seats + n;
-    print("[booking] released " + n + ", seats now " + seats);
+    print("[booking] released " ++ n ++ ", seats now " ++ seats);
   }
   method charge(amt) {
     charges = charges + amt;
-    print("[booking] charged " + amt + ", total " + charges);
+    print("[booking] charged " ++ amt ++ ", total " ++ charges);
   }
 }
 

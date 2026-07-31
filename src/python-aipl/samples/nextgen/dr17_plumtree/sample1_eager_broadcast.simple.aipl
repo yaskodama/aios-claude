@@ -14,14 +14,14 @@ var c_init = plumtree_init("c", "a", "");
 
 // Origin broadcasts; returns eager fan-out count.
 var fanout = plumtree_broadcast("a", "msg-1", "hello-plumtree");
-print("[dr17/1] origin a fanned out to " + fanout + " peers");
+print("[dr17/1] origin a fanned out to " ++ fanout ++ " peers");
 
 // Eager peers receive payload.
 var ok_b = plumtree_deliver("b", "a", "msg-1", "hello-plumtree");
 var ok_c = plumtree_deliver("c", "a", "msg-1", "hello-plumtree");
-print("[dr17/1] b accepted = " + ok_b + ", c accepted = " + ok_c);
+print("[dr17/1] b accepted = " ++ ok_b ++ ", c accepted = " ++ ok_c);
 
-print("[dr17/1] a sees? " + plumtree_seen("a", "msg-1"));
-print("[dr17/1] b sees? " + plumtree_seen("b", "msg-1"));
-print("[dr17/1] c sees? " + plumtree_seen("c", "msg-1"));
-print("[dr17/1] b payload = " + plumtree_payload("b", "msg-1"));
+print("[dr17/1] a sees? " ++ plumtree_seen("a", "msg-1"));
+print("[dr17/1] b sees? " ++ plumtree_seen("b", "msg-1"));
+print("[dr17/1] c sees? " ++ plumtree_seen("c", "msg-1"));
+print("[dr17/1] b payload = " ++ plumtree_payload("b", "msg-1"));

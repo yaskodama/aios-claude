@@ -19,7 +19,7 @@ function id(x) {
 }
 
 function describe(x) {
-  return "value = " + x;
+  return "value = " ++ x;
 }
 
 // fib via tail-style recursion (uses if as a statement; no expression-form).
@@ -30,16 +30,16 @@ function fib(n) {
   return fib(n - 1) + fib(n - 2);
 }
 
-print("add(3, 4)        = " + add(3, 4));
-print("id(\"hi\")        = " + id("hi"));
-print("describe(42)     = " + describe(42));
-print("fib(10)          = " + fib(10));
+print("add(3, 4)        = " ++ add(3, 4));
+print("id(\"hi\")        = " ++ id("hi"));
+print("describe(42)     = " ++ describe(42));
+print("fib(10)          = " ++ fib(10));
 
 // Call from inside a method body.
 class Caller {
   method init() {
-    print("[Caller] add(5, 6) = " + add(5, 6));
-    print("[Caller] fib(7)    = " + fib(7));
+    print("[Caller] add(5, 6) = " ++ add(5, 6));
+    print("[Caller] fib(7)    = " ++ fib(7));
   }
 }
 

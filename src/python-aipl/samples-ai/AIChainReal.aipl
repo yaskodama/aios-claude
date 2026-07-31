@@ -22,9 +22,9 @@ class Agent {
   }
 
   method handle(payload: string) !{ai, net} {
-    print("[" + role + "] <- " + payload);
+    print("[" ++ role ++ "] <- " ++ payload);
     var reply: string = ai_call_with_system(system_prompt, payload);
-    print("[" + role + "] -> " + reply);
+    print("[" ++ role ++ "] -> " ++ reply);
     if (has_next == 1) {
       send next.handle(reply);
     } else {

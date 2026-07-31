@@ -9,36 +9,36 @@
 
 class SolverActor {
   method solve(problem) {
-    aios_emit("solver.problem:" + problem);
+    aios_emit("solver.problem:" ++ problem);
     var answer = "12 because 3 boxes times 4 apples is 12";
-    aios_emit("solver.answer:" + answer);
+    aios_emit("solver.answer:" ++ answer);
     reply(answer);
   }
 }
 
 class ReviewerActor {
   method review(problem, answer) {
-    aios_emit("reviewer.problem:" + problem);
-    aios_emit("reviewer.answer:" + answer);
+    aios_emit("reviewer.problem:" ++ problem);
+    aios_emit("reviewer.answer:" ++ answer);
     var review = "accepted: the answer is correct";
-    aios_emit("reviewer.review:" + review);
+    aios_emit("reviewer.review:" ++ review);
     reply(review);
   }
 }
 
 class PlannerActor {
   method solve(problem) {
-    aios_emit("planner.problem:" + problem);
+    aios_emit("planner.problem:" ++ problem);
 
     var answer_future = aios_future("solver", "solve", problem);
     var answer = await(answer_future);
-    aios_emit("planner.answer:" + answer);
+    aios_emit("planner.answer:" ++ answer);
 
     var review_future = aios_future("reviewer", "review", problem, answer);
     var review = await(review_future);
-    aios_emit("planner.review:" + review);
+    aios_emit("planner.review:" ++ review);
 
-    reply("answer: " + answer + " | review: " + review);
+    reply("answer: " ++ answer ++ " | review: " ++ review);
   }
 }
 
@@ -79,7 +79,7 @@ print(session_state(ssidBad));
 var result = aios_now("planner", "solve", "If there are 3 boxes with 4 apples each, how many apples are there?");
 
 print("");
-print("final result = " + result);
+print("final result = " ++ result);
 print(protocol_state(psid));
 print(session_state(ssidGood));
 print(session_state(ssidBad));

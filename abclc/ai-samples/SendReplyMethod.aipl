@@ -28,7 +28,7 @@ class Driver {
   // Plain method — the actor loop dispatches `reply(r)` to it when
   // Worker's reply-on-send routes the value back into Driver's mailbox.
   method reply(r) {
-    print("[reply-method] got: " + r);
+    print("[reply-method] got: " ++ r);
   }
   method run(q) {
     var w = new Worker();

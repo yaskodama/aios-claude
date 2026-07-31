@@ -52,21 +52,21 @@ class Coordinator {
   method tackle(q: string) {
     // 1) planner runs synchronously — solver depends on its output
     var plan = now planner.plan(q);
-    print("[plan] " + plan);
+    print("[plan] " ++ plan);
 
     // 2) solver and reviewer.brief run in parallel via `future`
     var fut_ans   = future solver.solve(plan);
     var fut_brief = future reviewer.brief();
 
     var answer = await(fut_ans);
-    print("[answer] " + answer);
+    print("[answer] " ++ answer);
 
     var brief = await(fut_brief);
-    print("[reviewer brief] " + brief);
+    print("[reviewer brief] " ++ brief);
 
     // 3) final review synchronously, after answer is known
     var verdict = now reviewer.review(answer);
-    print("[verdict] " + verdict);
+    print("[verdict] " ++ verdict);
   }
 }
 

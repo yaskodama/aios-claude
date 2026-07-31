@@ -43,21 +43,21 @@ class Auditor {
   method run() {
     var acct = new BankAccount();
     var opened = now acct.open("Alice", 100);
-    print("opened with " + opened);
+    print("opened with " ++ opened);
 
     // OK: pub field, external read.
-    print("holder = " + acct.holder);
+    print("holder = " ++ acct.holder);
 
     // OK: balance accessed through a method.
     var b = now acct.peek();
-    print("balance via peek() = " + b);
+    print("balance via peek() = " ++ b);
 
     // OK: mutation through a method.
     var after_dep = now acct.deposit(50);
-    print("after deposit = " + after_dep);
+    print("after deposit = " ++ after_dep);
 
     var after_wd = now acct.withdraw(30);
-    print("after withdraw = " + after_wd);
+    print("after withdraw = " ++ after_wd);
   }
 }
 

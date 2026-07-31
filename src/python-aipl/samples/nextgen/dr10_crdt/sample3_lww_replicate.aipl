@@ -5,13 +5,13 @@
 
 var r1 = crdt_lww_new("init");
 crdt_lww_write(r1, "first-write");
-print("[dr10/3] r1 = " + crdt_lww_value(r1));
+print("[dr10/3] r1 = " ++ crdt_lww_value(r1));
 
 var r2 = crdt_lww_new("init");
 crdt_lww_write(r2, "second-write");
 
 var merged = crdt_lww_merge(r1, r2);
-print("[dr10/3] merged = " + crdt_lww_value(merged));
+print("[dr10/3] merged = " ++ crdt_lww_value(merged));
 
 crdt_replicate("lww_demo", merged);   // emits "crdt_replicate" NDJSON event
 print("[dr10/3] replicate hook fired");

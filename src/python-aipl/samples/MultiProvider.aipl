@@ -32,51 +32,51 @@ class Bench {
   method run_text() {
     print("--- (1) text-only, provider override ---");
     var prompt: string = "Say hello in one word.";
-    print("default (auto): " + ai_call(prompt));
-    print("Gemini    [1]:  " + ai_call(1, prompt));
-    print("Anthropic [2]:  " + ai_call(2, prompt));
-    print("OpenAI    [3]:  " + ai_call(3, prompt));
-    print("string alias:   " + ai_call("anthropic", prompt));
+    print("default (auto): " ++ ai_call(prompt));
+    print("Gemini    [1]:  " ++ ai_call(1, prompt));
+    print("Anthropic [2]:  " ++ ai_call(2, prompt));
+    print("OpenAI    [3]:  " ++ ai_call(3, prompt));
+    print("string alias:   " ++ ai_call("anthropic", prompt));
     print("");
 
     print("--- (2) with system, provider override ---");
     var sys: string = "Be very brief.";
-    print("Claude:  " + ai_call_with_system(2, sys, prompt));
-    print("ChatGPT: " + ai_call_with_system(3, sys, prompt));
+    print("Claude:  " ++ ai_call_with_system(2, sys, prompt));
+    print("ChatGPT: " ++ ai_call_with_system(3, sys, prompt));
   }
 
   method run_image() {
     print("");
     print("--- (3) multimodal: image + prompt ---");
     var img = make_pattern();
-    print("image typeof:  " + typeof(img));
+    print("image typeof:  " ++ typeof(img));
 
     var p: string = "Describe the test pattern in this image.";
-    print("auto:    " + ai_call_image(p, img));
-    print("Claude:  " + ai_call_image(2, p, img));
-    print("ChatGPT: " + ai_call_image(3, p, img));
+    print("auto:    " ++ ai_call_image(p, img));
+    print("Claude:  " ++ ai_call_image(2, p, img));
+    print("ChatGPT: " ++ ai_call_image(3, p, img));
 
     // (4) Image from disk via read_bytes — bytes path also works.
     print("");
     print("--- (4) image as raw bytes (array[int] from read_bytes) ---");
     image_save(img, "out_pattern.png");
     var raw = read_bytes("out_pattern.png");
-    print("typeof(raw) = " + typeof(raw) + "  (length=" + array_len(raw) + ")");
-    print("Gemini:  " + ai_call_image(1, "What format is this file?", raw));
+    print("typeof(raw) = " ++ typeof(raw) ++ "  (length=" ++ array_len(raw) ++ ")");
+    print("Gemini:  " ++ ai_call_image(1, "What format is this file?", raw));
 
     // (5) Image + system prompt.
     print("");
     print("--- (5) image with system prompt ---");
-    print("Claude:  " + ai_call_image_with_system(2,
+    print("Claude:  " ++ ai_call_image_with_system(2,
       "You are a curt vision reviewer.",
       "Pattern check:", img));
 
     // (6) typeof showcase on the new wiring.
     print("");
     print("--- (6) typeof showcase ---");
-    print("typeof(ai_call(1, \"hi\"))      = " + typeof(ai_call(1, "hi")));
-    print("typeof(ai_call_image(2, p, img)) = " + typeof(ai_call_image(2, p, img)));
-    print("typeof(image_create(2,2,0,0,0,255)) = " +
+    print("typeof(ai_call(1, \"hi\"))      = " ++ typeof(ai_call(1, "hi")));
+    print("typeof(ai_call_image(2, p, img)) = " ++ typeof(ai_call_image(2, p, img)));
+    print("typeof(image_create(2,2,0,0,0,255)) = " ++
           typeof(image_create(2, 2, 0, 0, 0, 255)));
   }
 }

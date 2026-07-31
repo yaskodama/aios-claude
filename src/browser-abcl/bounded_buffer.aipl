@@ -25,13 +25,13 @@ class Buffer {
     if (cwaiter != "") {
       send sender.put_ok();
       send cwaiter.got(item);
-      print("[BUF] passthrough put=" + item);
+      print("[BUF] passthrough put=" ++ item);
       cwaiter = "";
     } else {
       if (count == cap) {
         pwaiter = sender;
         pitem   = item;
-        print("[BUF] FULL  -- queued put=" + item);
+        print("[BUF] FULL  -- queued put=" ++ item);
       } else {
         if (tail == 0) { s0 = item; }
         if (tail == 1) { s1 = item; }
@@ -40,7 +40,7 @@ class Buffer {
         tail = tail + 1;
         if (tail == cap) { tail = 0; }
         count = count + 1;
-        print("[BUF] put=" + item + "   count=" + count);
+        print("[BUF] put=" ++ item ++ "   count=" ++ count);
         send sender.put_ok();
       }
     }
@@ -58,7 +58,7 @@ class Buffer {
       head = head + 1;
       if (head == cap) { head = 0; }
       count = count - 1;
-      print("[BUF] get   count=" + count);
+      print("[BUF] get   count=" ++ count);
       if (pwaiter != "") {
         if (tail == 0) { s0 = pitem; }
         if (tail == 1) { s1 = pitem; }
@@ -67,7 +67,7 @@ class Buffer {
         tail = tail + 1;
         if (tail == cap) { tail = 0; }
         count = count + 1;
-        print("[BUF] accepted queued put=" + pitem);
+        print("[BUF] accepted queued put=" ++ pitem);
         send pwaiter.put_ok();
         pwaiter = "";
       }
@@ -90,10 +90,10 @@ class Producer {
 
   method produce() {
     if (n == max) {
-      print("[P" + id + "] DONE");
+      print("[P" ++ id ++ "] DONE");
     } else {
       n = n + 1;
-      print("[P" + id + "] -> put " + n);
+      print("[P" ++ id ++ "] -> put " ++ n);
       send buf.put(n);
     }
   }
@@ -119,9 +119,9 @@ class Consumer {
 
   method got(item) {
     taken = taken + 1;
-    print("[C" + id + "] got " + item + "   (total=" + taken + ")");
+    print("[C" ++ id ++ "] got " ++ item ++ "   (total=" ++ taken ++ ")");
     if (taken == max) {
-      print("[C" + id + "] DONE");
+      print("[C" ++ id ++ "] DONE");
     } else {
       // Delay via self-send. The JS runtime's `wait` only postpones the
       // next dispatch of THIS actor, so the timed gap must precede a

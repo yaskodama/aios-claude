@@ -379,9 +379,9 @@ function recompute_and_print(sheet) {
     var c = array_get(sheet, i);
     if (c.kind == "Formula") {
       var v = eval_expr(c.expr, sheet);
-      print("[sheet] " + c.id + " = " + v);
+      print("[sheet] " ++ c.id ++ " = " ++ v);
     } else {
-      print("[sheet] " + c.id + " = " + c.val);
+      print("[sheet] " ++ c.id ++ " = " ++ c.val);
     }
     i = i + 1;
   }

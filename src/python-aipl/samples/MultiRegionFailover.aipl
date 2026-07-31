@@ -27,21 +27,21 @@
 
 class Demo {
   method run() {
-    print("[demo] starting at region " + current_region());
-    print("[demo] failover chain: " + region_chain());
-    print("[demo] regions available: " + regions_available());
+    print("[demo] starting at region " ++ current_region());
+    print("[demo] failover chain: " ++ region_chain());
+    print("[demo] regions available: " ++ regions_available());
 
     // Greeter is in the primary region → no failover.
-    print("[demo] failover Greeter -> " + failover_region("Greeter"));
+    print("[demo] failover Greeter -> " ++ failover_region("Greeter"));
 
     // Logger is only in eu-west-1 → primary lookup misses, fails over.
-    print("[demo] failover Logger -> " + failover_region("Logger"));
+    print("[demo] failover Logger -> " ++ failover_region("Logger"));
 
     // Bench is only in ap-1 → two-step failover.
-    print("[demo] failover Bench -> " + failover_region("Bench"));
+    print("[demo] failover Bench -> " ++ failover_region("Bench"));
 
     // No actor by this name anywhere → chain exhausted, returns "".
-    print("[demo] failover NoSuch -> '" + failover_region("NoSuch") + "'");
+    print("[demo] failover NoSuch -> '" ++ failover_region("NoSuch") ++ "'");
   }
 }
 

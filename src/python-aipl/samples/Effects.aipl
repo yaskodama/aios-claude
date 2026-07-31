@@ -63,16 +63,16 @@ class Demo {
   method run() {
     print("=== Phase 12 — capability-based effect system ===");
     var cfg = read_config("/etc/hostname");
-    print("config       = " + cfg);
+    print("config       = " ++ cfg);
     var c = classify("AI changed everything");
-    print("classify     = " + c);
+    print("classify     = " ++ c);
 
     var issues = type_check();
     print("");
-    print("type_check() found " + array_len(issues) + " issue(s):");
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  " + array_get(issues, i));
+      print("  " ++ array_get(issues, i));
       i = i + 1;
     }
   }

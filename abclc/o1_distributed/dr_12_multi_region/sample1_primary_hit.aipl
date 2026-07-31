@@ -12,8 +12,8 @@
 
 class D {
   method run() {
-    print("[demo] region: " + current_region());
-    print("[demo] failover Greeter -> " + failover_region("Greeter"));
+    print("[demo] region: " ++ current_region());
+    print("[demo] failover Greeter -> " ++ failover_region("Greeter"));
   }
 }
 var d = new D();

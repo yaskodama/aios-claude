@@ -30,7 +30,7 @@ class Worker {
         var answer = job * job + 1;
         // Send tuple back: (worker_id, job, answer).
         channel_send(res, (id, job, answer));
-        print("  [worker " + id + "] job " + job + " -> " + answer);
+        print("  [worker " ++ id ++ "] job " ++ job ++ " -> " ++ answer);
       } else {
         done = 1;
       }
@@ -96,11 +96,11 @@ class Demo {
 
     var coord = new Coordinator(req, res);
     var n_workers = now coord.spawn_pool(3);
-    print("spawned " + n_workers + " workers");
+    print("spawned " ++ n_workers ++ " workers");
 
     var jobs = [3, 5, 7, 11, 13, 17, 19];
     var n_jobs = now coord.dispatch(jobs);
-    print("dispatched " + n_jobs + " jobs");
+    print("dispatched " ++ n_jobs ++ " jobs");
 
     // Run each worker concurrently.
     var i = 0;
@@ -111,17 +111,17 @@ class Demo {
     }
 
     var results = now coord.drain_results(n_jobs);
-    print("collected " + array_len(results) + " results:");
+    print("collected " ++ array_len(results) ++ " results:");
     var k = 0;
     while (k < array_len(results)) do {
       var r = array_get(results, k);
-      print("  worker=" + r[0] + "  job=" + r[1] + "  -> " + r[2]);
+      print("  worker=" ++ r[0] ++ "  job=" ++ r[1] ++ "  -> " ++ r[2]);
       k = k + 1;
     }
 
     print("");
-    print("typeof(req) = " + typeof(req));
-    print("typeof(res) = " + typeof(res));
+    print("typeof(req) = " ++ typeof(req));
+    print("typeof(res) = " ++ typeof(res));
   }
 }
 

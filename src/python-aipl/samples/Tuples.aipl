@@ -25,10 +25,10 @@ class PointActor {
   }
 
   method describe() {
-    print("origin = (" + origin[0] + ", " + origin[1] + ")");
-    print("meta   = (" + meta[0] + ", " + meta[1] + ", " + meta[2] + ")");
-    print("typeof(origin) = " + typeof(origin));
-    print("typeof(meta)   = " + typeof(meta));
+    print("origin = (" ++ origin[0] ++ ", " ++ origin[1] ++ ")");
+    print("meta   = (" ++ meta[0] ++ ", " ++ meta[1] ++ ", " ++ meta[2] ++ ")");
+    print("typeof(origin) = " ++ typeof(origin));
+    print("typeof(meta)   = " ++ typeof(meta));
   }
 }
 
@@ -38,40 +38,40 @@ class Demo {
 
     // 1) Heterogeneous tuple from the request.
     var t1 = (1, 20, "test");
-    print("t1     = (" + t1[0] + ", " + t1[1] + ", " + t1[2] + ")");
-    print("typeof(t1) = " + typeof(t1));
+    print("t1     = (" ++ t1[0] ++ ", " ++ t1[1] ++ ", " ++ t1[2] ++ ")");
+    print("typeof(t1) = " ++ typeof(t1));
 
     // 2) Nested tuple from the request.
     var t2 = (2, (3, 4));
-    print("t2[0]      = " + t2[0]);
-    print("t2[1][0]   = " + t2[1][0]);
-    print("t2[1][1]   = " + t2[1][1]);
-    print("typeof(t2) = " + typeof(t2));
+    print("t2[0]      = " ++ t2[0]);
+    print("t2[1][0]   = " ++ t2[1][0]);
+    print("t2[1][1]   = " ++ t2[1][1]);
+    print("typeof(t2) = " ++ typeof(t2));
 
     // 3) Empty and 1-tuple.
     var empty = ();
     var single = (42,);
-    print("typeof(empty)  = " + typeof(empty));
-    print("typeof(single) = " + typeof(single));
-    print("single[0] = " + single[0]);
+    print("typeof(empty)  = " ++ typeof(empty));
+    print("typeof(single) = " ++ typeof(single));
+    print("single[0] = " ++ single[0]);
 
     // 4) Tuple inside a record, record inside a tuple.
     var pair = ({ name: "Alice", age: 30 }, [1, 2, 3]);
     var rec = pair[0];                  // extract via temp (chained postfix not yet supported)
     var arr = pair[1];
-    print("pair[0].name = " + rec.name);
-    print("pair[1][2]   = " + arr[2]);
-    print("typeof(pair) = " + typeof(pair));
+    print("pair[0].name = " ++ rec.name);
+    print("pair[1][2]   = " ++ arr[2]);
+    print("typeof(pair) = " ++ typeof(pair));
 
     // 5) Length via array_len works on tuples too.
-    print("array_len(t1) = " + array_len(t1));
-    print("array_len(t2) = " + array_len(t2));
+    print("array_len(t1) = " ++ array_len(t1));
+    print("array_len(t2) = " ++ array_len(t2));
 
     // 6) Use field-level tuples in an actor.
     var p = new PointActor();
     var moved = now p.translate((3, 4), 10, -1);
-    print("moved = (" + moved[0] + ", " + moved[1] + ")");
-    print("typeof(moved) = " + typeof(moved));
+    print("moved = (" ++ moved[0] ++ ", " ++ moved[1] ++ ")");
+    print("typeof(moved) = " ++ typeof(moved));
     send p.describe();
   }
 }

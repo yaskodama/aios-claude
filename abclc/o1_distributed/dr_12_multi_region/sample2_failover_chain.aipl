@@ -7,8 +7,8 @@
 
 class D {
   method run() {
-    print("[demo] failover Logger -> " + failover_region("Logger"));
-    print("[demo] failover Bench -> " + failover_region("Bench"));
+    print("[demo] failover Logger -> " ++ failover_region("Logger"));
+    print("[demo] failover Bench -> " ++ failover_region("Bench"));
   }
 }
 var d = new D();

@@ -9,8 +9,8 @@
 
 class Bank {
   var bal = 100;
-  method debit(amt) { bal = bal - amt; print("[bank] debit " + amt + " -> " + bal); }
-  method credit(amt) { bal = bal + amt; print("[bank] credit " + amt + " -> " + bal); }
+  method debit(amt) { bal = bal - amt; print("[bank] debit " ++ amt ++ " -> " ++ bal); }
+  method credit(amt) { bal = bal + amt; print("[bank] credit " ++ amt ++ " -> " ++ bal); }
 }
 
 class Driver {

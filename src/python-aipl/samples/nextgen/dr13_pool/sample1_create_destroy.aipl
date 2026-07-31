@@ -1,10 +1,10 @@
 // DR-13 / sample 1 — pool create + size + destroy.
 
-class Worker { method work(x) { print("[w] " + x); } }
+class Worker { method work(x) { print("[w] " ++ x); } }
 
 var p = pool_create("Worker", 0, 4, 2);
-print("[dr13/1] created : " + p);
-print("[dr13/1] size    : " + pool_size(p));
+print("[dr13/1] created : " ++ p);
+print("[dr13/1] size    : " ++ pool_size(p));
 var r = pool_destroy(p);
-print("[dr13/1] destroyed: " + r);
-print("[dr13/1] size now : " + pool_size(p));   // 0 (or '')
+print("[dr13/1] destroyed: " ++ r);
+print("[dr13/1] size now : " ++ pool_size(p));   // 0 (or '')

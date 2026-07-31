@@ -18,4 +18,4 @@ var u = {
   email: "alice@example.com"
 };
 var c = now g.city_of(u);
-print("[ce13/3] city = " + c);
+print("[ce13/3] city = " ++ c);

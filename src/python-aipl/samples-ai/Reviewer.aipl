@@ -12,8 +12,8 @@ class CodeReviewer {
 
   method review(snippet: string) !{ai, net} {
     var feedback: string = ai_call_with_system(persona, snippet);
-    print("[review] " + snippet);
-    print("         " + feedback);
+    print("[review] " ++ snippet);
+    print("         " ++ feedback);
   }
 }
 

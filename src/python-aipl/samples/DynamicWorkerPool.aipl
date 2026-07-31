@@ -17,14 +17,14 @@ class Manager {
   method ensure_workers(n: int) {
     if (compiled == 0) {
       var worker_src: string =
-        "class Worker {\n" +
-        "  var id: int = 0;\n" +
-        "  method init(my_id: int) { id = my_id; }\n" +
-        "  method square(x: int) -> int {\n" +
-        "    var r: int = x * x;\n" +
-        "    print(\"  [worker \" + id + \"] square(\" + x + \") = \" + r);\n" +
-        "    reply(r);\n" +
-        "  }\n" +
+        "class Worker {\n" ++
+        "  var id: int = 0;\n" ++
+        "  method init(my_id: int) { id = my_id; }\n" ++
+        "  method square(x: int) -> int {\n" ++
+        "    var r: int = x * x;\n" ++
+        "    print(\"  [worker \" ++ id ++ \"] square(\" ++ x ++ \") = \" ++ r);\n" ++
+        "    reply(r);\n" ++
+        "  }\n" ++
         "}\n";
       compile(worker_src);
       compiled = 1;
@@ -61,7 +61,7 @@ class Manager {
       sum = sum + v;
       k = k + 1;
     }
-    print("[manager] sum of squares = " + sum);
+    print("[manager] sum of squares = " ++ sum);
     reply(sum);
   }
 }
@@ -69,4 +69,4 @@ class Manager {
 var mgr = new Manager();
 send mgr.ensure_workers(3);
 var total: int = now mgr.dispatch([2, 3, 5, 7, 11]);
-print("=== final result: " + total + " ===");
+print("=== final result: " ++ total ++ " ===");

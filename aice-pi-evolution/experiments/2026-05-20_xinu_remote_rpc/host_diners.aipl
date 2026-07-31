@@ -48,8 +48,8 @@ class Philosopher {
     meals_target = target;
     meals_done   = 0;
     attempts     = 0;
-    print("  [P" + my_id + "] thinking (low=F" + lo_fork
-          + " high=F" + hi_fork + ")");
+    print("  [P" ++ my_id ++ "] thinking (low=F" ++ lo_fork
+          ++ " high=F" ++ hi_fork ++ ")");
     send self.try_eat();
   }
 
@@ -58,7 +58,7 @@ class Philosopher {
   // do a synchronous self-call from inside another self-call).
   method try_eat() {
     if (meals_done >= meals_target) {
-      print("  [P" + my_id + "] done after " + attempts + " attempts");
+      print("  [P" ++ my_id ++ "] done after " ++ attempts ++ " attempts");
     } else {
       attempts = attempts + 1;
 
@@ -89,13 +89,13 @@ class Philosopher {
           // Log every meal up to 10, then every 10th to avoid spam
           // when meals_target is large.
           if (meals_done <= 10) {
-            print("  [P" + my_id + " ate meal=" + meals_done
-                  + "] (attempts=" + attempts + ")");
+            print("  [P" ++ my_id ++ " ate meal=" ++ meals_done
+                  ++ "] (attempts=" ++ attempts ++ ")");
           } else {
             var bucket = meals_done - ((meals_done / 10) * 10);
             if (bucket == 0) {
-              print("  [P" + my_id + " ate meal=" + meals_done
-                    + "] (attempts=" + attempts + ")");
+              print("  [P" ++ my_id ++ " ate meal=" ++ meals_done
+                    ++ "] (attempts=" ++ attempts ++ ")");
             }
           }
           sleep(0.040);
@@ -116,8 +116,8 @@ print("=== pure-AIPL diners: 3 PC + 2 Xinu, meals=100 each ===");
 
 var hub_url = "uart1://127.0.0.1:5555";
 
-print("PING -> " + remote_now(hub_url, "_", "ping"));
-print("LIST -> " + remote_now(hub_url, "_", "list"));
+print("PING -> " ++ remote_now(hub_url, "_", "ping"));
+print("LIST -> " ++ remote_now(hub_url, "_", "list"));
 
 // Three PC philosophers — each is a real AIPL actor running in its
 // own thread.  The Xinu side hosts F0..F4 (Forks) and P4 + P5 at

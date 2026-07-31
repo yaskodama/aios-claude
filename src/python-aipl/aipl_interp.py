@@ -1085,13 +1085,12 @@ def _apply_binop(op: str, l, r):
         # `++ : forall a b. (a * b) -> string` と同じ）。
         return _to_str(l) + _to_str(r)
     if op == "+":
-        # 【OCaml 版との既知の差】OCaml 版では `+` は数値専用で、文字列連結は
-        # `++` に分離されている（オーバーロードの曖昧さを潰すため）。
-        # Py-I では既存の .aipl 資産 437 本のうち 263 本が `+` で文字列を
-        # 連結しているので、いま厳格にすると全部壊れる。移行するまでは
-        # 従来どおり受ける。新しく書くコードは `++` を使うこと。
+        # `+` は数値専用。文字列連結は `++`（OCaml 版と同じ分離）。
+        # 既存資産 238 本 5448 箇所は構文木で連鎖を判定して移行済み。
         if isinstance(l, str) or isinstance(r, str):
-            return _to_str(l) + _to_str(r)
+            raise RuntimeError(
+                "`+` は数値専用です。文字列の連結には `++` を使ってください "
+                f"(left={type(l).__name__}, right={type(r).__name__})")
         return l + r
     if op == "-": return l - r
     if op == "*": return l * r

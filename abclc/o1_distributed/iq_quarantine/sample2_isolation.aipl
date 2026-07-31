@@ -20,7 +20,7 @@ class Stable {
   var n = 0;
   method tick() {
     n = n + 1;
-    print("stable:" + n);
+    print("stable:" ++ n);
   }
 }
 

@@ -11,7 +11,7 @@ class Buffer {
   method put() {
     if (size < cap) {
       size = size + 1;
-      print("[buf] put -> size=" + size);
+      print("[buf] put -> size=" ++ size);
       send sender.put_ok();
     } else {
       send sender.put_full();
@@ -21,7 +21,7 @@ class Buffer {
   method take() {
     if (size > 0) {
       size = size - 1;
-      print("[buf] take -> size=" + size);
+      print("[buf] take -> size=" ++ size);
       send sender.take_ok();
     } else {
       send sender.take_empty();

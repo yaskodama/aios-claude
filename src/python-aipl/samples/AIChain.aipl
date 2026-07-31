@@ -22,12 +22,12 @@ class Agent {
   }
 
   method handle(payload: string) {
-    var processed: string = payload + " | " + name;
-    print("[agent " + name + "] " + processed);
+    var processed: string = payload ++ " | " ++ name;
+    print("[agent " ++ name ++ "] " ++ processed);
     if (has_next == 1) {
       send next.handle(processed);
     } else {
-      print("[final] " + processed);
+      print("[final] " ++ processed);
     }
   }
 }

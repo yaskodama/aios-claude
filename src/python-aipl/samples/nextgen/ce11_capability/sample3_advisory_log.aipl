@@ -8,4 +8,4 @@
 grant_cap("ai");
 check_capability("ai");    // ok
 check_capability("fs");    // advisory: logs cap_violation, returns true
-print("[ce11/3] both check_capability calls returned " + has_cap("ai"));
+print("[ce11/3] both check_capability calls returned " ++ has_cap("ai"));

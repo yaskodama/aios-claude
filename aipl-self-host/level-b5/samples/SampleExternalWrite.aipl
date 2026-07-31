@@ -30,10 +30,10 @@ class Driver {
     };
 
     var issues = tc_check_program(prog);
-    print("issues=" + array_len(issues));
+    print("issues=" ++ array_len(issues));
     var i = 0;
     while (i < array_len(issues)) do {
-      print("  - " + array_get(issues, i));
+      print("  - " ++ array_get(issues, i));
       i = i + 1;
     }
     print("(expected: 2 — both holder & balance writes are flagged)");
