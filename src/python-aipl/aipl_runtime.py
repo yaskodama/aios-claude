@@ -7,6 +7,7 @@ outstanding-message counter — the main thread can wait on that to know
 when the system is idle and exit cleanly.
 """
 
+import time
 import queue
 import threading
 from typing import Optional
@@ -63,6 +64,22 @@ class Future:
             if not self._done:
                 self._cond.wait(timeout=timeout)
             return self._value
+
+    def get_timed(self, seconds: float):
+        """(満たされたか, 値) を返す。
+
+        `get` は時間切れでも値でも None を返すので、`reply(None)` と
+        時間切れを区別できない。期限つき待ち（OCaml 版の
+        `now ... timeout <ms> else <expr>`）にはこちらを使う。
+        wait は早く起きることがあるので締切まで回す。"""
+        deadline = time.monotonic() + seconds
+        with self._cond:
+            while not self._done:
+                remain = deadline - time.monotonic()
+                if remain <= 0:
+                    return (False, None)
+                self._cond.wait(timeout=remain)
+            return (True, self._value)
 
 
 class Mailbox:

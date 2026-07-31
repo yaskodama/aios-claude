@@ -10,6 +10,11 @@ from typing import List, Optional, Union
 # ---------- Expressions ----------
 
 @dataclass
+class BoolLit:
+    value: bool
+
+
+@dataclass
 class IntLit:
     val: int
 
@@ -103,10 +108,15 @@ class FieldAccess:
 
 @dataclass
 class NowCall:
-    """Synchronous send: caller blocks until receiver replies."""
+    """Synchronous send: caller blocks until receiver replies.
+
+    deadline: (ミリ秒, 期限切れ時の式) または None。OCaml 版の
+    `now t.m(a) timeout <ms> else <expr>` に対応する。None は期限なし
+    （待ち続ける。型検査器が警告を出す）。"""
     target: str   # 'self' / 'sender' / a variable name
     method: str
     args: List['Expr']
+    deadline: object = None
 
 @dataclass
 class FutureCall:
@@ -114,6 +124,7 @@ class FutureCall:
     target: str
     method: str
     args: List['Expr']
+    deadline: object = None
 
 
 Expr = Union[IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
@@ -275,3 +286,13 @@ class GlobalStmt:
 @dataclass
 class Program:
     decls: List[Union[ClassDecl, FunctionDecl, GlobalStmt]]
+
+
+@dataclass
+class AwaitExpr:
+    """`await f timeout <ms> else <expr>`。deadline は (ミリ秒, 式) か None。
+
+    期限なしの `await f` は従来どおり CallExpr("await", [f]) へ落とすので、
+    このノードは期限つきの場合にだけ作られる。"""
+    fut: 'Expr'
+    deadline: object = None

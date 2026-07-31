@@ -18,6 +18,7 @@ class_decl: "class" NAME "{" (field | method_decl | function_decl)* "}"
 function_decl: "function" NAME "(" params ")" return_anno? effect_anno? "{" stmt* "}"
 
 return_anno: "->" type_expr
+           | ":" type_expr
 
 // Phase 12: effect annotation. `!{fs, ai, net, mut}` declares which
 // side-effect categories the function may produce. The static checker
@@ -168,9 +169,14 @@ block: "{" stmt* "}"
 
 args: (expr ("," expr)*)?
 
-?expr: rel_expr
-?rel_expr: add_expr (rel_op add_expr)*
-!rel_op: "==" | "!=" | "<=" | ">=" | "<" | ">"
+?expr: eq_expr
+?eq_expr: cmp_expr (eq_op cmp_expr)*
+!eq_op: "==" | "!="
+?cmp_expr: concat_expr (cmp_op concat_expr)*
+!cmp_op: "<=" | ">=" | "<" | ">"
+// `++` は文字列連結。`+` は数値専用（OCaml 版と同じ分離）
+?concat_expr: add_expr (concat_op add_expr)*
+!concat_op: "++"
 ?add_expr: mul_expr (add_op mul_expr)*
 !add_op: "+" | "-"
 ?mul_expr: unary (mul_op unary)*
@@ -179,6 +185,8 @@ args: (expr ("," expr)*)?
       | atom
 
 ?atom: INT           -> int_lit
+     | "true"        -> true_lit
+     | "false"       -> false_lit
      | FLOAT         -> float_lit
      | STRING        -> string_lit
      | "[" args "]"  -> array_lit
@@ -196,6 +204,10 @@ args: (expr ("," expr)*)?
      // await keyword: `await fut` blocks on a future and returns its value.
      // Equivalent to the builtin `await(f)` form, kept for parity with the
      // OCaml runtime where `await` is a unary keyword operator.
+     // 期限つきの待ち（OCaml 版 parser.mly の TIMEOUT ... ELSE と同じ）
+     | "now"    NAME     "." NAME "(" args ")" "timeout" INT "else" expr  -> now_call_dl
+     | "now"    "self"   "." NAME "(" args ")" "timeout" INT "else" expr  -> now_self_dl
+     | "await" atom "timeout" INT "else" expr        -> await_dl
      | "await" atom                                  -> await_expr
      | NAME "(" args ")"         -> call_expr
      | NAME dim_list             -> index_expr

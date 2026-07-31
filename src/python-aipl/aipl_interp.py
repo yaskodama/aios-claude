@@ -17,6 +17,7 @@ from aipl_ast import (
     Program, ClassDecl, MethodDecl, FunctionDecl, GlobalStmt,
     VarDecl, VarNew, Assign, IndexAssign, FieldAssign, Send, CallStmt,
     If, While, Become, Block, Return,
+    BoolLit, AwaitExpr,
     IntLit, FloatLit, StringLit, Var, Binop, Neg, New, CallExpr,
     ArrayLit, IndexExpr, ArraySized, RecordLit, FieldAccess, TupleLit,
     NowCall, FutureCall, Scope, Spawn, SelectStmt, SelectCase,
@@ -883,6 +884,7 @@ class Interpreter:
     def eval_expr(self, e, frame: Frame):
         kind = type(e)
         if kind is IntLit:    return e.val
+        if kind is BoolLit:   return e.value
         if kind is FloatLit:  return e.val
         if kind is StringLit: return e.val
         if kind is Var:
@@ -950,12 +952,24 @@ class Interpreter:
             except (KeyError, TypeError):
                 return None
         if kind is NowCall:
-            return self._do_now_send(e.target, e.method, e.args, frame)
+            return self._do_now_send(e.target, e.method, e.args, frame,
+                                     deadline=getattr(e, "deadline", None))
+        if kind is AwaitExpr:
+            fut = self.eval_expr(e.fut, frame)
+            dl = getattr(e, "deadline", None)
+            if dl is None:
+                return fut.get() if hasattr(fut, "get") else fut
+            ms, alt = dl
+            if not hasattr(fut, "get_timed"):
+                return fut
+            ok, val = fut.get_timed(ms / 1000.0)
+            return val if ok else self.eval_expr(alt, frame)
         if kind is FutureCall:
             return self._do_future_send(e.target, e.method, e.args, frame)
         raise RuntimeError(f"unknown expr: {e!r}")
 
-    def _do_now_send(self, target_name: str, method: str, raw_args: list, frame: Frame):
+    def _do_now_send(self, target_name: str, method: str, raw_args: list, frame: Frame,
+                     deadline=None):
         tgt = self._resolve_actor(target_name, frame)
         if tgt is None:
             print(f"[now] {target_name}.{method}(): no such actor")
@@ -963,7 +977,11 @@ class Interpreter:
         args = [self.eval_expr(a, frame) for a in raw_args]
         fut = Future()
         tgt.send_method(method, args, sender=frame.actor, reply_future=fut)
-        return fut.get()
+        if deadline is None:
+            return fut.get()
+        ms, alt = deadline
+        ok, val = fut.get_timed(ms / 1000.0)
+        return val if ok else self.eval_expr(alt, frame)
 
     def _do_future_send(self, target_name: str, method: str, raw_args: list, frame: Frame):
         tgt = self._resolve_actor(target_name, frame)
@@ -1062,7 +1080,16 @@ def _truthy(v) -> bool:
 
 
 def _apply_binop(op: str, l, r):
+    if op == "++":
+        # 文字列連結。両辺を文字列化する全域関数（OCaml 版 typing_env.ml の
+        # `++ : forall a b. (a * b) -> string` と同じ）。
+        return _to_str(l) + _to_str(r)
     if op == "+":
+        # 【OCaml 版との既知の差】OCaml 版では `+` は数値専用で、文字列連結は
+        # `++` に分離されている（オーバーロードの曖昧さを潰すため）。
+        # Py-I では既存の .aipl 資産 437 本のうち 263 本が `+` で文字列を
+        # 連結しているので、いま厳格にすると全部壊れる。移行するまでは
+        # 従来どおり受ける。新しく書くコードは `++` を使うこと。
         if isinstance(l, str) or isinstance(r, str):
             return _to_str(l) + _to_str(r)
         return l + r
@@ -1082,6 +1109,10 @@ def _apply_binop(op: str, l, r):
 
 
 def _to_str(v):
+    # bool は int の派生なので、数値より先に判定する。
+    # OCaml 版の string_of_bool に合わせて true / false と綴る（True ではない）。
+    if isinstance(v, bool):
+        return "true" if v else "false"
     if isinstance(v, float):
         # Match OCaml's printing of whole floats (e.g. "5.")
         if v.is_integer():
@@ -1502,7 +1533,16 @@ def _b_web_expose(args, frame, interp):
     name = _to_str(args[0])
     actor_arg = args[1]
     if not isinstance(actor_arg, Actor):
-        raise ValueError("web_expose: second arg must be an actor reference")
+        # OCaml 版の web_expose は (string, string) ---- 第2引数はアクター名の
+        # 文字列である（src/typing_env.ml の TFun([TString; TString], TUnit)）。
+        # Py-I は元々アクター参照だけを受けていたので食い違っていた。
+        # 名前で引けたら解決し、両方の書き方を受ける。
+        resolved = interp._resolve_actor(_to_str(actor_arg), frame)
+        if resolved is None:
+            raise ValueError(
+                "web_expose: second arg must be an actor reference or the "
+                f"name of a live actor (got {actor_arg!r})")
+        actor_arg = resolved
     expose(name, actor_arg)
     print(f"[expose] {name} -> {actor_arg.name}")
     return None

@@ -8,6 +8,8 @@ from typing import Optional
 from lark import Lark, Transformer, v_args
 
 from aipl_ast import (
+    AwaitExpr,
+    BoolLit,
     Program, ClassDecl, MethodDecl, FunctionDecl, GlobalStmt,
     VarDecl, VarNew, Assign, IndexAssign, FieldAssign, Send, CallStmt,
     If, While, Become, Block, Return,
@@ -51,6 +53,12 @@ class _Builder(Transformer):
     def future_call(self, target, method, args):
         return FutureCall(str(target), str(method), list(args.children))
 
+    def now_call_dl(self, target, method, args, ms, alt):
+        return NowCall(str(target), str(method), list(args.children), (int(ms), alt))
+    def now_self_dl(self, method, args, ms, alt):
+        return NowCall("self", str(method), list(args.children), (int(ms), alt))
+    def await_dl(self, e, ms, alt):
+        return AwaitExpr(e, (int(ms), alt))
     def await_expr(self, e):
         # `await x` desugars to the existing `await(x)` builtin call.
         return CallExpr("await", [e])
@@ -63,10 +71,21 @@ class _Builder(Transformer):
     @v_args(inline=False)
     def rel_expr(self, items):  return _flatten_binop(items)
     @v_args(inline=False)
+    def eq_expr(self, items):   return _flatten_binop(items)
+    @v_args(inline=False)
+    def cmp_expr(self, items):  return _flatten_binop(items)
+    @v_args(inline=False)
+    def concat_expr(self, items): return _flatten_binop(items)
+    @v_args(inline=False)
     def add_expr(self, items):  return _flatten_binop(items)
     @v_args(inline=False)
     def mul_expr(self, items):  return _flatten_binop(items)
     def rel_op(self, tok):      return str(tok)
+    def eq_op(self, tok):       return str(tok)
+    def cmp_op(self, tok):      return str(tok)
+    def concat_op(self, tok):   return str(tok)
+    def true_lit(self):         return BoolLit(True)
+    def false_lit(self):        return BoolLit(False)
     def add_op(self, tok):      return str(tok)
     def mul_op(self, tok):      return str(tok)
 
