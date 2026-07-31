@@ -793,8 +793,15 @@ class Interpreter:
                 # a child frame.  We deliberately keep `frame.sender` as
                 # the outer message's sender (OCaml does likewise — the
                 # select handler does not overwrite actor.last_sender).
-                _, m_args, _, _, _ = drained[matched_idx]
+                _, m_args, _, _, m_reply_future = drained[matched_idx]
                 child = Frame(actor=actor, sender=frame.sender, parent=frame)
+                # case 本体の reply は「選ばれたメッセージ」への返信である。
+                # 受け取ったメッセージの future を child に据えないと、
+                # 親フレーム（select を書いたメソッド自身）の future を
+                # 辿ってしまい、now の呼び出し元に値が戻らない。
+                # 実際 g4_select で `print(now w.job(1))` が値を受け取れず、
+                # [REPLY] と表示されるだけになっていた。
+                child.reply_future = m_reply_future
                 for pname, pval in zip(matched_case.params, m_args):
                     child.locals[pname] = pval
                 self.exec_block(matched_case.body, child)
