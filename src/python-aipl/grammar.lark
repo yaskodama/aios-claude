@@ -126,6 +126,8 @@ assign_stmt: NAME "=" expr ";"
 send_stmt: "send" "self"   "." NAME "(" args ")" ";"   -> send_self
          | "send" "sender" "." NAME "(" args ")" ";"   -> send_sender
          | "send" NAME     "." NAME "(" args ")" ";"   -> send_named
+         // メッシュの他ノードへ送る。宛先は "ノード/アクター" に解決する。
+         | "send" "remote" "(" STRING "," STRING ")" "." NAME "(" args ")" ";" -> send_remote
 call_stmt: ("call")? NAME "(" args ")" ";"
 if_stmt: "if" "(" expr ")" stmt ("else" stmt)?
 while_stmt: "while" expr "do" stmt
@@ -204,6 +206,7 @@ args: (expr ("," expr)*)?
      // Equivalent to the builtin `await(f)` form, kept for parity with the
      // OCaml runtime where `await` is a unary keyword operator.
      // 期限つきの待ち（OCaml 版 parser.mly の TIMEOUT ... ELSE と同じ）
+     | "now" "remote" "(" STRING "," STRING ")" "." NAME "(" args ")" "timeout" INT "else" expr -> now_remote_dl
      | "now"    NAME     "." NAME "(" args ")" "timeout" INT "else" expr  -> now_call_dl
      | "now"    "self"   "." NAME "(" args ")" "timeout" INT "else" expr  -> now_self_dl
      | "await" atom "timeout" INT "else" expr        -> await_dl

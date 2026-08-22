@@ -60,6 +60,16 @@ def main():
 
     try:
         program = parse_file(args.source)
+        # ★ メッシュへ配る荷物として、このファイルの原文をクラス名で引けるようにする
+        try:
+            from aipl_interp import register_unit_source
+            with open(args.source) as _f:
+                _src = _f.read()
+            for d in program.decls:
+                if type(d).__name__ == "ClassDecl":
+                    register_unit_source(d.name, _src)
+        except Exception:
+            pass
     except Exception as e:
         print(f"[parse error] {e}", file=sys.stderr)
         sys.exit(1)

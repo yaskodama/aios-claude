@@ -456,6 +456,29 @@ def _replies_here(st) -> bool:
 
 
 
+def _uses_replyto(stmts) -> bool:
+    """本体のどこかで replyto を使っているか。"""
+    found = [False]
+
+    def walk(n):
+        if found[0] or n is None or isinstance(n, (str, int, float, bool)):
+            return
+        if type(n).__name__ == "Var" and getattr(n, "name", None) == "replyto":
+            found[0] = True
+            return
+        for f in getattr(n, "__dataclass_fields__", {}):
+            v = getattr(n, f, None)
+            if isinstance(v, list):
+                for x in v:
+                    walk(x)
+            else:
+                walk(v)
+
+    for s in (stmts or []):
+        walk(s)
+    return found[0]
+
+
 def _is_stmt(n) -> bool:
     return type(n).__name__ in _STMT_NAMES
 
@@ -694,6 +717,14 @@ class TypeChecker:
             self._check_deadlines_only(stmts, where)
             return
 
+        # replyto を使うメソッドでは、返信の義務は線形性の検査が担う。
+        # reply の回数・被覆の構文検査は適用しない（OCaml 版と同じ）。
+        if _uses_replyto(stmts):
+            self._check_deadlines_only(stmts, where)
+            self._check_bad_deadlines(stmts, where)
+            self._check_resource_use(fn, where)
+            self._check_reply_linearity(fn, where)
+            return
         n = _max_replies(stmts)
         if n >= 2:
             self._issue(where, "reply が複数回起こりうる（返信は高々一度）")
@@ -710,6 +741,7 @@ class TypeChecker:
         self._check_deadlines_only(stmts, where)
         self._check_bad_deadlines(stmts, where)
         self._check_resource_use(fn, where)
+        self._check_reply_linearity(fn, where)
 
     def _check_reply_types(self, fn, stmts, where: str):
         """reply(e) の e の型が、宣言した戻り値型と合うか。
@@ -746,6 +778,89 @@ class TypeChecker:
 
         for st in stmts:
             visit(st)
+
+    def _check_reply_linearity(self, fn, where: str):
+        """返信先の線形性。replyto で取り出した義務は、ちょうど一度
+        answer するか、送信の引数に渡して相手へ移さなければならない。
+        OCaml 版 infer.ml の check_reply_linearity と同じ規律。
+        状態は (owed, spent) の対。消すだけだと二度渡しが
+        ただの変数参照に見えて素通りする。"""
+        def expr_st(e, st):
+            owed, spent = st
+            if e is None or isinstance(e, (str, int, float, bool)):
+                return st
+            kn = type(e).__name__
+            if kn in ("CallExpr", "CallStmt") and getattr(e, "name", None) == "answer":
+                args = getattr(e, "args", None) or []
+                if args and type(args[0]).__name__ == "Var":
+                    r = args[0].name
+                    if r in spent:
+                        self._issue(where, f"返信先 {r} を二度使っている")
+                        return st
+                    if r != "replyto" and r not in owed:
+                        self._issue(where, f"返信先 {r} は replyto から取り出されていない")
+                        return st
+                    if r != "replyto":
+                        return (owed - {r}, spent | {r})
+                return st
+            if kn in ("Send", "NowCall", "FutureCall"):
+                for a in (getattr(e, "args", None) or []):
+                    if type(a).__name__ == "Var":
+                        if a.name in spent:
+                            self._issue(where, f"返信先 {a.name} を二度使っている")
+                        elif a.name in owed:
+                            owed, spent = owed - {a.name}, spent | {a.name}
+                    else:
+                        owed, spent = expr_st(a, (owed, spent))
+                return (owed, spent)
+            for f in getattr(e, "__dataclass_fields__", {}):
+                v = getattr(e, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        owed, spent = expr_st(x, (owed, spent))
+                elif v is not None:
+                    owed, spent = expr_st(v, (owed, spent))
+            return (owed, spent)
+
+        def stmt_st(st_node, st):
+            owed, spent = st
+            if st_node is None:
+                return st
+            kn = type(st_node).__name__
+            if kn == "VarDecl":
+                e = getattr(st_node, "expr", None)
+                if type(e).__name__ == "Var" and e.name == "replyto":
+                    return (owed | {st_node.name}, spent)
+                return expr_st(e, st)
+            if kn == "Block":
+                for x in st_node.stmts:
+                    owed, spent = stmt_st(x, (owed, spent))
+                return (owed, spent)
+            if kn == "If":
+                s0 = expr_st(st_node.cond, st)
+                a = stmt_st(st_node.then_body, s0)
+                b = stmt_st(st_node.else_body, s0) if st_node.else_body is not None else s0
+                if a[0] != b[0]:
+                    self._issue(where, "二つの枝で果たしていない返信先が食い違う")
+                return a
+            if kn == "While":
+                s0 = expr_st(st_node.cond, st)
+                sb = stmt_st(st_node.body, s0)
+                if sb[0] != s0[0]:
+                    self._issue(where, "ループの本体は返信の義務を変えてはならない")
+                return s0
+            return expr_st(st_node, st)
+
+        start = set()
+        for p, a in zip(getattr(fn, "params", []) or [],
+                        getattr(fn, "param_annotations", None) or []):
+            if a == "reply":
+                start.add(p)
+        owed, _ = stmt_st(getattr(fn, "body", None), (start, set()))
+        if owed:
+            self._issue(where,
+                        "返信先 " + ", ".join(sorted(owed))
+                        + " に答えないままメソッドを抜けている")
 
     def _check_resource_use(self, fn, where: str):
         """acquire / release の対を本体の中で追う（順序つきの効果）。

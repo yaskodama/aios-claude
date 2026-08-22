@@ -53,6 +53,15 @@ class _Builder(Transformer):
     def future_call(self, target, method, args):
         return FutureCall(str(target), str(method), list(args.children))
 
+    # remote("node", "actor") ---- 宛先を "node/actor" という名前へ落とす。
+    # 同じ機械でノードを模しているときは、配備先がこの名前で表にいる。
+    def send_remote(self, node, actor, method, args):
+        tgt = str(node)[1:-1] + "/" + str(actor)[1:-1]
+        return Send(tgt, str(method), list(args.children))
+    def now_remote_dl(self, node, actor, method, args, ms, alt):
+        tgt = str(node)[1:-1] + "/" + str(actor)[1:-1]
+        return NowCall(tgt, str(method), list(args.children), (int(ms), alt))
+
     def now_call_dl(self, target, method, args, ms, alt):
         return NowCall(str(target), str(method), list(args.children), (int(ms), alt))
     def now_self_dl(self, method, args, ms, alt):

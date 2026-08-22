@@ -48,6 +48,18 @@ def _transient_check(value, declared_type, where: str) -> None:
         )
 
 
+class AiplReplyTo:
+    """返信先を値として持つ。中身は呼び出し側の Future。
+    answer(r, v) で fulfil する。線形性は型検査の側で見る。"""
+    __slots__ = ("fut",)
+
+    def __init__(self, fut):
+        self.fut = fut
+
+    def __repr__(self):
+        return "<replyto>"
+
+
 class AiplResult:
     """result<τ>。期限つきの待ちで else を書かなかったときの値。
     ok=True なら value に結果、ok=False なら期限切れ。
@@ -256,6 +268,10 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     "future_done":    "function(f:future) -> bool",
     "become":         "function(class_name:string [, args+]) -> unit",   # (also a stmt)
     # result<τ> を扱う組込み（期限つきの待ちで else を書かないと result が返る）
+    "answer":         "function(r:reply, v:any) -> unit",
+    "source_of":      "function(cls:string) -> string",
+    "node_allow":     "function(node:string, effects:string) -> unit",
+    "deploy":         "function(node:string, cls:string, name:string) -> string",
     "is_ok":          "function(r:result) -> bool",
     "timed_out":      "function(r:result) -> bool",
     "value":          "function(r:result, default:any) -> any",
@@ -431,7 +447,12 @@ class Interpreter:
                 print(f"[AI preamble exec] {e}", flush=True)
         for d in self.program.decls:
             if isinstance(d, GlobalStmt):
-                self.exec_stmt(d.stmt, frame)
+                # トップレベルの文で失敗しても、そこで止めずに続ける
+                # （OCaml 版は [Top-level CallStmt error] と出して続ける）。
+                try:
+                    self.exec_stmt(d.stmt, frame)
+                except Exception as e:
+                    print(f"[Top-level error] {e}", flush=True)
         # Make every globally-scoped actor reachable by name to remote
         # senders, matching OCaml's "actor_exists" behaviour.
         try:
@@ -630,7 +651,9 @@ class Interpreter:
                 reply_future.set(r.value)
                 reply_future = None    # don't override below with None
         # If the method never called reply(), unblock any waiter with None.
-        if reply_future is not None:
+        # ただし replyto で返信先を持ち出していたら、義務は他所へ移っている。
+        # ここで None を入れると委譲した先の answer が間に合わなくなる。
+        if reply_future is not None and not getattr(reply_future, "_delegated", False):
             reply_future.set(None)
 
     # ------------------------------------------------------------------
@@ -916,6 +939,20 @@ class Interpreter:
         if kind is FloatLit:  return e.val
         if kind is StringLit: return e.val
         if kind is Var:
+            # ★ replyto ---- いま処理しているメッセージの返信先を値にする。
+            #    ABCL/1 の reply destination を線形に扱って取り戻したもの。
+            if e.name == "replyto":
+                fut = frame.get_reply_future()
+                if fut is None:
+                    raise RuntimeError("replyto: no message is being handled")
+                # 返信の義務を持ち出した印。これが無いと、メソッドが
+                # reply しないまま終わった時点で None で解決されてしまい、
+                # あとから answer しても遅い（委譲が成立しない）。
+                try:
+                    fut._delegated = True
+                except Exception:
+                    pass
+                return AiplReplyTo(fut)
             # Standard lookup, but if the name resolves to a user function
             # (top-level or in-class) and isn't shadowed locally, return a
             # FunctionRef so typeof / printing surface a function value.
@@ -3006,6 +3043,83 @@ def _b_type_check(args, frame, interp):
 _held_res = set()
 
 
+# ---- メッシュ配備 -----------------------------------------------------
+# アクターのソースを他ノードへ送り、相手先で構文解析・型検査してから
+# 実体化する。輸送は同一プロセス内で模しているが、言語から見える形
+# （何を送り、相手が何を検査するか）は実機と同じ。
+_unit_src = {}          # クラス名 -> そのクラスを定義したソース原文
+_node_policy = {}       # ノード名 -> 許す効果の集合
+
+
+def register_unit_source(cls_name, src):
+    _unit_src[cls_name] = src
+
+
+def _b_source_of(args, frame, interp):
+    cls = args[0] if args else None
+    if cls not in _unit_src:
+        raise RuntimeError("source_of: no source for class " + str(cls))
+    return _unit_src[cls]
+
+
+def _b_node_allow(args, frame, interp):
+    node, effs = args[0], args[1]
+    _node_policy[node] = {e.strip() for e in str(effs).split(",") if e.strip()}
+    return None
+
+
+def _b_deploy(args, frame, interp):
+    # 失敗は例外にする。呼び出し側（トップレベル）が拾って表示する。
+    node, cls, aname = args[0], args[1], args[2]
+    src = _unit_src.get(cls)
+    if src is None:
+        raise RuntimeError("deploy: no source for class " + str(cls))
+    # --- 相手先での処理（JIT）。実機では Xinu ノード側になる ---
+    from aipl_parser import parse as _parse
+    try:
+        prog = _parse(src)
+    except Exception:
+        raise RuntimeError("deploy: the shipped source does not parse at " + str(node))
+    from aipl_typeck import check as _check
+    issues = _check(prog, BUILTIN_SIGNATURES)
+    errs = [i for i in issues if "期限が無い" not in i.message]
+    if errs:
+        raise RuntimeError("deploy: the shipped source does not type-check at " + str(node))
+    # 受け入れ方針の照合
+    allowed = _node_policy.get(node)
+    if allowed is not None:
+        need = set()
+        for d in prog.decls:
+            if type(d).__name__ == "ClassDecl" and d.name == cls:
+                for m in d.methods:
+                    need |= set(getattr(m, "effects", None) or [])
+        over = need - allowed
+        if over:
+            raise RuntimeError(
+                "deploy: node %s does not accept effect(s) {%s} required by %s"
+                % (node, ", ".join(sorted(over)), cls))
+    # 相手先でクラスを登録して実体化する
+    for d in prog.decls:
+        if type(d).__name__ == "ClassDecl":
+            interp.classes[d.name] = d
+    handle = str(node) + "/" + str(aname)
+    a = interp.spawn_actor(cls, [], handle)
+    # remote("node","actor") は "node/actor" という名前へ落ちるので、
+    # 大域に同じ名前で登録しておけば送信が届く。
+    with interp._global_lock:
+        interp.globals[handle] = a
+    print("[deploy] %s -> %s (compiled at destination)" % (cls, handle))
+    return handle
+
+
+def _b_answer(args, frame, interp):
+    """answer(r, v) ---- 返信先 r へ v を返す。reply(v) はこの糖衣にあたる。"""
+    if len(args) < 2 or not isinstance(args[0], AiplReplyTo):
+        raise RuntimeError("answer(r, v): a reply destination and a value are expected")
+    args[0].fut.set(args[1])
+    return None
+
+
 def _b_is_ok(args, frame, interp) -> bool:
     if not args or not isinstance(args[0], AiplResult):
         raise RuntimeError("is_ok(r): a result is expected")
@@ -3289,6 +3403,10 @@ _BUILTINS = {
     "compile": _b_compile,
     "spawn":   _b_spawn,
     # result<τ> と資源
+    "answer":    _b_answer,
+    "source_of": _b_source_of,
+    "node_allow": _b_node_allow,
+    "deploy":    _b_deploy,
     "is_ok":     _b_is_ok,
     "timed_out": _b_timed_out,
     "value":     _b_result_value,
