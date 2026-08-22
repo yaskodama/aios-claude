@@ -591,6 +591,7 @@ class TypeChecker:
         self.fn_decl_effects: "dict[str, set]" = {}
         self.fn_observed_effects: "dict[str, set]" = {}
         self._wait_edges: list = []      # now / await の辺
+        self._remote_waits: list = []    # (待つ側, ノード名)
         self._current_observed_key: Optional[str] = None
         # Phase 14: linear / affine ownership tracking. `_moved` is the
         # set of var names that have been consumed in the current scope.
@@ -719,6 +720,23 @@ class TypeChecker:
         else:
             self._issue("global", "義務レベルが収束しない（待ちのグラフに閉路がある）")
             return
+        # ノード間のレベル。プログラム中の node_level("n", k) を読み、
+        # そのノードへの待ちが上へ向かうことを要求する。
+        floors = {}
+        for d in self.program.decls:
+            st = getattr(d, "stmt", None)
+            if st is not None and type(st).__name__ == "CallStmt" \
+               and getattr(st, "name", None) == "node_level":
+                args = getattr(st, "args", None) or []
+                if len(args) == 2 and type(args[0]).__name__ == "StringLit" \
+                   and type(args[1]).__name__ == "IntLit":
+                    floors[args[0].val] = args[1].val
+        for caller, node in self._remote_waits:
+            if node in floors and floors[node] <= lv.get(caller, 0):
+                self._issue("global",
+                            f"義務レベル: {caller} (@{lv.get(caller, 0)}) が"
+                            f" ノード {node}（下限 @{floors[node]}）を待っている"
+                            f"（ノードをまたぐ待ちは上へ向かわなければならない）")
         import os as _os
         if _os.environ.get("AIOS_SHOW_LEVELS") == "1":
             for k, v in sorted(lv.items(), key=lambda kv: kv[1]):
@@ -1425,6 +1443,11 @@ class TypeChecker:
             init = self._infer(e.init, env, where=where) if e.init is not None else "int"
             return ("array[" * len(e.sizes)) + init + ("]" * len(e.sizes))
         if kind is NowCall:
+            # remote("node","actor") は "node/actor" という宛先名になる。
+            # 宛先の実体は別ノードにあり見えないので、ノード単位で記録する。
+            if isinstance(e.target, str) and "/" in e.target and self._current_observed_key:
+                self._remote_waits.append(
+                    (self._current_observed_key, e.target.split("/", 1)[0]))
             self._validate_method_call(e.target, e.method, e.args, env, where,
                                        call_form="now")
             rt = self._method_return(e.target, e.method, env)
