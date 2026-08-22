@@ -662,8 +662,46 @@ class TypeChecker:
                 self._check_bad_deadlines([d.stmt], "top level")
         # Phase 12: compare declared vs observed effects per user function.
         self._check_effect_declarations()
+        self._check_reply_totality()
+        self._check_levels()
         self._check_wait_cycle()
         return self.issues
+
+    def _check_reply_totality(self):
+        """now/await で待たれるメソッドは、戻り値型に関わらず全経路で reply する。
+        デッドロックは循環待ちだけではない ---- 閉路が無くても、
+        呼ばれる側が reply しなければ待ちは返らない。"""
+        waited = {b for _, b in self._wait_edges}
+        for d in self.program.decls:
+            if type(d).__name__ != "ClassDecl":
+                continue
+            for m in d.methods:
+                key = f"{d.name}.{m.name}"
+                if key not in waited:
+                    continue
+                stmts = _stmts_of(getattr(m, "body", None))
+                if _uses_replyto(stmts):
+                    continue
+                if not _replies_on_all_paths(stmts):
+                    self._issue(f"method {d.name}.{m.name}",
+                                "now/await で待たれるのに、reply しない経路がある")
+
+    def _check_levels(self):
+        """義務レベル。now/await は厳密に大きいレベルへしか向かえない。
+        両端に注釈があるときだけ検査する（明示宣言のみの段階）。"""
+        lv = {}
+        for d in self.program.decls:
+            if type(d).__name__ != "ClassDecl":
+                continue
+            for m in d.methods:
+                n = getattr(m, "level", None)
+                if n is not None:
+                    lv[f"{d.name}.{m.name}"] = n
+        for a, b in self._wait_edges:
+            if a in lv and b in lv and lv[b] <= lv[a]:
+                self._issue("global",
+                            f"義務レベル: {a} (@{lv[a]}) が {b} (@{lv[b]}) を待っている"
+                            f"（待ちは厳密に大きいレベルへ向かわなければならない）")
 
     def _check_wait_cycle(self):
         """now / await の辺に閉路があれば循環待ち。

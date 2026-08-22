@@ -42,7 +42,9 @@ type_anno: ":" type_expr
 // `expr` (not INT) so dimensions can be variables, fields, or any expression.
 dim_list: ("[" expr "]")+
 
-method_decl: "method" NAME "(" params ")" return_anno? effect_anno? "{" stmt* "}"
+method_decl: "method" NAME "(" params ")" return_anno? level_anno? effect_anno? "{" stmt* "}"
+// 義務レベル。now/await は厳密に大きいレベルへしか向かえない。
+level_anno: "@" INT                                             -> level_anno
 params: (param ("," param)*)?
 // Optional type annotation on each parameter, e.g. `method add(a: int, b: int)`.
 param: NAME type_anno?

@@ -440,6 +440,9 @@ class _Builder(Transformer):
     def ref_paren(self, items):
         return "(" + str(items[0]) + ")"
 
+    def level_anno(self, n):
+        return int(n)
+
     @v_args(inline=False)
     def method_decl(self, items):
         # items: [NAME, params, return_anno?, effect_anno?, *body_stmts]
@@ -448,17 +451,25 @@ class _Builder(Transformer):
         idx = 2
         ret_anno: Optional[str] = None
         effects: Optional[list] = None
+        level: Optional[int] = None
         if idx < len(items) and isinstance(items[idx], str):
             ret_anno = items[idx]; idx += 1
+        if idx < len(items) and isinstance(items[idx], int):
+            level = items[idx]; idx += 1
         if idx < len(items) and isinstance(items[idx], list):
             effects = items[idx]; idx += 1
         body_stmts = items[idx:]
         param_names = [p[0] for p in params_raw]
         param_annos = [p[1] for p in params_raw]
-        return MethodDecl(name, param_names, Block(list(body_stmts)),
+        md = MethodDecl(name, param_names, Block(list(body_stmts)),
                           return_annotation=ret_anno,
                           param_annotations=param_annos,
                           effects=effects)
+        try:
+            object.__setattr__(md, "level", level)
+        except Exception:
+            pass
+        return md
 
     @v_args(inline=False)
     def function_decl(self, items):
