@@ -667,10 +667,137 @@ class TypeChecker:
         self._check_effect_declarations()
         self._scan_selects()
         self._check_selects()
+        self._check_protocols()
         self._check_reply_totality()
         self._check_levels()
         self._check_wait_cycle()
         return self.issues
+
+    def _check_protocols(self):
+        """セッション型 ---- 実行時のプロトコルを型検査へ持ち上げる。
+        protocol_define / protocol_start / protocol_end を読み、
+        トップレベルの送信の順序が約束どおりかを走らせる前に見る。
+        セッションがアクターをまたぐ場合は静的に追えないので、
+        「やり残し」は既定では言わない（AIOS_STRICT_PROTOCOL=1 で警告）。"""
+        import os as _os
+
+        def parse_spec(spec):
+            out = []
+            for part in str(spec).split("->"):
+                part = part.strip()
+                if "." in part:
+                    a, m = part.split(".", 1)
+                    out.append((a.strip(), m.strip()))
+            return out
+
+        def sends_of(n, acc):
+            """文/式から (宛先, メソッド) をプログラム順に取り出す。"""
+            if n is None or isinstance(n, (str, int, float, bool)):
+                return
+            kn = type(n).__name__
+            # 引数を先に見てから自分を足す（now f(g(x)) の順序を保つ）
+            if kn in ("Send", "NowCall", "FutureCall"):
+                for a in (getattr(n, "args", None) or []):
+                    sends_of(a, acc)
+                t = getattr(n, "target", None)
+                m = getattr(n, "method", None)
+                if isinstance(t, str) and m:
+                    acc.append((t, m))
+                return
+            if kn in ("CallExpr", "CallStmt") and getattr(n, "name", None) in (
+                    "aios_now", "aios_send", "remote_now"):
+                args = getattr(n, "args", None) or []
+                if len(args) >= 2 and type(args[0]).__name__ == "StringLit" \
+                   and type(args[1]).__name__ == "StringLit":
+                    for a in args[2:]:
+                        sends_of(a, acc)
+                    acc.append((args[0].val, args[1].val))
+                    return
+            for f in getattr(n, "__dataclass_fields__", {}):
+                v = getattr(n, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        sends_of(x, acc)
+                else:
+                    sends_of(v, acc)
+
+        # 1) 宣言を集める
+        defs = {}
+        globals_ = [d.stmt for d in self.program.decls
+                    if type(d).__name__ == "GlobalStmt"]
+        for st in globals_:
+            if type(st).__name__ == "CallStmt" and getattr(st, "name", None) == "protocol_define":
+                args = getattr(st, "args", None) or []
+                if len(args) == 2 and all(type(a).__name__ == "StringLit" for a in args):
+                    defs[args[0].val] = parse_spec(args[1].val)
+        if not defs:
+            return
+
+        # トップレベルが行う送信をすべて集める（またぐかどうかの判定に使う）
+        top = []
+        for st in globals_:
+            sends_of(st, top)
+
+        active, cur, full = None, [], False
+        for st in globals_:
+            kn = type(st).__name__
+            name = getattr(st, "name", None)
+            # protocol_start は文でも `var sid = protocol_start(...)` でも来る
+            started = None
+            if kn == "CallStmt" and name == "protocol_start":
+                a = getattr(st, "args", None) or []
+                if a and type(a[0]).__name__ == "StringLit":
+                    started = a[0].val
+            elif kn == "VarDecl":
+                e = getattr(st, "expr", None)
+                if type(e).__name__ == "CallExpr" and getattr(e, "name", None) == "protocol_start":
+                    a = getattr(e, "args", None) or []
+                    if a and type(a[0]).__name__ == "StringLit":
+                        started = a[0].val
+            if started is not None:
+                if started not in defs:
+                    self._issue("global", f"protocol_start: 未知のプロトコル {started}")
+                else:
+                    active, cur = started, list(defs[started])
+                    full = all(s in top for s in defs[started])
+                continue
+            if kn == "CallStmt" and name == "protocol_end":
+                if active is not None and cur:
+                    a, m = cur[0]
+                    msg = (f"プロトコル {active} が protocol_end の時点で未完了"
+                           f"（次に期待するのは {a}.{m}）")
+                    if full:
+                        self._issue("global", msg)
+                    elif _os.environ.get("AIOS_STRICT_PROTOCOL") == "1":
+                        self.warnings.append(TypeIssue("global", msg, None, None))
+                active, cur = None, []
+                continue
+            if active is None:
+                continue
+            acc = []
+            sends_of(st, acc)
+            all_steps = defs[active]
+            for (t, m) in acc:
+                # 手順に無い宛先はこのセッションと無関係
+                if (t, m) not in all_steps:
+                    continue
+                if not cur:
+                    continue
+                ea, em = cur[0]
+                if (ea, em) == (t, m):
+                    cur = cur[1:]
+                else:
+                    self._issue("global",
+                                f"プロトコル {active}: {ea}.{em} を期待しているが"
+                                f" {t}.{m} を送っている")
+                    return
+        if active is not None and cur:
+            a, m = cur[0]
+            msg = f"プロトコル {active} が完了していない（次に期待するのは {a}.{m}）"
+            if full:
+                self._issue("global", msg)
+            elif _os.environ.get("AIOS_STRICT_PROTOCOL") == "1":
+                self.warnings.append(TypeIssue("global", msg, None, None))
 
     def _scan_selects(self):
         """select の case が待つメッセージと、期限の有無を集める。
