@@ -688,20 +688,42 @@ class TypeChecker:
 
     def _check_levels(self):
         """義務レベル。now/await は厳密に大きいレベルへしか向かえない。
-        両端に注釈があるときだけ検査する（明示宣言のみの段階）。"""
-        lv = {}
+        注釈が無いメソッドにはレベルを推論する ---- 待ちの辺 (a, b) を見て
+        level(b) <= level(a) なら b を押し上げる、を不動点まで繰り返す。
+        明示注釈は固定点で、押し上げが要るのに動かせなければそこが矛盾。
+        これで片方にしか注釈が無い辺も検査できる。"""
+        lv, fixed = {}, set()
         for d in self.program.decls:
             if type(d).__name__ != "ClassDecl":
                 continue
             for m in d.methods:
+                key = f"{d.name}.{m.name}"
                 n = getattr(m, "level", None)
+                lv[key] = n if n is not None else 0
                 if n is not None:
-                    lv[f"{d.name}.{m.name}"] = n
-        for a, b in self._wait_edges:
-            if a in lv and b in lv and lv[b] <= lv[a]:
-                self._issue("global",
-                            f"義務レベル: {a} (@{lv[a]}) が {b} (@{lv[b]}) を待っている"
-                            f"（待ちは厳密に大きいレベルへ向かわなければならない）")
+                    fixed.add(key)
+        for _ in range(1000):
+            changed = False
+            for a, b in self._wait_edges:
+                la, lb = lv.get(a, 0), lv.get(b, 0)
+                if lb <= la:
+                    if b in fixed:
+                        self._issue("global",
+                                    f"義務レベル: {a} (@{la}) が {b} (@{lb}) を待っている"
+                                    f"（待ちは厳密に大きいレベルへ向かわなければならない）")
+                        return
+                    lv[b] = la + 1
+                    changed = True
+            if not changed:
+                break
+        else:
+            self._issue("global", "義務レベルが収束しない（待ちのグラフに閉路がある）")
+            return
+        import os as _os
+        if _os.environ.get("AIOS_SHOW_LEVELS") == "1":
+            for k, v in sorted(lv.items(), key=lambda kv: kv[1]):
+                print(f"[level] {k:<28} @{v}"
+                      + (" (declared)" if k in fixed else ""), flush=True)
 
     def _check_wait_cycle(self):
         """now / await の辺に閉路があれば循環待ち。
