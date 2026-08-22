@@ -698,36 +698,110 @@ class TypeChecker:
                     out.append((a.strip(), m.strip()))
             return out
 
-        def sends_of(n, acc):
-            """文/式から (宛先, メソッド) をプログラム順に取り出す。"""
+        # ---- 宛先の解決表 ------------------------------------------
+        # 手順は "main_thread.run" のようにアクターの変数名で書かれるが、
+        # 送信は aios_now("main", "run", ...) のようにサービス名で書かれる。
+        # 両者は aios_register_service("main", "main_thread") で結ばれる。
+        svc_actor, var_class, field_class, methods_of = {}, {}, {}, {}
+        for d in self.program.decls:
+            kd = type(d).__name__
+            if kd == "ClassDecl":
+                for fd in (d.fields or []):
+                    if type(fd).__name__ == "VarNew":
+                        field_class[(d.name, fd.name)] = fd.cls_name
+                    elif type(fd).__name__ == "VarDecl" and \
+                            type(getattr(fd, "expr", None)).__name__ == "NewExpr":
+                        field_class[(d.name, fd.name)] = fd.expr.class_name
+                for md in (d.methods or []):
+                    methods_of[(d.name, md.name)] = md
+            elif kd == "GlobalStmt":
+                st = d.stmt
+                kn = type(st).__name__
+                if kn == "VarNew":
+                    var_class[st.name] = st.cls_name
+                elif kn == "VarDecl" and \
+                        type(getattr(st, "expr", None)).__name__ == "NewExpr":
+                    var_class[st.name] = st.expr.class_name
+                elif kn == "CallStmt" and getattr(st, "name", None) == "aios_register_service":
+                    ar = getattr(st, "args", None) or []
+                    if len(ar) == 2 and all(type(x).__name__ == "StringLit" for x in ar):
+                        svc_actor[ar[0].val] = ar[1].val
+
+        # 非同期の呼び先が手順を含んでいた = 静的に順序を決められない
+        state = {"unsequenced": False, "steps": []}
+
+        def class_of(cls, params, a):
+            if a in params:
+                return params[a]
+            if cls is not None and (cls, a) in field_class:
+                return field_class[(cls, a)]
+            return var_class.get(a)
+
+        def expand(vis, cls, params, target, m, sync, acc):
+            """送信ひとつを、それ自身と（同期なら）呼び先の送信列に展開する。
+
+            同期の送信（now / aios_now）は、呼び先が呼び出し側の続きより
+            先に走り切るので、その送信列をその場に差し込んでよい。
+            非同期は順序が決まらないので差し込まず、呼び先が手順を含むなら
+            「静的に並べられない」と印を付ける。"""
+            a = svc_actor.get(target, target)
+            acc.append((a, m))
+            c = class_of(cls, params, a)
+            md = methods_of.get((c, m)) if c is not None else None
+            if md is None:
+                # 手順の宛先なのに本体が見えないなら、続きがそこで進むかもしれない
+                if (a, m) in state["steps"]:
+                    state["unsequenced"] = True
+                return
+            if (c, m) in vis:
+                return                      # 再帰は一度で止める
+            sub = dict(params)
+            for nm, ann in zip(md.params, (md.param_annotations or [])):
+                if ann and ann[:1].isupper():
+                    sub[nm] = ann
+                else:
+                    sub.pop(nm, None)
+            inner = []
+            sends_of(md.body, inner, vis + [(c, m)], c, sub)
+            if sync:
+                acc.extend(inner)
+            elif any(x in state["steps"] for x in inner):
+                state["unsequenced"] = True
+
+        def sends_of(n, acc, vis=(), cls=None, params=None):
+            """文/式から (宛先, メソッド) をプログラム順に取り出す。
+            同期の送信では呼び先の本体を展開する（振る舞い展開）。"""
             if n is None or isinstance(n, (str, int, float, bool)):
                 return
+            vis = list(vis)
+            params = params if params is not None else {}
             kn = type(n).__name__
             # 引数を先に見てから自分を足す（now f(g(x)) の順序を保つ）
             if kn in ("Send", "NowCall", "FutureCall"):
                 for a in (getattr(n, "args", None) or []):
-                    sends_of(a, acc)
+                    sends_of(a, acc, vis, cls, params)
                 t = getattr(n, "target", None)
                 m = getattr(n, "method", None)
                 if isinstance(t, str) and m:
-                    acc.append((t, m))
+                    expand(vis, cls, params, t, m, kn == "NowCall", acc)
                 return
             if kn in ("CallExpr", "CallStmt") and getattr(n, "name", None) in (
-                    "aios_now", "aios_send", "remote_now"):
+                    "aios_now", "aios_send", "aios_future", "remote_now"):
                 args = getattr(n, "args", None) or []
                 if len(args) >= 2 and type(args[0]).__name__ == "StringLit" \
                    and type(args[1]).__name__ == "StringLit":
                     for a in args[2:]:
-                        sends_of(a, acc)
-                    acc.append((args[0].val, args[1].val))
+                        sends_of(a, acc, vis, cls, params)
+                    expand(vis, cls, params, args[0].val, args[1].val,
+                           n.name in ("aios_now", "remote_now"), acc)
                     return
             for f in getattr(n, "__dataclass_fields__", {}):
                 v = getattr(n, f, None)
                 if isinstance(v, list):
                     for x in v:
-                        sends_of(x, acc)
+                        sends_of(x, acc, vis, cls, params)
                 else:
-                    sends_of(v, acc)
+                    sends_of(v, acc, vis, cls, params)
 
         # 1) 宣言を集める
         defs = {}
@@ -741,10 +815,13 @@ class TypeChecker:
         if not defs:
             return
 
-        # トップレベルが行う送信をすべて集める（またぐかどうかの判定に使う）
-        top = []
+        # 送信列を一度全部展開して、静的に並べきれたかを見る。
+        # 並べきれたなら、セッションがアクターをまたいでいても
+        # 「やり残し」を誤りと言ってよい。
+        state["steps"] = [s for v in defs.values() for s in v]
         for st in globals_:
-            sends_of(st, top)
+            sends_of(st, [])
+        sequenced = not state["unsequenced"]
 
         active, cur, full = None, [], False
         for st in globals_:
@@ -767,7 +844,7 @@ class TypeChecker:
                     self._issue("global", f"protocol_start: 未知のプロトコル {started}")
                 else:
                     active, cur = started, list(defs[started])
-                    full = all(s in top for s in defs[started])
+                    full = sequenced
                 continue
             if kn == "CallStmt" and name == "protocol_end":
                 if active is not None and cur:
