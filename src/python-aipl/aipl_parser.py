@@ -59,6 +59,15 @@ class _Builder(Transformer):
         return NowCall("self", str(method), list(args.children), (int(ms), alt))
     def await_dl(self, e, ms, alt):
         return AwaitExpr(e, (int(ms), alt))
+
+    # else を書かない形。deadline の第2要素を None にして、
+    # 「値は result<τ> になる」ことを表す。
+    def now_call_res(self, target, method, args, ms):
+        return NowCall(str(target), str(method), list(args.children), (int(ms), None))
+    def now_self_res(self, method, args, ms):
+        return NowCall("self", str(method), list(args.children), (int(ms), None))
+    def await_res(self, e, ms):
+        return AwaitExpr(e, (int(ms), None))
     def await_expr(self, e):
         # `await x` desugars to the existing `await(x)` builtin call.
         return CallExpr("await", [e])

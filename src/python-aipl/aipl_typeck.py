@@ -204,15 +204,47 @@ def _strip_linear(t: str) -> tuple:
     return False, t
 
 
+def _actor_class_of(t: str):
+    """`actor(C)` なら "C"、大文字で始まる裸の識別子ならそれ自身（クラス名の注釈）。
+    それ以外は None。"""
+    if not t:
+        return None
+    if t.startswith("actor(") and t.endswith(")"):
+        return t[len("actor("):-1].split(",")[0].strip()
+    if t[0].isupper() and t.replace("_", "").isalnum():
+        return t
+    return None
+
+
+def _is_result(t: str) -> bool:
+    return isinstance(t, str) and t.startswith("result[")
+
+
 def _compatible(expected: str, actual: str) -> bool:
     # Phase 14: linearity is a separate dimension from element type.
     # Strip both sides so `linear int` matches `int` for compat purposes.
     _, expected = _strip_linear(expected)
     _, actual = _strip_linear(actual)
+    # 裸の `result` は、どの result<τ> とも合う（is_ok / value の引数）。
+    if expected == "result" and _is_result(actual):
+        return True
+    if actual == "result" and _is_result(expected):
+        return True
+    # それ以外では result<τ> は any とも混ざらない。ここを緩めると
+    # 「期限切れかもしれない値」が普通の値として流れてしまう。
+    if _is_result(expected) != _is_result(actual):
+        return False
     if expected == "any" or actual == "any":
         return True
     if expected == actual:
         return True
+    # クラス名の注釈 `A` と、値の型 `actor(A)` は同じものを指す。
+    # ここを揃えないと `method f(x: A)` に actor(B) を渡しても素通りする
+    # （OCaml 版 unify の TActor 分岐と同じ規律）。
+    _e_cls, _a_cls = _actor_class_of(expected), _actor_class_of(actual)
+    if _e_cls is not None and _a_cls is not None:
+        # "?" は実行時の値から来た未知のクラス。どちらとも合わせる。
+        return _e_cls == _a_cls or "?" in (_e_cls, _a_cls)
     # Union forms: split on `|` and check intersection.
     if "|" in expected:
         es = {e.strip() for e in expected.split("|")}
@@ -424,6 +456,61 @@ def _replies_here(st) -> bool:
 
 
 
+def _is_stmt(n) -> bool:
+    return type(n).__name__ in _STMT_NAMES
+
+
+def _deadline_ms(e):
+    """deadline から待ち時間(ms)を取り出す。取れなければ None。"""
+    d = getattr(e, "deadline", None)
+    if d is None:
+        return None
+    for attr in ("ms", "millis", "timeout"):
+        v = getattr(d, attr, None)
+        if isinstance(v, int):
+            return v
+        if v is not None and isinstance(getattr(v, "value", None), int):
+            return v.value
+    if isinstance(d, (list, tuple)) and d and isinstance(d[0], int):
+        return d[0]
+    return None
+
+
+def _scan_bad_deadlines(stmts):
+    """期限が正でない now / await を拾う（0 や負は待ちにならない）。"""
+    bad = []
+
+    def walk_expr(e):
+        if e is None or isinstance(e, (str, int, float, bool)):
+            return
+        if isinstance(e, (NowCall, AwaitExpr)):
+            ms = _deadline_ms(e)
+            if ms is not None and ms <= 0:
+                bad.append(("now" if isinstance(e, NowCall) else "await", ms))
+        for f in getattr(e, "__dataclass_fields__", {}):
+            v = getattr(e, f, None)
+            if isinstance(v, list):
+                for x in v:
+                    walk_expr(x)
+            else:
+                walk_expr(v)
+
+    def walk_stmt(s):
+        if s is None:
+            return
+        for f in getattr(s, "__dataclass_fields__", {}):
+            v = getattr(s, f, None)
+            if isinstance(v, list):
+                for x in v:
+                    (walk_stmt if _is_stmt(x) else walk_expr)(x)
+            elif v is not None and not isinstance(v, (str, int, float, bool)):
+                (walk_stmt if _is_stmt(v) else walk_expr)(v)
+
+    for s in stmts:
+        walk_stmt(s)
+    return bad
+
+
 def _scan_unbounded_waits(stmts):
     """期限を書いていない now / await を拾って種別を返す。"""
     found = []
@@ -480,6 +567,7 @@ class TypeChecker:
         # fn_sigs) and observed effects (filled during walk).
         self.fn_decl_effects: "dict[str, set]" = {}
         self.fn_observed_effects: "dict[str, set]" = {}
+        self._wait_edges: list = []      # now / await の辺
         self._current_observed_key: Optional[str] = None
         # Phase 14: linear / affine ownership tracking. `_moved` is the
         # set of var names that have been consumed in the current scope.
@@ -519,6 +607,10 @@ class TypeChecker:
     # ----- top-level driver --------------------------------------------
     def check(self) -> list[TypeIssue]:
         self._build_user_sigs()
+        # トップレベルの文は環境を共有する。ここを毎回 {} にしていたため
+        # `var u = new Use(); send u.f(b);` の u が未知になり、
+        # トップレベルの呼び出しは引数がひとつも照合されていなかった。
+        global_env: dict = {}
         for d in self.program.decls:
             if isinstance(d, FunctionDecl):
                 self._check_function(d, where=f"function {d.name}",
@@ -538,15 +630,59 @@ class TypeChecker:
                     self._check_function(fn, where=f"function {d.name}.{fn.name}",
                                          observed_key=f"{d.name}.{fn.name}")
             elif isinstance(d, GlobalStmt):
-                self._check_stmt(d.stmt, env={}, where="global")
+                self._check_stmt(d.stmt, env=global_env, where="global")
                 # トップレベルにも期限なしの待ちは現れる
                 # （クラスの外で `print(now front.place(3));` と書ける）。
                 # ここを見落とすと OCaml 版が3件出すファイルで1件しか出ず、
                 # 検査が過小報告になる。
                 self._check_deadlines_only([d.stmt], "top level")
+                self._check_bad_deadlines([d.stmt], "top level")
         # Phase 12: compare declared vs observed effects per user function.
         self._check_effect_declarations()
+        self._check_wait_cycle()
         return self.issues
+
+    def _check_wait_cycle(self):
+        """now / await の辺に閉路があれば循環待ち。
+        効果の伝播に使う辺をそのまま流用するので、検査はほぼ只である。
+        メソッド単位の保守的な検査で、遠隔配備先は見えない。"""
+        succ: dict = {}
+        for a, b in self._wait_edges:
+            succ.setdefault(a, []).append(b)
+        state: dict = {}
+        found = []
+
+        def dfs(path, n):
+            if found:
+                return
+            st = state.get(n, 0)
+            if st == 1:
+                cyc, seen = [], False
+                for x in path:
+                    if x == n:
+                        seen = True
+                    if seen:
+                        cyc.append(x)
+                found.append(cyc + [n] if cyc else [n])
+                return
+            if st == 2:
+                return
+            state[n] = 1
+            for m in succ.get(n, []):
+                dfs(path + [n], m)
+            state[n] = 2
+
+        for k in list(succ):
+            if not found:
+                dfs([], k)
+        if found:
+            import os as _os
+            msg = ("循環待ち: " + " -> ".join(found[0])
+                   + "（now/await の閉路。期限が無ければ確実に詰まる）")
+            if _os.environ.get("AIOS_LAX_WAIT") in ("1", "true", "yes"):
+                self.warnings.append(TypeIssue("global", msg, None, None))
+            else:
+                self._issue("global", msg)
 
     def _check_reply_and_deadlines(self, fn, where: str):
         """reply の線形性と、期限なしの待ちを見る（OCaml 版 infer.ml と同じ規律）。"""
@@ -561,6 +697,7 @@ class TypeChecker:
         n = _max_replies(stmts)
         if n >= 2:
             self._issue(where, "reply が複数回起こりうる（返信は高々一度）")
+        self._check_reply_types(fn, stmts, where)
         ret = getattr(fn, "return_annotation", None)
         # return で返しているなら義務は果たされている
         if ret and ret != "unit" and not _has_return(stmts):
@@ -571,6 +708,131 @@ class TypeChecker:
                             f"戻り値型 {ret} を宣言しているが reply しない経路がある")
 
         self._check_deadlines_only(stmts, where)
+        self._check_bad_deadlines(stmts, where)
+        self._check_resource_use(fn, where)
+
+    def _check_reply_types(self, fn, stmts, where: str):
+        """reply(e) の e の型が、宣言した戻り値型と合うか。
+        OCaml 版は ρ 表で reply 地点と宣言を結んでいるが、
+        Py-I にはこの照合がどこにも無く、
+        `method f(x) : int { reply("s"); }` が素通りしていた。"""
+        ret = getattr(fn, "return_annotation", None)
+        if not ret or ret == "unit" or ret == "any":
+            return
+        env = {p: (a or "any") for p, a in
+               zip(fn.params, fn.param_annotations or [])}
+        for f in getattr(self, "_current_fields", set()):
+            env.setdefault(f, "any")
+
+        def visit(n):
+            if n is None or isinstance(n, (str, int, float, bool)):
+                return
+            kn = type(n).__name__
+            if kn in ("CallStmt", "CallExpr") and getattr(n, "name", None) == "reply":
+                args = getattr(n, "args", None) or []
+                if len(args) == 1:
+                    actual = self._infer(args[0], env, where=where)
+                    if not _compatible(ret, actual):
+                        self._issue(where,
+                                    f"reply の型が宣言した戻り値型と合わない",
+                                    ret, actual)
+            for f in getattr(n, "__dataclass_fields__", {}):
+                v = getattr(n, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        visit(x)
+                else:
+                    visit(v)
+
+        for st in stmts:
+            visit(st)
+
+    def _check_resource_use(self, fn, where: str):
+        """acquire / release の対を本体の中で追う（順序つきの効果）。
+        効果は集合なので「取得したら解放する」を表せない。
+        OCaml 版 infer.ml の check_resource_use と同じ規律:
+          1. メソッドを抜けるとき持ち物が残っていてはならない
+          2. 持っていない資源を release してはならない
+          3. 二重に acquire してはならない
+        if の二つの枝は同じ持ち物で合流し、while の本体は持ち物を変えない。"""
+        def name_of(n):
+            args = getattr(n, "args", None) or []
+            if len(args) == 1 and type(args[0]).__name__ in ("StringLit", "StrLit"):
+                return getattr(args[0], "val", getattr(args[0], "value", None))
+            return None
+
+        def expr_held(e, held):
+            if e is None or isinstance(e, (str, int, float, bool)):
+                return held
+            kn = type(e).__name__
+            if kn in ("CallExpr", "CallStmt"):
+                fname = getattr(e, "name", None)
+                r = name_of(e)
+                if fname == "acquire" and r is not None:
+                    if r in held:
+                        self._issue(where, f"資源 {r} を二重に acquire している")
+                        return held
+                    return held | {r}
+                if fname == "release" and r is not None:
+                    if r not in held:
+                        self._issue(where, f"取得していない資源 {r} を release している")
+                        return held
+                    return held - {r}
+            for f in getattr(e, "__dataclass_fields__", {}):
+                v = getattr(e, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        held = expr_held(x, held)
+                elif v is not None:
+                    held = expr_held(v, held)
+            return held
+
+        def stmt_held(st, held):
+            if st is None:
+                return held
+            kn = type(st).__name__
+            if kn == "Block":
+                for x in st.stmts:
+                    held = stmt_held(x, held)
+                return held
+            if kn == "If":
+                h = expr_held(st.cond, held)
+                ha = stmt_held(st.then_body, h)
+                hb = stmt_held(st.else_body, h) if st.else_body is not None else h
+                if ha != hb:
+                    d = (ha - hb) | (hb - ha)
+                    self._issue(where,
+                        "二つの枝で持っている資源が食い違う（" + ", ".join(sorted(d)) + "）")
+                return ha
+            if kn == "While":
+                h = expr_held(st.cond, held)
+                hb = stmt_held(st.body, h)
+                if hb != h:
+                    self._issue(where, "ループの本体は持ち物を変えてはならない")
+                return h
+            if kn in ("CallStmt",):
+                return expr_held(st, held)
+            for f in getattr(st, "__dataclass_fields__", {}):
+                v = getattr(st, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        held = (stmt_held if _is_stmt(x) else expr_held)(x, held)
+                elif v is not None and not isinstance(v, (str, int, float, bool)):
+                    held = (stmt_held if _is_stmt(v) else expr_held)(v, held)
+            return held
+
+        left = stmt_held(getattr(fn, "body", None), frozenset())
+        if left:
+            self._issue(where,
+                "資源 " + ", ".join(sorted(left)) + " を持ったままメソッドを抜けている")
+
+    def _check_bad_deadlines(self, stmts, where: str):
+        """期限が正でない now / await。0 ミリ秒は待ちにならないので、
+        書いた本人の意図と実際がずれる。OCaml 版は
+        `timeout must be positive` として弾いている。"""
+        for kind, ms in _scan_bad_deadlines(stmts):
+            self._issue(where,
+                        f"{kind} の期限が {ms} ミリ秒（正の値でなければならない）")
 
     def _check_deadlines_only(self, stmts, where: str):
         """期限なしの now / await（OCaml 版は既定で警告、
@@ -598,9 +860,14 @@ class TypeChecker:
         # `field = expr;` and `field` reads inside method bodies type-check
         # against the field's annotation (Phase 11d/11e benefit).
         cls_name = self._owning_class(where)
+        # 効果 mut / mem を出すために、囲むクラスのフィールド名を憶えておく。
+        # OCaml 版 infer.ml は current_fields で同じことをしている。
+        prev_fields = getattr(self, "_current_fields", set())
+        self._current_fields = set()
         if cls_name:
             cls = self.classes_by_name.get(cls_name)
             if cls is not None:
+                self._current_fields = {f.name for f in cls.fields}
                 for f in cls.fields:
                     if f.name in env:
                         continue   # parameter shadows field
@@ -609,6 +876,7 @@ class TypeChecker:
                     else:
                         env[f.name] = self._infer(f.expr, {}, where=where)
         self._check_block(fn.body, env, fn.return_annotation, where)
+        self._current_fields = prev_fields
         self._current_observed_key = prev_key
         self._moved = prev_moved
 
@@ -636,9 +904,23 @@ class TypeChecker:
                             s.type_annotation, actual)
             env[s.name] = s.type_annotation or actual
         elif kind is VarNew:
+            self._add_effects({"mem"})          # 動的割り付け
             env[s.name] = f"actor({s.cls_name})"
             self._check_constructor(s.cls_name, s.args, env, where)
         elif kind is Assign:
+            # 自分のフィールドへの代入は状態変更＝mut
+            if s.name in getattr(self, "_current_fields", set()):
+                self._add_effects({"mut"})
+            # 未宣言の名前への代入。読み出しは弾いているのに代入だけ素通りしていた。
+            # フィールド名を打ち間違えると、フィールドは更新されないまま
+            # 別の変数ができて何のエラーも出ない。
+            import os as _os
+            if (s.name not in env
+                    and s.name not in getattr(self, "_current_fields", set())
+                    and _os.environ.get("AIOS_LAX_ASSIGN") not in ("1", "true", "yes")):
+                self._issue(where,
+                            f"未宣言の名前 `{s.name}` に代入している"
+                            f"（`var {s.name} = ...` と宣言する）")
             actual = self._infer(s.expr, env, where=where)
             expected = env.get(s.name, "any")
             if expected != "any" and not _compatible(expected, actual):
@@ -708,6 +990,7 @@ class TypeChecker:
                     f"(Phase 15: symbol_owned enforcement)")
             self._infer(s.expr, env, where=where)
         elif kind is Become:
+            self._add_effects({"mut", "mem"})   # 振る舞いの置換は状態変更＋割り付け
             self._check_constructor(s.cls_name, s.args, env, where)
 
     # ----- constructor / method dispatch -------------------------------
@@ -724,17 +1007,34 @@ class TypeChecker:
     def _validate_method_call(self, target: str, method: str, args: list,
                               env: dict, where: str, call_form: str = "now") -> Optional[dict]:
         actor_t = env.get(target, "any") if target not in ("self", "sender") else "any"
-        cls_name = None
-        if actor_t.startswith("actor(") and actor_t.endswith(")"):
-            cls_name = actor_t[len("actor("):-1].split(",")[0].strip()
-        if cls_name is None:
+        # 宛先は `actor(C)`（new で作った変数）とは限らず、
+        # `method f(x: D)` のように注釈だけのこともある。
+        # actor(...) の形しか見ていなかったため、引数に受け取ったアクターへの
+        # 送信は「メソッドの存在・引数の数・引数の型」がひとつも検査されていなかった。
+        cls_name = _actor_class_of(actor_t)
+        if cls_name in (None, "?", "any"):
             return None
         key = f"{cls_name}.{method}"
         sig = self.fn_sigs.get(key)
         if sig is None:
+            # クラスが分かっているのにそのメソッドが無いなら、それは誤りである。
+            # 黙って None を返していたため `send x.nosuch()` が素通りしていた。
+            # クラス自体を知らない場合（外部・リモート）は従来どおり黙る。
+            cls = self.classes_by_name.get(cls_name)
+            if cls is not None:
+                self._issue(where,
+                            f"actor({cls_name}) に メソッド `{method}` が無い")
             return None
-        # Phase 12: a method call inherits the method's declared effects.
-        self._observe_effects_from(key)
+        # 呼ばれる側の効果を引き継ぐのは「待つ」呼び出しだけ。
+        # send は送って待たないので引き継がない
+        # （ガイド g6 の ViaSend に明記されている仕様。OCaml 版もそうしている）。
+        # ここで call_form を見ていなかったため、send しかしないメソッドまで
+        # ai / net を要求され、仕様どおりのプログラムが落ちていた。
+        if call_form != "send":
+            self._observe_effects_from(key)
+            # 待つ呼び出しの辺（待つ側 -> 待たれる側）。閉路＝循環待ち。
+            if self._current_observed_key:
+                self._wait_edges.append((self._current_observed_key, key))
         return self._validate_with_sig(f"{call_form} {target}.{method}", sig, args, env, where)
 
     def _validate_call(self, name: str, args: list, env: dict, where: str,
@@ -745,6 +1045,15 @@ class TypeChecker:
         if sig is None:
             return None
         return self._validate_with_sig(f"{kind_label} `{name}`", sig, args, env, where)
+
+    def _add_effects(self, effs):
+        """呼び出し以外の構文が生む効果を積む（フィールド代入・become・new）。
+        これが無いと `n = n + 1;` だけのメソッドの効果が空になり、
+        `!{log}` と宣言していても食い違いが出ない。"""
+        if self._current_observed_key is None:
+            return
+        bucket = self.fn_observed_effects.setdefault(self._current_observed_key, set())
+        bucket |= set(effs)
 
     def _observe_effects_from(self, callee: str):
         if self._current_observed_key is None:
@@ -866,6 +1175,13 @@ class TypeChecker:
         if kind is Binop:
             l = self._infer(e.lhs, env, where=where)
             r = self._infer(e.rhs, env, where=where)
+            # result<τ> は演算子に渡せない。期限切れかもしれない値を
+            # そのまま計算に流さないための壁（is_ok / value で取り出す）。
+            for side, t in (("左", l), ("右", r)):
+                if _is_result(t):
+                    self._issue(where,
+                        f"演算子 `{e.op}` の{side}が {t} である"
+                        f"（is_ok で成否を見て value で取り出す）")
             if e.op == "+":
                 if "string" in (l, r):    return "string"
                 if "float" in (l, r):     return "float"
@@ -936,7 +1252,19 @@ class TypeChecker:
         if kind is NowCall:
             self._validate_method_call(e.target, e.method, e.args, env, where,
                                        call_form="now")
-            return self._method_return(e.target, e.method, env)
+            rt = self._method_return(e.target, e.method, env)
+            # else を書かない期限つきの待ちは result<τ>。
+            # 成功したかどうかを型で持つので、そのまま値としては使えない。
+            dl = getattr(e, "deadline", None)
+            if dl is not None and dl[1] is None:
+                return f"result[{rt}]"
+            return rt
+        if kind is AwaitExpr:
+            dl = getattr(e, "deadline", None)
+            self._infer(e.fut, env, where=where)
+            if dl is not None and dl[1] is None:
+                return "result[any]"
+            return "any"
         if kind is FutureCall:
             self._validate_method_call(e.target, e.method, e.args, env, where,
                                        call_form="future")

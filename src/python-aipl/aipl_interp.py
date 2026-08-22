@@ -48,6 +48,20 @@ def _transient_check(value, declared_type, where: str) -> None:
         )
 
 
+class AiplResult:
+    """result<τ>。期限つきの待ちで else を書かなかったときの値。
+    ok=True なら value に結果、ok=False なら期限切れ。
+    is_ok / timed_out / value の組込みで取り出す。"""
+    __slots__ = ("ok", "value")
+
+    def __init__(self, ok, value=None):
+        self.ok = ok
+        self.value = value
+
+    def __repr__(self):
+        return "<ok:%r>" % (self.value,) if self.ok else "<timedout>"
+
+
 class Frame:
     """Lexical frame: locals chain back to a parent frame."""
     def __init__(
@@ -241,6 +255,13 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     "await":          "function(f:future) -> any",
     "future_done":    "function(f:future) -> bool",
     "become":         "function(class_name:string [, args+]) -> unit",   # (also a stmt)
+    # result<τ> を扱う組込み（期限つきの待ちで else を書かないと result が返る）
+    "is_ok":          "function(r:result) -> bool",
+    "timed_out":      "function(r:result) -> bool",
+    "value":          "function(r:result, default:any) -> any",
+    # 資源の取得と解放（順序つきの効果。対になっているかは型検査側で見る）
+    "acquire":        "function(name:string) -> unit",
+    "release":        "function(name:string) -> unit",
     # Classes / functions / typeof — meta
     "typeof":         "function(value:any) -> string",
     "type_check":     "function() -> array[string]",
@@ -970,6 +991,8 @@ class Interpreter:
             if not hasattr(fut, "get_timed"):
                 return fut
             ok, val = fut.get_timed(ms / 1000.0)
+            if alt is None:
+                return AiplResult(ok, val if ok else None)
             return val if ok else self.eval_expr(alt, frame)
         if kind is FutureCall:
             return self._do_future_send(e.target, e.method, e.args, frame)
@@ -988,6 +1011,8 @@ class Interpreter:
             return fut.get()
         ms, alt = deadline
         ok, val = fut.get_timed(ms / 1000.0)
+        if alt is None:
+            return AiplResult(ok, val if ok else None)
         return val if ok else self.eval_expr(alt, frame)
 
     def _do_future_send(self, target_name: str, method: str, raw_args: list, frame: Frame):
@@ -2977,6 +3002,44 @@ def _b_type_check(args, frame, interp):
         return [f"[type] checker error: {e}"]
 
 
+# 組込みは (args, frame, interp) で呼ばれる。
+_held_res = set()
+
+
+def _b_is_ok(args, frame, interp) -> bool:
+    if not args or not isinstance(args[0], AiplResult):
+        raise RuntimeError("is_ok(r): a result is expected")
+    return args[0].ok
+
+
+def _b_timed_out(args, frame, interp) -> bool:
+    if not args or not isinstance(args[0], AiplResult):
+        raise RuntimeError("timed_out(r): a result is expected")
+    return not args[0].ok
+
+
+def _b_result_value(args, frame, interp):
+    if len(args) < 2 or not isinstance(args[0], AiplResult):
+        raise RuntimeError("value(r, default): a result and a default are expected")
+    return args[0].value if args[0].ok else args[1]
+
+
+def _b_acquire(args, frame, interp):
+    name = args[0] if args else None
+    if name in _held_res:
+        raise RuntimeError("acquire: resource already held: " + str(name))
+    _held_res.add(name)
+    return None
+
+
+def _b_release(args, frame, interp):
+    name = args[0] if args else None
+    if name not in _held_res:
+        raise RuntimeError("release: resource not held: " + str(name))
+    _held_res.discard(name)
+    return None
+
+
 def _b_typeof(args, frame, interp) -> str:
     """Structural type inference. For records, descend recursively to
     surface the shape; for arrays, sample one element if uniform."""
@@ -3225,6 +3288,12 @@ _BUILTINS = {
     # Dynamic class registration + actor instantiation by string name.
     "compile": _b_compile,
     "spawn":   _b_spawn,
+    # result<τ> と資源
+    "is_ok":     _b_is_ok,
+    "timed_out": _b_timed_out,
+    "value":     _b_result_value,
+    "acquire":   _b_acquire,
+    "release":   _b_release,
     # Structural type inference (records, arrays, scalars, actors).
     "typeof":  _b_typeof,
     # Phase 11 — gradual static type checker.

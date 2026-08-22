@@ -107,7 +107,6 @@ global_stmt: var_new_stmt
      | call_stmt
      | if_stmt
      | while_stmt
-     | become_stmt
      | return_stmt
      | scope_stmt
      | select_stmt
@@ -130,7 +129,7 @@ send_stmt: "send" "self"   "." NAME "(" args ")" ";"   -> send_self
 call_stmt: ("call")? NAME "(" args ")" ";"
 if_stmt: "if" "(" expr ")" stmt ("else" stmt)?
 while_stmt: "while" expr "do" stmt
-become_stmt: "become" NAME "(" args ")" ";"
+// become は 2026-08-22 に言語から外した（docs/samples/removed/README.md）
 
 // Phase 17: structured concurrency.
 // `scope { ... }` is a block whose exit awaits every `future` issued
@@ -208,6 +207,10 @@ args: (expr ("," expr)*)?
      | "now"    NAME     "." NAME "(" args ")" "timeout" INT "else" expr  -> now_call_dl
      | "now"    "self"   "." NAME "(" args ")" "timeout" INT "else" expr  -> now_self_dl
      | "await" atom "timeout" INT "else" expr        -> await_dl
+     // else を書かない形。値は result<τ> になり、成功したかどうかを型で持つ。
+     | "now"    NAME     "." NAME "(" args ")" "timeout" INT  -> now_call_res
+     | "now"    "self"   "." NAME "(" args ")" "timeout" INT  -> now_self_res
+     | "await" atom "timeout" INT                    -> await_res
      | "await" atom                                  -> await_expr
      | NAME "(" args ")"         -> call_expr
      | NAME dim_list             -> index_expr
@@ -230,7 +233,7 @@ args: (expr ("," expr)*)?
 record_fields: record_field ("," record_field)* ","?
 record_field:  NAME ":" expr
 
-NAME: /(?!(class|method|function|return|var|float|int|new|send|call|become|if|else|while|do|self|sender|now|future|await|true|false|pub|linear|scope|where|and|or|not)\b)[a-zA-Z_][a-zA-Z0-9_]*/
+NAME: /(?!(class|method|function|return|var|float|int|new|send|call|if|else|while|do|self|sender|now|future|await|true|false|pub|linear|scope|where|and|or|not)\b)[a-zA-Z_][a-zA-Z0-9_]*/
 INT: /[0-9]+(?!\.)/
 FLOAT: /[0-9]+\.[0-9]*|\.[0-9]+/
 STRING: /"([^"\\]|\\.)*"/
