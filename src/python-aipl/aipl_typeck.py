@@ -592,6 +592,8 @@ class TypeChecker:
         self.fn_observed_effects: "dict[str, set]" = {}
         self._wait_edges: list = []      # now / await の辺
         self._remote_waits: list = []    # (待つ側, ノード名)
+        self._sent_msgs: set = set()     # 送られた "クラス.メソッド"
+        self._selected: list = []        # select が待つ (クラス, メソッド, where)
         self._current_observed_key: Optional[str] = None
         # Phase 14: linear / affine ownership tracking. `_moved` is the
         # set of var names that have been consumed in the current scope.
@@ -663,10 +665,72 @@ class TypeChecker:
                 self._check_bad_deadlines([d.stmt], "top level")
         # Phase 12: compare declared vs observed effects per user function.
         self._check_effect_declarations()
+        self._scan_selects()
+        self._check_selects()
         self._check_reply_totality()
         self._check_levels()
         self._check_wait_cycle()
         return self.issues
+
+    def _scan_selects(self):
+        """select の case が待つメッセージと、期限の有無を集める。
+        待ちが返らなくなる三つ目の経路 ---- 閉路でも返信漏れでもなく、
+        「誰も送らない」だけで詰まる。"""
+        import os as _os
+        strict_dl = _os.environ.get("AIOS_STRICT_DEADLINE") in ("1", "true", "yes")
+        for d in self.program.decls:
+            if type(d).__name__ != "ClassDecl":
+                continue
+            for m in d.methods:
+                where = f"method {d.name}.{m.name}"
+
+                def walk(n):
+                    if n is None or isinstance(n, (str, int, float, bool)):
+                        return
+                    if type(n).__name__ == "SelectStmt":
+                        if getattr(n, "timeout_ms", None) is None:
+                            msg = ("期限の無い select は永久に待ちうる"
+                                   "（`timeout <ms> -> { ... }` と書く）")
+                            if strict_dl:
+                                self._issue(where, msg)
+                            else:
+                                self.warnings.append(TypeIssue(where, msg, None, None))
+                        for c in (getattr(n, "cases", None) or []):
+                            mn = getattr(c, "method", None) or getattr(c, "name", None)
+                            if mn:
+                                self._selected.append((d.name, mn, where))
+                    for f in getattr(n, "__dataclass_fields__", {}):
+                        v = getattr(n, f, None)
+                        if isinstance(v, list):
+                            for x in v:
+                                walk(x)
+                        else:
+                            walk(v)
+
+                walk(getattr(m, "body", None))
+
+    def _check_selects(self):
+        """select が待つメッセージを誰かが送っているか。
+        外部からの送り手（web_expose / web_listen / deploy / remote）があれば
+        当てにならないので検査しない。"""
+        import os as _os
+        external = bool(self._remote_waits)
+        for d in self.program.decls:
+            st = getattr(d, "stmt", None)
+            if st is not None and type(st).__name__ == "CallStmt" \
+               and getattr(st, "name", None) in ("web_expose", "web_listen", "deploy"):
+                external = True
+        if external:
+            return
+        strict = _os.environ.get("AIOS_STRICT_SELECT") in ("1", "true", "yes")
+        for cls, mn, where in self._selected:
+            if f"{cls}.{mn}" not in self._sent_msgs:
+                msg = (f"select が {cls}.{mn} を待っているが、"
+                       f"このプログラムの中で誰も送っていない")
+                if strict:
+                    self._issue(where, msg)
+                else:
+                    self.warnings.append(TypeIssue(where, msg, None, None))
 
     def _check_reply_totality(self):
         """now/await で待たれるメソッドは、戻り値型に関わらず全経路で reply する。
@@ -1208,6 +1272,7 @@ class TypeChecker:
         if cls_name in (None, "?", "any"):
             return None
         key = f"{cls_name}.{method}"
+        self._sent_msgs.add(key)
         sig = self.fn_sigs.get(key)
         if sig is None:
             # クラスが分かっているのにそのメソッドが無いなら、それは誤りである。
