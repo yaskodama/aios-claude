@@ -586,6 +586,10 @@ class TypeChecker:
         self.fn_sigs: dict = {}
         self.classes_by_name: dict = {}
         self.issues: list[TypeIssue] = []
+        # 資源の入れ子から集める辺 (下位, 上位) -> どこで
+        self._res_edges: dict = {}
+        # 名前がリテラルでなく追えなかった acquire の場所
+        self._res_opaque: list = []
         # Phase 12: declared effects per user function/method (key matches
         # fn_sigs) and observed effects (filled during walk).
         self.fn_decl_effects: "dict[str, set]" = {}
@@ -663,6 +667,10 @@ class TypeChecker:
                 # 検査が過小報告になる。
                 self._check_deadlines_only([d.stmt], "top level")
                 self._check_bad_deadlines([d.stmt], "top level")
+        # トップレベルの並びも同じ規律で見る（ここでも acquire できる）
+        self._check_toplevel_resources()
+        # ★ 資源への全体順序。対だけでは逆順の取得を止められない。
+        self._check_resource_order()
         # Phase 12: compare declared vs observed effects per user function.
         self._check_effect_declarations()
         self._scan_selects()
@@ -1156,7 +1164,14 @@ class TypeChecker:
                     if r in held:
                         self._issue(where, f"資源 {r} を二重に acquire している")
                         return held
+                    # すでに持っているものは、これより先に取られた＝下位である
+                    for h in held:
+                        if h != r:
+                            self._res_edges.setdefault((h, r), where)
                     return held | {r}
+                if fname == "acquire" and r is None and (getattr(e, "args", None) or []):
+                    # 名前が実行時に決まる acquire は追えない。覚えておく。
+                    self._res_opaque.append(where)
                 if fname == "release" and r is not None:
                     if r not in held:
                         self._issue(where, f"取得していない資源 {r} を release している")
@@ -1209,6 +1224,127 @@ class TypeChecker:
         if left:
             self._issue(where,
                 "資源 " + ", ".join(sorted(left)) + " を持ったままメソッドを抜けている")
+
+    def _check_toplevel_resources(self):
+        """トップレベルの文の並びも acquire / release の対で見る。
+        ついでに入れ子の辺もここで集まる。"""
+        # stmt_held は型名で分岐するので、名前が "Block" の器を作る
+        blk = type("Block", (), {})()
+        blk.stmts = [d.stmt for d in self.program.decls
+                     if isinstance(d, GlobalStmt)]
+        holder = type("_Holder", (), {})()
+        holder.body = blk
+        self._check_resource_use(holder, "top level")
+
+    def _check_resource_order(self):
+        """資源への全体順序。
+
+        対の検査は「取ったら返す」までしか見ない。
+        二つのアクターが同じ二つの資源を逆の順序で取ると、
+        どちらも対は正しいのに、実行するとお互いを待つ。
+        取得の入れ子から辺を集め（r を持ったまま s を取ったなら r < s）、
+        閉路が無いことを見る。閉路が無い = 全体順序を作れる、である。
+        resource_order("a -> b -> c") で明示的に辺を足せる。"""
+        import os as _os
+
+        # 1) 宣言された順序
+        def order_spec(n):
+            if type(n).__name__ in ("CallExpr", "CallStmt") and \
+               getattr(n, "name", None) == "resource_order":
+                args = getattr(n, "args", None) or []
+                if len(args) == 1 and type(args[0]).__name__ in ("StringLit", "StrLit"):
+                    return getattr(args[0], "val", getattr(args[0], "value", None))
+            return None
+
+        def walk(n):
+            if n is None or isinstance(n, (str, int, float, bool)):
+                return
+            spec = order_spec(n)
+            if spec is not None:
+                names = [x.strip() for x in str(spec).split("->") if x.strip()]
+                for a, b in zip(names, names[1:]):
+                    self._res_edges.setdefault((a, b), "resource_order")
+            for f in getattr(n, "__dataclass_fields__", {}):
+                v = getattr(n, f, None)
+                if isinstance(v, list):
+                    for x in v:
+                        walk(x)
+                elif v is not None:
+                    walk(v)
+
+        for d in self.program.decls:
+            if isinstance(d, GlobalStmt):
+                walk(d.stmt)
+
+        if not self._res_edges:
+            return
+
+        # 2) 閉路 = 逆順に取る場所がある
+        succ: dict = {}
+        for (a, b) in self._res_edges:
+            succ.setdefault(a, []).append(b)
+        color: dict = {}
+        found = [None]
+
+        def go(n, path):
+            if found[0] is not None:
+                return
+            c = color.get(n)
+            if c == 2:
+                return
+            if c == 1:
+                # n はいま辿っている道の上にある = 閉路
+                acc = []
+                for x in path:
+                    if x == n:
+                        found[0] = [n] + acc
+                        return
+                    acc.insert(0, x)
+                return
+            color[n] = 1
+            for m in succ.get(n, []):
+                go(m, [n] + path)
+            color[n] = 2
+
+        for a in list(succ):
+            go(a, [])
+
+        if found[0]:
+            cyc = found[0]
+            edges = list(zip(cyc, cyc[1:])) + [(cyc[-1], cyc[0])]
+            where = "; ".join(
+                f"{a} は {b} より先（{self._res_edges.get((a, b), '?')}）"
+                for a, b in edges)
+            self._issue("resource order",
+                        "資源の順序 " + " -> ".join(cyc) + f" -> {cyc[0]} が循環している"
+                        f"（{where}）。逆の順序で取るとデッドロックする")
+            return
+
+        # 3) 追えなかった acquire を知らせる（既定では黙る）
+        if _os.environ.get("AIOS_STRICT_RESOURCE") in ("1", "true", "yes"):
+            for w in self._res_opaque:
+                print(f"[warn] {w}: 名前がリテラルでない acquire があり、順序を検査できない")
+
+        # 4) 推論した全体順序を見せる
+        if _os.environ.get("AIOS_SHOW_LEVELS") in ("1", "true", "yes"):
+            nodes = set()
+            for (a, b) in self._res_edges:
+                nodes.add(a); nodes.add(b)
+            depth: dict = {}
+
+            def d_of(n):
+                if n in depth:
+                    return depth[n]
+                depth[n] = 0
+                depth[n] = max([0] + [1 + d_of(m) for m in succ.get(n, [])])
+                return depth[n]
+
+            for n in nodes:
+                d_of(n)
+            mx = max(depth.values()) if depth else 0
+            for n, d in sorted(((n, mx - d) for n, d in depth.items()),
+                               key=lambda t: (t[1], t[0])):
+                print(f"[resource] {n:<20} @{d}")
 
     def _check_bad_deadlines(self, stmts, where: str):
         """期限が正でない now / await。0 ミリ秒は待ちにならないので、

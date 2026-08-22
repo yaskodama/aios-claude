@@ -278,6 +278,7 @@ BUILTIN_SIGNATURES: "dict[str, str]" = {
     # 資源の取得と解放（順序つきの効果。対になっているかは型検査側で見る）
     "acquire":        "function(name:string) -> unit",
     "release":        "function(name:string) -> unit",
+    "resource_order": "function(spec:string) -> unit",
     # Classes / functions / typeof — meta
     "typeof":         "function(value:any) -> string",
     "type_check":     "function() -> array[string]",
@@ -3138,11 +3139,35 @@ def _b_result_value(args, frame, interp):
     return args[0].value if args[0].ok else args[1]
 
 
+# 宣言された全体順序。resource_order("a -> b") で 0, 1 と振る。
+# 静的検査は名前が文字列リテラルの acquire しか追えないので、
+# 追えなかったものはここで捕まえる。
+_res_rank: dict = {}
+
+
 def _b_acquire(args, frame, interp):
     name = args[0] if args else None
     if name in _held_res:
         raise RuntimeError("acquire: resource already held: " + str(name))
+    rk = _res_rank.get(name)
+    if rk is not None:
+        for h in _held_res:
+            hk = _res_rank.get(h)
+            if hk is not None and hk >= rk:
+                raise RuntimeError(
+                    f"acquire: {h} is held, so {name} must not be acquired now"
+                    " (declared order)")
     _held_res.add(name)
+    return None
+
+
+def _b_resource_order(args, frame, interp):
+    """資源への全体順序の宣言。型検査が読むのが主で、
+    実行時にも「追えなかった acquire」を捕まえるために効かせる。"""
+    spec = str(args[0]) if args else ""
+    names = [x.strip() for x in spec.split("->") if x.strip()]
+    for i, n in enumerate(names):
+        _res_rank[n] = i
     return None
 
 
@@ -3412,6 +3437,7 @@ _BUILTINS = {
     "value":     _b_result_value,
     "acquire":   _b_acquire,
     "release":   _b_release,
+    "resource_order": _b_resource_order,
     # Structural type inference (records, arrays, scalars, actors).
     "typeof":  _b_typeof,
     # Phase 11 — gradual static type checker.
