@@ -9,10 +9,10 @@
 // requirement that the expected fields actually appear.
 
 class Greeter {
-  method greet(p: {name: string}) -> string { return "Hi, " + p.name; }
+  method greet(p: record{name: string}) -> string { return "Hi, " + p.name; }
 }
 
 var g = new Greeter();
 var x = {label: "abc"};
-var s = now g.greet(x);
+var s = now g.greet(x) timeout 5000 else 0;
 print(s);

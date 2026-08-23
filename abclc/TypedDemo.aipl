@@ -20,14 +20,14 @@ function add(a: int, b: int) -> int {
 }
 
 function greet(name: string) -> string {
-  return "hello, " + name;
+  return "hello, " ++ name;
 }
 
 // Typed local variables.
 var n: int = add(3, 4);
 var msg: string = greet("alice");
-print("n   = " + n);
-print("msg = " + msg);
+print("n   = " ++ n);
+print("msg = " ++ msg);
 
 // Typed method parameters + return.
 class Counter {
@@ -40,12 +40,12 @@ class Counter {
 }
 
 var c = new Counter();
-var after = now c.bump(5);
-print("counter = " + after);
+var after = now c.bump(5) timeout 5000 else 0;
+print("counter = " ++ after);
 
 // Typed records and tuples — types match values structurally.
-var pt: {x: int, y: int} = {x: 3, y: 4};
-print("pt.x = " + pt.x);
+var pt: record{x: int, y: int} = {x: 3, y: 4};
+print("pt.x = " ++ pt.x);
 
-var pair: (int, string) = (42, "hello");
-print("pair[1] = " + pair[1]);
+var pair: tuple(int, string) = (42, "hello");
+print("pair[1] = " ++ pair[1]);

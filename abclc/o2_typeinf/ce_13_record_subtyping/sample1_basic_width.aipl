@@ -9,12 +9,12 @@
 // this would raise `record field count mismatch`.
 
 class Greeter {
-  method greet(p: {name: string}) -> string {
+  method greet(p: record{name: string}) -> string {
     return "Hello, " + p.name;
   }
 }
 
 var g = new Greeter();
 var u = {name: "Alice", age: 30, email: "alice@example.com"};
-var hi = now g.greet(u);
+var hi = now g.greet(u) timeout 5000 else 0;
 print(hi);

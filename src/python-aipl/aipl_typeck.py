@@ -167,8 +167,9 @@ def _parse_signature(sig: str) -> Optional[list]:
     parts: list = []          # (本文, その引数が始まった時点の省略の深さ)
     buf = ""
     opt_depth = 0             # 省略可能の入れ子の深さ
-    ty_depth = 0              # 型の中の角括弧の深さ
+    ty_depth = 0              # 型の中の角括弧・波括弧の深さ
     par = 0
+    brace = 0                 # record{...} の深さ（中のカンマで切らない）
     stack: list = []          # "opt" か "ty"
     cur_depth = 0
     i = 0
@@ -203,7 +204,11 @@ def _parse_signature(sig: str) -> Optional[list]:
             par += 1
         elif ch == ")":
             par -= 1
-        if ch == "," and par == 0 and ty_depth == 0:
+        elif ch == "{":
+            brace += 1
+        elif ch == "}":
+            brace = max(0, brace - 1)
+        if ch == "," and par == 0 and ty_depth == 0 and brace == 0:
             if buf.strip():
                 parts.append((buf.strip(), cur_depth))
             buf = ""

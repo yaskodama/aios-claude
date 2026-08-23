@@ -6,12 +6,12 @@
 
 class Geometry {
   // Param is a `{p, q}` whose fields are themselves records.
-  method dx(box: {p: {x: int, y: int}, q: {x: int, y: int}}) -> int {
+  method dx(box: record{p: record{x: int, y: int}, q: record{x: int, y: int}}) -> int {
     return box.q.x - box.p.x;
   }
 }
 
 var g = new Geometry();
 var b = {p: {x: 3, y: 4}, q: {x: 10, y: 20}};
-var d: int = now g.dx(b);
+var d: int = now g.dx(b) timeout 5000 else 0;
 print(d);

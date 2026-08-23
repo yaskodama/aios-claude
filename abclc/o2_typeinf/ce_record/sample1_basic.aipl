@@ -5,17 +5,17 @@
 // method parameter as a fresh tvar regardless of annotation, so
 // cross-class callers silently absorbed every record shape mismatch.
 // O-2.e wires the parameter annotations through preinfer so
-// `now obj.method(rec)` actually checks `rec`'s shape against the
+// `now obj.method(rec) timeout 5000 else 0` actually checks `rec`'s shape against the
 // declared `{a:int, b:int}`.
 //
 // Run via /api/typecheck or `dune exec src/test_o2d_inference.exe`.
 
 class Geometry {
   // Parameter is a record type — annotation now honored.
-  method magnitude(p: {x: int, y: int}) -> int {
+  method magnitude(p: record{x: int, y: int}) -> int {
     return p.x * p.x + p.y * p.y;
   }
-  method dx(p: {x: int, y: int}, q: {x: int, y: int}) -> int {
+  method dx(p: record{x: int, y: int}, q: record{x: int, y: int}) -> int {
     return q.x - p.x;
   }
 }
@@ -24,7 +24,7 @@ var g = new Geometry();
 // Record literal — field order can differ from the annotation.
 var p1 = {x: 3, y: 4};
 var p2 = {y: 20, x: 10};   // unsorted, still unifies via structural sort
-var m: int = now g.magnitude(p1);
-var d: int = now g.dx(p1, p2);
+var m: int = now g.magnitude(p1) timeout 5000 else 0;
+var d: int = now g.dx(p1, p2) timeout 5000 else 0;
 print(m);
 print(d);

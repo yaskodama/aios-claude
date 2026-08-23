@@ -7,13 +7,13 @@
 // — field order doesn't matter (sorted internally).
 
 class Reader {
-  method first(r: {head: int, tail: int}) -> int { return r.head; }
-  method second(r: {head: int, tail: int}) -> int { return r.tail; }
+  method first(r: record{head: int, tail: int}) -> int { return r.head; }
+  method second(r: record{head: int, tail: int}) -> int { return r.tail; }
 }
 
 var rd = new Reader();
 // Field order swapped from the annotation — still unifies.
 var rec = {tail: 100, head: 7};
-var x: int = now rd.first(rec);
-var y: int = now rd.second(rec);
+var x: int = now rd.first(rec) timeout 5000 else 0;
+var y: int = now rd.second(rec) timeout 5000 else 0;
 print(x); print(y);

@@ -9,12 +9,12 @@
 // outer record's extra `tag` field is ignored.
 
 class Outer {
-  method read(r: {inner: {key: string, value: int}}) -> int {
+  method read(r: record{inner: record{key: string, value: int}}) -> int {
     return r.inner.value;
   }
 }
 
 var o = new Outer();
 var rec = {inner: {key: "k1", value: 42, debug: "x"}, tag: "ignored"};
-var v = now o.read(rec);
+var v = now o.read(rec) timeout 5000 else 0;
 print(v);
