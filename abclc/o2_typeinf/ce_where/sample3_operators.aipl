@@ -20,9 +20,9 @@ class Ops {
 var o = new Ops();
 // Parser has no unary `-` in expression position; use `0 - N` for negatives
 // when calling.  (Refinement predicates above DO allow `-`.)
-var a = now o.sign(0 - 1);
-var b = now o.not_zero(42);
-var c = now o.solve(3);
-var d = now o.neg_band(0 - 5);
-var e = now o.holed(7);
+var a = now o.sign(0 - 1) timeout 5000 else 0;
+var b = now o.not_zero(42) timeout 5000 else 0;
+var c = now o.solve(3) timeout 5000 else 0;
+var d = now o.neg_band(0 - 5) timeout 5000 else 0;
+var e = now o.holed(7) timeout 5000 else 0;
 print(a); print(b); print(c); print(d); print(e);

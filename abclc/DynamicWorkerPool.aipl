@@ -79,7 +79,7 @@ class Manager {
     var k = 0;
     var nf = array_len(futures);
     while (k < nf) do {
-      var v = await(array_get(futures, k));
+      var v = await(array_get(futures, k)) timeout 5000 else 0;
       sum = sum + v;
       k = k + 1;
     }
@@ -92,7 +92,7 @@ var mgr = new Manager();
 // `now` is used for both calls so that ensure_workers fully completes
 // (workers spawned, n_workers stored) before run() starts dispatching.
 // `send` at top-level is queued via the REPL's pending_global_sends and
-// would not have fired before the blocking `now mgr.run()` below.
-var ready = now mgr.ensure_workers(3);
-var total = now mgr.run();
+// would not have fired before the blocking `now mgr.run() timeout 5000 else 0` below.
+var ready = now mgr.ensure_workers(3) timeout 5000 else 0;
+var total = now mgr.run() timeout 5000 else 0;
 print("=== final result: " ++ total ++ " ===");

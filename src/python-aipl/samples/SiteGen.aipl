@@ -167,6 +167,6 @@ print("config typeof = " ++ typeof(config));
 print("");
 
 var gen = new SiteGen();
-var dir = now gen.generate(config);
+var dir = now gen.generate(config) timeout 5000 else 0;
 print("");
 print("=== done; site root = " ++ dir ++ " ===");

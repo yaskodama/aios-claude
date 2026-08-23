@@ -30,11 +30,11 @@ class Engine {
 var n: int where n > 0 = 7;
 
 var e = new Engine();
-var a = now e.process(50);
+var a = now e.process(50) timeout 5000 else 0;
 // Negative literal in expr position: parser has no unary `-`, so use `0 - 1`.
 // (Negative literals ARE allowed *inside* a `where` predicate via refine_unary.)
-var b = now e.sign(0 - 1);
-var c = now e.nonzero(42);
+var b = now e.sign(0 - 1) timeout 5000 else 0;
+var c = now e.nonzero(42) timeout 5000 else 0;
 print(a);
 print(b);
 print(c);

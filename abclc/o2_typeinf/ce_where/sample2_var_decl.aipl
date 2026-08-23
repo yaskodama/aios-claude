@@ -15,5 +15,5 @@ var counter: int where counter >= 0 = 5;
 var scale: float where scale > 0.0 = 2.5;
 
 var d = new Demo();
-var out: int = now d.process(counter);
+var out: int = now d.process(counter) timeout 5000 else 0;
 print(out);
