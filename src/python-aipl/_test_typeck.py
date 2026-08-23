@@ -85,10 +85,10 @@ def test_phase_11c_unions_generics() -> None:
     assert "u2 = hello" in out
     assert "describe int = got 7" in out
     # Static checker catches all 4 intentional bugs.
-    assert "type_check() found 5 issue(s):" in out, out
+    assert "type_check() found 4 issue(s):" in out, out
     for needle in (
         "call to function `pair` arg `b`: type-var `T` already bound to int, got string",
-        "call to function `head` arg `arr` mismatch  (expected array, got int)",
+        "call to function `head` arg `arr` mismatch  (expected array[T], got int)",
         "call to function `describe` arg `x` mismatch  (expected int | string, got array[int, 2])",
         "`var bad_union` initializer mismatch  (expected int | string, got float)",
     ):
@@ -167,6 +167,7 @@ def test_optional_trailing_arg_signature() -> None:
     out, _, rc = _run("OptionalArgSig.aipl")
     assert "both = bc" in out, out
     assert "tail = cdef" in out, out
+    assert "r1 in range = true" in out, out
     print("OK  OptionalArgSig.aipl")
 
 

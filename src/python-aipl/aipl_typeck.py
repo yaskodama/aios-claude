@@ -138,7 +138,20 @@ def _split_top(text: str) -> list:
 
 
 def _parse_signature(sig: str) -> Optional[list]:
-    """Return list[ParamSpec] for `function(...) -> R`. None if malformed."""
+    """`function(...) -> R` を ParamSpec の並びにする。None は解析失敗。
+
+    省略可能な引数は角括弧で書く。現れる形は次のとおりで、
+    入れ子（`[n:int [, hi:int]]`）もある。
+
+        (name:string [, default:string])        末尾が省略可能
+        ([n:int [, hi:int]])                    全部省略可能（入れ子）
+        (class_name:string [, args+])           末尾が省略可能な可変長
+        ([provider:int|string,] prompt:string)  先頭が省略可能
+        (w:int, ..., b:int [, a:int=255])       既定値つき
+
+    以前は「先頭の [..,]」しか読めず、末尾や入れ子の省略可能引数を
+    取りこぼしていた。角括弧の深さを数えて、括弧の中に現れた引数を
+    すべて optional にする。"""
     open_p = sig.find("(")
     close_p = sig.rfind(") ->")
     if open_p < 0 or close_p < 0:
@@ -146,48 +159,76 @@ def _parse_signature(sig: str) -> Optional[list]:
     inside = sig[open_p + 1:close_p].strip()
     if not inside:
         return []
-    # Strip a leading "[provider:T,]" or similar optional-first marker:
-    # we model it as ParamSpec(optional=True) but otherwise unconstrained.
-    optional_first: Optional[ParamSpec] = None
-    s = inside
-    if s.startswith("["):
-        end = s.find("]")
-        if end > 0:
-            chunk = s[1:end].rstrip(",").strip()
-            if ":" in chunk:
-                n, _, t = chunk.partition(":")
-                optional_first = ParamSpec(n.strip(), t.strip(), optional=True)
+
+    # 角括弧の深さを見ながら、トップレベルのカンマで切る。
+    # 角括弧には二種類ある ---- 省略可能を表す印と、型の一部（array[T]）である。
+    # 前者だけを数える。判定は「引数の切れ目にある `[`」か
+    # 「直後がカンマの `[`」（`start:int [, end:int]` の形）。
+    parts: list = []          # (本文, その引数が始まった時点の省略の深さ)
+    buf = ""
+    opt_depth = 0             # 省略可能の入れ子の深さ
+    ty_depth = 0              # 型の中の角括弧の深さ
+    par = 0
+    stack: list = []          # "opt" か "ty"
+    cur_depth = 0
+    i = 0
+    n = len(inside)
+    while i < n:
+        ch = inside[i]
+        if ch == "[":
+            j = i + 1
+            while j < n and inside[j].isspace():
+                j += 1
+            is_opt = (not buf.strip()) or (j < n and inside[j] == ",")
+            if is_opt:
+                opt_depth += 1
+                stack.append("opt")
+                i += 1
+                continue
+            ty_depth += 1
+            stack.append("ty")
+            buf += ch
+            i += 1
+            continue
+        if ch == "]":
+            kind = stack.pop() if stack else "ty"
+            if kind == "opt":
+                opt_depth = max(0, opt_depth - 1)
             else:
-                optional_first = ParamSpec(chunk.strip(), "any", optional=True)
-            s = s[end + 1:].lstrip(", ")
-    # 末尾の "[, end:int]" 形式も省略可能な引数である。
-    # ここを読めていなかったため、str_sub(s, i, j) が
-    # 「arity 3 vs declared [2]」で弾かれ、str_sub(s, i) は
-    # start の型が "int [, end:int]" という文字列になって不一致になっていた。
-    optional_last: Optional[ParamSpec] = None
-    lb = s.rfind("[")
-    if lb >= 0 and s.rstrip().endswith("]"):
-        chunk = s[lb + 1:s.rstrip().rfind("]")].strip().lstrip(",").strip()
-        if chunk:
-            if ":" in chunk:
-                n, _, t = chunk.partition(":")
-                optional_last = ParamSpec(n.strip(), t.strip(), optional=True)
-            else:
-                optional_last = ParamSpec(chunk.strip(), "any", optional=True)
-            s = s[:lb].rstrip().rstrip(",").rstrip()
+                ty_depth = max(0, ty_depth - 1)
+                buf += ch
+            i += 1
+            continue
+        if ch == "(":
+            par += 1
+        elif ch == ")":
+            par -= 1
+        if ch == "," and par == 0 and ty_depth == 0:
+            if buf.strip():
+                parts.append((buf.strip(), cur_depth))
+            buf = ""
+            i += 1
+            continue
+        if not buf.strip() and not ch.isspace():
+            cur_depth = opt_depth
+        buf += ch
+        i += 1
+    if buf.strip():
+        parts.append((buf.strip(), cur_depth))
+
     out: list = []
-    if optional_first:
-        out.append(optional_first)
-    for p in _split_top(s):
-        is_var = p.endswith("+")
-        body = p[:-1] if is_var else p
+    for body, d in parts:
+        is_var = body.endswith("+")
+        if is_var:
+            body = body[:-1]
         if ":" in body:
             n, _, t = body.partition(":")
-            out.append(ParamSpec(n.strip(), t.strip(), variadic=is_var))
+            t = t.split("=")[0].strip()          # `a:int=255` の既定値を落とす
+            out.append(ParamSpec(n.strip(), t or "any",
+                                 variadic=is_var, optional=(d > 0)))
         else:
-            out.append(ParamSpec(body.strip(), "any", variadic=is_var))
-    if optional_last:
-        out.append(optional_last)
+            out.append(ParamSpec(body.strip(), "any",
+                                 variadic=is_var, optional=(d > 0)))
     return out
 
 
@@ -1691,52 +1732,42 @@ class TypeChecker:
         if specs is None:
             return None
         bindings: dict = {}
-        # Strip optional first when its arity matches (caller passed extra arg).
-        opt_first = specs[0] if specs and specs[0].optional else None
-        rest = specs[1:] if opt_first else specs[:]
-        # 末尾の省略可能引数（str_sub(s, start [, end]) など）
-        opt_last = rest[-1] if rest and rest[-1].optional else None
-        non_opt = rest[:-1] if opt_last else rest
-        # Detect variadic on the LAST non-optional param.
-        if non_opt and non_opt[-1].variadic:
-            v_param = non_opt[-1]
-            required = non_opt[:-1]
-            min_args = len(required)
-            if opt_first and len(args) >= min_args + 1:
-                self._check_arg(args[0], opt_first, env, where, label, bindings)
-                self._check_required(args[1:], required, env, where, label, bindings)
-                for a in args[1 + len(required):]:
-                    self._check_arg(a, v_param, env, where, label, bindings)
+        # 省略可能な引数（角括弧で書かれたもの）を一般に扱う。
+        #   ・可変長（末尾の `+`）があれば上限は無い
+        #   ・省略可能が「先頭に固まっていて、必須が後ろにある」形
+        #     （ai_call([provider,] prompt) など）は右詰めで対応づける
+        #   ・それ以外（末尾が省略可能、あるいは全部省略可能）は左詰め
+        required = [p for p in specs if not p.optional]
+        min_args = len(required)
+        var_param = specs[-1] if specs and specs[-1].variadic else None
+        if var_param is not None and not var_param.optional:
+            min_args = max(0, min_args - 1)   # 可変長は 0 個でもよい
+        max_args = None if var_param is not None else len(specs)
+
+        if len(args) < min_args or (max_args is not None and len(args) > max_args):
+            want = f">= {min_args}" if max_args is None else \
+                   (str(min_args) if min_args == max_args
+                    else f"{min_args}..{max_args}")
+            self._issue(where,
+                        f"call to {label}: arity {len(args)} vs declared [{want}]")
+            return bindings
+
+        # 引数と仕様の対応づけ
+        lead_opt = 0
+        for p in specs:
+            if p.optional:
+                lead_opt += 1
             else:
-                if len(args) < min_args:
-                    self._issue(where, f"call to {label}: too few args (need >= {min_args}, got {len(args)})")
-                    return bindings
-                self._check_required(args[:len(required)], required, env, where, label, bindings)
-                for a in args[len(required):]:
-                    self._check_arg(a, v_param, env, where, label, bindings)
-            return bindings
-        # Non-variadic.
-        n_required = len(non_opt)
-        valid_arities = {n_required}
-        if opt_first:
-            valid_arities.add(n_required + 1)
-        if opt_last:
-            valid_arities.add(n_required + 1)
-            if opt_first:
-                valid_arities.add(n_required + 2)
-        if len(args) not in valid_arities:
-            self._issue(where, f"call to {label}: arity {len(args)} vs declared {sorted(valid_arities)}")
-            return bindings
-        offset = 0
-        rest_args = list(args)
-        if opt_first and len(args) > n_required + (1 if opt_last else 0):
-            self._check_arg(args[0], opt_first, env, where, label, bindings)
-            offset = 1
-            rest_args = args[1:]
-        if opt_last and len(rest_args) == n_required + 1:
-            self._check_arg(rest_args[-1], opt_last, env, where, label, bindings)
-            rest_args = rest_args[:-1]
-        self._check_required(rest_args, non_opt, env, where, label, bindings)
+                break
+        if lead_opt and lead_opt < len(specs) and len(args) < len(specs):
+            # 先頭が省略可能で必須が後ろにある ---- 右詰め
+            chosen = specs[len(specs) - len(args):]
+        else:
+            chosen = list(specs[:len(args)])
+            if var_param is not None and len(args) > len(specs):
+                chosen += [var_param] * (len(args) - len(specs))
+        for a, spec in zip(args, chosen):
+            self._check_arg(a, spec, env, where, label, bindings)
         return bindings
 
     def _check_required(self, args: list, specs: list, env: dict,

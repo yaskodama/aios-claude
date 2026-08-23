@@ -11,3 +11,14 @@ class U {
 var u = new U();
 print("both = " ++ (now u.both("abcdef") timeout 200 else "?"));
 print("tail = " ++ (now u.tail("abcdef") timeout 200 else "?"));
+
+// 省略可能の形は一種類ではない。角括弧の入れ子（random）、先頭が省略可能
+// （ai_call）、既定値つき（image_create）、型の中の角括弧（array[T]）が混ざる。
+// 型の角括弧まで省略の印として数えてしまうと、array[T] が arrayT になる。
+class V {
+  method r0() : float !{} { reply(random()); }        // 全部省略
+  method r1() : int   !{} { reply(random(10)); }      // 1個
+  method r2() : int   !{} { reply(random(3, 9)); }    // 2個
+}
+var v = new V();
+print("r1 in range = " ++ ((now v.r1() timeout 200 else -1) >= 0));
