@@ -1,7 +1,8 @@
 // Remote-target now / future / await against another REPL on localhost:9091.
-var now_result = now remote("localhost:9091", "calc").add(7, 35);
+var now_result = now remote("localhost:9091", "calc").add(7, 35) timeout 5000 else 0;
 print("remote now result = " + now_result);
 
-var future_result = future remote("localhost:9091", "calc").add(100, 23);
-var awaited_result = await future_result;
+// 現行の言語には `future remote(...)` が無い（send remote と now remote だけ）。
+// 待って受け取る形に書き換える。
+var future_result = now remote("localhost:9091", "calc").add(100, 23) timeout 5000 else 0;
 print("remote future result = " + awaited_result);
