@@ -6,23 +6,23 @@
 
 class Mixed {
   // Rat: satisfiable
-  method rat_window(r: Rat where r > 0 and r < 1) -> Rat {
+  method rat_window(r: float where r > 0 and r < 1) -> float {
     reply(r);
   }
   // Rat: holed interval (sat — union of two valid sub-intervals)
-  method rat_holed(s: Rat where (s > 0.0 and s < 0.4) or (s > 0.6 and s < 1.0)) -> Rat {
+  method rat_holed(s: float where (s > 0.0 and s < 0.4) or (s > 0.6 and s < 1.0)) -> float {
     reply(s);
   }
   // Real: not-equality is satisfiable
-  method real_avoid_zero(x: Real where not (x == 0.0)) -> Real {
+  method real_avoid_zero(x: float where not (x == 0.0)) -> float {
     reply(x);
   }
   // Real: solves to a single point  (sat — x = 1.5)
-  method real_one_solution(x: Real where 2.0 * x + 1.0 == 4.0) -> Real {
+  method real_one_solution(x: float where 2.0 * x + 1.0 == 4.0) -> float {
     reply(x);
   }
   // UNSAT: contradiction hidden behind boolean structure
-  method contradictory(z: Real where (z > 5.0) and not (z > 1.0)) -> Real {
+  method contradictory(z: float where (z > 5.0) and not (z > 1.0)) -> float {
     reply(z);
   }
 }

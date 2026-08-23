@@ -1,4 +1,4 @@
-// CE-6 / O-2.c: Real refinement with division and arithmetic.
+// CE-6 / O-2.c: float refinement with division and arithmetic.
 //
 // Z3 Real theory handles real division (`/`) cleanly.  Int literals
 // inside a Real predicate auto-promote.

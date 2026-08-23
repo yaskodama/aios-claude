@@ -8,9 +8,9 @@
 
 class Mixed {
   var s = 0;
-  method asInt(x: Int)      { s = x; }
+  method asInt(x: int)      { s = x; }
   method asBool()           { reply(s == 0); }       // OK: read Int, returns Bool
-  method writeBool(b: Bool) { s = b; }               // BAD: Int field <- Bool
+  method writeBool(b: bool) { s = b; }               // BAD: int field <- Bool
 }
 
 var m = new Mixed();

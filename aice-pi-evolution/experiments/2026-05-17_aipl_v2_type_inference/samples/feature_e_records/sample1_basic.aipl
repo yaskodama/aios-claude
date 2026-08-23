@@ -19,7 +19,7 @@ var p2 = now g.makePoint(10, 20) timeout 5000 else 0;
 var d  = now g.dx(p1, p2) timeout 5000 else 0;
 var m  = now g.magnitudeSquared(p1) timeout 5000 else 0;
 
-// Standalone record literal — should infer {a: Int, b: Bool}.
+// Standalone record literal — should infer {a: int, b: bool}.
 var rec = {a: 5, b: 0 == 0};
 var r_a = rec.a;
 var r_b = rec.b;

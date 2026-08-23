@@ -10,9 +10,9 @@ class Counter {
   var n = 0;
   method init(initial)  { n = initial; }
   method bump(delta)    { n = n + delta; reply(n); }
-  method narrow(k: Int where k >= 5 and k <= 3) -> Int { reply(k); }
+  method narrow(k: int where k >= 5 and k <= 3) -> int { reply(k); }
 }
 
 var c   = new Counter(100);
-var v   = now c.bump(7);
-var bad = now c.narrow(4);
+var v   = now c.bump(7) timeout 5000 else 0;
+var bad = now c.narrow(4) timeout 5000 else 0;

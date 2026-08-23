@@ -1,4 +1,4 @@
-// CE-1 / O-2.b: Int refinement with free variables in the predicate.
+// CE-1 / O-2.b: int refinement with free variables in the predicate.
 //
 // The Z3 backend declares each free name in the predicate as a fresh
 // Int and asks Z3 whether the conjunction is satisfiable.  In this

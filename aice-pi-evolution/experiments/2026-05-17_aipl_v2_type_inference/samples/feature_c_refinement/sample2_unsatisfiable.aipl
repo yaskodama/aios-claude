@@ -4,16 +4,16 @@
 // Each declaration produces one `refinement issue`.
 
 class Unsat {
-  method bad_range(k: Int where k >= 5 and k <= 3) -> Int {
+  method bad_range(k: int where k >= 5 and k <= 3) -> int {
     reply(k);
   }
-  method bad_sign(x: Int where x > 0 and x < 0) -> Int {
+  method bad_sign(x: int where x > 0 and x < 0) -> int {
     reply(x);
   }
-  method bad_century(n: Int where n >= 100 and n <= 10) -> Int {
+  method bad_century(n: int where n >= 100 and n <= 10) -> int {
     reply(n);
   }
-  method bad_dual(k: Int where k == 1 and k == 2) -> Int {
+  method bad_dual(k: int where k == 1 and k == 2) -> int {
     reply(k);
   }
 }

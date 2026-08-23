@@ -635,7 +635,7 @@ var profiles = new TaskProfiles();
 var rev1 = new Reviewer("GuardDigits", "あなたは数値誤差レビュアーです。候補の guard_digits_strategy が Chudnovsky × binary-splitting の累積誤差を 10,000 桁時点で吸収できるかを 1 文で答えてください ('OK: +log2N で n_guard = 14 bit' などの具体表現を含めること).", 0, 0.2, util, digits);
 var rev2 = new Reviewer("OwnershipFit", "あなたは所有権モデル fit レビュアーです。binary splitting の再帰木 (T(a,b) = combine(T(a,m), T(m,b))) において, 中間 limb_array の所有が region / linear / rc のどれと最も整合するかを 1 文で答えてください.", 0, 0.2, util, digits);
 var rev3 = new Reviewer("SIMDLowering", "あなたは SIMD コード生成レビュアーです。primitive_set が limb_ops_intrinsic か stream_combinators の場合に, 同一ソースから AVX2 (x8_32bit) へ自動下げ可能かを 1 文で答えてください.", 0, 0.2, util, digits);
-var rev4 = new Reviewer("DSLEconomy", "あなたは DSL 経済性レビュアーです。'pi : Real with digits=10000 = chudnovsky |> emit' のような 1-2 行記述が成立する primitive 集合かを 1 文で答えてください.", 0, 0.2, util, digits);
+var rev4 = new Reviewer("DSLEconomy", "あなたは DSL 経済性レビュアーです。'pi : float with digits=10000 = chudnovsky |> emit' のような 1-2 行記述が成立する primitive 集合かを 1 文で答えてください.", 0, 0.2, util, digits);
 var rev5 = new Reviewer("VerifiedExtraction", "あなたは検証可能抽出レビュアーです。extraction_mode と precision_model の組合せが '生成された 10,000 桁の最終桁誤差 < 0.5 ulp' を型レベルで保証できるかを 1 文で答えてください.", 0, 0.2, util, digits);
 var eval_actor = new Evaluator(rev1, rev2, rev3, rev4, rev5);
 var worker = new Worker(util, eval_actor, profiles);

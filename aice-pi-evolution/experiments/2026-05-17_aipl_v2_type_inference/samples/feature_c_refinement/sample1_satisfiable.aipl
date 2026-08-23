@@ -7,26 +7,26 @@
 // inhabitant exists.  No refinement issues should be reported.
 
 class Sat {
-  method needs_nonneg(k: Int where k >= 0) -> Int {
+  method needs_nonneg(k: int where k >= 0) -> int {
     reply(k);
   }
-  method needs_ge_two(n_terms: Int where n_terms >= 2) -> Int {
+  method needs_ge_two(n_terms: int where n_terms >= 2) -> int {
     reply(n_terms);
   }
-  method needs_unit_sign(sign: Int where sign == 1 or sign == -1) -> Int {
+  method needs_unit_sign(sign: int where sign == 1 or sign == -1) -> int {
     reply(sign);
   }
-  method needs_between(m: Int where m > 0 and m < 100) -> Int {
+  method needs_between(m: int where m > 0 and m < 100) -> int {
     reply(m);
   }
-  method needs_complex(x: Int where x >= 0 and x <= 100 and x != 50) -> Int {
+  method needs_complex(x: int where x >= 0 and x <= 100 and x != 50) -> int {
     reply(x);
   }
 }
 
 var s = new Sat();
-var r1 = now s.needs_nonneg(7);
-var r2 = now s.needs_ge_two(3);
-var r3 = now s.needs_unit_sign(-1);
-var r4 = now s.needs_between(50);
-var r5 = now s.needs_complex(25);
+var r1 = now s.needs_nonneg(7) timeout 5000 else 0;
+var r2 = now s.needs_ge_two(3) timeout 5000 else 0;
+var r3 = now s.needs_unit_sign(-1) timeout 5000 else 0;
+var r4 = now s.needs_between(50) timeout 5000 else 0;
+var r5 = now s.needs_complex(25) timeout 5000 else 0;

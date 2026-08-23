@@ -7,29 +7,29 @@
 //   - mixed satisfiable+unsat in one class
 
 class Mixed {
-  method range_pred(a: Int where 0 <= a and a <= 100) -> Int {
+  method range_pred(a: int where 0 <= a and a <= 100) -> int {
     reply(a);
   }
-  method nonzero(b: Int where not (b == 0)) -> Int {
+  method nonzero(b: int where not (b == 0)) -> int {
     reply(b);
   }
-  method holed(c: Int where (c == 0) or (c > 5 and c < 10)) -> Int {
+  method holed(c: int where (c == 0) or (c > 5 and c < 10)) -> int {
     reply(c);
   }
-  method solves_for_three(d: Int where 2 * d + 1 == 7) -> Int {
+  method solves_for_three(d: int where 2 * d + 1 == 7) -> int {
     reply(d);
   }
   // The next two are UNSAT and will produce refinement issues.
-  method shadow_unsat(x: Int where (x > 10) and not (x > 5)) -> Int {
+  method shadow_unsat(x: int where (x > 10) and not (x > 5)) -> int {
     reply(x);
   }
-  method arith_unsat(y: Int where y + 1 == y) -> Int {
+  method arith_unsat(y: int where y + 1 == y) -> int {
     reply(y);
   }
 }
 
 var m = new Mixed();
-var v1 = now m.range_pred(50);
-var v2 = now m.nonzero(7);
-var v3 = now m.holed(8);
-var v4 = now m.solves_for_three(3);
+var v1 = now m.range_pred(50) timeout 5000 else 0;
+var v2 = now m.nonzero(7) timeout 5000 else 0;
+var v3 = now m.holed(8) timeout 5000 else 0;
+var v4 = now m.solves_for_three(3) timeout 5000 else 0;

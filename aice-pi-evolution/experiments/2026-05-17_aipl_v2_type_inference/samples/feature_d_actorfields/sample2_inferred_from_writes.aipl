@@ -5,7 +5,7 @@
 // initialize with another field so n's type is *open* until init()
 // writes a value.  Three classes participate so the inference must
 // chain across actor boundaries:
-//   - Source.value() -> Int
+//   - Source.value() -> int
 //   - Bridge.feed(s) reads s.value(), writes to Sink.put()
 //   - Sink.put(x) writes x to field stored
 
@@ -21,8 +21,8 @@ class Sink {
 
 class Bridge {
   method feed(s, k) {
-    var v = now s.value() timeout 5000 else 0;        // v : Int (from Source.value)
-    var r = now k.put(v) timeout 5000 else 0;         // pushes v : Int → Sink.stored : Int
+    var v = now s.value() timeout 5000 else 0;        // v : int (from Source.value)
+    var r = now k.put(v) timeout 5000 else 0;         // pushes v : int → Sink.stored : int
     reply(r);
   }
 }

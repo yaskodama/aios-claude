@@ -18,12 +18,12 @@ class Writer {
 class Logger {
   var w     = new Writer();
   var label = "log: ";
-  method log(message, level: Int where level >= 0 and level <= 9) {
+  method log(message, level: int where level >= 0 and level <= 9) {
     var loud = str_upper(message);
     var rec  = {who: label, what: loud, sev: level};
-    reply(now w.dump(loud));
+    reply(now w.dump(loud) timeout 5000 else 0);
   }
 }
 
 var lg = new Logger();
-var rc = now lg.log("disk full", 7);
+var rc = now lg.log("disk full", 7) timeout 5000 else 0;

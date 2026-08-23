@@ -228,7 +228,10 @@ def _parse_signature(sig: str) -> Optional[list]:
             body = body[:-1]
         if ":" in body:
             n, _, t = body.partition(":")
-            t = t.split("=")[0].strip()          # `a:int=255` の既定値を落とす
+            # `a:int=255` の既定値を落とす。ただし精緻化の述語
+            # （`k where k >= 0`）の `=` を切ってはならない。
+            # 既定値は「型名のあとの = リテラル」の形に限る。
+            t = re.sub(r'^([^\s=]+)\s*=\s*\S+$', r'\1', t.strip())
             out.append(ParamSpec(n.strip(), t or "any",
                                  variadic=is_var, optional=(d > 0)))
         else:

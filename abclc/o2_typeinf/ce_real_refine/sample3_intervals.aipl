@@ -1,4 +1,4 @@
-// CE-6 / O-2.c: Real refinement with open/closed/holed intervals.
+// CE-6 / O-2.c: float refinement with open/closed/holed intervals.
 //
 // Highlights the Real theory's ability to reason about open vs closed
 // boundaries (a difference Int can't see).

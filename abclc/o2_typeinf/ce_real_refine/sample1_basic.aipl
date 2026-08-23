@@ -1,4 +1,4 @@
-// Phase O-2.c: Real / float refinement (Z3 Real theory) demo.
+// Phase O-2.c: float / float refinement (Z3 Real theory) demo.
 //
 // Same shape as WhereVacuous.aipl but with `float where ...` instead
 // of `int where ...`.  With `AIPL_REFINE_CHECK=1` the type-checker

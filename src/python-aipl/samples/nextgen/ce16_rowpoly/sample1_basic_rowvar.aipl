@@ -9,7 +9,7 @@
 // Run with:
 //   AIPL_ROWPOLY=1 python3 aipl_main.py --check \
 //     samples/nextgen/ce16_rowpoly/sample1_basic_rowvar.aipl
-// Expected: `p` inferred as `{age: Int, name: Str | ρ}`.
+// Expected: `p` inferred as `{age: int, name: Str | ρ}`.
 
 class Greeter {
   method greet(p) {

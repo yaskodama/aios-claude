@@ -3,16 +3,16 @@
 // satisfy these predicates and report each one.
 
 class BadReals {
-  method gt1_lt05(x: Real where x > 1.0 and x < 0.5) -> Real {
+  method gt1_lt05(x: float where x > 1.0 and x < 0.5) -> float {
     reply(x);
   }
-  method strict_open_zero(y: Real where y > 0.0 and y < 0.0) -> Real {
+  method strict_open_zero(y: float where y > 0.0 and y < 0.0) -> float {
     reply(y);
   }
-  method bigger_than_self(z: Real where z > z + 1.0) -> Real {
+  method bigger_than_self(z: float where z > z + 1.0) -> float {
     reply(z);
   }
-  method bool_eq_int(w: Real where w == 1.0 and w == 2.0) -> Real {
+  method bool_eq_int(w: float where w == 1.0 and w == 2.0) -> float {
     reply(w);
   }
 }

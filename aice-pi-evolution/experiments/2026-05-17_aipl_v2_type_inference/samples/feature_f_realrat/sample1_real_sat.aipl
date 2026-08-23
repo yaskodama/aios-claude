@@ -1,23 +1,23 @@
-// Feature F (Phase E-γ-R: Real/Rat refinement) — Sample 1.
+// Feature F (Phase E-γ-R: float/Rat refinement) — Sample 1.
 // All predicates are satisfiable over the reals.  No issues should
 // be reported by the Z3 backend, because the inference engine now
 // translates `Real where ...` annotations through Z3's Real theory
 // (previously they fell through as "non-Int refinement deferred").
 
 class Reals {
-  method unit_open(x: Real where x > 0.0 and x < 1.0) -> Real {
+  method unit_open(x: float where x > 0.0 and x < 1.0) -> float {
     reply(x);
   }
-  method nonneg(y: Real where y >= 0.0) -> Real {
+  method nonneg(y: float where y >= 0.0) -> float {
     reply(y);
   }
-  method positive_below(z: Real where 0.0 < z and z < 100.0) -> Real {
+  method positive_below(z: float where 0.0 < z and z < 100.0) -> float {
     reply(z);
   }
-  method offset_window(w: Real where w > a and w < a + 1.0) -> Real {
+  method offset_window(w: float where w > a and w < a + 1.0) -> float {
     reply(w);
   }
-  method monotone(p: Real where p == 2.0 * q + 1.0) -> Real {
+  method monotone(p: float where p == 2.0 * q + 1.0) -> float {
     reply(p);
   }
 }
