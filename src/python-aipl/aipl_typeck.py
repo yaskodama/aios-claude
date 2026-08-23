@@ -278,11 +278,29 @@ def _is_result(t: str) -> bool:
     return isinstance(t, str) and t.startswith("result[")
 
 
+def _strip_refine(t: str) -> str:
+    """`int where k >= 0` の述語部分を落として基底型を返す。
+
+    精緻化の述語を確かめるのは Z3 を使う推論パス（aipl_inference.py、
+    --infer / AIPL_REFINE_CHECK）の仕事である。こちらの型検査は基底型しか見ない。
+    ここを見落としていたため、`method f(k: int where k >= 0) -> int`
+    のような、精緻化された引数をそのまま返すプログラムが
+    「expected int, got int where k >= 0」で弾かれていた ---- 
+    精緻化された型は基底型の部分型なので、通るのが正しい。"""
+    if not isinstance(t, str):
+        return t
+    i = t.find(" where ")
+    return t[:i].strip() if i >= 0 else t
+
+
 def _compatible(expected: str, actual: str) -> bool:
     # Phase 14: linearity is a separate dimension from element type.
     # Strip both sides so `linear int` matches `int` for compat purposes.
     _, expected = _strip_linear(expected)
     _, actual = _strip_linear(actual)
+    # 精緻化は基底型の上の飾りである。述語の含意は推論パスが見る。
+    expected = _strip_refine(expected)
+    actual = _strip_refine(actual)
     # 裸の `result` は、どの result<τ> とも合う（is_ok / value の引数）。
     if expected == "result" and _is_result(actual):
         return True
