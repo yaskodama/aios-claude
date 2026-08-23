@@ -36,7 +36,7 @@
 \definecolor{codestr}{RGB}{160,40,40}
 
 \lstdefinelanguage{aipl}{
-  keywords={class, method, function, return, var, float, int, new, send, call, become,
+  keywords={class, method, function, return, var, float, int, new, send, call, replyto,
             if, else, while, do, self, sender, now, future, await, true, false, pub, linear,
             scope, transient, reply, channel, select, case, timeout, then, remote},
   keywordstyle=\color{codekw}\bfseries,
@@ -71,7 +71,7 @@
 \title{AIPL ユーザーズマニュアル\\
 \large Actor-based Intelligent Parallel Language}
 \author{児玉 靖 \\ \small \texttt{yaskodama@gmail.com}}
-\date{2026年5月13日}
+\date{2026年8月23日版\\{\small Python 実装（Py-I）向け。核の仕様は abclcp のユーザーズガイドが正典}}
 
 \begin{document}
 \maketitle
@@ -97,6 +97,46 @@
 % ============================================================
 \section{はじめに}
 % ============================================================
+
+\subsection*{このマニュアルの位置づけ}
+
+AIPL には実装が三つある (OCaml 版・Python 版・ブラウザの JavaScript 版).
+ただし\textbf{三つが同じ言語というわけではない}.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{3.4cm}p{6.4cm}@{}}
+\toprule
+層 & どこが実装するか & 内容 \\
+\midrule
+\textbf{核} & 三実装すべて & アクターと三種の送信, \texttt{reply}, 型・効果・期限,
+  失敗の型 \texttt{result}$\langle\tau\rangle$, 返信先の一級性, 資源の順序,
+  義務レベル, セッション型, メッシュ配備 \\
+\addlinespace
+\textbf{拡張} & \textbf{Python 版のみ} & レコード型と行多相, \texttt{where} による精緻化型,
+  CSP チャネル, 所有 (\texttt{pub} / \texttt{move}), タプル, \texttt{match},
+  saga, 分散ランタイム \texttt{aipl\_dist} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{本書は Python 版のマニュアルである.} 核と拡張の両方を扱う.
+核だけを厳密に知りたい場合は,
+\texttt{aios/abclcp/docs/aipl\_guide\_ja.pdf}（ユーザーズガイド）を見ること.
+そちらが仕様の正典で, 三実装で出力の一致まで検証してある.
+
+本書のうち, レコード型・組型・Phase C-E2 型推論・\texttt{aipl\_dist}・Next-gen 機能の各章は
+\textbf{拡張層}である. OCaml 版と JavaScript 版では動かない.
+
+どちらの層に属するかは機械的に分かる.
+
+\begin{lstlisting}[language=]
+sh ~/aios/abclcp/tools/classify_corpus.sh
+\end{lstlisting}
+
+OCaml 版が通せば核, Python 版だけが通せば拡張である.
+
+\subsection*{言語の骨格}
 
 AIPL は \textbf{アクターモデル} に基づく並行プログラミング言語である.
 プログラムは複数の独立した \emph{アクター} (クラスのインスタンス) から構成され,
@@ -165,7 +205,7 @@ _build/default/src/repl_thread.exe abclc/Hello.aipl
 \subsubsection*{キーワード}
 
 \begin{lstlisting}
-class  method  var  float  new  become
+class  method  var  float  new  replyto
 send   send!   call  remote  reply
 if  then  else  while  do
 select  case  timeout  ->
@@ -254,7 +294,6 @@ stmt := var x = expr ;                 // ローカル変数宣言
       | call f(arg, ...) ;             // 同上 (明示形)
       | send target.method(args) ;     // 非同期メッセージ送信
       | send! target.method(args) ;    // 型検査をバイパスする送信
-      | become C(args) ;               // 自己の振る舞い置換
       | if (expr) stmt [else stmt]
       | while expr do stmt
       | { stmt; stmt; ... }            // ブロック
@@ -320,9 +359,9 @@ send target.method(args);
 \subsubsection*{\texttt{now} / \texttt{future} / \texttt{await} (同期・非同期返答付き送信)}
 
 \begin{lstlisting}
-var v = now calc.add(3, 4);         // ブロックして reply 値を取得
+var v = now calc.add(3, 4) timeout 1000 else 0;   // ブロックして reply 値を取得
 var f = future ai.ask("long task"); // すぐ Future 値を返す
-var ans = await(f);                  // 後で値を取り出す
+var ans = await(f) timeout 1000 else 0;           // 後で値を取り出す
 \end{lstlisting}
 
 ABCL/1 で言うところの now 型送信と future 型送信に対応する.
@@ -352,29 +391,34 @@ select {
   \item \texttt{timeout} 節は省略可 (その場合は永久に待つ)
 \end{itemize}
 
-\subsection{\texttt{become} による振る舞い更新}
+\subsection{振る舞いの切り替え --- \texttt{become} は無くなった}
 
-アクター自身を別のクラスに「化ける」ことができる.
+かつて \texttt{become} でアクター自身を別のクラスに「化ける」ことができたが,
+\textbf{この機能は言語から外された}. OCaml 版でも Python 版でも構文エラーになる.
+
+外した理由は三つである. ABCL/1 に無かったこと, 型を守る制限を課すと
+状態フィールドと分岐で書くのとほぼ同じになること, そして
+543 本の実プログラムを数えて\textbf{一つも使われていなかった}ことである
+(使っていたのは \texttt{become} 自身のテスト 4 本だけであった).
+
+振る舞いの切り替えは, 状態フィールドと \texttt{if} で書く.
 
 \begin{lstlisting}
-class A {
-  method ping() {
-    print("A.ping");
-    become B();
-  }
-}
-class B {
-  method ping() {
-    print("B.ping");
-    become A();
+class Door {
+  var st = 0;                      // 0=closed 1=opening 2=opened
+  method push() : unit !{mut, log} {
+    if (st == 0)      { st = 1; print("opening"); }
+    else { if (st == 1) { st = 2; print("opened"); }
+           else         { st = 0; print("closed"); } }
   }
 }
 \end{lstlisting}
 
-\texttt{become} はメソッド本体内でのみ使え,現在のアクターのフィールドとメソッドを
-新クラスの \texttt{init} 結果で置き換える.メールボックスは保持される.
+こう書くと, アクター型が実行時に変わらないので\textbf{外から見た型が嘘にならない}.
+代価は, 状態が増えると \texttt{if} が深くなることである.
 
 \subsection{\texttt{reply} と \texttt{sender}}
+\label{sec:replysender}
 
 メソッド本体では暗黙の変数 \texttt{sender} が使える (直近にこのメッセージを送ったアクター).
 
@@ -407,6 +451,10 @@ send remote("localhost:8080", "fork2").take(0);
 
 \subsection{レコードと組型 (タプル)}
 
+\noindent\fbox{\parbox{0.96\textwidth}{\small レコード型と組型は\textbf{拡張層}である (Python 版のみ)。
+核だけで書きたい場合は使わないこと。}}
+
+
 OCaml ランタイムでは構造的なレコードとタプルがリテラルとフィールド/インデックス
 アクセスとともに利用できる.HM 型推論が型を構造的に保持する.
 
@@ -437,6 +485,95 @@ print(pair[1]);             // "label"
 両者とも HM 推論で \texttt{unify} 時にラベル/位置と要素型を照合する.
 
 % ============================================================
+% ============================================================
+\section{核の七つの規律}
+% ============================================================
+
+型・効果・期限の上に, 三実装すべてが備える\textbf{七つの規律}が載っている.
+どれも\textbf{注釈を書かなくても効く}ように作ってある.
+ここでは要点だけを示す. 詳細と例は正典のユーザーズガイド
+(\texttt{aios/abclcp/docs/aipl\_guide\_ja.pdf}) にある.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{5.0cm}p{4.6cm}@{}}
+\toprule
+規律 & 書き方 & 止めるもの \\
+\midrule
+効果 & \texttt{!\{ai, net\}} & 実時間側が機外のモデルを待つこと \\
+期限 & \texttt{timeout $n$ else $e$} & 返らない待ち \\
+失敗の型 & \texttt{timeout $n$} (\texttt{else} 無し) & 期限切れの値を正常値として流すこと \\
+返信先の一級性 & \texttt{replyto} / \texttt{answer} / 引数型 \texttt{reply} & 返信の取りこぼしと二重返信 \\
+資源の順序 & \texttt{acquire} / \texttt{release} / \texttt{resource\_order} & 放し忘れ・二重取得・逆順の取得 \\
+義務レベル & \texttt{@$n$} (書かなければ推論) & 待ちの循環 \\
+セッション型 & \texttt{protocol\_define} / \texttt{\_start} / \texttt{\_end} & やり取りの順序違反 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{待ちには期限が要る}
+
+現行仕様では, 待ちに \texttt{timeout} を書く. 書かないと警告が出る.
+
+\begin{lstlisting}
+var v = now calc.add(3, 4) timeout 1000 else 0;   // else あり -> int
+var r = now calc.add(3, 4) timeout 1000;          // else なし -> result<int>
+if (is_ok(r)) { print("ok " ++ value(r, -1)); } else { print("timed out"); }
+\end{lstlisting}
+
+\texttt{else} を書かないと \texttt{result}$\langle\tau\rangle$ が返る.
+これは数値として使えないので, 確かめずに計算へ流すことができない.
+時間切れの値が正常な答えのふりをして下流へ流れる,
+という壊れ方がここで止まる.
+
+\subsection{待ちは必ず「上」へ向かう --- 義務レベル}
+
+各メソッドに番号を付け, 待ちは必ず番号の大きい方へ向かうことを要求する.
+\textbf{書かなくてよい}. 書かなければ, 待ちの辺を見て押し上げる不動点で推論される.
+
+\begin{lstlisting}
+class Leaf { method f(x)  : int @2 !{} { reply(x + 1); } }
+class Mid  { var l = new Leaf();
+             method g(x)  : int @1 !{} { reply(now l.f(x) timeout 200 else 0); } }
+\end{lstlisting}
+
+これにより, \textbf{待ちの宛先がクラスとして分かる範囲では
+デッドロック自由が型で保証される}. 紙の上だけの主張ではなく,
+Coq/Rocq で \texttt{await} を含んだまま機械検証してある
+(\texttt{aios/abclcp/coq/AIPLSoundness2.v}, 公理なし).
+
+\subsection{資源は対で取り, 順序を守る}
+
+\begin{lstlisting}
+acquire("i2c");  ... ;  release("i2c");     // 対になっていないと型エラー
+\end{lstlisting}
+
+さらに, \textbf{$r$ を持っているあいだに $s$ を取った}という入れ子が
+そのまま $r < s$ の主張になる. プログラム全体から集めて閉路が無いことを見るので,
+二つのアクターが同じ資源を逆順に取ると弾かれる.
+
+\subsection{やり取りの順序 --- セッション型}
+
+\begin{lstlisting}
+protocol_define("Pipeline", "f.get -> r.scale -> st.put");
+var sid = protocol_start("Pipeline");
+... ;
+protocol_end(sid);
+\end{lstlisting}
+
+実行時のプロトコル宣言を型検査の側でも読む. 新しい宣言は要らない.
+同期の呼び先は展開するので, セッションがアクターをまたいでも追える.
+
+\subsection{\texttt{sender} は Python 版だけの機能である}
+
+本書の \S\ref{sec:replysender} で使う \texttt{sender} を\textbf{値として}扱う書き方
+(\texttt{var w = sender;} のように保持する) は\textbf{拡張層}である.
+核では \texttt{sender} は送信の宛先としてしか書けない.
+
+核で「送り主を溜めて後で返す」を書くには,
+返信先を一級の値として扱う \texttt{replyto} を使う.
+ただし核でも\textbf{フィールドには持てない}(引数としては渡せる).
+
 \section{組込み関数リファレンス}
 % ============================================================
 
@@ -558,9 +695,9 @@ ai_call_with_system(2, "be brief", "hi")
 \textbf{3 並行モデル経由の AI 呼び出し} もそのまま使える:
 
 \begin{lstlisting}
-var ans  = now ai.ask("hello");          // 同期 reply 待ち
+var ans  = now ai.ask("hello") timeout 5000 else "";   // 同期 reply 待ち
 var fut  = future ai.ask("long task");   // future 取得
-var done = await(fut);                    // 後で取り出す
+var done = await(fut) timeout 5000 else "";            // 後で取り出す
 send ai.ask("fire and forget");          // past 型,戻り値不要
 \end{lstlisting}
 
@@ -673,33 +810,38 @@ var ponger = new Ponger();
 \textbf{学べること}: \texttt{sender} による「直前の送信元」への返信,
 循環メッセージでずっと走り続けるアクター. \texttt{init} の中から外部アクターへ \texttt{send} できる.
 
-\subsection{Become --- 振る舞いの動的入れ替え}
+\subsection{Door --- 状態フィールドによる振る舞いの切り替え}
 
-\texttt{abclc/become.aipl}
+\texttt{docs/samples/paper/s08\_state\_machine.aipl}
 
 \begin{lstlisting}
-class A {
-  method ping() {
-    print("A.ping");
-    become B();
+class Door {
+  var st = 0;                      // 0=closed 1=opening 2=opened
+  method push() : unit !{mut, log} {
+    if (st == 0)      { st = 1; print("opening"); }
+    else { if (st == 1) { st = 2; print("opened"); }
+           else         { st = 0; print("closed"); } }
+  }
+  method show() : unit !{log} {
+    if (st == 0) { print("closed"); }
+    else { if (st == 1) { print("opening"); } else { print("opened"); } }
   }
 }
-
-class B {
-  method ping() {
-    print("B.ping");
-    become A();
-  }
-}
-
-var x = new A();
-send x.ping();   // A.ping  -> B 化
-send x.ping();   // B.ping  -> A 化
-send x.ping();   // A.ping
+var d = new Door();
+send d.show();
+send d.push();
+send d.push();
 \end{lstlisting}
 
-\textbf{学べること}: 同じアクター変数 \texttt{x} の振る舞いが受信ごとに切り替わる.
-メッセージの順序は保たれ,\texttt{become} は次のメッセージから効く.
+\begin{lstlisting}[language=]
+closed
+opening
+opened
+\end{lstlisting}
+
+\textbf{学べること}: かつて \texttt{become} で書いていた「振る舞いの入れ替え」は,
+状態フィールドと分岐で書く. アクター型が実行時に変わらないので,
+外から見た型が嘘にならない.
 
 \subsection{Records --- レコード型}
 
@@ -765,7 +907,9 @@ class Buffer {
       }
     }
   }
-  method get() { /* ... */ }
+  method get() {
+    // ...
+  }
 }
 \end{lstlisting}
 
@@ -882,6 +1026,10 @@ print("Open http://localhost:8080/ and send to actor 'calc'");
 
 % ============================================================
 \section{Phase C-E2 型推論 (Python ランタイム)}
+
+\noindent\fbox{\parbox{0.96\textwidth}{\small 本章は\textbf{拡張層}である (Python 版のみ)。\texttt{where} による精緻化型を含む。
+核だけで書きたい場合は使わないこと。}}
+
 % ============================================================
 
 Phase 11 系の gradual 静的型検査に加え,Python 版 AIPL は Phase C 以降で
@@ -996,6 +1144,10 @@ method bad(k: Int where k >= 5 and k <= 3) -> Int { reply(k); }
 
 % ============================================================
 \section{AIPL v2 Distributed Runtime (\texttt{aipl\_dist})}
+
+\noindent\fbox{\parbox{0.96\textwidth}{\small 本章は\textbf{拡張層}である (Python 版のみ)。
+核だけで書きたい場合は使わないこと。}}
+
 % ============================================================
 
 \texttt{aipl\_dist.py} は AIPL v2 (2) ``Distributed'' の進化計算で発見された
@@ -1147,6 +1299,10 @@ aipl_dist.call_ai_quorum(prompt, providers=None, **kw)
 
 % ============================================================
 \section{Next-gen 機能 (CE-10〜13 + DR-10〜13, 2026-05-18)}
+
+\noindent\fbox{\parbox{0.96\textwidth}{\small 本章は\textbf{拡張層}である (Python 版のみ)。
+核だけで書きたい場合は使わないこと。}}
+
 % ============================================================
 
 Phase C-E2 (CE-1〜9) と AIPL v2 Distributed (DR-1〜9) の上に積み増した
@@ -1230,7 +1386,7 @@ class Worker {
     check_capability("fs");        // ok: grant に入っている
     var c = read_file("/etc/hosts");
     check_capability("net");       // FAIL: strict mode で throw
-    /* ... */
+    // ...
   }
 }
 \end{lstlisting}
@@ -1304,7 +1460,7 @@ export AIPL_ROUTE_REGION_eu-west-1="Greeter:slow"
 class Master {
   method init() {
     var pool = pool_create("Worker", 2, 10, 4);  // min, max, target_qlen
-    /* ... */
+    // ...
     var w = pool_pick(pool);
     send w.task("payload");
   }
@@ -1368,7 +1524,7 @@ OpenAI tier-1 rate limit & \texttt{AIPL\_DIST\_RPM=400 AIPL\_DIST\_TPM=180000} �
 
 \par\vspace{8pt}
 \noindent\textbf{設計指針のまとめ}: AIPL では「同期したいなら sender に reply,
-待ちたいなら select,状態を切り替えたいなら become」と覚えておくと,
+待ちたいなら select,状態を切り替えたいなら状態フィールドと分岐」と覚えておくと,
 大半の並行パターンを言語機能だけで表現できる.型は HM 推論で自動的に
 決まるため,通常は注釈を書かずに走らせて構わない.明示したい場合のみ
 Python (annotated) ランタイムを使うとよい.
