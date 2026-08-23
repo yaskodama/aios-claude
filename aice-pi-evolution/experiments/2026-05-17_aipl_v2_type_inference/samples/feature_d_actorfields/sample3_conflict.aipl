@@ -1,3 +1,4 @@
+// @expect reject: フィールドの型が衝突する例。拒否されるのが正しい
 // Feature D (Phase E-β) — Sample 3: cross-method type conflict.
 //
 // The field `s` is consistently used as an Int through the

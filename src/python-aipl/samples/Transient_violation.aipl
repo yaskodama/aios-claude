@@ -1,3 +1,4 @@
+// @expect reject: transient cast の違反例。string を int に渡す
 // Phase 16 — transient cast violation sample.
 //
 // This program runs cleanly without --transient.  With --transient,

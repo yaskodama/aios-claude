@@ -1,3 +1,4 @@
+// @expect reject: 線形性の違反例（move 後の使用）を含む
 // Phase 14 — practical: database transaction with linear handle.
 //
 // A `Tx` value (modeled as `linear int`) MUST be terminated by exactly

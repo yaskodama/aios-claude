@@ -1,3 +1,4 @@
+// @expect reject: ユニオン型と総称の実演。わざと 4 件の誤りを含む
 // Phase 11c — union type annotations + simple generics.
 //
 // Union annotations:

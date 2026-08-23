@@ -1,3 +1,4 @@
+// @expect reject: 効果注釈の実演。宣言し忘れた効果をわざと含む
 // Phase 12 — capability-based effect system.
 //
 // Functions and methods declare their side-effect set with `!{...}`:

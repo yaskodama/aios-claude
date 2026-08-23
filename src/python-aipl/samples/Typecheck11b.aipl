@@ -1,3 +1,4 @@
+// @expect reject: 呼び出し側の引数検査の実演。わざと 6 件の誤りを含む
 // Phase 11b — call-site arg validation + actor method return inference.
 //
 // 11a flagged: var/field/return annotation mismatches, function arity.

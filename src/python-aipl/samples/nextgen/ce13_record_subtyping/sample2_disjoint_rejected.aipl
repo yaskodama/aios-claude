@@ -1,3 +1,4 @@
+// @expect reject: 交わらない record を渡す例。拒否されるのが正しい
 // CE-13 / sample 2 — explicit-annotation forces a disjoint rejection.
 //
 // Py-I record subtyping is *gradual* by default: when no parameter

@@ -1,3 +1,4 @@
+// @expect reject: 型検査の実演。わざと 6 件の誤りを含み、type_check() がそれを数える
 // Phase 11 — gradual static type checker for AIPL.
 //
 // Annotation syntax:

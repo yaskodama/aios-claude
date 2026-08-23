@@ -1,3 +1,4 @@
+// @expect reject: 絞り込みと長さ付き配列の実演。わざと 4 件の誤りを含む
 // Phase 11d (narrowing) + Phase 11e (length-tagged arrays).
 //
 // 11d: `if (typeof(x) == "T")` narrows `x` to `T` in the then-branch

@@ -1,3 +1,4 @@
+// @expect reject: 推論の前に型検査が捕まえる例。落ちるのが正しい
 // Feature G (Phase E-2: typeck × inference integration) — Sample 1.
 // Annotated nominal types that typeck flags before inference even
 // runs.  These checks use builtin signatures + linearity + effects

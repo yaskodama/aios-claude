@@ -74,6 +74,20 @@ BUILTIN_EFFECTS: "dict[str, set]" = {
     # Anything not in this dict is considered effect-free.
 }
 
+# ---- DOFBOT/TinyML の組込み効果 ----
+try:
+    from aipl_dofbot import EFFECTS as _DOFBOT_EFFECTS
+    BUILTIN_EFFECTS.update(_DOFBOT_EFFECTS)
+except Exception:
+    pass
+
+# ---- Unitree G1 の組込み効果 ----
+try:
+    from aipl_humanoid import EFFECTS as _G1_EFFECTS
+    BUILTIN_EFFECTS.update(_G1_EFFECTS)
+except Exception:
+    pass
+
 
 def _typevars_in(t: str) -> set:
     return set(_TYPEVAR_RE.findall(t))
