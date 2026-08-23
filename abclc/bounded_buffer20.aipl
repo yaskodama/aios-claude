@@ -95,7 +95,7 @@ class Producer {
     }
   }
   method put_ok() {
-    call wait(speed);
+    wait(speed);
     send self.produce();
   }
 }
@@ -118,7 +118,7 @@ class Consumer {
     if (taken == max) {
       print("[C" ++ id ++ "] DONE");
     } else {
-      call wait(speed);
+      wait(speed);
       send self.do_get();
     }
   }

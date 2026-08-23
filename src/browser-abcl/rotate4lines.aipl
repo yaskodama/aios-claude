@@ -21,8 +21,8 @@ class Line {
     var y1 = cy - dy;
     var x2 = cx + dx;
     var y2 = cy + dy;
-    call canvas_line(x1, y1, x2, y2);
-    call wait(32);
+    canvas_line(x1, y1, x2, y2);
+    wait(32);
     send self.rotate();
   }
 }

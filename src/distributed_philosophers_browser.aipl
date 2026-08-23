@@ -29,7 +29,7 @@ class Fork {
   method take(reqId) {
     if (taken == 0) {
       taken = 1;
-      call fork_held(id, reqId);
+      fork_held(id, reqId);
       print("VIZ FORK " ++ id ++ " TAKEN " ++ reqId);
       send sender.fork_granted();
     } else {
@@ -41,10 +41,10 @@ class Fork {
   method release() {
     if (waiter == "") {
       taken = 0;
-      call fork_free(id);
+      fork_free(id);
       print("VIZ FORK " ++ id ++ " FREE");
     } else {
-      call fork_held(id, waiterId);
+      fork_held(id, waiterId);
       print("VIZ FORK " ++ id ++ " HANDOFF " ++ waiterId);
       print("VIZ FORK " ++ id ++ " TAKEN " ++ waiterId);
       send waiter.fork_granted();
@@ -87,9 +87,9 @@ class Philosopher {
     if (running == 0) {
       print("VIZ PHILO " ++ id ++ " DONE");
     } else {
-      call philo_state(id, 0);
+      philo_state(id, 0);
       print("VIZ PHILO " ++ id ++ " THINK");
-      call wait(700);
+      wait(700);
       send self.hungry();
     }
   }
@@ -98,7 +98,7 @@ class Philosopher {
     if (running == 0) {
       print("VIZ PHILO " ++ id ++ " DONE");
     } else {
-      call philo_state(id, 1);
+      philo_state(id, 1);
       print("VIZ PHILO " ++ id ++ " HUNGRY");
       hasLow = 0;
       send lowFork.take(id);
@@ -129,10 +129,10 @@ class Philosopher {
       send highFork.release();
       print("VIZ PHILO " ++ id ++ " DONE");
     } else {
-      call philo_state(id, 2);
+      philo_state(id, 2);
       eatCount = eatCount + 1;
       print("VIZ PHILO " ++ id ++ " EAT " ++ eatCount);
-      call wait(900);
+      wait(900);
       send self.eat_done();
     }
   }

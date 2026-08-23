@@ -9,48 +9,48 @@ class Line {
 
   method start() {
     var xx1 = 50.; var yy1 = 50.; var scale = 2.;
-    call sdl_clear();
-    call sdl_line(xx1,yy1,xx1,yy1+(40*scale));
-    call sdl_line(xx1,yy1+(40*scale),xx1+(20*scale),yy1+(40*scale));
-    call sdl_line(xx1+(20*scale),yy1+(40*scale),xx1+(20*scale),yy1);
+    sdl_clear();
+    sdl_line(xx1,yy1,xx1,yy1+(40*scale));
+    sdl_line(xx1,yy1+(40*scale),xx1+(20*scale),yy1+(40*scale));
+    sdl_line(xx1+(20*scale),yy1+(40*scale),xx1+(20*scale),yy1);
     var xx2 = x1+(50*scale);
-    call sdl_line(xx2,yy1+(20*scale),xx2,yy1+(40*scale));
-    call sdl_line(xx2,yy1+(20*scale),xx2+(15*scale),yy1+(20*scale));
-    call sdl_line(xx2+(15*scale),yy1+(20*scale),xx2+(15*scale),yy1+(40*scale));
+    sdl_line(xx2,yy1+(20*scale),xx2,yy1+(40*scale));
+    sdl_line(xx2,yy1+(20*scale),xx2+(15*scale),yy1+(20*scale));
+    sdl_line(xx2+(15*scale),yy1+(20*scale),xx2+(15*scale),yy1+(40*scale));
     var xx3 = xx2+(25*scale);
-    call sdl_line(xx3,yy1+(20*scale),xx3,yy1+(40*scale));
-    call sdl_line(xx3,yy1+(15*scale),xx3,yy1+(17*scale));
+    sdl_line(xx3,yy1+(20*scale),xx3,yy1+(40*scale));
+    sdl_line(xx3,yy1+(15*scale),xx3,yy1+(17*scale));
     var xx4 = xx3+(10*scale);
-    call sdl_line(xx4,yy1+(20*scale),xx4+(7*scale),yy1+(40*scale));
-    call sdl_line(xx4+(7*scale),yy1+(40*scale),xx4+(14*scale),yy1+(20*scale));
+    sdl_line(xx4,yy1+(20*scale),xx4+(7*scale),yy1+(40*scale));
+    sdl_line(xx4+(7*scale),yy1+(40*scale),xx4+(14*scale),yy1+(20*scale));
     var xx5 = xx4+(20*scale);
-    call sdl_line(xx5+(15*scale),yy1+(25*scale),xx5,yy1+(25*scale));
-    call sdl_line(xx5,yy1+(25*scale),xx5,yy1+(35*scale));
-    call sdl_line(xx5,yy1+(35*scale),xx5+(15*scale),yy1+(35*scale));
-    call sdl_line(xx5+(15*scale),yy1+(35*scale),xx5+(15*scale),yy1+(25*scale));
-    call sdl_line(xx5+(15*scale),yy1+(40*scale),xx5,yy1+(40*scale));
-    call sdl_line(xx5,yy1+(35*scale),xx5,yy1+(40*scale));
+    sdl_line(xx5+(15*scale),yy1+(25*scale),xx5,yy1+(25*scale));
+    sdl_line(xx5,yy1+(25*scale),xx5,yy1+(35*scale));
+    sdl_line(xx5,yy1+(35*scale),xx5+(15*scale),yy1+(35*scale));
+    sdl_line(xx5+(15*scale),yy1+(35*scale),xx5+(15*scale),yy1+(25*scale));
+    sdl_line(xx5+(15*scale),yy1+(40*scale),xx5,yy1+(40*scale));
+    sdl_line(xx5,yy1+(35*scale),xx5,yy1+(40*scale));
     var xx6 = xx5+(20*scale);
-    call sdl_line(xx6,yy1+(25*scale),xx6,yy1+(40*scale));
-    call sdl_line(xx6,yy1+(25*scale),xx6+(10*scale),yy1+(25*scale));
-    call sdl_line(xx6+(10*scale),yy1+(25*scale),xx6+(10*scale),yy1+(30*scale));
+    sdl_line(xx6,yy1+(25*scale),xx6,yy1+(40*scale));
+    sdl_line(xx6,yy1+(25*scale),xx6+(10*scale),yy1+(25*scale));
+    sdl_line(xx6+(10*scale),yy1+(25*scale),xx6+(10*scale),yy1+(30*scale));
     var xx7 = xx6+(15*scale);
-    call sdl_line(xx7+(15*scale),yy1+(25*scale),xx7,yy1+(25*scale));
-    call sdl_line(xx7,yy1+(25*scale),xx7,yy1+(32*scale));
-    call sdl_line(xx7,yy1+(32*scale),xx7+(15*scale),yy1+(32*scale));
-    call sdl_line(xx7+(15*scale),yy1+(32*scale),xx7+(15*scale),yy1+(40*scale));
-    call sdl_line(xx7+(15*scale),yy1+(40*scale),xx7,yy1+(40*scale));
+    sdl_line(xx7+(15*scale),yy1+(25*scale),xx7,yy1+(25*scale));
+    sdl_line(xx7,yy1+(25*scale),xx7,yy1+(32*scale));
+    sdl_line(xx7,yy1+(32*scale),xx7+(15*scale),yy1+(32*scale));
+    sdl_line(xx7+(15*scale),yy1+(32*scale),xx7+(15*scale),yy1+(40*scale));
+    sdl_line(xx7+(15*scale),yy1+(40*scale),xx7,yy1+(40*scale));
     var xx8 = xx7+(20*scale);
-    call sdl_line(xx8,yy1+(20*scale),xx8,yy1+(40*scale));
-    call sdl_line(xx8,yy1+(15*scale),xx8,yy1+(17*scale));
+    sdl_line(xx8,yy1+(20*scale),xx8,yy1+(40*scale));
+    sdl_line(xx8,yy1+(15*scale),xx8,yy1+(17*scale));
     var xx9 = xx8+(10*scale);
-    call sdl_line(xx9,yy1+(20*scale),xx9,yy1+(40*scale));
-    call sdl_line(xx9-(5*scale),yy1+(20*scale),xx9+(5*scale),yy1+(20*scale));
+    sdl_line(xx9,yy1+(20*scale),xx9,yy1+(40*scale));
+    sdl_line(xx9-(5*scale),yy1+(20*scale),xx9+(5*scale),yy1+(20*scale));
     var xx10 = xx9+(10*scale);
-    call sdl_line(xx10,yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
-    call sdl_line(xx10+(14*scale),yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
-    call sdl_line(xx10+(7*scale),yy1+(30*scale),xx10+(7*scale),yy1+(40*scale));
-    call sdl_present();
+    sdl_line(xx10,yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
+    sdl_line(xx10+(14*scale),yy1+(20*scale),xx10+(7*scale),yy1+(30*scale));
+    sdl_line(xx10+(7*scale),yy1+(30*scale),xx10+(7*scale),yy1+(40*scale));
+    sdl_present();
   }
 
   method rotate() {
@@ -60,10 +60,10 @@ class Line {
     var dy = len * sin(rad);
     ox1 = x1; oy1 = y1; ox2 = x2;oy2 = y2;
     x1 = cx - dx; y1 = cy - dy; x2 = cx + dx; y2 = cy + dy;
-    call sdl_erase_line(ox1, oy1, ox2, oy2);
-    call sdl_line(x1, y1, x2, y2);    
-    call sdl_present();
-    call wait(100);
+    sdl_erase_line(ox1, oy1, ox2, oy2);
+    sdl_line(x1, y1, x2, y2);    
+    sdl_present();
+    wait(100);
 
   }
 }

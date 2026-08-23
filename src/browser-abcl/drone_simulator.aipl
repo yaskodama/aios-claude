@@ -34,9 +34,9 @@ class Drone {
     destX   = dx;
     destY   = dy;
     battery = startBatt;
-    call drone_register(id);
-    call drone_pos(id, x, y);
-    call drone_state(id, 0);
+    drone_register(id);
+    drone_pos(id, x, y);
+    drone_state(id, 0);
     send self.step();
   }
 
@@ -46,10 +46,10 @@ class Drone {
         battery = battery - 1;
         if (battery <= 0) {
           dead = 1;
-          call drone_state(id, 2);
+          drone_state(id, 2);
         }
         if (dead == 0) {
-          call drone_scan(id, x, y);
+          drone_scan(id, x, y);
           var ddx  = destX - x;
           var ddy  = destY - y;
           var dist = sqrt(ddx * ddx + ddy * ddy);
@@ -57,8 +57,8 @@ class Drone {
             x = destX;
             y = destY;
             arrived = 1;
-            call drone_pos(id, x, y);
-            call drone_state(id, 1);
+            drone_pos(id, x, y);
+            drone_state(id, 1);
           } else {
             var moveX = ddx / dist * speed;
             var moveY = ddy / dist * speed;
@@ -86,9 +86,9 @@ class Drone {
             }
             x = x + moveX;
             y = y + moveY;
-            call drone_pos(id, x, y);
+            drone_pos(id, x, y);
           }
-          call wait(55);
+          wait(55);
           send self.step();
         }
       }
@@ -102,8 +102,8 @@ class Drone {
       obsX     = ox;
       obsY     = oy;
       obsR     = oR;
-      call drone_remember(id, newObsId);
-      call drone_broadcast(id, newObsId, ox, oy, oR);
+      drone_remember(id, newObsId);
+      drone_broadcast(id, newObsId, ox, oy, oR);
     } else {
       if (obsId != newObsId) {
         var dNew = sqrt((ox - x) * (ox - x) + (oy - y) * (oy - y));
@@ -114,8 +114,8 @@ class Drone {
           obsY  = oy;
           obsR  = oR;
         }
-        call drone_remember(id, newObsId);
-        call drone_broadcast(id, newObsId, ox, oy, oR);
+        drone_remember(id, newObsId);
+        drone_broadcast(id, newObsId, ox, oy, oR);
       }
     }
   }
@@ -145,7 +145,7 @@ class Spawner {
       var batt = 400 + rand(400);
       print(new Drone(count, sx, sy, destX, destY, batt));
       count = count + 1;
-      call wait(25);
+      wait(25);
       send self.spawn_next();
     } else {
       print("spawner: all drones dispatched");
@@ -154,14 +154,14 @@ class Spawner {
 }
 
 // ---- World setup (canvas 800x600, comm range 110 px, view range 55 px) ----
-call world_setup(800, 600, 110, 55);
-call place_safe(720.0, 540.0, 38.0);
+world_setup(800, 600, 110, 55);
+place_safe(720.0, 540.0, 38.0);
 
 // Disaster zones — impassable points
-call place_obstacle(1, 280.0, 220.0, 55.0);
-call place_obstacle(2, 480.0, 380.0, 65.0);
-call place_obstacle(3, 200.0, 450.0, 48.0);
-call place_obstacle(4, 560.0, 180.0, 42.0);
+place_obstacle(1, 280.0, 220.0, 55.0);
+place_obstacle(2, 480.0, 380.0, 65.0);
+place_obstacle(3, 200.0, 450.0, 48.0);
+place_obstacle(4, 560.0, 180.0, 42.0);
 
 // Spawn 14 drones from the upper-left "city center"
 var spawner = new Spawner(14, 720.0, 540.0);

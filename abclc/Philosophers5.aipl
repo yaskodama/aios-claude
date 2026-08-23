@@ -63,21 +63,21 @@ class Fork {
     var ey  = hy - uy * 26.0;
     var abx = ex - ux * 10.0;
     var aby = ey - uy * 10.0;
-    call sdl_erase_line(sX - pnx * 7.0, sY - pny * 7.0,
+    sdl_erase_line(sX - pnx * 7.0, sY - pny * 7.0,
                         sX + pnx * 7.0, sY + pny * 7.0);
-    call sdl_erase_line(asX, asY, ex, ey);
-    call sdl_erase_line(ex, ey, abx + pnx * 6.0, aby + pny * 6.0);
-    call sdl_erase_line(ex, ey, abx - pnx * 6.0, aby - pny * 6.0);
+    sdl_erase_line(asX, asY, ex, ey);
+    sdl_erase_line(ex, ey, abx + pnx * 6.0, aby + pny * 6.0);
+    sdl_erase_line(ex, ey, abx - pnx * 6.0, aby - pny * 6.0);
   }
 
   method draw_free() {
     // Erase whatever was previously drawn (in-line; don't self-send).
     if (drawn == 1) {
-      call sdl_erase_line(fx - 12, fy, fx + 12, fy);
+      sdl_erase_line(fx - 12, fy, fx + 12, fy);
     }
     if (drawn == 2) {
       // erase_held is called synchronously via evalStmt on the Call path —
-      // but `call erase_held()` only works for primitives. Use the inlined
+      // but `erase_held()` only works for primitives. Use the inlined
       // formulas here instead. (self-send would run asynchronously.)
       var dx  = hx - fx;
       var dy  = hy - fy;
@@ -94,21 +94,21 @@ class Fork {
       var ey  = hy - uy * 26.0;
       var abx = ex - ux * 10.0;
       var aby = ey - uy * 10.0;
-      call sdl_erase_line(sX - pnx * 7.0, sY - pny * 7.0,
+      sdl_erase_line(sX - pnx * 7.0, sY - pny * 7.0,
                           sX + pnx * 7.0, sY + pny * 7.0);
-      call sdl_erase_line(asX, asY, ex, ey);
-      call sdl_erase_line(ex, ey, abx + pnx * 6.0, aby + pny * 6.0);
-      call sdl_erase_line(ex, ey, abx - pnx * 6.0, aby - pny * 6.0);
+      sdl_erase_line(asX, asY, ex, ey);
+      sdl_erase_line(ex, ey, abx + pnx * 6.0, aby + pny * 6.0);
+      sdl_erase_line(ex, ey, abx - pnx * 6.0, aby - pny * 6.0);
     }
-    call sdl_line(fx - 12, fy, fx + 12, fy);
+    sdl_line(fx - 12, fy, fx + 12, fy);
     drawn = 1;
-    call sdl_present();
+    sdl_present();
   }
 
   method draw_held(phx, phy, cr, cg, cb) {
     // ---- erase previous drawing using OLD state ----
     if (drawn == 1) {
-      call sdl_erase_line(fx - 12, fy, fx + 12, fy);
+      sdl_erase_line(fx - 12, fy, fx + 12, fy);
     }
     if (drawn == 2) {
       var odx  = hx - fx;
@@ -126,11 +126,11 @@ class Fork {
       var oey  = hy - ouy * 26.0;
       var oabx = oex - oux * 10.0;
       var oaby = oey - ouy * 10.0;
-      call sdl_erase_line(osX - opnx * 7.0, osY - opny * 7.0,
+      sdl_erase_line(osX - opnx * 7.0, osY - opny * 7.0,
                           osX + opnx * 7.0, osY + opny * 7.0);
-      call sdl_erase_line(oasX, oasY, oex, oey);
-      call sdl_erase_line(oex, oey, oabx + opnx * 6.0, oaby + opny * 6.0);
-      call sdl_erase_line(oex, oey, oabx - opnx * 6.0, oaby - opny * 6.0);
+      sdl_erase_line(oasX, oasY, oex, oey);
+      sdl_erase_line(oex, oey, oabx + opnx * 6.0, oaby + opny * 6.0);
+      sdl_erase_line(oex, oey, oabx - opnx * 6.0, oaby - opny * 6.0);
     }
     // ---- commit new holder state ----
     hx = phx; hy = phy;
@@ -154,13 +154,13 @@ class Fork {
     var ey  = hy - uy * 26.0;
     var abx = ex - ux * 10.0;           // arrowhead base (10 back from tip)
     var aby = ey - uy * 10.0;
-    call sdl_line_c(sX - pnx * 7.0, sY - pny * 7.0,
+    sdl_line_c(sX - pnx * 7.0, sY - pny * 7.0,
                     sX + pnx * 7.0, sY + pny * 7.0, hr, hg, hb);
-    call sdl_line_c(asX, asY, ex, ey, hr, hg, hb);
-    call sdl_line_c(ex, ey, abx + pnx * 6.0, aby + pny * 6.0, hr, hg, hb);
-    call sdl_line_c(ex, ey, abx - pnx * 6.0, aby - pny * 6.0, hr, hg, hb);
+    sdl_line_c(asX, asY, ex, ey, hr, hg, hb);
+    sdl_line_c(ex, ey, abx + pnx * 6.0, aby + pny * 6.0, hr, hg, hb);
+    sdl_line_c(ex, ey, abx - pnx * 6.0, aby - pny * 6.0, hr, hg, hb);
     drawn = 2;
-    call sdl_present();
+    sdl_present();
   }
 
   method take(reqId, phx, phy, cr, cg, cb) {
@@ -216,41 +216,41 @@ class Philosopher {
 
   method refresh() {
     // Erase previously-drawn concentric squares
-    call sdl_erase_line(px - 8, py - 8, px + 8, py - 8);
-    call sdl_erase_line(px + 8, py - 8, px + 8, py + 8);
-    call sdl_erase_line(px + 8, py + 8, px - 8, py + 8);
-    call sdl_erase_line(px - 8, py + 8, px - 8, py - 8);
+    sdl_erase_line(px - 8, py - 8, px + 8, py - 8);
+    sdl_erase_line(px + 8, py - 8, px + 8, py + 8);
+    sdl_erase_line(px + 8, py + 8, px - 8, py + 8);
+    sdl_erase_line(px - 8, py + 8, px - 8, py - 8);
     if (drawnState > 0) {
-      call sdl_erase_line(px - 14, py - 14, px + 14, py - 14);
-      call sdl_erase_line(px + 14, py - 14, px + 14, py + 14);
-      call sdl_erase_line(px + 14, py + 14, px - 14, py + 14);
-      call sdl_erase_line(px - 14, py + 14, px - 14, py - 14);
+      sdl_erase_line(px - 14, py - 14, px + 14, py - 14);
+      sdl_erase_line(px + 14, py - 14, px + 14, py + 14);
+      sdl_erase_line(px + 14, py + 14, px - 14, py + 14);
+      sdl_erase_line(px - 14, py + 14, px - 14, py - 14);
     }
     if (drawnState > 1) {
-      call sdl_erase_line(px - 20, py - 20, px + 20, py - 20);
-      call sdl_erase_line(px + 20, py - 20, px + 20, py + 20);
-      call sdl_erase_line(px + 20, py + 20, px - 20, py + 20);
-      call sdl_erase_line(px - 20, py + 20, px - 20, py - 20);
+      sdl_erase_line(px - 20, py - 20, px + 20, py - 20);
+      sdl_erase_line(px + 20, py - 20, px + 20, py + 20);
+      sdl_erase_line(px + 20, py + 20, px - 20, py + 20);
+      sdl_erase_line(px - 20, py + 20, px - 20, py - 20);
     }
     // Draw concentric squares in philosopher's colour
-    call sdl_line_c(px - 8, py - 8, px + 8, py - 8, cr, cg, cb);
-    call sdl_line_c(px + 8, py - 8, px + 8, py + 8, cr, cg, cb);
-    call sdl_line_c(px + 8, py + 8, px - 8, py + 8, cr, cg, cb);
-    call sdl_line_c(px - 8, py + 8, px - 8, py - 8, cr, cg, cb);
+    sdl_line_c(px - 8, py - 8, px + 8, py - 8, cr, cg, cb);
+    sdl_line_c(px + 8, py - 8, px + 8, py + 8, cr, cg, cb);
+    sdl_line_c(px + 8, py + 8, px - 8, py + 8, cr, cg, cb);
+    sdl_line_c(px - 8, py + 8, px - 8, py - 8, cr, cg, cb);
     if (state > 0) {
-      call sdl_line_c(px - 14, py - 14, px + 14, py - 14, cr, cg, cb);
-      call sdl_line_c(px + 14, py - 14, px + 14, py + 14, cr, cg, cb);
-      call sdl_line_c(px + 14, py + 14, px - 14, py + 14, cr, cg, cb);
-      call sdl_line_c(px - 14, py + 14, px - 14, py - 14, cr, cg, cb);
+      sdl_line_c(px - 14, py - 14, px + 14, py - 14, cr, cg, cb);
+      sdl_line_c(px + 14, py - 14, px + 14, py + 14, cr, cg, cb);
+      sdl_line_c(px + 14, py + 14, px - 14, py + 14, cr, cg, cb);
+      sdl_line_c(px - 14, py + 14, px - 14, py - 14, cr, cg, cb);
     }
     if (state > 1) {
-      call sdl_line_c(px - 20, py - 20, px + 20, py - 20, cr, cg, cb);
-      call sdl_line_c(px + 20, py - 20, px + 20, py + 20, cr, cg, cb);
-      call sdl_line_c(px + 20, py + 20, px - 20, py + 20, cr, cg, cb);
-      call sdl_line_c(px - 20, py + 20, px - 20, py - 20, cr, cg, cb);
+      sdl_line_c(px - 20, py - 20, px + 20, py - 20, cr, cg, cb);
+      sdl_line_c(px + 20, py - 20, px + 20, py + 20, cr, cg, cb);
+      sdl_line_c(px + 20, py + 20, px - 20, py + 20, cr, cg, cb);
+      sdl_line_c(px - 20, py + 20, px - 20, py - 20, cr, cg, cb);
     }
     drawnState = state;
-    call sdl_present();
+    sdl_present();
   }
 
   // Waits below are generous so the visualisation is easy to follow:
@@ -263,7 +263,7 @@ class Philosopher {
   method think() {
     state = 0;
     send self.refresh();
-    call wait(1800);
+    wait(1800);
     send self.hungry();
   }
 
@@ -271,17 +271,17 @@ class Philosopher {
     state = 1;
     send self.refresh();
     hasLow = 0;
-    call wait(600);
+    wait(600);
     send lowFork.take(id, px, py, cr, cg, cb);
   }
 
   method fork_granted() {
     if (hasLow == 0) {
       hasLow = 1;
-      call wait(500);
+      wait(500);
       send highFork.take(id, px, py, cr, cg, cb);
     } else {
-      call wait(300);
+      wait(300);
       send self.eat();
     }
   }
@@ -290,15 +290,15 @@ class Philosopher {
     state = 2;
     send self.refresh();
     eatCount = eatCount + 1;
-    call wait(1800);
+    wait(1800);
     send self.eat_done();
   }
 
   method eat_done() {
     send lowFork.release();
-    call wait(400);
+    wait(400);
     send highFork.release();
-    call wait(300);
+    wait(300);
     send self.think();
   }
 }

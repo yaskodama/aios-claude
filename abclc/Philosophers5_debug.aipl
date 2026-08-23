@@ -52,7 +52,7 @@ class Philosopher {
 
   method think() {
     print("P" ++ id ++ " think");
-    call wait(700);
+    wait(700);
     send self.hungry();
   }
 
@@ -76,7 +76,7 @@ class Philosopher {
   method eat() {
     eatCount = eatCount + 1;
     print("P" ++ id ++ " eat #" ++ eatCount);
-    call wait(900);
+    wait(900);
     send self.eat_done();
   }
 

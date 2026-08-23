@@ -2,7 +2,7 @@ class Ponger {
   var cnt = 0.;
   method ping(x, y) {
     cnt = cnt + x + y;
-    call print("pong: " ++ cnt);
+    print("pong: " ++ cnt);
   }
 }
 

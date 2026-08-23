@@ -171,11 +171,11 @@ class Buffer {
       }
     }
 
-    call sdl_clear();
-    call draw_all();
-    call sdl_present();
+    sdl_clear();
+    draw_all();
+    sdl_present();
 
-    call wait(50);
+    wait(50);
     send self.tick();
   }
 
@@ -183,54 +183,54 @@ class Buffer {
     // ---- producer box (10,30)-(70,90) ------------------------------------
     var pr = 102; var pg = 204; var pb = 255;
     if (prodBlocked == 1) { pr = 255; pg = 153; pb = 85; }
-    call sdl_line_c(10, 30,  70, 30,  pr, pg, pb);
-    call sdl_line_c(70, 30,  70, 90,  pr, pg, pb);
-    call sdl_line_c(70, 90,  10, 90,  pr, pg, pb);
-    call sdl_line_c(10, 90,  10, 30,  pr, pg, pb);
-    call sdl_line_c(16, 36,  64, 36,  pr, pg, pb);
-    call sdl_line_c(64, 36,  64, 84,  pr, pg, pb);
-    call sdl_line_c(64, 84,  16, 84,  pr, pg, pb);
-    call sdl_line_c(16, 84,  16, 36,  pr, pg, pb);
+    sdl_line_c(10, 30,  70, 30,  pr, pg, pb);
+    sdl_line_c(70, 30,  70, 90,  pr, pg, pb);
+    sdl_line_c(70, 90,  10, 90,  pr, pg, pb);
+    sdl_line_c(10, 90,  10, 30,  pr, pg, pb);
+    sdl_line_c(16, 36,  64, 36,  pr, pg, pb);
+    sdl_line_c(64, 36,  64, 84,  pr, pg, pb);
+    sdl_line_c(64, 84,  16, 84,  pr, pg, pb);
+    sdl_line_c(16, 84,  16, 36,  pr, pg, pb);
     // arrow inside pointing right
-    call sdl_line_c(25, 60,  55, 60,  pr, pg, pb);
-    call sdl_line_c(50, 55,  55, 60,  pr, pg, pb);
-    call sdl_line_c(50, 65,  55, 60,  pr, pg, pb);
+    sdl_line_c(25, 60,  55, 60,  pr, pg, pb);
+    sdl_line_c(50, 55,  55, 60,  pr, pg, pb);
+    sdl_line_c(50, 65,  55, 60,  pr, pg, pb);
 
     // ---- consumer box (650,30)-(710,90) ----------------------------------
     var cr = 255; var cg = 204; var cb = 102;
     if (consBlocked == 1) { cr = 255; cg = 153; cb = 85; }
-    call sdl_line_c(650, 30,  710, 30,  cr, cg, cb);
-    call sdl_line_c(710, 30,  710, 90,  cr, cg, cb);
-    call sdl_line_c(710, 90,  650, 90,  cr, cg, cb);
-    call sdl_line_c(650, 90,  650, 30,  cr, cg, cb);
-    call sdl_line_c(656, 36,  704, 36,  cr, cg, cb);
-    call sdl_line_c(704, 36,  704, 84,  cr, cg, cb);
-    call sdl_line_c(704, 84,  656, 84,  cr, cg, cb);
-    call sdl_line_c(656, 84,  656, 36,  cr, cg, cb);
-    call sdl_line_c(665, 60,  695, 60,  cr, cg, cb);
-    call sdl_line_c(690, 55,  695, 60,  cr, cg, cb);
-    call sdl_line_c(690, 65,  695, 60,  cr, cg, cb);
+    sdl_line_c(650, 30,  710, 30,  cr, cg, cb);
+    sdl_line_c(710, 30,  710, 90,  cr, cg, cb);
+    sdl_line_c(710, 90,  650, 90,  cr, cg, cb);
+    sdl_line_c(650, 90,  650, 30,  cr, cg, cb);
+    sdl_line_c(656, 36,  704, 36,  cr, cg, cb);
+    sdl_line_c(704, 36,  704, 84,  cr, cg, cb);
+    sdl_line_c(704, 84,  656, 84,  cr, cg, cb);
+    sdl_line_c(656, 84,  656, 36,  cr, cg, cb);
+    sdl_line_c(665, 60,  695, 60,  cr, cg, cb);
+    sdl_line_c(690, 55,  695, 60,  cr, cg, cb);
+    sdl_line_c(690, 65,  695, 60,  cr, cg, cb);
 
     // ---- arrows producer→buffer and buffer→consumer ----------------------
-    call sdl_line_c(70,  60, 140, 60, 136, 136, 170);
-    call sdl_line_c(135, 55, 140, 60, 136, 136, 170);
-    call sdl_line_c(135, 65, 140, 60, 136, 136, 170);
-    call sdl_line_c(580, 60, 650, 60, 136, 136, 170);
-    call sdl_line_c(645, 55, 650, 60, 136, 136, 170);
-    call sdl_line_c(645, 65, 650, 60, 136, 136, 170);
+    sdl_line_c(70,  60, 140, 60, 136, 136, 170);
+    sdl_line_c(135, 55, 140, 60, 136, 136, 170);
+    sdl_line_c(135, 65, 140, 60, 136, 136, 170);
+    sdl_line_c(580, 60, 650, 60, 136, 136, 170);
+    sdl_line_c(645, 55, 650, 60, 136, 136, 170);
+    sdl_line_c(645, 65, 650, 60, 136, 136, 170);
 
     // ---- 20 buffer slots (x = 141 + i*22, y = 40..80) --------------------
     var i = 0;
     while (i < 20) do {
       var x0i = 141 + i * 22;
       var vi  = array_get(slots, i);
-      call draw_slot(i, vi, x0i);
+      draw_slot(i, vi, x0i);
       i = i + 1;
     }
 
     // ---- speed bars ------------------------------------------------------
-    call draw_bar(10,  115, 350, 135, prodSpeed, 102, 204, 255);
-    call draw_bar(370, 115, 710, 135, consSpeed, 255, 204, 102);
+    draw_bar(10,  115, 350, 135, prodSpeed, 102, 204, 255);
+    draw_bar(370, 115, 710, 135, consSpeed, 255, 204, 102);
 
     // ---- big digits: 残り入力可能 = cap - count --------------------------
     var remIn = cap - count;
@@ -238,8 +238,8 @@ class Buffer {
     if (remIn == 0) { icr = 255; icg = 153; icb = 85; }
     var d1i = remIn / 10;
     var d0i = remIn - d1i * 10;
-    call draw_digit(d1i, 14, 160, icr, icg, icb);
-    call draw_digit(d0i, 34, 160, icr, icg, icb);
+    draw_digit(d1i, 14, 160, icr, icg, icb);
+    draw_digit(d0i, 34, 160, icr, icg, icb);
 
     // ---- big digits: 残り出力可能 = count --------------------------------
     var remOut = count;
@@ -247,53 +247,53 @@ class Buffer {
     if (remOut == 0) { ocr = 255; ocg = 153; ocb = 85; }
     var d1o = remOut / 10;
     var d0o = remOut - d1o * 10;
-    call draw_digit(d1o, 654, 160, ocr, ocg, ocb);
-    call draw_digit(d0o, 674, 160, ocr, ocg, ocb);
+    draw_digit(d1o, 654, 160, ocr, ocg, ocb);
+    draw_digit(d0o, 674, 160, ocr, ocg, ocb);
 
     // ---- keyboard-hint crosses (↑↓ under producer digits, ←→ under cons)
     // producer: up/down cross at (30, 220)
-    call sdl_line_c(30, 210,  30, 232, 102, 204, 255);
-    call sdl_line_c(26, 214,  30, 210, 102, 204, 255);
-    call sdl_line_c(34, 214,  30, 210, 102, 204, 255);
-    call sdl_line_c(26, 228,  30, 232, 102, 204, 255);
-    call sdl_line_c(34, 228,  30, 232, 102, 204, 255);
+    sdl_line_c(30, 210,  30, 232, 102, 204, 255);
+    sdl_line_c(26, 214,  30, 210, 102, 204, 255);
+    sdl_line_c(34, 214,  30, 210, 102, 204, 255);
+    sdl_line_c(26, 228,  30, 232, 102, 204, 255);
+    sdl_line_c(34, 228,  30, 232, 102, 204, 255);
     // consumer: left/right cross at (670, 220)
-    call sdl_line_c(660, 220, 682, 220, 255, 204, 102);
-    call sdl_line_c(664, 216, 660, 220, 255, 204, 102);
-    call sdl_line_c(664, 224, 660, 220, 255, 204, 102);
-    call sdl_line_c(678, 216, 682, 220, 255, 204, 102);
-    call sdl_line_c(678, 224, 682, 220, 255, 204, 102);
+    sdl_line_c(660, 220, 682, 220, 255, 204, 102);
+    sdl_line_c(664, 216, 660, 220, 255, 204, 102);
+    sdl_line_c(664, 224, 660, 220, 255, 204, 102);
+    sdl_line_c(678, 216, 682, 220, 255, 204, 102);
+    sdl_line_c(678, 224, 682, 220, 255, 204, 102);
   }
 
   // Draw one buffer slot: grey border always, green inner frame if filled.
   method draw_slot(idx, val, x0) {
     _i = idx; _i = val; _i = x0;
-    call sdl_line_c(x0,      40, x0 + 20, 40, 136, 136, 170);
-    call sdl_line_c(x0 + 20, 40, x0 + 20, 80, 136, 136, 170);
-    call sdl_line_c(x0 + 20, 80, x0,      80, 136, 136, 170);
-    call sdl_line_c(x0,      80, x0,      40, 136, 136, 170);
+    sdl_line_c(x0,      40, x0 + 20, 40, 136, 136, 170);
+    sdl_line_c(x0 + 20, 40, x0 + 20, 80, 136, 136, 170);
+    sdl_line_c(x0 + 20, 80, x0,      80, 136, 136, 170);
+    sdl_line_c(x0,      80, x0,      40, 136, 136, 170);
     // (idx - head + cap) % cap < count  ⇒  this slot is currently filled
     var diff = idx - head;
     if (diff < 0) { diff = diff + cap; }
     if (diff < count) {
-      call sdl_line_c(x0 + 2,  42, x0 + 18, 42, 85, 255, 85);
-      call sdl_line_c(x0 + 18, 42, x0 + 18, 78, 85, 255, 85);
-      call sdl_line_c(x0 + 18, 78, x0 + 2,  78, 85, 255, 85);
-      call sdl_line_c(x0 + 2,  78, x0 + 2,  42, 85, 255, 85);
+      sdl_line_c(x0 + 2,  42, x0 + 18, 42, 85, 255, 85);
+      sdl_line_c(x0 + 18, 42, x0 + 18, 78, 85, 255, 85);
+      sdl_line_c(x0 + 18, 78, x0 + 2,  78, 85, 255, 85);
+      sdl_line_c(x0 + 2,  78, x0 + 2,  42, 85, 255, 85);
       // a couple of horizontal "fill" lines so a filled slot reads clearly
-      call sdl_line_c(x0 + 4,  54, x0 + 16, 54, 140, 255, 140);
-      call sdl_line_c(x0 + 4,  60, x0 + 16, 60, 140, 255, 140);
-      call sdl_line_c(x0 + 4,  66, x0 + 16, 66, 140, 255, 140);
+      sdl_line_c(x0 + 4,  54, x0 + 16, 54, 140, 255, 140);
+      sdl_line_c(x0 + 4,  60, x0 + 16, 60, 140, 255, 140);
+      sdl_line_c(x0 + 4,  66, x0 + 16, 66, 140, 255, 140);
     }
   }
 
   // Horizontal speed bar.  Fill length ∝ (2000 - speed), so a long fill = fast.
   method draw_bar(x1, y1, x2, y2, speed, r, g, b) {
     _i = x1; _i = y1; _i = x2; _i = y2; _i = speed;
-    call sdl_line_c(x1, y1, x2, y1, 136, 136, 170);
-    call sdl_line_c(x2, y1, x2, y2, 136, 136, 170);
-    call sdl_line_c(x2, y2, x1, y2, 136, 136, 170);
-    call sdl_line_c(x1, y2, x1, y1, 136, 136, 170);
+    sdl_line_c(x1, y1, x2, y1, 136, 136, 170);
+    sdl_line_c(x2, y1, x2, y2, 136, 136, 170);
+    sdl_line_c(x2, y2, x1, y2, 136, 136, 170);
+    sdl_line_c(x1, y2, x1, y1, 136, 136, 170);
     var w = x2 - x1 - 4;
     var fill = 2000 - speed;
     fill = fill * w;
@@ -301,7 +301,7 @@ class Buffer {
     if (fill < 2) { fill = 2; }
     var y = y1 + 2;
     while (y <= y2 - 2) do {
-      call sdl_line_c(x1 + 2, y, x1 + 2 + fill, y, r, g, b);
+      sdl_line_c(x1 + 2, y, x1 + 2 + fill, y, r, g, b);
       y = y + 1;
     }
   }
@@ -310,73 +310,73 @@ class Buffer {
   method draw_digit(d, x, y, r, g, b) {
     _i = d; _i = x; _i = y;
     if (d == 0) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
     }
     if (d == 1) {
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
     }
     if (d == 2) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 3) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 4) {
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 5) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 6) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 7) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
     }
     if (d == 8) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 12, x,      y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
     if (d == 9) {
-      call sdl_line_c(x,      y,      x + 14, y,      r, g, b);
-      call sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
-      call sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
-      call sdl_line_c(x,      y,      x,      y + 12, r, g, b);
-      call sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
+      sdl_line_c(x,      y,      x + 14, y,      r, g, b);
+      sdl_line_c(x + 14, y,      x + 14, y + 12, r, g, b);
+      sdl_line_c(x + 14, y + 12, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y + 24, x + 14, y + 24, r, g, b);
+      sdl_line_c(x,      y,      x,      y + 12, r, g, b);
+      sdl_line_c(x,      y + 12, x + 14, y + 12, r, g, b);
     }
   }
 }
@@ -397,7 +397,7 @@ class Producer {
   }
 
   method put_ok() {
-    call wait(speed);
+    wait(speed);
     send self.produce();
   }
 
@@ -416,7 +416,7 @@ class Consumer {
 
   method got(item) {
     taken = taken + 1;
-    call wait(speed);
+    wait(speed);
     send self.do_get();
   }
 

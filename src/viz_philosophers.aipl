@@ -85,7 +85,7 @@ class Philosopher {
       print("VIZ PHILO " ++ id ++ " DONE");
     } else {
       print("VIZ PHILO " ++ id ++ " THINK");
-      call wait(700);
+      wait(700);
       send self.hungry();
     }
   }
@@ -132,7 +132,7 @@ class Philosopher {
     } else {
       eatCount = eatCount + 1;
       print("VIZ PHILO " ++ id ++ " EAT " ++ eatCount);
-      call wait(900);
+      wait(900);
       send self.eat_done();
     }
   }

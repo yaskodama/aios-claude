@@ -9,7 +9,7 @@ class Philosopher0 {
   method think_eat() {
 
     count = count + 1.0;
-    call print(count);
+    print(count);
 
   }
 };
@@ -19,7 +19,7 @@ class Philosopher1 {
   method think_eat() {
 
     count = count + 1.0;
-    call print(count);
+    print(count);
 
   }
 };
@@ -29,7 +29,7 @@ class Philosopher2 {
   method think_eat() {
 
     count = count + 1.0;
-    call print(count);
+    print(count);
 
   }
 };
@@ -39,7 +39,7 @@ class Philosopher3 {
   method think_eat() {
 
     count = count + 1.0;
-    call print(count);
+    print(count);
 
   }
 };
@@ -49,7 +49,7 @@ class Philosopher4 {
   method think_eat() {
 
     count = count + 1.0;
-    call print(count);
+    print(count);
 
   }
 };

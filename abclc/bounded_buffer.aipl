@@ -110,7 +110,7 @@ class Producer {
   }
 
   method put_ok() {
-    call wait(120);
+    wait(120);
     send self.produce();
   }
 }
@@ -138,7 +138,7 @@ class Consumer {
       // next dispatch of THIS actor, so the timed gap must precede a
       // self-send, not a cross-actor send. OCaml's `wait` blocks the
       // actor thread so either pattern works there.
-      call wait(420);
+      wait(420);
       send self.do_get();
     }
   }

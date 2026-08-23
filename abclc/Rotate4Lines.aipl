@@ -22,7 +22,7 @@ class Line {
 
   method rotate() {
     if (drawn == 1) {
-      call sdl_erase_line(x1, y1, x2, y2);
+      sdl_erase_line(x1, y1, x2, y2);
     }
     angle = angle + 3.0;
     var rad = angle * 3.14159 / 180.0;
@@ -32,10 +32,10 @@ class Line {
     y1 = cy - dy;
     x2 = cx + dx;
     y2 = cy + dy;
-    call sdl_line_c(x1, y1, x2, y2, r, g, b);
-    call sdl_present();
+    sdl_line_c(x1, y1, x2, y2, r, g, b);
+    sdl_present();
     drawn = 1;
-    call wait(32);
+    wait(32);
     send self.rotate();
   }
 }

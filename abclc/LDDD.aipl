@@ -6,9 +6,9 @@ class Line {
   var len = 50.0;
 
   method start() {
-    call sdl_clear();
-    call sdl_line(100, 100, 400, 300);
-    call adl_present();
+    sdl_clear();
+    sdl_line(100, 100, 400, 300);
+    adl_present();
   }
   method rotate() {
     angle = angle + 5.0;
@@ -24,7 +24,7 @@ class Line {
     var y1 = cy - dy;
     var x2 = cx + dx;
     var y2 = cy + dy;
-    call sdl_line(x1, y1, x2, y2);    
+    sdl_line(x1, y1, x2, y2);    
     send self.rotate();
   }
 }

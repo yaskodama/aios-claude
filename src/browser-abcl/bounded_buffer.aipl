@@ -99,7 +99,7 @@ class Producer {
   }
 
   method put_ok() {
-    call wait(120);
+    wait(120);
     send self.produce();
   }
 }
@@ -126,7 +126,7 @@ class Consumer {
       // Delay via self-send. The JS runtime's `wait` only postpones the
       // next dispatch of THIS actor, so the timed gap must precede a
       // self-send, not a cross-actor send.
-      call wait(420);
+      wait(420);
       send self.do_get();
     }
   }

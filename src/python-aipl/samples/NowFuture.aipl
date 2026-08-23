@@ -14,7 +14,7 @@ class Calculator {
     reply(a + b);
   }
   method slow_double(x: int) -> int {
-    call wait(80);          // pretend this is expensive work
+    wait(80);          // pretend this is expensive work
     reply(x * 2);
   }
 }

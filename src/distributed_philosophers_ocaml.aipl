@@ -40,7 +40,7 @@ class Fork {
     waiterId = reqId;          // side effect: reqId : int
     if (taken == 0) {
       taken = 1;
-      call dispatch_grant(waiterId);
+      dispatch_grant(waiterId);
       waiterId = 0;
     } else {
       waiter = "w";
@@ -53,7 +53,7 @@ class Fork {
       print("VIZ FORK " + id + " FREE");
     } else {
       print("VIZ FORK " + id + " HANDOFF " + waiterId);
-      call dispatch_grant(waiterId);
+      dispatch_grant(waiterId);
       waiter   = "";
       waiterId = 0;
     }
@@ -118,7 +118,7 @@ class Philosopher {
       print("VIZ PHILO " + id + " DONE");
     } else {
       print("VIZ PHILO " + id + " THINK");
-      call wait(700);
+      wait(700);
       send self.hungry();
     }
   }
@@ -161,7 +161,7 @@ class Philosopher {
     } else {
       eatCount = eatCount + 1;
       print("VIZ PHILO " + id + " EAT " + eatCount);
-      call wait(900);
+      wait(900);
       send self.eat_done();
     }
   }

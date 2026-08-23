@@ -1,12 +1,12 @@
 class Window {
   method create(width, height, title) {
-    call openWindow(width, height, title);
+    openWindow(width, height, title);
   }
 
   method drawLine(x1, y1, x2, y2) {
-    call clear();
-    call drawLine(x1, y1, x2, y2);
-    call flush();
+    clear();
+    drawLine(x1, y1, x2, y2);
+    flush();
   }
 }
 
