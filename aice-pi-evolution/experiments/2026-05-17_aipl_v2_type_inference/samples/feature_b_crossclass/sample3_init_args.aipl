@@ -13,12 +13,12 @@ class Counter {
 
 class CounterUser {
   method exercise(c) {
-    var a = now c.get();          // a : Int  (from Counter.get -> Int)
-    var b = now c.bump(7);        // b : Int  (from Counter.bump : Int -> Int)
+    var a = now c.get() timeout 5000 else 0;          // a : Int  (from Counter.get -> Int)
+    var b = now c.bump(7) timeout 5000 else 0;        // b : Int  (from Counter.bump : Int -> Int)
     reply(b);
   }
 }
 
 var c    = new Counter(100);
 var user = new CounterUser();
-var v    = now user.exercise(c);
+var v    = now user.exercise(c) timeout 5000 else 0;

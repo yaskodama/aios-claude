@@ -53,19 +53,19 @@ class Coordinator {
     print("");
 
     print("================== 1) PLANNER ==================");
-    var plan = now planner.plan(problem);
+    var plan = now planner.plan(problem) timeout 5000 else 0;
     print(plan);
     print("");
 
     print("================== 2) SOLVER ==================");
     var ps = "Problem:\n" ++ problem ++ "\n\nPlan:\n" ++ plan;
-    var solution = now solver.solve(ps);
+    var solution = now solver.solve(ps) timeout 5000 else 0;
     print(solution);
     print("");
 
     print("================== 3) REVIEWER ==================");
     var psol = "Problem:\n" ++ problem ++ "\n\nDraft solution:\n" ++ solution;
-    var critique = now reviewer.review(psol);
+    var critique = now reviewer.review(psol) timeout 5000 else 0;
     print(critique);
     print("");
 

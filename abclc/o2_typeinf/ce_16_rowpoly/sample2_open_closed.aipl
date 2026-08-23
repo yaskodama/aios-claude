@@ -11,5 +11,5 @@ class Greeter {
 
 var g = new Greeter();
 print("[ce16/2] open record:");
-print(now g.greet({name: "Alice", id: "u-001", email: "a@b"}));
-print(now g.idof({name: "Bob",  id: "u-002", role: "admin"}));
+print(now g.greet({name: "Alice", id: "u-001", email: "a@b"}) timeout 5000 else 0);
+print(now g.idof({name: "Bob",  id: "u-002", role: "admin"}) timeout 5000 else 0);

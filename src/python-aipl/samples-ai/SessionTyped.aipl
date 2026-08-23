@@ -31,11 +31,11 @@ class PlannerActor {
     aios_emit("planner.problem:" ++ problem);
 
     var answer_future = aios_future("solver", "solve", problem);
-    var answer = await(answer_future);
+    var answer = await(answer_future) timeout 5000 else 0;
     aios_emit("planner.answer:" ++ answer);
 
     var review_future = aios_future("reviewer", "review", problem, answer);
-    var review = await(review_future);
+    var review = await(review_future) timeout 5000 else 0;
     aios_emit("planner.review:" ++ review);
 
     reply("answer: " ++ answer ++ " | review: " ++ review);

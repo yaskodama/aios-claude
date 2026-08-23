@@ -26,8 +26,8 @@ class Counter {
   method tick() {
     count = count + 1;
   }
-  method get() -> int {
-    return count;
+  method get() : int {
+    reply(count);          // now で待たれるので reply が要る
   }
 }
 
@@ -82,7 +82,7 @@ class Demo {
     var c = new Counter();
     send c.tick();
     send c.tick();
-    var n = now c.get();
+    var n = now c.get() timeout 200 else 0;
     print("counter.get = " ++ n);
 
     print("");

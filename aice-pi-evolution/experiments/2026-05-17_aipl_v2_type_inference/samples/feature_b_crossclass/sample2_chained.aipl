@@ -15,8 +15,8 @@ class Filter {
 
 class Pipeline {
   method run(prod, filt) {
-    var v = now prod.make_value();           // v : Int (Producer.make_value -> Int)
-    var p = now filt.positive(v);            // p : Int (Filter.positive : Int -> Int)
+    var v = now prod.make_value() timeout 5000 else 0;           // v : Int (Producer.make_value -> Int)
+    var p = now filt.positive(v) timeout 5000 else 0;            // p : Int (Filter.positive : Int -> Int)
     reply(p);                                  // Pipeline.run : (Producer, Filter) -> Int
   }
 }
@@ -24,4 +24,4 @@ class Pipeline {
 var p = new Producer();
 var f = new Filter();
 var pipe = new Pipeline();
-var result = now pipe.run(p, f);
+var result = now pipe.run(p, f) timeout 5000 else 0;

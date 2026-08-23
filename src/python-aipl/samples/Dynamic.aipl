@@ -39,7 +39,7 @@ class Main {
                       "    print(\"  [Greeter#\" ++ count ++ \"] hello, \" ++ who);\n" ++
                       "  }\n" ++
                       "}\n";
-    var greeter = now factory.create("Greeter", greeter_src);
+    var greeter = now factory.create("Greeter", greeter_src) timeout 5000 else 0;
     send greeter.hello("Alice");
     send greeter.hello("Bob");
     send greeter.hello("Carol");
@@ -55,14 +55,14 @@ class Main {
                       "    print(\"  [Counter] final n=\" ++ n);\n" ++
                       "  }\n" ++
                       "}\n";
-    var counter = now factory.create("Counter", counter_src);
+    var counter = now factory.create("Counter", counter_src) timeout 5000 else 0;
     send counter.tick();
     send counter.tick();
     send counter.tick();
     send counter.dump();
 
     // 3) Multiple instances of the same dynamically-compiled class.
-    var another_greeter = now factory.create("Greeter", greeter_src);
+    var another_greeter = now factory.create("Greeter", greeter_src) timeout 5000 else 0;
     send another_greeter.hello("Dave");
     send greeter.hello("Eve");           // independent state from Dave's
 

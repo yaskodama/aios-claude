@@ -13,5 +13,5 @@ class Engine {
 var e   = new Engine();
 var r1  = {key: 3, val: 99};
 var r2  = {key: 4, label: 0 == 0};   // {key: Int, label: Bool}
-var a   = now e.process(r1);
-var b   = now e.process(r2);          // <- second call: shape conflict
+var a   = now e.process(r1) timeout 5000 else 0;
+var b   = now e.process(r2) timeout 5000 else 0;          // <- second call: shape conflict

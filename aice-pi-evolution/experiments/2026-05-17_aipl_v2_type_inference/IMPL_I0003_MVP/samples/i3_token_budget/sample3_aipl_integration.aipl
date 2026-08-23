@@ -20,4 +20,4 @@ class Caller {
 }
 
 var c = new Caller();
-var done = now c.ask_three();
+var done = now c.ask_three() timeout 5000 else 0;

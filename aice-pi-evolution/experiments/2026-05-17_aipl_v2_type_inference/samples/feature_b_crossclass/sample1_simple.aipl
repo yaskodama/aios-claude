@@ -8,11 +8,11 @@ class Adder {
 
 class Bridge {
   method use_adder(other, a, b) {
-    var s = now other.add(a, b);
+    var s = now other.add(a, b) timeout 5000 else 0;
     reply(s);
   }
 }
 
 var adder  = new Adder();
 var bridge = new Bridge();
-var r = now bridge.use_adder(adder, 3, 4);
+var r = now bridge.use_adder(adder, 3, 4) timeout 5000 else 0;

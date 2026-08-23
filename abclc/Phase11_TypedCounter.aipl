@@ -31,15 +31,15 @@ class Driver {
   }
 
   method query() {
-    var r1 = now calc.add(3, 4);
+    var r1 = now calc.add(3, 4) timeout 5000 else 0;
     print("3 + 4 =");
     print(r1);
 
-    var r2 = now calc.add(10, 20);
+    var r2 = now calc.add(10, 20) timeout 5000 else 0;
     print("10 + 20 =");
     print(r2);
 
-    var r3 = now calc.bump(99);
+    var r3 = now calc.bump(99) timeout 5000 else 0;
     print("bump(99) =");
     print(r3);
   }

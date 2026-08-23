@@ -57,7 +57,7 @@ class Manager {
     var k: int = 0;
     var n: int = array_len(futures);
     while (k < n) do {
-      var v: int = await(array_get(futures, k));
+      var v: int = await(array_get(futures, k)) timeout 5000 else 0;
       sum = sum + v;
       k = k + 1;
     }
@@ -68,5 +68,5 @@ class Manager {
 
 var mgr = new Manager();
 send mgr.ensure_workers(3);
-var total: int = now mgr.dispatch([2, 3, 5, 7, 11]);
+var total: int = now mgr.dispatch([2, 3, 5, 7, 11]) timeout 5000 else 0;
 print("=== final result: " ++ total ++ " ===");

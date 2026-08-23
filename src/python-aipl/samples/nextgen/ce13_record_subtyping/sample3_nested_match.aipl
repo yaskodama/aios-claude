@@ -17,5 +17,5 @@ var u = {
   addr: { city: "Tokyo", zip: "1000001", country: "JP" },
   email: "alice@example.com"
 };
-var c = now g.city_of(u);
+var c = now g.city_of(u) timeout 5000 else 0;
 print("[ce13/3] city = " ++ c);

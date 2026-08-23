@@ -99,7 +99,7 @@ class Demo {
     send stat.add(42);
     send stat.add(99);
     send stat.add(7);
-    var avg_v: int = now stat.summary();
+    var avg_v: int = now stat.summary() timeout 5000 else 0;
     print("avg from actor = " ++ avg_v);
   }
 }

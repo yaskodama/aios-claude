@@ -109,7 +109,7 @@ class Util {
       if (i >= n) { found = 2; }
       else {
         var c = str_sub(s, i, i + 1);
-        var d = now digits.val(c);
+        var d = now digits.val(c) timeout 5000 else 0;
         if (d >= 0) {
           first_digit = d;
           found = 1;
@@ -127,7 +127,7 @@ class Util {
         if (i >= n) { done_int = 1; }
         else {
           var c2 = str_sub(s, i, i + 1);
-          var d2 = now digits.val(c2);
+          var d2 = now digits.val(c2) timeout 5000 else 0;
           if (d2 >= 0) {
             int_part = int_part * 10 + d2;
             i = i + 1;
@@ -145,7 +145,7 @@ class Util {
             if (i >= n) { done_frac = 1; }
             else {
               var c3 = str_sub(s, i, i + 1);
-              var d3 = now digits.val(c3);
+              var d3 = now digits.val(c3) timeout 5000 else 0;
               if (d3 >= 0) {
                 div = div * 10.0;
                 frac = frac + (d3 + 0.0) / div;
@@ -292,12 +292,12 @@ class Worker {
   }
 
   method compute_cell(genome, cell_axes_csv) {
-    var n = now util.count_csv(cell_axes_csv);
+    var n = now util.count_csv(cell_axes_csv) timeout 5000 else 0;
     var i = 0;
     var out = "";
     while (i < n) do {
-      var axis = now util.nth_csv(cell_axes_csv, i);
-      var v = now util.get_axis(genome, axis);
+      var axis = now util.nth_csv(cell_axes_csv, i) timeout 5000 else 0;
+      var v = now util.get_axis(genome, axis) timeout 5000 else "";
       if (i == 0) { out = axis ++ "=" ++ v; }
       else { out = out ++ "|" ++ axis ++ "=" ++ v; }
       i = i + 1;
@@ -306,13 +306,13 @@ class Worker {
   }
 
   method compute_score(genome, task_csv) {
-    var n = now util.count_csv(task_csv);
+    var n = now util.count_csv(task_csv) timeout 5000 else 0;
     var i = 0;
     var sum = 0.0;
     while (i < n) do {
-      var task = now util.nth_csv(task_csv, i);
-      var prof = now profiles.get(task);
-      var s = now evaluator.score_for_task(genome, prof);
+      var task = now util.nth_csv(task_csv, i) timeout 5000 else 0;
+      var prof = now profiles.get(task) timeout 5000 else "";
+      var s = now evaluator.score_for_task(genome, prof) timeout 5000 else 0;
       sum = sum + s;
       i = i + 1;
     }
@@ -347,20 +347,20 @@ class Generator {
     var g = "";
     var ok = 0;
     while (ok == 0) do {
-      var n_axes = now util.count_csv(axes_csv);
+      var n_axes = now util.count_csv(axes_csv) timeout 5000 else 0;
       var i = 0;
       var cand = "";
       while (i < n_axes) do {
-        var axis = now util.nth_csv(axes_csv, i);
-        var vals = now util.axis_values(values_table, axis);
-        var n_vals = now util.count_csv(vals);
-        var v = now util.nth_csv(vals, random(n_vals));
+        var axis = now util.nth_csv(axes_csv, i) timeout 5000 else 0;
+        var vals = now util.axis_values(values_table, axis) timeout 5000 else "";
+        var n_vals = now util.count_csv(vals) timeout 5000 else 0;
+        var v = now util.nth_csv(vals, random(n_vals)) timeout 5000 else 0;
         if (i == 0) { cand = axis ++ "=" ++ v; }
         else { cand = cand ++ "|" ++ axis ++ "=" ++ v; }
         i = i + 1;
       }
       g = cand;
-      ok = now util.is_coherent(g);
+      ok = now util.is_coherent(g) timeout 5000 else 0;
       tries = tries + 1;
       if (tries >= 50) { ok = 1; }
     }
@@ -372,15 +372,15 @@ class Generator {
     var child = parent;
     var ok = 0;
     while (ok == 0) do {
-      var n_axes = now util.count_csv(axes_csv);
+      var n_axes = now util.count_csv(axes_csv) timeout 5000 else 0;
       var idx = random(n_axes);
-      var axis = now util.nth_csv(axes_csv, idx);
-      var vals = now util.axis_values(values_table, axis);
-      var n_vals = now util.count_csv(vals);
-      var v = now util.nth_csv(vals, random(n_vals));
-      var cand = now util.set_axis(parent, axis, v);
+      var axis = now util.nth_csv(axes_csv, idx) timeout 5000 else 0;
+      var vals = now util.axis_values(values_table, axis) timeout 5000 else "";
+      var n_vals = now util.count_csv(vals) timeout 5000 else 0;
+      var v = now util.nth_csv(vals, random(n_vals)) timeout 5000 else 0;
+      var cand = now util.set_axis(parent, axis, v) timeout 5000 else 0;
       child = cand;
-      ok = now util.is_coherent(child);
+      ok = now util.is_coherent(child) timeout 5000 else 0;
       tries = tries + 1;
       if (tries >= 50) { ok = 1; }
     }
@@ -392,20 +392,20 @@ class Generator {
     var child = a;
     var ok = 0;
     while (ok == 0) do {
-      var n_axes = now util.count_csv(axes_csv);
+      var n_axes = now util.count_csv(axes_csv) timeout 5000 else 0;
       var i = 0;
       var cand = "";
       while (i < n_axes) do {
-        var axis = now util.nth_csv(axes_csv, i);
+        var axis = now util.nth_csv(axes_csv, i) timeout 5000 else 0;
         var src = a;
         if (random(2) == 1) { src = b; }
-        var v = now util.get_axis(src, axis);
+        var v = now util.get_axis(src, axis) timeout 5000 else "";
         if (i == 0) { cand = axis ++ "=" ++ v; }
         else { cand = cand ++ "|" ++ axis ++ "=" ++ v; }
         i = i + 1;
       }
       child = cand;
-      ok = now util.is_coherent(child);
+      ok = now util.is_coherent(child) timeout 5000 else 0;
       tries = tries + 1;
       if (tries >= 50) { ok = 1; }
     }
@@ -441,7 +441,7 @@ class Reviewer {
                    "\n理想プロファイル: " ++ task_profile ++
                    "\n\nこのプロファイルに対する適合度を 0.0 から 1.0 の単一の decimal number で返してください。説明禁止。数値1つだけ。";
       var ai_text = ai_call_with_system(persona, prompt);
-      var ai_score = now util.parse_score(ai_text, digits);
+      var ai_score = now util.parse_score(ai_text, digits) timeout 5000 else 0;
       reply(ai_score);
     } else {
     // Deterministic: fraction of profile axes the genome matches.
@@ -506,12 +506,12 @@ class Evaluator {
     var f1 = future r1.score(genome, profile);
     var f2 = future r2.score(genome, profile);
     var f3 = future r3.score(genome, profile);
-    var s1 = await(f1);
-    var w1 = now r1.get_weight();
-    var s2 = await(f2);
-    var w2 = now r2.get_weight();
-    var s3 = await(f3);
-    var w3 = now r3.get_weight();
+    var s1 = await(f1) timeout 5000 else 0;
+    var w1 = now r1.get_weight() timeout 5000 else 0;
+    var s2 = await(f2) timeout 5000 else 0;
+    var w2 = now r2.get_weight() timeout 5000 else 0;
+    var s3 = await(f3) timeout 5000 else 0;
+    var w3 = now r3.get_weight() timeout 5000 else 0;
     var combined = s1 * w1 + s2 * w2 + s3 * w3;
     reply(combined);
   }
@@ -685,22 +685,22 @@ class Coordinator {
     // Phase 1: seed
     var i = 0;
     while (i < seed_count) do {
-      var g = now generator.seed();
+      var g = now generator.seed() timeout 5000 else 0;
       next_id = next_id + 1;
       var id = "I" ++ next_id;
-      var cell = now worker.compute_cell(g, cell_axes_csv);
-      var score = now worker.compute_score(g, task_csv);
+      var cell = now worker.compute_cell(g, cell_axes_csv) timeout 5000 else 0;
+      var score = now worker.compute_score(g, task_csv) timeout 5000 else 0;
       send lineage.add(id, g, "", score, 0, "seed", cell);
       send elite.propose(cell, id, g, score);
       i = i + 1;
     }
-    print("[seed] elite cells filled: " ++ (now elite.size()));
+    print("[seed] elite cells filled: " ++ (now elite.size() timeout 5000 else 0));
 
     // Phase 2: evolution
     var gen = 1;
     while (gen <= generations) do {
-      var parent = now elite.sample_random_genome();
-      var size = now elite.size();
+      var parent = now elite.sample_random_genome() timeout 5000 else "";
+      var size = now elite.size() timeout 5000 else 0;
       var do_cross = 0;
       if (random(10) < 3) {
         if (size >= 2) { do_cross = 1; }
@@ -708,31 +708,31 @@ class Coordinator {
       var child = "";
       var op = "";
       if (do_cross == 1) {
-        var partner = now elite.sample_random_genome();
-        child = now generator.cross(parent, partner);
+        var partner = now elite.sample_random_genome() timeout 5000 else "";
+        child = now generator.cross(parent, partner) timeout 5000 else 0;
         op = "uniform_crossover";
       } else {
-        child = now generator.mutate(parent);
+        child = now generator.mutate(parent) timeout 5000 else 0;
         op = "axis_resample";
       }
       next_id = next_id + 1;
       var cid = "I" ++ next_id;
-      var ccell = now worker.compute_cell(child, cell_axes_csv);
-      var cscore = now worker.compute_score(child, task_csv);
+      var ccell = now worker.compute_cell(child, cell_axes_csv) timeout 5000 else 0;
+      var cscore = now worker.compute_score(child, task_csv) timeout 5000 else 0;
       send lineage.add(cid, child, "", cscore, gen, op, ccell);
       send elite.propose(ccell, cid, child, cscore);
       // crash-recovery: flush lineage every generation so silent SDK
       // hangs (cf. Pi_Phase1_OpenSearch v3 attempt 2026-05-16) do not
       // lose the partial result.  Cost: one fs write per generation.
-      var ckpt_n = now lineage.dump("out/AIPL_XinuRazPi_RemoteRPC.aipl_lineage.json");
+      var ckpt_n = now lineage.dump("out/AIPL_XinuRazPi_RemoteRPC.aipl_lineage.json") timeout 5000 else 0;
       print("[ckpt gen=" ++ gen ++ "] flushed " ++ ckpt_n ++ " individuals");
       gen = gen + 1;
     }
 
-    print("[done] cells filled: " ++ (now elite.size()));
-    print(now elite.best_summary(5));
+    print("[done] cells filled: " ++ (now elite.size() timeout 5000 else 0));
+    print(now elite.best_summary(5) timeout 5000 else 0);
 
-    var n = now lineage.dump("out/AIPL_XinuRazPi_RemoteRPC.aipl_lineage.json");
+    var n = now lineage.dump("out/AIPL_XinuRazPi_RemoteRPC.aipl_lineage.json") timeout 5000 else 0;
     print("[lineage] wrote " ++ n ++ " individuals to out/AIPL_XinuRazPi_RemoteRPC.aipl_lineage.json");
   }
 }

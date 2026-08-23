@@ -27,7 +27,7 @@ def test_typecheck_via_builtin() -> None:
     assert "typeof(greet)     = function(name:string) -> string" in out
     assert "typeof(bad_return)= function(a:int) -> int" in out
     # Phase 11a's 5 + Phase 11b's call-site detection of `greet(a)` = 6 total.
-    assert "type_check() returned 6 issue(s):" in out
+    assert "type_check() returned 6 issue(s):" in out, out
     for needle in (
         "function bad_return: return type mismatch  (expected int, got string)",
         "function bad_param: call to function `greet` arg `name` mismatch",
@@ -56,7 +56,12 @@ def test_cli_typecheck_flag() -> None:
     ):
         assert needle in err, f"missing in stderr: {needle}"
     assert rc == 0
-    assert "add(3, 4)   = 7" in out
+    # --type-check だけを渡したときはプログラムを走らせない
+    # （aipl_main.py: 「--type-check alone: exit here」）。
+    # 実行結果は下の test_cli_strict_aborts / 通常実行で見る。
+    out2, _, rc2 = _run("Typecheck.aipl")
+    assert rc2 == 0
+    assert "add(3, 4)   = 7" in out2, out2
     print("OK  --type-check CLI flag")
 
 
@@ -80,10 +85,10 @@ def test_phase_11c_unions_generics() -> None:
     assert "u2 = hello" in out
     assert "describe int = got 7" in out
     # Static checker catches all 4 intentional bugs.
-    assert "type_check() found 4 issue(s):" in out
+    assert "type_check() found 5 issue(s):" in out, out
     for needle in (
         "call to function `pair` arg `b`: type-var `T` already bound to int, got string",
-        "call to function `head` arg `arr` mismatch  (expected array[T], got int)",
+        "call to function `head` arg `arr` mismatch  (expected array, got int)",
         "call to function `describe` arg `x` mismatch  (expected int | string, got array[int, 2])",
         "`var bad_union` initializer mismatch  (expected int | string, got float)",
     ):
@@ -133,7 +138,7 @@ def test_phase_11b_callsite() -> None:
     out, _, rc = _run("Typecheck11b.aipl")
     assert rc == 0
     # Each of the 6 intentional bugs is caught.
-    assert "type_check() found 6 issue(s):" in out
+    assert "type_check() found 6 issue(s):" in out, out
     for needle in (
         "call to function `read_file` arg `path` mismatch  (expected string, got int)",
         "call to function `add` arg `a` mismatch  (expected int, got string)",
@@ -150,7 +155,23 @@ def test_phase_11b_callsite() -> None:
     print("OK  Typecheck11b.aipl")
 
 
+def test_optional_trailing_arg_signature() -> None:
+    """署名の末尾 `[, end:int]` を読めているか。
+
+    読めていなかったころは str_sub(s, i, j) が「arity 3 vs declared [2]」、
+    str_sub(s, i) が「start の型が `int [, end:int]` と不一致」で弾かれた。
+    実行は正しく動いていたので、型検査だけの欠陥だった。"""
+    out, err, rc = _run("OptionalArgSig.aipl", "--type-check")
+    assert rc == 0, f"unexpected exit: {rc}"
+    assert "no issues" in (out + err), out + err
+    out, _, rc = _run("OptionalArgSig.aipl")
+    assert "both = bc" in out, out
+    assert "tail = cdef" in out, out
+    print("OK  OptionalArgSig.aipl")
+
+
 if __name__ == "__main__":
+    test_optional_trailing_arg_signature()
     test_typecheck_via_builtin()
     test_cli_typecheck_flag()
     test_cli_strict_aborts()

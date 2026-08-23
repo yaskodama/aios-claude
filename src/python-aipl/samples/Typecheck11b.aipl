@@ -13,20 +13,32 @@ function greet(name: string) -> string { return "hello " ++ name; }
 class Counter {
   var count: int = 0;
   method init(start: int) { count = start; }
-  method tick(by: int) { count = count + by; }
-  method get() -> int { return count; }
+  method tick(by: int) : int { count = count + by; reply(count); }   // now で待たれるので reply が要る
+  method get() : int { reply(count); }
 }
 
 class Demo {
   method run() {
     print("=== Phase 11b — strengthened type-check ===");
 
+    // -- print stats（意図的な誤りより先に出す。type_check() は静的なので
+    //    後ろに書いた誤りもここで数えられる） ----
+    var issues = type_check();
+    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
+    var i = 0;
+    while (i < array_len(issues)) do {
+      print("  " ++ array_get(issues, i));
+      i = i + 1;
+    }
+    print("");
+
+
     // -- correct uses (should NOT be flagged) ----
     var ok1: int    = add(3, 4);              // OK
     var ok2: string = greet("world");         // OK
     var c = new Counter(10);                  // OK: init(start: int)
     send c.tick(5);                            // OK
-    var n: int = now c.get();                 // OK: method return inferred
+    var n: int = now c.get() timeout 200 else 0;   // OK: method return inferred
 
     // -- intentionally INCORRECT (each flagged by 11b) ----
     // (1) builtin call: read_file expects string, gets int
@@ -39,7 +51,7 @@ class Demo {
     var too_many = add(1, 2, 3);
 
     // (4) NowCall on actor: tick expects (by: int), got string
-    var bad_method = now c.tick("nope");
+    var bad_method = now c.tick("nope") timeout 200 else 0;
 
     // (5) Constructor: new Counter(start: int), passing string
     var bad_ctor = new Counter("ten");
@@ -50,17 +62,7 @@ class Demo {
     // (7) Variadic with wrong element type — int passed to string+ slot
     var bad_path2 = path_join("a", 42, "c");
 
-    // -- print stats ----
-    var issues = type_check();
-    print("type_check() found " ++ array_len(issues) ++ " issue(s):");
-    var i = 0;
-    while (i < array_len(issues)) do {
-      print("  " ++ array_get(issues, i));
-      i = i + 1;
-    }
-
-    print("");
-    print("typeof(c.get())     = " ++ typeof(now c.get()));   // -> int
+    print("typeof(c.get())     = " ++ typeof(now c.get() timeout 200 else 0));   // -> int
     print("typeof(future c.get()) = " ++ typeof(future c.get())); // -> future
   }
 }

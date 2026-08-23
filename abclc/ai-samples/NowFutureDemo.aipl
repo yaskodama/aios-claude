@@ -6,9 +6,9 @@ class Calc {
 }
 
 var calc = new Calc();
-var now_result = now calc.add(1, 2);
+var now_result = now calc.add(1, 2) timeout 5000 else 0;
 print("now result = " ++ now_result);
 
 var future_result = future calc.add(10, 20);
-var awaited_result = await future_result;
+var awaited_result = await future_result timeout 5000 else 0;
 print("future result = " ++ awaited_result);

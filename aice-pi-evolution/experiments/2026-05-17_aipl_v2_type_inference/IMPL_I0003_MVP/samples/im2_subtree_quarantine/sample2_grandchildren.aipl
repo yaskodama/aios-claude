@@ -17,7 +17,7 @@ class Leaf {
 class Mid {
   method spawn_leaf() {
     var leaf = new Leaf();
-    var rc = now leaf.ping();
+    var rc = now leaf.ping() timeout 5000 else 0;
     reply(rc);
   }
 }
@@ -25,12 +25,12 @@ class Mid {
 class Root {
   method build_and_crash() {
     var mid = new Mid();
-    var ok  = now mid.spawn_leaf();   // mid spawns leaf
+    var ok  = now mid.spawn_leaf() timeout 5000 else 0;   // mid spawns leaf
     var bad = 1 / 0;                  // root crashes -> quarantine mid + leaf
     reply(bad);
   }
 }
 
 var root = new Root();
-var rc   = now root.build_and_crash();
+var rc   = now root.build_and_crash() timeout 5000 else 0;
 println("driver done");

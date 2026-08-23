@@ -45,9 +45,9 @@ class Coordinator {
     var f_o = future optimist.analyze(topic);
     var f_s = future skeptic.analyze(topic);
     var f_p = future pragmatist.analyze(topic);
-    var ans_o = await(f_o);
-    var ans_s = await(f_s);
-    var ans_p = await(f_p);
+    var ans_o = await(f_o) timeout 5000 else 0;
+    var ans_s = await(f_s) timeout 5000 else 0;
+    var ans_p = await(f_p) timeout 5000 else 0;
     var elapsed = now_ms() - t0;
     print("=== Optimist (parallel) ===");
     print(ans_o);
@@ -62,9 +62,9 @@ class Coordinator {
   method run_sequential(topic: string) {
     var t0 = now_ms();
     print("[sequential] calling 3 specialists one at a time");
-    var ans_o = now optimist.analyze(topic);
-    var ans_s = now skeptic.analyze(topic);
-    var ans_p = now pragmatist.analyze(topic);
+    var ans_o = now optimist.analyze(topic) timeout 5000 else 0;
+    var ans_s = now skeptic.analyze(topic) timeout 5000 else 0;
+    var ans_p = now pragmatist.analyze(topic) timeout 5000 else 0;
     var elapsed = now_ms() - t0;
     print("=== Optimist (sequential) ===");
     print(ans_o);

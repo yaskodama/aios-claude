@@ -34,5 +34,5 @@ class Bench {
 
 var g = new Greeter();
 var b = new Bench();
-var rc1 = now g.greet("Alice");
-var rc2 = now b.run();
+var rc1 = now g.greet("Alice") timeout 5000 else 0;
+var rc2 = now b.run() timeout 5000 else 0;

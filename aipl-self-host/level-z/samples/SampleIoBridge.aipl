@@ -21,11 +21,11 @@
 grant_cap("fs");
 
 var io = new IoBridge();
-var n = now io.write("/tmp/levelz_io_demo.txt", "hello self-host\n");
+var n = now io.write("/tmp/levelz_io_demo.txt", "hello self-host\n") timeout 5000 else 0;
 print("[io] fs grant ok");
 print("[io] write done");
 
-var s = now io.read("/tmp/levelz_io_demo.txt");
+var s = now io.read("/tmp/levelz_io_demo.txt") timeout 5000 else 0;
 print("[io] read = " ++ s);
 
 // Without granting "ai" first, this should log a cap_violation
@@ -33,5 +33,5 @@ print("[io] read = " ++ s);
 print("[io] attempting ungranted ai_simple (advisory) ...");
 grant_cap("ai");
 grant_cap("net");
-var r = now io.ai_simple("ignored under mock provider");
+var r = now io.ai_simple("ignored under mock provider") timeout 5000 else 0;
 print("[io] ai_simple = " ++ r);

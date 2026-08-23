@@ -69,7 +69,7 @@ class Demo {
 
     // 6) Use field-level tuples in an actor.
     var p = new PointActor();
-    var moved = now p.translate((3, 4), 10, -1);
+    var moved = now p.translate((3, 4), 10, -1) timeout 5000 else 0;
     print("moved = (" ++ moved[0] ++ ", " ++ moved[1] ++ ")");
     print("typeof(moved) = " ++ typeof(moved));
     send p.describe();

@@ -52,19 +52,19 @@ class Coordinator {
     print("");
 
     print("================== 1) プランナー ==================");
-    var plan = now planner.plan(problem);
+    var plan = now planner.plan(problem) timeout 5000 else 0;
     print(plan);
     print("");
 
     print("================== 2) ソルバー ==================");
     var ps = "問題:\n" ++ problem ++ "\n\n手順:\n" ++ plan;
-    var solution = now solver.solve(ps);
+    var solution = now solver.solve(ps) timeout 5000 else 0;
     print(solution);
     print("");
 
     print("================== 3) レビュアー ==================");
     var psol = "問題:\n" ++ problem ++ "\n\n解答案:\n" ++ solution;
-    var critique = now reviewer.review(psol);
+    var critique = now reviewer.review(psol) timeout 5000 else 0;
     print(critique);
     print("");
 

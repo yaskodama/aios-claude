@@ -20,6 +20,6 @@ class Arithmetic {
 }
 
 var arith = new Arithmetic();
-var s = now arith.square(7);
-var c = now arith.cube(3);
-var d = now arith.abs_diff(10, 3);
+var s = now arith.square(7) timeout 5000 else 0;
+var c = now arith.cube(3) timeout 5000 else 0;
+var d = now arith.abs_diff(10, 3) timeout 5000 else 0;

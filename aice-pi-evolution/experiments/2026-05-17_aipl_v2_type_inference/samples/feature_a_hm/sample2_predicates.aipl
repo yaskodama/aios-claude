@@ -21,6 +21,6 @@ class Predicates {
 }
 
 var p  = new Predicates();
-var t1 = now p.is_zero(0);
-var t2 = now p.in_range(5, 0, 10);
-var t3 = now p.same_sign(-3, -4);
+var t1 = now p.is_zero(0) timeout 5000 else 0;
+var t2 = now p.in_range(5, 0, 10) timeout 5000 else 0;
+var t3 = now p.same_sign(-3, -4) timeout 5000 else 0;

@@ -50,5 +50,5 @@ class Counter {
 var c = new Counter();
 send c.inc(3);
 send c.inc(4);
-var v = now c.value();
+var v = now c.value() timeout 5000 else 0;
 print("count = " ++ v);

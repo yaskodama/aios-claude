@@ -134,7 +134,7 @@ class Demo {
     var m = new Matrix();
     send m.fill_with_sum();
     send m.print_grid();
-    var t: int = now m.trace();
+    var t: int = now m.trace() timeout 5000 else 0;
     print("trace = " ++ t);
 
     // 4) Field-level 3D cube on Cube actor.
@@ -142,7 +142,7 @@ class Demo {
     send c.poke(0, 0, 0, 100);
     send c.poke(1, 2, 3, 999);
     send c.poke(0, 2, 1, 42);
-    var v: int = now c.peek(1, 2, 3);
+    var v: int = now c.peek(1, 2, 3) timeout 5000 else 0;
     print("cube[1][2][3] = " ++ v);
     send c.dump();
   }

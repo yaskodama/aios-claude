@@ -31,14 +31,14 @@ class Supervisor {
   method drive() {
     var f = new Flaky();
     var s = new Stable();
-    var bad = now f.boom();   // flaky fails -> quarantined
-    var p1  = now s.ping();
-    var p2  = now s.ping();
-    var p3  = now s.ping();
+    var bad = now f.boom() timeout 5000 else 0;   // flaky fails -> quarantined
+    var p1  = now s.ping() timeout 5000 else 0;
+    var p2  = now s.ping() timeout 5000 else 0;
+    var p3  = now s.ping() timeout 5000 else 0;
     println("stable pings = ", p3);
     reply(p3);
   }
 }
 
 var sup = new Supervisor();
-var rc  = now sup.drive();
+var rc  = now sup.drive() timeout 5000 else 0;

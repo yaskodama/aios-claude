@@ -23,7 +23,7 @@ var f = new Factory();
 
 // Build a Greeter class at runtime and instantiate it via spawn.
 var src = "class Greeter { var label = \"g1\"; method hi(n) { print(\"hello \" ++ n ++ \" from \" ++ label); } }";
-var g = now f.build("Greeter", src, "g1");
+var g = now f.build("Greeter", src, "g1") timeout 5000 else 0;
 
 send g.hi("Alice");
 send g.hi("Bob");

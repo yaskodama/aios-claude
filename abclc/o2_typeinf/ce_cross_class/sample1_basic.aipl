@@ -1,10 +1,10 @@
 // CE-2 / O-2.d: cross-class inference basic.
 //
-// `Bridge.delegate` invokes `now other.add(...)`.  Phase O-2.d wires
+// `Bridge.delegate` invokes `now other.add(...) timeout 5000 else 0`.  Phase O-2.d wires
 // up the class-method-scheme lookup so the call's static return type
 // is `int` (from `Adder.add : (int, int) -> int`), not blanket TAny.
 // That return then flows through `var s = now ...` into the
-// `var result: int = now br.delegate(...)` annotation.
+// `var result: int = now br.delegate(...) timeout 5000 else 0` annotation.
 
 class Adder {
   method add(x: int, y: int) -> int { return x + y; }
@@ -12,12 +12,12 @@ class Adder {
 
 class Bridge {
   method delegate(other: any, a: int, b: int) -> int {
-    var s = now other.add(a, b);   // s : int (from Adder.add scheme)
+    var s = now other.add(a, b) timeout 5000 else 0;   // s : int (from Adder.add scheme)
     return s;
   }
 }
 
 var ad = new Adder();
 var br = new Bridge();
-var result: int = now br.delegate(ad, 3, 4);
+var result: int = now br.delegate(ad, 3, 4) timeout 5000 else 0;
 print(result);

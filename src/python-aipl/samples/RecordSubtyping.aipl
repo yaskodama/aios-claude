@@ -35,7 +35,7 @@ var m = new Mailer();
 // both succeed because the intersected fields unify.
 var user = {name: "Alice", age: 30, email: "alice@example.com", role: "admin"};
 
-var hi = now g.greet(user);
-var note = now m.deliver(user);
+var hi = now g.greet(user) timeout 5000 else 0;
+var note = now m.deliver(user) timeout 5000 else 0;
 print(hi);
 print(note);

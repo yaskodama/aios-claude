@@ -17,6 +17,6 @@ class Reader {
 
 var rd = new Reader();
 var rec = {head: 7, tail: 100};
-var x = now rd.first(rec);
-var y = now rd.second(rec);
-var s = now rd.both(rec);
+var x = now rd.first(rec) timeout 5000 else 0;
+var y = now rd.second(rec) timeout 5000 else 0;
+var s = now rd.both(rec) timeout 5000 else 0;

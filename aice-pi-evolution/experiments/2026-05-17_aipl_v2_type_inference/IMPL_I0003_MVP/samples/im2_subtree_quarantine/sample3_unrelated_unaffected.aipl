@@ -14,18 +14,18 @@ class Worker {
 class Trunk {
   method live(label) {
     var w = new Worker();
-    var r = now w.id_self(label);
+    var r = now w.id_self(label) timeout 5000 else 0;
     reply(r);
   }
   method die() {
     var w = new Worker();
-    var r = now w.blow_up();
+    var r = now w.blow_up() timeout 5000 else 0;
     reply(r);
   }
 }
 
 var ta = new Trunk();
 var tb = new Trunk();
-var r1 = now ta.die();           // Tree A actors get quarantined
-var r2 = now tb.live("B");       // Tree B keeps running
+var r1 = now ta.die() timeout 5000 else 0;           // Tree A actors get quarantined
+var r2 = now tb.live("B") timeout 5000 else 0;       // Tree B keeps running
 println("driver done");

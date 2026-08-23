@@ -17,14 +17,14 @@ class Cache {
 
 class Worker {
   method tick(c) {
-    var n = now c.hit();
+    var n = now c.hit() timeout 5000 else 0;
     reply(n);
   }
 }
 
 var cache  = new Cache();
 var worker = new Worker();
-var a = now worker.tick(cache);
-var b = now worker.tick(cache);
-var c = now worker.tick(cache);
+var a = now worker.tick(cache) timeout 5000 else 0;
+var b = now worker.tick(cache) timeout 5000 else 0;
+var c = now worker.tick(cache) timeout 5000 else 0;
 println("tick count = ", c);

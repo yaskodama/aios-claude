@@ -14,5 +14,5 @@ class Greeter {
 
 var g = new Greeter();
 var user = {name: "Alice", age: 30, email: "alice@example.com"};
-var hi = now g.greet(user);
+var hi = now g.greet(user) timeout 5000 else 0;
 print("[ce13/1] " ++ hi);

@@ -94,9 +94,9 @@ class Philosopher {
 
       // --- try acquire low fork ---
       var send_lo = "SEND " ++ lo_fork ++ " acquire " ++ my_id;
-      var _ack1 = now coord.rpc(send_lo);
+      var _ack1 = now coord.rpc(send_lo) timeout 5000 else 0;
       sleep(0.025);
-      var q_lo = now coord.rpc("QUERY " ++ lo_fork ++ " 0");
+      var q_lo = now coord.rpc("QUERY " ++ lo_fork ++ " 0") timeout 5000 else 0;
       var want_lo = "value=" ++ my_id;
       var pos_lo = str_index(q_lo, want_lo);
       var got_lo = 0;
@@ -111,9 +111,9 @@ class Philosopher {
       } else {
         // --- try acquire high fork ---
         var send_hi = "SEND " ++ hi_fork ++ " acquire " ++ my_id;
-        var _ack2 = now coord.rpc(send_hi);
+        var _ack2 = now coord.rpc(send_hi) timeout 5000 else 0;
         sleep(0.025);
-        var q_hi = now coord.rpc("QUERY " ++ hi_fork ++ " 0");
+        var q_hi = now coord.rpc("QUERY " ++ hi_fork ++ " 0") timeout 5000 else 0;
         var want_hi = "value=" ++ my_id;
         var pos_hi = str_index(q_hi, want_hi);
         var got_hi = 0;
@@ -124,7 +124,7 @@ class Philosopher {
 
         if (got_hi == 0) {
           var rel1 = "SEND " ++ lo_fork ++ " release " ++ my_id;
-          var _r1 = now coord.rpc(rel1);
+          var _r1 = now coord.rpc(rel1) timeout 5000 else 0;
           sleep(0.030);
           send self.try_eat();
         } else {
@@ -134,8 +134,8 @@ class Philosopher {
           sleep(0.040);
           var rel_hi = "SEND " ++ hi_fork ++ " release " ++ my_id;
           var rel_lo = "SEND " ++ lo_fork ++ " release " ++ my_id;
-          var _r2 = now coord.rpc(rel_hi);
-          var _r3 = now coord.rpc(rel_lo);
+          var _r2 = now coord.rpc(rel_hi) timeout 5000 else 0;
+          var _r3 = now coord.rpc(rel_lo) timeout 5000 else 0;
           sleep(0.010);
           send self.try_eat();
         }
@@ -150,17 +150,17 @@ var coord = new Coordinator("127.0.0.1", 5555);
 
 // Sanity checks first.
 print("=== sanity ===");
-print("PING -> " ++ (now coord.rpc("PING")));
-print("LIST -> " ++ (now coord.rpc("LIST")));
+print("PING -> " ++ (now coord.rpc("PING") timeout 5000 else 0));
+print("LIST -> " ++ (now coord.rpc("LIST") timeout 5000 else 0));
 
 // Upload + compile + run a small AIPL source through Xinu's
 // in-kernel toolchain.  abclc subset: class + method + printf,
 // then main { new + send }.  Prints 7007 to UART0 on success.
 print("=== dynamic compile ===");
 var dyn_src = "class Greeter {\n  method run() {\n    printf(\"[dyn] hello from in-Xinu compile, x=%d\\n\", 7007);\n  }\n}\n\nmain {\n  new Greeter g;\n  send g.run();\n}\n";
-print("LOAD    -> " ++ (now coord.do_load("dyn", dyn_src)));
-print("COMPILE -> " ++ (now coord.rpc("COMPILE dyn")));
-print("RUN     -> " ++ (now coord.rpc("RUN dyn")));
+print("LOAD    -> " ++ (now coord.do_load("dyn", dyn_src) timeout 5000 else 0));
+print("COMPILE -> " ++ (now coord.rpc("COMPILE dyn") timeout 5000 else 0));
+print("RUN     -> " ++ (now coord.rpc("RUN dyn") timeout 5000 else 0));
 
 // Spawn 3 PC philosophers — each is a real AIPL actor running in
 // its own thread, all sharing `coord` for socket I/O.  P4 + P5 are

@@ -47,13 +47,13 @@ class Coordinator {
     print("");
 
     print("================== 1) プランナー (ホスト) ==================");
-    var plan = now planner.plan(problem);
+    var plan = now planner.plan(problem) timeout 5000 else 0;
     print(plan);
     print("");
 
     print("================== 2) ソルバー (ホスト) ==================");
     var ps = "問題:\n" ++ problem ++ "\n\n手順:\n" ++ plan;
-    var solution = now solver.solve(ps);
+    var solution = now solver.solve(ps) timeout 5000 else 0;
     print(solution);
     print("");
 

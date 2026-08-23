@@ -78,7 +78,7 @@ class Demo {
     send p.touch_hit();
     send p.touch_miss();
     send p.rename("admin");
-    var leaf: int = now p.peek_leaf();
+    var leaf: int = now p.peek_leaf() timeout 5000 else 0;
     print("peek leaf = " ++ leaf);
     send p.dump();
   }

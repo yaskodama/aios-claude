@@ -40,5 +40,5 @@ class Reporter {
 
 var counter  = new Counter();
 var reporter = new Reporter();
-var bumped   = now counter.bump(10);
-var done     = now reporter.announce(bumped);
+var bumped   = now counter.bump(10) timeout 5000 else 0;
+var done     = now reporter.announce(bumped) timeout 5000 else 0;

@@ -28,14 +28,14 @@ class Flaky {
 class Driver {
   method run() {
     var f = new Flaky();
-    var a = now f.boom();      // 1st: fails, quarantine fires
-    var b = now f.boom();      // 2nd-4th: skipped via quarantine
-    var c = now f.boom();
-    var d = now f.boom();
+    var a = now f.boom() timeout 5000 else 0;      // 1st: fails, quarantine fires
+    var b = now f.boom() timeout 5000 else 0;      // 2nd-4th: skipped via quarantine
+    var c = now f.boom() timeout 5000 else 0;
+    var d = now f.boom() timeout 5000 else 0;
     println("done");
     reply(0);
   }
 }
 
 var dr = new Driver();
-var rc = now dr.run();
+var rc = now dr.run() timeout 5000 else 0;

@@ -160,6 +160,21 @@ def _parse_signature(sig: str) -> Optional[list]:
             else:
                 optional_first = ParamSpec(chunk.strip(), "any", optional=True)
             s = s[end + 1:].lstrip(", ")
+    # 末尾の "[, end:int]" 形式も省略可能な引数である。
+    # ここを読めていなかったため、str_sub(s, i, j) が
+    # 「arity 3 vs declared [2]」で弾かれ、str_sub(s, i) は
+    # start の型が "int [, end:int]" という文字列になって不一致になっていた。
+    optional_last: Optional[ParamSpec] = None
+    lb = s.rfind("[")
+    if lb >= 0 and s.rstrip().endswith("]"):
+        chunk = s[lb + 1:s.rstrip().rfind("]")].strip().lstrip(",").strip()
+        if chunk:
+            if ":" in chunk:
+                n, _, t = chunk.partition(":")
+                optional_last = ParamSpec(n.strip(), t.strip(), optional=True)
+            else:
+                optional_last = ParamSpec(chunk.strip(), "any", optional=True)
+            s = s[:lb].rstrip().rstrip(",").rstrip()
     out: list = []
     if optional_first:
         out.append(optional_first)
@@ -171,6 +186,8 @@ def _parse_signature(sig: str) -> Optional[list]:
             out.append(ParamSpec(n.strip(), t.strip(), variadic=is_var))
         else:
             out.append(ParamSpec(body.strip(), "any", variadic=is_var))
+    if optional_last:
+        out.append(optional_last)
     return out
 
 
@@ -1676,7 +1693,10 @@ class TypeChecker:
         bindings: dict = {}
         # Strip optional first when its arity matches (caller passed extra arg).
         opt_first = specs[0] if specs and specs[0].optional else None
-        non_opt = specs[1:] if opt_first else specs[:]
+        rest = specs[1:] if opt_first else specs[:]
+        # 末尾の省略可能引数（str_sub(s, start [, end]) など）
+        opt_last = rest[-1] if rest and rest[-1].optional else None
+        non_opt = rest[:-1] if opt_last else rest
         # Detect variadic on the LAST non-optional param.
         if non_opt and non_opt[-1].variadic:
             v_param = non_opt[-1]
@@ -1700,14 +1720,23 @@ class TypeChecker:
         valid_arities = {n_required}
         if opt_first:
             valid_arities.add(n_required + 1)
+        if opt_last:
+            valid_arities.add(n_required + 1)
+            if opt_first:
+                valid_arities.add(n_required + 2)
         if len(args) not in valid_arities:
             self._issue(where, f"call to {label}: arity {len(args)} vs declared {sorted(valid_arities)}")
             return bindings
         offset = 0
-        if opt_first and len(args) == n_required + 1:
+        rest_args = list(args)
+        if opt_first and len(args) > n_required + (1 if opt_last else 0):
             self._check_arg(args[0], opt_first, env, where, label, bindings)
             offset = 1
-        self._check_required(args[offset:], non_opt, env, where, label, bindings)
+            rest_args = args[1:]
+        if opt_last and len(rest_args) == n_required + 1:
+            self._check_arg(rest_args[-1], opt_last, env, where, label, bindings)
+            rest_args = rest_args[:-1]
+        self._check_required(rest_args, non_opt, env, where, label, bindings)
         return bindings
 
     def _check_required(self, args: list, specs: list, env: dict,
@@ -1780,6 +1809,11 @@ class TypeChecker:
                     self._issue(where,
                         f"演算子 `{e.op}` の{side}が {t} である"
                         f"（is_ok で成否を見て value で取り出す）")
+            if e.op == "++":
+                # 文字列連結。結果は必ず string である。
+                # ここが抜けていて any に落ちていたため、
+                # `n ++ "x"` を int と宣言したメソッドが素通りしていた。
+                return "string"
             if e.op == "+":
                 if "string" in (l, r):    return "string"
                 if "float" in (l, r):     return "float"
