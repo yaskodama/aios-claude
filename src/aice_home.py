@@ -22,6 +22,11 @@ from urllib.parse import parse_qs, urlparse
 
 # repo root, derived from this file's location (src/aice_home.py)
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Py-I（Python 実装）の正典は test-bed 側にある。このリポジトリにも
+# src/python-aipl があるが、そちらは古い写しで、現行の AIPL を
+# 構文解析できない（資源の全体順序・セッション型などが入る前の版）。
+# AIPL のダッシュボードは正典の方を起動する。
+CANON = os.path.join(os.path.expanduser("~"), "test-bed", "aios-claude")
 
 # Server-side allowlist. Only these ids can be started; the launch command and
 # working directory are fixed here, never taken from the request.
@@ -73,9 +78,9 @@ TARGETS = [
         "addr": "127.0.0.1:8899/actors",
         "href": "http://127.0.0.1:8899/actors",
         "port": 8899,
-        "cwd": REPO,
+        "cwd": CANON,
         "cmd": "python3 src/python-aipl/aipl_main.py --dashboard 8899 "
-               "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.abcl",
+               "aice-pi-evolution/experiments/2026-05-27_dining_mac_xinu/local_diners.aipl",
     },
     {
         "id": "phil5",
@@ -222,11 +227,35 @@ TARGETS = [
         "cwd": os.path.join(os.path.expanduser("~"), "aipl_line_simulator"),
         "cmd": "python3 -m http.server 8022 --bind 127.0.0.1",
     },
+    {
+        "id": "g1",
+        "glyph": "G1",
+        "portlabel": ":8023/index.html",
+        "title": "Unitree G1 人型ロボット歩行 &mdash; 46 Xinu + LIPM/DCM 歩容 + Capability推論",
+        "desc": "実機 <b>Unitree G1</b>(全高130cm/35kg/<b>23関節</b>)相当の人型ロボットを Three.js で3D再現し、<b>AIPL のスクリプトで二足歩行</b>させる。<b>各関節に soft-Xinu 2台=計46</b>を接続し、メソッド本体から <b>Capability推論</b>で役割を導出(<code>JointMotor!{act,mut,net}</code> / <code>JointSensor!{net}</code> / <code>LegKinematics!{net}</code> / <code>SafetyActor!{fs,net}</code>)&mdash;<b>関節を駆動できるのは JointMotor だけ</b>で、歩行ループ本体は駆動権限を持たない。歩容は<b>線形倒立振子(LIPM)を DCM(発散成分)で後退再帰して解析的に解いた</b>もので数値積分なし、脚6関節は<b>解析解の逆運動学</b>(残差 10<sup>-13</sup>mm)。46 Xinu には<b>レート単調の応答時間解析</b> <code>R = C + &Sigma;&lceil;R/T&rceil;C</code> を実際に解いて <code>R &le; D</code> を判定(過負荷注入で締切超過を再現)。着地点・CoM・ZMP・捕捉点(DCM)・支持多角形を可視化し、<b>外乱を与えると捕捉点に基づいて踏み直して立て直す</b>。実機API <code>g1_joint_write/read</code> で駆動し、AIPL ソースは1行も変えずに実機へ向けられる。",
+        "addr": "127.0.0.1:8023/index.html",
+        "href": "http://127.0.0.1:8023/index.html",
+        "port": 8023,
+        "cwd": os.path.join(os.path.expanduser("~"), "aipl_humanoid_simulator"),
+        "cmd": "python3 -m http.server 8023 --bind 127.0.0.1",
+    },
+    {
+        "id": "othello",
+        "glyph": "Othello",
+        "portlabel": ":8099",
+        "title": "オセロ探索木 &mdash; 完全解析で実際に読んだ木",
+        "desc": "<b>6&times;6 盤オセロは後手(白)必勝</b>(黒16 対 白20、Feinstein 1993)。自作ソルバ(ビットボード+置換表+PVS)が <b>410億局面・33分11秒</b>(1コア)で再現した、その<b>探索木そのもの</b>を描く。縦が手数、横が兄弟の並び、<b>枝の太さはその先で実際に読んだ局面数</b>(対数)&mdash;細い枝ほどアルファ・ベータ法が早く刈った枝。<b>葉には終局の盤面</b>が並び、緑枠が終局(4&times;4 は94個)、黄枠は<b>置換表で値が既知</b>だったため読まずに済んだ節点。木の全体は保存できない(410億節点 &asymp; 1.85 TB)ので、<b>葉をクリックするとその局面から読み直して先を継ぎ足す</b>。ソルバを走らせながらの<b>実況</b>も可。",
+        "addr": "127.0.0.1:8099",
+        "href": "http://127.0.0.1:8099/",
+        "port": 8099,
+        "cwd": os.path.join(os.path.expanduser("~"), "othello6x6"),
+        "cmd": "python3 server.py 8099",
+    },
 ]
 TARGET_BY_ID = {t["id"]: t for t in TARGETS}
 
 # Targets shown in their own section above, not in the generic Dashboards grid.
-_ROBOT_IDS = {"milky", "rover", "mecharm", "dofbot"}
+_ROBOT_IDS = {"milky", "rover", "mecharm", "dofbot", "g1"}
 
 # id -> Popen for processes this portal launched (so we can stop them)
 _PROCS: dict[str, subprocess.Popen] = {}
@@ -558,6 +587,19 @@ _PAGE_TMPL = r"""<!doctype html>
      <button class="btn btn-start" data-start>Start</button>
      <button class="btn btn-stop" data-stop>Stop</button>
      <button class="btn btn-open" data-href="http://127.0.0.1:8022/index.html">Open &#8599;</button>
+    </div></div>
+  </div>
+  <div class="card" data-id="g1">
+   <div class="thumb"><span class="glyph">&#128694;</span><span class="port">:8023/index.html</span>
+    <span class="status" data-status><span class="led"></span><span class="txt">…</span></span></div>
+   <span class="arrow">&#8599;</span>
+   <div class="body"><h3>Unitree G1 人型ロボット歩行 &mdash; 46 Xinu + LIPM/DCM 歩容 + Capability推論</h3>
+    <p>実機 <b>Unitree G1</b>(全高130cm/35kg/<b>23関節</b>)相当の人型ロボットを Three.js で3D再現し、<b>AIPL のスクリプトで二足歩行</b>させる。<b>各関節に soft-Xinu 2台=計46</b>を接続し、メソッド本体から <b>Capability推論</b>で役割を導出(<code>JointMotor!{act,mut,net}</code> / <code>JointSensor!{net}</code> / <code>SafetyActor!{fs,net}</code>)&mdash;<b>関節を駆動できるのは JointMotor だけ</b>。歩容は<b>線形倒立振子を DCM で解析的に解いた</b>もの(数値積分なし)、脚は<b>解析解の逆運動学</b>。46 Xinu には<b>レート単調の応答時間解析</b>を実際に解いて締切を判定。着地点・CoM・ZMP・捕捉点・支持多角形を可視化し、<b>外乱を与えると踏み直して立て直す</b>。</p>
+    <span class="addr">127.0.0.1:8023/index.html</span>
+    <div class="controls">
+     <button class="btn btn-start" data-start>Start</button>
+     <button class="btn btn-stop" data-stop>Stop</button>
+     <button class="btn btn-open" data-href="http://127.0.0.1:8023/index.html">Open &#8599;</button>
     </div></div>
   </div>
  </div>
