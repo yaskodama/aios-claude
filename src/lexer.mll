@@ -26,6 +26,8 @@ rule token = parse
 | [' ' '\t']+                       { token lexbuf }
 
   (* --- キーワード/記号 --- *)
+| "true"       { TRUE }
+| "false"      { FALSE }
 | "class"      { CLASS }
 | "priority"   { PRIORITY }
 | "become"     { BECOME }
@@ -56,11 +58,14 @@ rule token = parse
 | "->"         { ARROW }
 | "=="         { EQ }
 | "!="         { NEQ }
+| "!"          { BANG }        (* 効果注釈 !{ai, net} *)
+| "@"          { AT }          (* 義務レベル注釈 m() : T @ 3 *)
 | ">="         { GE }
 | "<="         { LE }
 | ">"          { GT }
 | "<"          { LT }
 | "="          { ASSIGN }
+| "++"         { PLUSPLUS }   (* 文字列連結。最長一致のため "+" より前に置く *)
 | "+"          { PLUS }
 | "-"          { MINUS }
 | "*"          { TIMES }

@@ -27,6 +27,10 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %token EOF NEW
 %token VAR EQ NEQ DOT BECOME FUNCTION RETURN
 %token WHERE AND_KW OR_KW NOT_KW   /* O-2.a: refinement-type predicates */
+%token PLUSPLUS      /* ++ ... 文字列連結（正典 AIPL の表層構文） */
+%token BANG          /* !  ... 効果注釈 !{...} */
+%token AT            /* @  ... 義務レベル注釈 */
+%token TRUE FALSE    /* 真偽値リテラル */
 /* Precedence and associativity, lowest to highest.
    Aim: keep the grammar at exactly one shift/reduce conflict —
    the canonical "dangling else" (IF ... stmt vs IF ... stmt ELSE stmt).
@@ -36,6 +40,7 @@ let mk_stmt1 i d : Ast.stmt = { sloc = loc_of_rhs i; sdesc = d }
 %nonassoc ELSE
 %left EQ NEQ              /* equality:   a == b == c parses ((a==b)==c) */
 %left LT GT LE GE         /* relational: a < b < c   parses ((a<b)<c) */
+%left PLUSPLUS            /* 文字列連結。比較より強く加減より弱い（正典と同じ） */
 %left PLUS MINUS          /* additive */
 %left TIMES DIV           /* multiplicative */
 %left DOT LBRACK          /* postfix access — tightest */
@@ -125,10 +130,10 @@ methods:
   | method_decl methods { $1 :: $2 }
 
 method_decl:
-  | METHOD ID LPAREN annot_param_list RPAREN method_ret_opt LBRACE stmts RBRACE
+  | METHOD ID LPAREN annot_param_list RPAREN method_ret_opt opt_level_ign opt_eff_ign LBRACE stmts_opt RBRACE
     { let (names, tys) = List.split $4 in
       { mname = $2; params = names; param_types = tys; ret_ty = $6;
-        body = mk_stmt1 2 (Seq $8) } }
+        body = mk_stmt1 2 (Seq $10) } }
 
 annot_param:
   | ID                          { ($1, None) }
@@ -142,6 +147,24 @@ annot_param_list:
 method_ret_opt:
   |                              { None }
   | ARROW type_expr              { Some $2 }
+  | COLON type_expr              { Some $2 }   /* 正典 AIPL の `method m() : T` */
+
+/* 義務レベル `@ 3` と効果注釈 `!{ai, net}`。
+   Xinu バックエンドは配置と実行だけを担うので、ここでは構文として受理して
+   読み飛ばす（意味検査は正典の実装が担う）。「黙って落とす」のではなく
+   「受理して無視する」ことを規則名で明示しておく。 */
+opt_level_ign:
+  |                              { () }
+  | AT INTLIT                    { ignore $2 }
+
+opt_eff_ign:
+  |                              { () }
+  | BANG LBRACE RBRACE           { () }
+  | BANG LBRACE eff_id_list RBRACE { ignore $3 }
+
+eff_id_list:
+  | ID                           { [$1] }
+  | ID COMMA eff_id_list         { $1 :: $3 }
 
 type_expr:
   | ID                                  { match $1 with
@@ -219,6 +242,12 @@ stmts:
   | stmt { [$1] }
   | stmt stmts { $1 :: $2 }
 
+/* 空のメソッド本体 `{ }` を許す（正典 AIPL は許す）。stmts 自体を空可能に
+   すると他所で衝突するので、本体位置専用の規則として分けてある。 */
+stmts_opt:
+  |       { [] }
+  | stmts { $1 }
+
 stmt_list:
   | stmt stmt_list { $1::$2 }
   |                { [] }
@@ -294,9 +323,12 @@ expr:
   | FLOATLIT { mk_expr1 1 (Float $1) }
   | STRINGLIT { mk_expr1 1 (String $1) }
   | INTLIT { mk_expr1 1 (Int $1) }
+  | TRUE   { mk_expr1 1 (Int 1) }   /* Xinu バックエンドは真偽値を int で表す */
+  | FALSE  { mk_expr1 1 (Int 0) }
   | ID { mk_expr1 1 (Var $1) }
   | SELF { mk_expr1 1 (Var "self") }
   | SENDER { mk_expr1 1 (Var "sender") }
+  | expr PLUSPLUS expr { mk_expr1 2 (Binop ("+", $1, $3)) }   /* ++ は既存の文字列連結 + に写す */
   | expr PLUS expr { mk_expr1 2 (Binop ("+", $1, $3)) }
   | expr MINUS expr { mk_expr1 2 (Binop ("-", $1, $3)) }
   | expr TIMES expr { mk_expr1 2 (Binop ("*", $1, $3)) }
